@@ -1,0 +1,13 @@
+{
+  "itemGroup.duelcraft": "Example Mod Tab",
+  "block.duelcraft.example_block": "Example Block",
+  "item.duelcraft.example_item": "Example Item",
+
+  "duelcraft.configuration.title": "Duelcraft Configs",
+  "duelcraft.configuration.section.duelcraft.common.toml": "Duelcraft Configs",
+  "duelcraft.configuration.section.duelcraft.common.toml.title": "Duelcraft Configs",
+  "duelcraft.configuration.items": "Item List",
+  "duelcraft.configuration.logDirtBlock": "Log Dirt Block",
+  "duelcraft.configuration.magicNumberIntroduction": "Magic Number Text",
+  "duelcraft.configuration.magicNumber": "Magic Number"
+}
