@@ -1,0 +1,3 @@
+[submodule "native/ygopro-core"]
+	path = native/ygopro-core
+	url = https://github.com/edo9300/ygopro-core
