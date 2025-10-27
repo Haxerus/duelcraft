@@ -24,3 +24,17 @@ runs
 run-data
 
 repo
+
+# native
+*.dll
+*.so
+*.dylib
+*.obj
+*.o
+*.a
+*.lib
+
+# IDE
+.cursor/rules/
+.cursorignore
+.vscode/
