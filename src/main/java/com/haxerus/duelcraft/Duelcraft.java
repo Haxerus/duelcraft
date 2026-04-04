@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft;
 
+import com.haxerus.duelcraft.core.OcgCore;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -30,6 +31,8 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
+import java.util.Arrays;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(Duelcraft.MODID)
@@ -99,6 +102,9 @@ public class Duelcraft {
         LOGGER.info("{}{}", Config.MAGIC_NUMBER_INTRODUCTION.get(), Config.MAGIC_NUMBER.getAsInt());
 
         Config.ITEM_STRINGS.get().forEach((item) -> LOGGER.info("ITEM >> {}", item));
+
+        int[] version = OcgCore.nGetVersion();
+        LOGGER.info(Arrays.toString(version));
     }
 
     // Add the example block item to the building blocks tab

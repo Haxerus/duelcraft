@@ -34,7 +34,7 @@ base {
     archivesName = mod_id
 }
 
-// --- Native Build (ygopro-core) ---
+// --- Native Build ---
 
 // Locate MSBuild from Visual Studio 2022
 def findMSBuild() {
@@ -48,19 +48,36 @@ def findMSBuild() {
         def msbuild = file("${base}/Msbuild/Current/Bin/MSBuild.exe")
         if (msbuild.exists()) return msbuild.absolutePath
     }
-    // Fallback: assume it's on PATH
     return 'MSBuild.exe'
 }
 
-def nativeSrcDir = file('native/ygopro-core')
-def nativeBuildDir = file('native/ygopro-core/build')
-def nativeOutputDir = file('native/ygopro-core/bin/x64/release')
+// Locate CMake from Visual Studio 2022
+def findCMake() {
+    def vsBasePaths = [
+        'C:/Program Files/Microsoft Visual Studio/2022/Community',
+        'C:/Program Files/Microsoft Visual Studio/2022/Professional',
+        'C:/Program Files/Microsoft Visual Studio/2022/Enterprise',
+        'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools',
+    ]
+    for (base in vsBasePaths) {
+        def cmake = file("${base}/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe")
+        if (cmake.exists()) return cmake.absolutePath
+    }
+    return 'cmake'
+}
+
 def nativeDestDir = file('src/main/resources/natives/windows-x86_64')
 
-tasks.register('buildNative', Exec) {
+// --- ocgcore (ygopro-core shared library) ---
+
+def ocgcoreSrcDir = file('native/ygopro-core')
+def ocgcoreBuildDir = file('native/ygopro-core/build')
+def ocgcoreOutputDir = file('native/ygopro-core/bin/x64/release')
+
+tasks.register('buildOcgcore', Exec) {
     description = 'Build ocgcore shared library (Windows x64 Release)'
     group = 'native'
-    workingDir = nativeBuildDir
+    workingDir = ocgcoreBuildDir
     commandLine findMSBuild(),
         'ocgcoreshared.vcxproj',
         '-p:Configuration=Release',
@@ -68,25 +85,17 @@ tasks.register('buildNative', Exec) {
         '-t:Build',
         '-v:minimal'
 
-    inputs.files(fileTree(nativeSrcDir) {
+    inputs.files(fileTree(ocgcoreSrcDir) {
         include '*.cpp', '*.h', '**/*.cpp', '**/*.h', '**/*.c'
         exclude 'build/**', 'bin/**'
     })
-    outputs.file("${nativeOutputDir}/ocgcore.dll")
+    outputs.file("${ocgcoreOutputDir}/ocgcore.dll")
 }
 
-tasks.register('copyNative', Copy) {
-    description = 'Copy ocgcore.dll into mod resources for JAR bundling'
+tasks.register('cleanOcgcore', Exec) {
+    description = 'Clean ocgcore build artifacts'
     group = 'native'
-    dependsOn 'buildNative'
-    from("${nativeOutputDir}/ocgcore.dll")
-    into nativeDestDir
-}
-
-tasks.register('cleanNative', Exec) {
-    description = 'Clean native build artifacts'
-    group = 'native'
-    workingDir = nativeBuildDir
+    workingDir = ocgcoreBuildDir
     commandLine findMSBuild(),
         'ocgcoreshared.vcxproj',
         '-p:Configuration=Release',
@@ -95,12 +104,68 @@ tasks.register('cleanNative', Exec) {
         '-v:minimal'
 }
 
+// --- duelcraft_jni (JNI bridge library) ---
+
+def jniBridgeSrcDir = file('native/jni-bridge')
+def jniBridgeBuildDir = file('native/jni-bridge/build')
+def jniBridgeOutputDir = file('native/jni-bridge/build/Release')
+
+tasks.register('configureJniBridge', Exec) {
+    description = 'Configure JNI bridge CMake project'
+    group = 'native'
+    workingDir = jniBridgeBuildDir
+    commandLine findCMake(),
+        '..',
+        '-G', 'Visual Studio 17 2022',
+        '-A', 'x64'
+
+    inputs.file("${jniBridgeSrcDir}/CMakeLists.txt")
+    outputs.file("${jniBridgeBuildDir}/duelcraft_jni.vcxproj")
+
+    doFirst {
+        mkdir jniBridgeBuildDir
+    }
+}
+
+tasks.register('buildJniBridge', Exec) {
+    description = 'Build JNI bridge shared library (Windows x64 Release)'
+    group = 'native'
+    dependsOn 'buildOcgcore', 'configureJniBridge'
+    workingDir = jniBridgeBuildDir
+    commandLine findCMake(),
+        '--build', '.',
+        '--config', 'Release'
+
+    inputs.files(fileTree(jniBridgeSrcDir) {
+        include 'src/**', 'include/**', 'CMakeLists.txt'
+    })
+    inputs.file("${ocgcoreOutputDir}/ocgcore.dll")
+    outputs.file("${jniBridgeOutputDir}/duelcraft_jni.dll")
+}
+
+tasks.register('cleanJniBridge', Delete) {
+    description = 'Clean JNI bridge build artifacts'
+    group = 'native'
+    delete jniBridgeBuildDir
+}
+
+// --- Copy both DLLs into mod resources ---
+
+tasks.register('copyNative', Copy) {
+    description = 'Copy native DLLs into mod resources for JAR bundling'
+    group = 'native'
+    dependsOn 'buildOcgcore', 'buildJniBridge'
+    from("${ocgcoreOutputDir}/ocgcore.dll")
+    from("${jniBridgeOutputDir}/duelcraft_jni.dll")
+    into nativeDestDir
+}
+
 // Wire native build into the Java build lifecycle
 tasks.named('processResources').configure {
     dependsOn 'copyNative'
 }
 
-clean.dependsOn 'cleanNative'
+clean.dependsOn 'cleanOcgcore', 'cleanJniBridge'
 
 // Mojang ships Java 21 to end users in 1.21.11, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
