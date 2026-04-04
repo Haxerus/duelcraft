@@ -1,6 +1,8 @@
 package com.haxerus.duelcraft;
 
-import com.haxerus.duelcraft.core.OcgCore;
+import com.haxerus.duelcraft.server.DuelManager;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
@@ -32,7 +34,8 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(Duelcraft.MODID)
@@ -83,6 +86,8 @@ public class Duelcraft {
         // Note that this is necessary if and only if we want *this* class (Duelcraft) to respond directly to events.
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.addListener(DuelManager::onServerStarting);
+        NeoForge.EVENT_BUS.addListener(DuelManager::onServerStopped);
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
@@ -100,11 +105,6 @@ public class Duelcraft {
         }
 
         LOGGER.info("{}{}", Config.MAGIC_NUMBER_INTRODUCTION.get(), Config.MAGIC_NUMBER.getAsInt());
-
-        Config.ITEM_STRINGS.get().forEach((item) -> LOGGER.info("ITEM >> {}", item));
-
-        int[] version = OcgCore.nGetVersion();
-        LOGGER.info(Arrays.toString(version));
     }
 
     // Add the example block item to the building blocks tab

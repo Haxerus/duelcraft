@@ -30,13 +30,21 @@ public class Config {
             .define("magicNumberIntroduction", "The magic number is... ");
 
     // a list of strings that are treated as resource locations for items
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
-            .comment("A list of items to log on common setup.")
-            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "", Config::validateItemName);
+//    public static final ModConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
+//            .comment("A list of items to log on common setup.")
+//            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "",);
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> CARD_DATABASE_PATHS = BUILDER
+            .comment("Paths to your Yu-Gi-Oh! card database files")
+            .defineList("dbPaths", List.of("C:/ProjectIgnis/expansions/cards.cdb"), () -> "",  Config::validateNonEmpty);
+
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> SCRIPT_SEARCH_PATHS = BUILDER
+            .comment("Paths to your Yu-Gi-Oh! card script files")
+            .defineList("scriptPaths", List.of("C:/ProjectIgnis/script;C:/ProjectIgnis/script/official"), () -> "",  Config::validateNonEmpty);
 
     static final ModConfigSpec SPEC = BUILDER.build();
 
-    private static boolean validateItemName(final Object obj) {
-        return obj instanceof String itemName && BuiltInRegistries.ITEM.containsKey(Identifier.parse(itemName));
+    private static boolean validateNonEmpty(final Object obj) {
+        return obj instanceof String path && !path.isEmpty();
     }
 }
