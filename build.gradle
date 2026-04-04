@@ -251,27 +251,22 @@ configurations {
 }
 
 dependencies {
-    // Example optional mod dependency with JEI
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
-    // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
-    // We add the full version to localRuntime, not runtimeOnly, so that we do not publish a dependency on it
-    // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
 
-    // Example mod dependency using a mod jar from ./libs with a flat dir repository
-    // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
-    // The group id is ignored when searching -- in this case, it is "blank"
-    // implementation "blank:coolmod-${mc_version}:${coolmod_version}"
+// --- JNI Test Configuration ---
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    dependsOn 'copyNative'
 
-    // Example mod dependency using a file as dependency
-    // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
+    // Make native DLLs discoverable via java.library.path
+    def nativeLibDir = file('src/main/resources/natives/windows-x86_64')
+    jvmArgs "-Djava.library.path=${nativeLibDir.absolutePath}"
 
-    // Example project dependency using a sister or child project:
-    // implementation project(":myproject")
-
-    // For more info:
-    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
-    // http://www.gradle.org/docs/current/userguide/dependency_management.html
+    // Pass EDOPro data paths as system properties for tests to use
+    systemProperty 'duelcraft.test.dbPath', 'C:/ProjectIgnis/expansions/cards.cdb'
+    systemProperty 'duelcraft.test.scriptPaths', 'C:/ProjectIgnis/script;C:/ProjectIgnis/script/official'
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

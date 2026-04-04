@@ -12,6 +12,20 @@ public final class NativeLoader {
 
     private NativeLoader() {}
 
+    private static boolean tryLoadFromLibraryPath(String[] libs) {
+        try {
+            for (String lib : libs) {
+                // Strip platform prefix/suffix to get the base name for System.loadLibrary
+                String name = lib.replaceFirst("^lib", "")
+                                 .replaceFirst("\\.(dll|so|dylib)$", "");
+                System.loadLibrary(name);
+            }
+            return true;
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
+    }
+
     public static synchronized void load() {
         if (loaded) return;
 
@@ -32,11 +46,19 @@ public final class NativeLoader {
                     "Unsupported platform: " + os + " " + arch);
         }
 
+        // First, try loading from java.library.path (works in dev/test environments
+        // where the DLLs are on disk, not inside a JAR)
+        boolean loadedFromPath = tryLoadFromLibraryPath(libs);
+        if (loadedFromPath) {
+            loaded = true;
+            return;
+        }
+
+        // Otherwise, extract from JAR resources to a temp directory
         try {
             Path tempDir = Files.createTempDirectory("duelcraft-natives");
             tempDir.toFile().deleteOnExit();
 
-            // Load in order: ocgcore first, then the JNI bridge that depends on it
             for (String lib : libs) {
                 String resourcePath = "/natives/" + platform + "/" + lib;
                 Path extractedPath = tempDir.resolve(lib);
