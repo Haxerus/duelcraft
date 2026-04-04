@@ -1,4 +1,334 @@
 package com.haxerus.duelcraft.duel.message;
 
-public class DuelMessage {
+import java.util.List;
+
+import static com.haxerus.duelcraft.core.OcgConstants.*;
+
+/**
+ * Sealed interface representing a parsed duel message from ygopro-core.
+ * Each message type is a record with the relevant fields already extracted.
+ * Use {@code instanceof} pattern matching to handle specific types.
+ */
+public sealed interface DuelMessage {
+
+    /** The MSG_* constant identifying this message type. */
+    int type();
+
+    /** Fallback for messages we don't parse yet. Carries the raw body bytes. */
+    record Raw(int type, byte[] body) implements DuelMessage {}
+
+    // ---- Lifecycle ----
+
+    record Start(int playerType, int lp0, int lp1,
+                 int deckCount0, int extraCount0,
+                 int deckCount1, int extraCount1) implements DuelMessage {
+        public int type() { return MSG_START; }
+    }
+
+    record Win(int winner, int reason) implements DuelMessage {
+        public int type() { return MSG_WIN; }
+    }
+
+    record NewTurn(int player) implements DuelMessage {
+        public int type() { return MSG_NEW_TURN; }
+    }
+
+    record NewPhase(int phase) implements DuelMessage {
+        public int type() { return MSG_NEW_PHASE; }
+    }
+
+    // ---- Card Movement ----
+
+    record Draw(int player, List<Integer> codes) implements DuelMessage {
+        public int type() { return MSG_DRAW; }
+    }
+
+    record Move(int code, LocInfo from, LocInfo to, int reason) implements DuelMessage {
+        public int type() { return MSG_MOVE; }
+    }
+
+    record PosChange(int code, int controller, int location, int sequence,
+                     int prevPosition, int newPosition) implements DuelMessage {
+        public int type() { return MSG_POS_CHANGE; }
+    }
+
+    record Set(int code, LocInfo location) implements DuelMessage {
+        public int type() { return MSG_SET; }
+    }
+
+    record Swap(int code1, LocInfo loc1, int code2, LocInfo loc2) implements DuelMessage {
+        public int type() { return MSG_SWAP; }
+    }
+
+    // ---- Summons ----
+
+    record Summoning(int code, LocInfo location) implements DuelMessage {
+        public int type() { return MSG_SUMMONING; }
+    }
+
+    record Summoned() implements DuelMessage {
+        public int type() { return MSG_SUMMONED; }
+    }
+
+    record SpSummoning(int code, LocInfo location) implements DuelMessage {
+        public int type() { return MSG_SPSUMMONING; }
+    }
+
+    record SpSummoned() implements DuelMessage {
+        public int type() { return MSG_SPSUMMONED; }
+    }
+
+    record FlipSummoning(int code, LocInfo location) implements DuelMessage {
+        public int type() { return MSG_FLIPSUMMONING; }
+    }
+
+    record FlipSummoned() implements DuelMessage {
+        public int type() { return MSG_FLIPSUMMONED; }
+    }
+
+    // ---- Chain ----
+
+    record Chaining(int code, LocInfo location, int chainIndex,
+                    long desc, int chainCount) implements DuelMessage {
+        public int type() { return MSG_CHAINING; }
+    }
+
+    record Chained(int chainIndex) implements DuelMessage {
+        public int type() { return MSG_CHAINED; }
+    }
+
+    record ChainSolving(int chainIndex) implements DuelMessage {
+        public int type() { return MSG_CHAIN_SOLVING; }
+    }
+
+    record ChainSolved(int chainIndex) implements DuelMessage {
+        public int type() { return MSG_CHAIN_SOLVED; }
+    }
+
+    record ChainEnd() implements DuelMessage {
+        public int type() { return MSG_CHAIN_END; }
+    }
+
+    record ChainNegated(int chainIndex) implements DuelMessage {
+        public int type() { return MSG_CHAIN_NEGATED; }
+    }
+
+    record ChainDisabled(int chainIndex) implements DuelMessage {
+        public int type() { return MSG_CHAIN_DISABLED; }
+    }
+
+    // ---- LP ----
+
+    record Damage(int player, int amount) implements DuelMessage {
+        public int type() { return MSG_DAMAGE; }
+    }
+
+    record Recover(int player, int amount) implements DuelMessage {
+        public int type() { return MSG_RECOVER; }
+    }
+
+    record LpUpdate(int player, int lp) implements DuelMessage {
+        public int type() { return MSG_LPUPDATE; }
+    }
+
+    record PayLpCost(int player, int amount) implements DuelMessage {
+        public int type() { return MSG_PAY_LPCOST; }
+    }
+
+    // ---- Battle ----
+
+    record Attack(LocInfo attacker, LocInfo target) implements DuelMessage {
+        public int type() { return MSG_ATTACK; }
+    }
+
+    record Battle(LocInfo attacker, int atkAtk, int atkDef,
+                  LocInfo defender, int defAtk, int defDef) implements DuelMessage {
+        public int type() { return MSG_BATTLE; }
+    }
+
+    record AttackDisabled() implements DuelMessage {
+        public int type() { return MSG_ATTACK_DISABLED; }
+    }
+
+    record DamageStepStart() implements DuelMessage {
+        public int type() { return MSG_DAMAGE_STEP_START; }
+    }
+
+    record DamageStepEnd() implements DuelMessage {
+        public int type() { return MSG_DAMAGE_STEP_END; }
+    }
+
+    // ---- Deck/Hand ----
+
+    record ShuffleDeck(int player) implements DuelMessage {
+        public int type() { return MSG_SHUFFLE_DECK; }
+    }
+
+    record ShuffleHand(int player, List<Integer> codes) implements DuelMessage {
+        public int type() { return MSG_SHUFFLE_HAND; }
+    }
+
+    record ShuffleExtra(int player) implements DuelMessage {
+        public int type() { return MSG_SHUFFLE_EXTRA; }
+    }
+
+    // ---- UI / Info ----
+
+    record Hint(int hintType, int player, long data) implements DuelMessage {
+        public int type() { return MSG_HINT; }
+    }
+
+    record CardHint(int code, LocInfo location, int chintType, long value) implements DuelMessage {
+        public int type() { return MSG_CARD_HINT; }
+    }
+
+    record FieldDisabled(int field) implements DuelMessage {
+        public int type() { return MSG_FIELD_DISABLED; }
+    }
+
+    record BecomeTarget(List<LocInfo> targets) implements DuelMessage {
+        public int type() { return MSG_BECOME_TARGET; }
+    }
+
+    // ---- Selection (prompts that require a player response) ----
+
+    /** Main phase action menu. Raw body preserved for response building. */
+    record SelectIdleCmd(int player, byte[] rawBody) implements DuelMessage {
+        public int type() { return MSG_SELECT_IDLECMD; }
+    }
+
+    /** Battle phase action menu. Raw body preserved for response building. */
+    record SelectBattleCmd(int player, byte[] rawBody) implements DuelMessage {
+        public int type() { return MSG_SELECT_BATTLECMD; }
+    }
+
+    record SelectCard(int player, boolean cancelable, int min, int max,
+                      List<CardInfo> cards) implements DuelMessage {
+        public int type() { return MSG_SELECT_CARD; }
+    }
+
+    record SelectChain(int player, int count, boolean forced,
+                       byte[] rawBody) implements DuelMessage {
+        public int type() { return MSG_SELECT_CHAIN; }
+    }
+
+    record SelectEffectYn(int player, int code, LocInfo location,
+                          long desc) implements DuelMessage {
+        public int type() { return MSG_SELECT_EFFECTYN; }
+    }
+
+    record SelectYesNo(int player, long desc) implements DuelMessage {
+        public int type() { return MSG_SELECT_YESNO; }
+    }
+
+    record SelectOption(int player, List<Long> options) implements DuelMessage {
+        public int type() { return MSG_SELECT_OPTION; }
+    }
+
+    record SelectPlace(int player, int count, int field) implements DuelMessage {
+        public int type() { return MSG_SELECT_PLACE; }
+    }
+
+    record SelectPosition(int player, int code, int positions) implements DuelMessage {
+        public int type() { return MSG_SELECT_POSITION; }
+    }
+
+    record SelectTribute(int player, boolean cancelable, int min, int max,
+                         List<CardInfo> cards) implements DuelMessage {
+        public int type() { return MSG_SELECT_TRIBUTE; }
+    }
+
+    record SelectCounter(int player, int counterType, int count,
+                         List<CardInfo> cards) implements DuelMessage {
+        public int type() { return MSG_SELECT_COUNTER; }
+    }
+
+    record SelectSum(int player, boolean mustExact, int totalSum,
+                     int min, int max, byte[] rawBody) implements DuelMessage {
+        public int type() { return MSG_SELECT_SUM; }
+    }
+
+    record SelectUnselectCard(int player, boolean finishable, boolean cancelable,
+                              int min, int max, List<CardInfo> selectableCards,
+                              List<CardInfo> unselectableCards) implements DuelMessage {
+        public int type() { return MSG_SELECT_UNSELECT_CARD; }
+    }
+
+    record SortCard(int player, List<CardInfo> cards) implements DuelMessage {
+        public int type() { return MSG_SORT_CARD; }
+    }
+
+    record SortChain(int player, List<CardInfo> cards) implements DuelMessage {
+        public int type() { return MSG_SORT_CHAIN; }
+    }
+
+    record AnnounceRace(int player, int count, long available) implements DuelMessage {
+        public int type() { return MSG_ANNOUNCE_RACE; }
+    }
+
+    record AnnounceAttrib(int player, int count, int available) implements DuelMessage {
+        public int type() { return MSG_ANNOUNCE_ATTRIB; }
+    }
+
+    record AnnounceNumber(int player, List<Long> options) implements DuelMessage {
+        public int type() { return MSG_ANNOUNCE_NUMBER; }
+    }
+
+    record AnnounceCard(int player, byte[] rawBody) implements DuelMessage {
+        public int type() { return MSG_ANNOUNCE_CARD; }
+    }
+
+    record RockPaperScissors(int player) implements DuelMessage {
+        public int type() { return MSG_ROCK_PAPER_SCISSORS; }
+    }
+
+    // ---- Misc Action ----
+
+    record Equip(LocInfo card, LocInfo target) implements DuelMessage {
+        public int type() { return MSG_EQUIP; }
+    }
+
+    record Unequip(LocInfo card) implements DuelMessage {
+        public int type() { return MSG_UNEQUIP; }
+    }
+
+    record CardTarget(LocInfo card, LocInfo target) implements DuelMessage {
+        public int type() { return MSG_CARD_TARGET; }
+    }
+
+    record CancelTarget(LocInfo card, LocInfo target) implements DuelMessage {
+        public int type() { return MSG_CANCEL_TARGET; }
+    }
+
+    record AddCounter(int counterType, int player, LocInfo location,
+                      int count) implements DuelMessage {
+        public int type() { return MSG_ADD_COUNTER; }
+    }
+
+    record RemoveCounter(int counterType, int player, LocInfo location,
+                         int count) implements DuelMessage {
+        public int type() { return MSG_REMOVE_COUNTER; }
+    }
+
+    record TossCoin(int player, List<Integer> results) implements DuelMessage {
+        public int type() { return MSG_TOSS_COIN; }
+    }
+
+    record TossDice(int player, List<Integer> results) implements DuelMessage {
+        public int type() { return MSG_TOSS_DICE; }
+    }
+
+    // ---- Shared sub-record for cards within selection messages ----
+
+    record CardInfo(int code, int controller, int location, int sequence, int position) {
+        public static CardInfo read(BufferReader reader) {
+            return new CardInfo(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readInt32(),
+                reader.readInt32()
+            );
+        }
+    }
 }
