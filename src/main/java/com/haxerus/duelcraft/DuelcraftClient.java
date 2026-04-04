@@ -11,11 +11,11 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
-@Mod(value = duelcraft.MODID, dist = Dist.CLIENT)
+@Mod(value = Duelcraft.MODID, dist = Dist.CLIENT)
 // You can use EventBusSubscriber to automatically register all static methods in the class annotated with @SubscribeEvent
-@EventBusSubscriber(modid = duelcraft.MODID, value = Dist.CLIENT)
-public class duelcraftClient {
-    public duelcraftClient(ModContainer container) {
+@EventBusSubscriber(modid = Duelcraft.MODID, value = Dist.CLIENT)
+public class DuelcraftClient {
+    public DuelcraftClient(ModContainer container) {
         // Allows NeoForge to create a config screen for this mod's configs.
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
         // Do not forget to add translations for your config options to the en_us.json file.
@@ -25,7 +25,7 @@ public class duelcraftClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         // Some client setup code
-        duelcraft.LOGGER.info("HELLO FROM CLIENT SETUP");
-        duelcraft.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+        Duelcraft.LOGGER.info("HELLO FROM CLIENT SETUP");
+        Duelcraft.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
     }
 }
