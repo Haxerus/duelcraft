@@ -32,6 +32,9 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Native Build Artifacts ###
+src/main/resources/natives/
+
 ### Minecraft Modding ###
 run/
 !**/src/**/run/

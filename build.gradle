@@ -34,6 +34,74 @@ base {
     archivesName = mod_id
 }
 
+// --- Native Build (ygopro-core) ---
+
+// Locate MSBuild from Visual Studio 2022
+def findMSBuild() {
+    def vsBasePaths = [
+        'C:/Program Files/Microsoft Visual Studio/2022/Community',
+        'C:/Program Files/Microsoft Visual Studio/2022/Professional',
+        'C:/Program Files/Microsoft Visual Studio/2022/Enterprise',
+        'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools',
+    ]
+    for (base in vsBasePaths) {
+        def msbuild = file("${base}/Msbuild/Current/Bin/MSBuild.exe")
+        if (msbuild.exists()) return msbuild.absolutePath
+    }
+    // Fallback: assume it's on PATH
+    return 'MSBuild.exe'
+}
+
+def nativeSrcDir = file('native/ygopro-core')
+def nativeBuildDir = file('native/ygopro-core/build')
+def nativeOutputDir = file('native/ygopro-core/bin/x64/release')
+def nativeDestDir = file('src/main/resources/natives/windows-x86_64')
+
+tasks.register('buildNative', Exec) {
+    description = 'Build ocgcore shared library (Windows x64 Release)'
+    group = 'native'
+    workingDir = nativeBuildDir
+    commandLine findMSBuild(),
+        'ocgcoreshared.vcxproj',
+        '-p:Configuration=Release',
+        '-p:Platform=x64',
+        '-t:Build',
+        '-v:minimal'
+
+    inputs.files(fileTree(nativeSrcDir) {
+        include '*.cpp', '*.h', '**/*.cpp', '**/*.h', '**/*.c'
+        exclude 'build/**', 'bin/**'
+    })
+    outputs.file("${nativeOutputDir}/ocgcore.dll")
+}
+
+tasks.register('copyNative', Copy) {
+    description = 'Copy ocgcore.dll into mod resources for JAR bundling'
+    group = 'native'
+    dependsOn 'buildNative'
+    from("${nativeOutputDir}/ocgcore.dll")
+    into nativeDestDir
+}
+
+tasks.register('cleanNative', Exec) {
+    description = 'Clean native build artifacts'
+    group = 'native'
+    workingDir = nativeBuildDir
+    commandLine findMSBuild(),
+        'ocgcoreshared.vcxproj',
+        '-p:Configuration=Release',
+        '-p:Platform=x64',
+        '-t:Clean',
+        '-v:minimal'
+}
+
+// Wire native build into the Java build lifecycle
+tasks.named('processResources').configure {
+    dependsOn 'copyNative'
+}
+
+clean.dependsOn 'cleanNative'
+
 // Mojang ships Java 21 to end users in 1.21.11, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
