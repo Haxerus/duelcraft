@@ -490,21 +490,10 @@ Mirror `ocgapi_constants.h` into Java. These are used by the message parser and 
 - `com.haxerus.duelcraft.core.QueryFlag` — all `QUERY_*` constants
 - `com.haxerus.duelcraft.core.Phase` — `DRAW`, `STANDBY`, `MAIN1`, `BATTLE`, `MAIN2`, `END`
 
-### 3.4 Generate JNI Headers
-
-After compiling the Java native class:
-
-```bash
-javac -h native/jni-bridge/src/ src/main/java/com/haxerus/duelcraft/core/OcgCore.java
-```
-
-This generates the C header (`com_haxerus_duelcraft_core_OcgCore.h`) that `jni_interface.cpp` implements.
-
 ### Deliverables
 - [ ] `OcgCore.java` with all native method declarations
 - [ ] `LogHandler.java` functional interface
-- [ ] Constants classes mirroring `ocgapi_constants.h`
-- [ ] Generated JNI header for C++ implementation
+- [ ] `OcgConstants.java` mirroring `ocgapi_constants.h`
 
 ---
 
