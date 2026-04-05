@@ -207,18 +207,20 @@ class MessageParserTest {
 
     @Test
     void parseChaining() {
-        // [int32 code][locinfo][uint8 chainIdx][int64 desc][uint8 chainCount]
-        ByteBuffer b = body(4 + 10 + 1 + 8 + 1);
+        // [int32 code][locinfo][uint8 cc][uint8 cl][int32 cs][int64 desc][int32 ct]
+        ByteBuffer b = body(4 + 10 + 1 + 1 + 4 + 8 + 4);
         b.putInt(44095762);  // Mirror Force
         putLocInfo(b, 0, LOCATION_SZONE, 1, POS_FACEDOWN_DEFENSE);
-        b.put((byte) 1);    // chain index
+        b.put((byte) 0);    // trig controller
+        b.put((byte) LOCATION_SZONE); // trig location
+        b.putInt(1);         // trig sequence
         b.putLong(0L);      // desc
-        b.put((byte) 1);    // chain count
+        b.putInt(1);         // chain count
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CHAINING, b.array()));
         var chain = (DuelMessage.Chaining) msgs.getFirst();
         assertEquals(44095762, chain.code());
-        assertEquals(1, chain.chainIndex());
+        assertEquals(1, chain.chainCount());
     }
 
     @Test
@@ -294,13 +296,15 @@ class MessageParserTest {
 
     @Test
     void parseBattle() {
-        ByteBuffer b = body(10 + 8 + 10 + 8);
+        ByteBuffer b = body(10 + 8 + 1 + 10 + 8 + 1);
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
         b.putInt(3000);  // attacker ATK
         b.putInt(2500);  // attacker DEF
+        b.put((byte) 0); // da (damage flag)
         putLocInfo(b, 1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
         b.putInt(2500);  // defender ATK
         b.putInt(2100);  // defender DEF
+        b.put((byte) 0); // dd (damage flag)
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_BATTLE, b.array()));
         var battle = (DuelMessage.Battle) msgs.getFirst();
@@ -453,13 +457,14 @@ class MessageParserTest {
 
     @Test
     void parseSelectTribute() {
-        ByteBuffer b = body(1 + 1 + 4 + 4 + 4 + 14);
+        // TributeCard: code(4) + con(1) + loc(1) + seq(4) + tributeCount(1) = 11 bytes
+        ByteBuffer b = body(1 + 1 + 4 + 4 + 4 + 11);
         b.put((byte) 0);  // player
         b.put((byte) 0);  // not cancelable
         b.putInt(1);       // min
         b.putInt(1);       // max
         b.putInt(1);       // count
-        putCardInfo(b, 69247929, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
+        b.putInt(69247929); b.put((byte) 0); b.put((byte) LOCATION_MZONE); b.putInt(0); b.put((byte) 1); // tribute count
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_TRIBUTE, b.array()));
         var st = (DuelMessage.SelectTribute) msgs.getFirst();
@@ -470,20 +475,21 @@ class MessageParserTest {
 
     @Test
     void parseSelectChain() {
-        // [uint8 player][uint8 count][uint8 forced][...chain response...]
-        ByteBuffer b = body(3 + 6); // 3 header bytes + some raw chain response
+        // [uint8 player][uint8 specount][uint8 forced][int32 hint0][int32 hint1][int32 count][chains...]
+        // 0 chains for simplicity
+        ByteBuffer b = body(1 + 1 + 1 + 4 + 4 + 4);
         b.put((byte) 0);   // player
-        b.put((byte) 2);   // count
+        b.put((byte) 0);   // specount
         b.put((byte) 1);   // forced
-        // Remaining bytes are raw chain response
-        b.put(new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+        b.putInt(0);        // hint0
+        b.putInt(0);        // hint1
+        b.putInt(0);        // count = 0 chains
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_CHAIN, b.array()));
         var sc = (DuelMessage.SelectChain) msgs.getFirst();
         assertEquals(0, sc.player());
-        assertEquals(2, sc.count());
         assertTrue(sc.forced());
-        assertEquals(6, sc.rawBody().length);
+        assertEquals(0, sc.count());
     }
 
     @Test

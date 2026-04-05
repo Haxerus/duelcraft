@@ -81,10 +81,10 @@ public class MessageParser {
                 case MSG_BECOME_TARGET -> parseBecomeTarget(reader);
 
                 // Selection messages
-                case MSG_SELECT_IDLECMD   -> parseSelectIdleCmd(reader, bodyLength);
-                case MSG_SELECT_BATTLECMD -> parseSelectBattleCmd(reader, bodyLength);
+                case MSG_SELECT_IDLECMD   -> parseSelectIdleCmd(reader);
+                case MSG_SELECT_BATTLECMD -> parseSelectBattleCmd(reader);
                 case MSG_SELECT_CARD      -> parseSelectCard(reader);
-                case MSG_SELECT_CHAIN     -> parseSelectChain(reader, bodyLength);
+                case MSG_SELECT_CHAIN     -> parseSelectChain(reader);
                 case MSG_SELECT_EFFECTYN  -> parseSelectEffectYn(reader);
                 case MSG_SELECT_YESNO     -> parseSelectYesNo(reader);
                 case MSG_SELECT_OPTION    -> parseSelectOption(reader);
@@ -239,10 +239,12 @@ public class MessageParser {
     private static DuelMessage.Chaining parseChaining(BufferReader r) {
         int code = r.readInt32();
         LocInfo loc = LocInfo.read(r);
-        int chainIndex = r.readUint8();
+        int trigController = r.readUint8();
+        int trigLocation = r.readUint8();
+        int trigSequence = r.readInt32();
         long desc = r.readInt64();
-        int chainCount = r.readUint8();
-        return new DuelMessage.Chaining(code, loc, chainIndex, desc, chainCount);
+        int chainCount = r.readInt32();
+        return new DuelMessage.Chaining(code, loc, trigController, trigLocation, trigSequence, desc, chainCount);
     }
 
     // ---- LP (shared structure) ----
@@ -271,10 +273,12 @@ public class MessageParser {
         LocInfo attacker = LocInfo.read(r);
         int atkAtk = r.readInt32();
         int atkDef = r.readInt32();
+        int da = r.readUint8();
         LocInfo defender = LocInfo.read(r);
         int defAtk = r.readInt32();
         int defDef = r.readInt32();
-        return new DuelMessage.Battle(attacker, atkAtk, atkDef, defender, defAtk, defDef);
+        int dd = r.readUint8();
+        return new DuelMessage.Battle(attacker, atkAtk, atkDef, da, defender, defAtk, defDef, dd);
     }
 
     // ---- Deck/Hand ----
@@ -299,11 +303,10 @@ public class MessageParser {
     }
 
     private static DuelMessage.CardHint parseCardHint(BufferReader r) {
-        int code = r.readInt32();
         LocInfo loc = LocInfo.read(r);
         int chintType = r.readUint8();
         long value = r.readInt64();
-        return new DuelMessage.CardHint(code, loc, chintType, value);
+        return new DuelMessage.CardHint(loc, chintType, value);
     }
 
     private static DuelMessage.BecomeTarget parseBecomeTarget(BufferReader r) {
@@ -317,29 +320,82 @@ public class MessageParser {
 
     // ---- Selection messages ----
 
-    private static DuelMessage.SelectIdleCmd parseSelectIdleCmd(BufferReader r, int bodyLength) {
-        // Complex structure — extract player, preserve raw body for the response builder
-        int startPos = r.remaining();
+    private static DuelMessage.SelectIdleCmd parseSelectIdleCmd(BufferReader r) {
         int player = r.readUint8();
-        int consumed = startPos - r.remaining();
-        int remaining = bodyLength - consumed;
-        byte[] rawBody = new byte[remaining];
-        for (int i = 0; i < remaining; i++) {
-            rawBody[i] = (byte) r.readUint8();
-        }
-        return new DuelMessage.SelectIdleCmd(player, rawBody);
+
+        // Summonable: [uint32 count][ (uint32 code, uint8 con, uint8 loc, uint32 seq) * N ]
+        int summonCount = r.readInt32();
+        List<DuelMessage.IdleCmdCard> summonable = new ArrayList<>(summonCount);
+        for (int i = 0; i < summonCount; i++) summonable.add(DuelMessage.IdleCmdCard.read(r));
+
+        int spSummonCount = r.readInt32();
+        List<DuelMessage.IdleCmdCard> spSummonable = new ArrayList<>(spSummonCount);
+        for (int i = 0; i < spSummonCount; i++) spSummonable.add(DuelMessage.IdleCmdCard.read(r));
+
+        // Repositionable: [uint32 count][ (uint32 code, uint8 con, uint8 loc, uint8 seq) * N ]
+        int reposCount = r.readInt32();
+        List<DuelMessage.ReposCard> repositionable = new ArrayList<>(reposCount);
+        for (int i = 0; i < reposCount; i++) repositionable.add(DuelMessage.ReposCard.read(r));
+
+        int setMonsterCount = r.readInt32();
+        List<DuelMessage.IdleCmdCard> settableMonsters = new ArrayList<>(setMonsterCount);
+        for (int i = 0; i < setMonsterCount; i++) settableMonsters.add(DuelMessage.IdleCmdCard.read(r));
+
+        int setSpellCount = r.readInt32();
+        List<DuelMessage.IdleCmdCard> settableSpells = new ArrayList<>(setSpellCount);
+        for (int i = 0; i < setSpellCount; i++) settableSpells.add(DuelMessage.IdleCmdCard.read(r));
+
+        // Activatable: [uint32 count][ (uint32 code, uint8 con, uint8 loc, uint32 seq, uint64 desc, uint8 flag) * N ]
+        int activateCount = r.readInt32();
+        List<DuelMessage.ActivatableCard> activatable = new ArrayList<>(activateCount);
+        for (int i = 0; i < activateCount; i++) activatable.add(DuelMessage.ActivatableCard.read(r));
+
+        boolean canBattle = r.readUint8() != 0;
+        boolean canEnd = r.readUint8() != 0;
+        boolean canShuffle = r.readUint8() != 0;
+
+        return new DuelMessage.SelectIdleCmd(player, summonable, spSummonable,
+                repositionable, settableMonsters, settableSpells, activatable,
+                canBattle, canEnd, canShuffle);
     }
 
-    private static DuelMessage.SelectBattleCmd parseSelectBattleCmd(BufferReader r, int bodyLength) {
-        int startPos = r.remaining();
+    private static DuelMessage.SelectBattleCmd parseSelectBattleCmd(BufferReader r) {
         int player = r.readUint8();
-        int consumed = startPos - r.remaining();
-        int remaining = bodyLength - consumed;
-        byte[] rawBody = new byte[remaining];
-        for (int i = 0; i < remaining; i++) {
-            rawBody[i] = (byte) r.readUint8();
+
+        // Activatable: same format as idle cmd
+        int activateCount = r.readInt32();
+        List<DuelMessage.ActivatableCard> activatable = new ArrayList<>(activateCount);
+        for (int i = 0; i < activateCount; i++) activatable.add(DuelMessage.ActivatableCard.read(r));
+
+        // Attackable: [uint32 count][ (uint32 code, uint8 con, uint8 loc, uint8 seq, uint8 diratt) * N ]
+        int attackCount = r.readInt32();
+        List<DuelMessage.AttackCard> attackable = new ArrayList<>(attackCount);
+        for (int i = 0; i < attackCount; i++) attackable.add(DuelMessage.AttackCard.read(r));
+
+        boolean canMain2 = r.readUint8() != 0;
+        boolean canEnd = r.readUint8() != 0;
+        return new DuelMessage.SelectBattleCmd(player, activatable, attackable,
+                canMain2, canEnd);
+    }
+
+    /** Read a count-prefixed list of CardInfo entries. */
+    private static List<DuelMessage.CardInfo> readCardInfoList(BufferReader r) {
+        int count = r.readInt32();
+        List<DuelMessage.CardInfo> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            list.add(DuelMessage.CardInfo.read(r));
         }
-        return new DuelMessage.SelectBattleCmd(player, rawBody);
+        return list;
+    }
+
+    /** Read a count-prefixed list of ActivatableCard entries (CardInfo + int64 desc). */
+    private static List<DuelMessage.ActivatableCard> readActivatableList(BufferReader r) {
+        int count = r.readInt32();
+        List<DuelMessage.ActivatableCard> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            list.add(DuelMessage.ActivatableCard.read(r));
+        }
+        return list;
     }
 
     private static DuelMessage.SelectCard parseSelectCard(BufferReader r) {
@@ -355,18 +411,18 @@ public class MessageParser {
         return new DuelMessage.SelectCard(player, cancelable, min, max, cards);
     }
 
-    private static DuelMessage.SelectChain parseSelectChain(BufferReader r, int bodyLength) {
-        int startPos = r.remaining();
+    private static DuelMessage.SelectChain parseSelectChain(BufferReader r) {
         int player = r.readUint8();
-        int count = r.readUint8();
+        int speCount = r.readUint8();
         boolean forced = r.readUint8() != 0;
-        int consumed = startPos - r.remaining();
-        int remaining = bodyLength - consumed;
-        byte[] rawBody = new byte[remaining];
-        for (int i = 0; i < remaining; i++) {
-            rawBody[i] = (byte) r.readUint8();
+        int hint0 = r.readInt32();
+        int hint1 = r.readInt32();
+        int count = r.readInt32();
+        List<DuelMessage.ActivatableCard> chains = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            chains.add(DuelMessage.ActivatableCard.read(r));
         }
-        return new DuelMessage.SelectChain(player, count, forced, rawBody);
+        return new DuelMessage.SelectChain(player, speCount, forced, hint0, hint1, chains);
     }
 
     private static DuelMessage.SelectEffectYn parseSelectEffectYn(BufferReader r) {
@@ -413,9 +469,9 @@ public class MessageParser {
         int min = r.readInt32();
         int max = r.readInt32();
         int count = r.readInt32();
-        List<DuelMessage.CardInfo> cards = new ArrayList<>(count);
+        List<DuelMessage.TributeCard> cards = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            cards.add(DuelMessage.CardInfo.read(r));
+            cards.add(DuelMessage.TributeCard.read(r));
         }
         return new DuelMessage.SelectTribute(player, cancelable, min, max, cards);
     }
@@ -424,10 +480,10 @@ public class MessageParser {
         int player = r.readUint8();
         int counterType = r.readUint16();
         int count = r.readUint16();
-        int cardCount = r.readUint8();
-        List<DuelMessage.CardInfo> cards = new ArrayList<>(cardCount);
+        int cardCount = r.readInt32();
+        List<DuelMessage.CounterCard> cards = new ArrayList<>(cardCount);
         for (int i = 0; i < cardCount; i++) {
-            cards.add(DuelMessage.CardInfo.read(r));
+            cards.add(DuelMessage.CounterCard.read(r));
         }
         return new DuelMessage.SelectCounter(player, counterType, count, cards);
     }
@@ -471,9 +527,9 @@ public class MessageParser {
     private static DuelMessage.SortCard parseSortCard(BufferReader r) {
         int player = r.readUint8();
         int count = r.readInt32();
-        List<DuelMessage.CardInfo> cards = new ArrayList<>(count);
+        List<DuelMessage.SortableCard> cards = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            cards.add(DuelMessage.CardInfo.read(r));
+            cards.add(DuelMessage.SortableCard.read(r));
         }
         return new DuelMessage.SortCard(player, cards);
     }
@@ -481,9 +537,9 @@ public class MessageParser {
     private static DuelMessage.SortChain parseSortChain(BufferReader r) {
         int player = r.readUint8();
         int count = r.readInt32();
-        List<DuelMessage.CardInfo> cards = new ArrayList<>(count);
+        List<DuelMessage.SortableCard> cards = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            cards.add(DuelMessage.CardInfo.read(r));
+            cards.add(DuelMessage.SortableCard.read(r));
         }
         return new DuelMessage.SortChain(player, cards);
     }
@@ -529,18 +585,20 @@ public class MessageParser {
 
     private static DuelMessage.AddCounter parseAddCounter(BufferReader r) {
         int counterType = r.readUint16();
-        int player = r.readUint8();
-        LocInfo loc = LocInfo.read(r);
+        int controller = r.readUint8();
+        int location = r.readUint8();
+        int sequence = r.readUint8();
         int count = r.readUint16();
-        return new DuelMessage.AddCounter(counterType, player, loc, count);
+        return new DuelMessage.AddCounter(counterType, controller, location, sequence, count);
     }
 
     private static DuelMessage.RemoveCounter parseRemoveCounter(BufferReader r) {
         int counterType = r.readUint16();
-        int player = r.readUint8();
-        LocInfo loc = LocInfo.read(r);
+        int controller = r.readUint8();
+        int location = r.readUint8();
+        int sequence = r.readUint8();
         int count = r.readUint16();
-        return new DuelMessage.RemoveCounter(counterType, player, loc, count);
+        return new DuelMessage.RemoveCounter(counterType, controller, location, sequence, count);
     }
 
     private static DuelMessage.TossCoin parseTossCoin(BufferReader r) {

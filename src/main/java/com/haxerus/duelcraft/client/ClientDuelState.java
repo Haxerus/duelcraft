@@ -152,7 +152,7 @@ public class ClientDuelState {
 
             // ---- Chain ----
             case DuelMessage.Chaining c ->
-                    chain.add(new ChainLink(c.code(), c.location(), c.chainIndex()));
+                    chain.add(new ChainLink(c.code(), c.location(), c.chainCount()));
             case DuelMessage.ChainEnd ignored -> chain.clear();
             case DuelMessage.Chained ignored -> { }
             case DuelMessage.ChainSolving ignored -> { }

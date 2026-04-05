@@ -67,29 +67,49 @@ class ResponseValidatorTest {
 
     // ---- SelectChain ----
 
+    static DuelMessage.ActivatableCard activatable(int code) {
+        return new DuelMessage.ActivatableCard(code, 0, LOCATION_SZONE, 0, 0L, 0);
+    }
+
+    static DuelMessage.TributeCard tribute(int code) {
+        return new DuelMessage.TributeCard(code, 0, LOCATION_MZONE, 0, 1);
+    }
+
+    static DuelMessage.SortableCard sortable(int code) {
+        return new DuelMessage.SortableCard(code, 0, LOCATION_HAND, 0);
+    }
+
+    static DuelMessage.CounterCard counterCard(int code) {
+        return new DuelMessage.CounterCard(code, 0, LOCATION_MZONE, 0, 3);
+    }
+
     @Test
     void selectChainActivateValid() {
-        var prompt = new DuelMessage.SelectChain(0, 2, false, new byte[0]);
+        var prompt = new DuelMessage.SelectChain(0, 0, false, 0, 0,
+                List.of(activatable(1), activatable(2)));
         assertDoesNotThrow(() -> ResponseValidator.selectChain(prompt, 0));
         assertDoesNotThrow(() -> ResponseValidator.selectChain(prompt, 1));
     }
 
     @Test
     void selectChainDeclineWhenOptional() {
-        var prompt = new DuelMessage.SelectChain(0, 2, false, new byte[0]);
+        var prompt = new DuelMessage.SelectChain(0, 0, false, 0, 0,
+                List.of(activatable(1), activatable(2)));
         assertDoesNotThrow(() -> ResponseValidator.selectChain(prompt, -1));
     }
 
     @Test
     void selectChainDeclineWhenForced() {
-        var prompt = new DuelMessage.SelectChain(0, 2, true, new byte[0]);
+        var prompt = new DuelMessage.SelectChain(0, 0, true, 0, 0,
+                List.of(activatable(1), activatable(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.selectChain(prompt, -1));
     }
 
     @Test
     void selectChainIndexOutOfRange() {
-        var prompt = new DuelMessage.SelectChain(0, 2, false, new byte[0]);
+        var prompt = new DuelMessage.SelectChain(0, 0, false, 0, 0,
+                List.of(activatable(1), activatable(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.selectChain(prompt, 3));
     }
@@ -194,27 +214,27 @@ class ResponseValidatorTest {
 
     @Test
     void sortCardValid() {
-        var prompt = new DuelMessage.SortCard(0, List.of(card(1), card(2), card(3)));
+        var prompt = new DuelMessage.SortCard(0, List.of(sortable(1), sortable(2), sortable(3)));
         assertDoesNotThrow(() -> ResponseValidator.sortCard(prompt, 2, 0, 1));
     }
 
     @Test
     void sortCardWrongLength() {
-        var prompt = new DuelMessage.SortCard(0, List.of(card(1), card(2)));
+        var prompt = new DuelMessage.SortCard(0, List.of(sortable(1), sortable(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.sortCard(prompt, 0)); // need 2 entries
     }
 
     @Test
     void sortCardDuplicate() {
-        var prompt = new DuelMessage.SortCard(0, List.of(card(1), card(2), card(3)));
+        var prompt = new DuelMessage.SortCard(0, List.of(sortable(1), sortable(2), sortable(3)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.sortCard(prompt, 0, 0, 1)); // duplicate 0
     }
 
     @Test
     void sortCardIndexOutOfRange() {
-        var prompt = new DuelMessage.SortCard(0, List.of(card(1), card(2)));
+        var prompt = new DuelMessage.SortCard(0, List.of(sortable(1), sortable(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.sortCard(prompt, 0, 5));
     }
@@ -302,7 +322,7 @@ class ResponseValidatorTest {
     @Test
     void selectCounterValid() {
         var prompt = new DuelMessage.SelectCounter(0, 0x1, 3,
-                List.of(card(1), card(2)));
+                List.of(counterCard(1), counterCard(2)));
         // Remove 2 from first card, 1 from second = 3 total
         assertDoesNotThrow(() -> ResponseValidator.selectCounter(prompt, 2, 1));
     }
@@ -310,7 +330,7 @@ class ResponseValidatorTest {
     @Test
     void selectCounterWrongTotal() {
         var prompt = new DuelMessage.SelectCounter(0, 0x1, 3,
-                List.of(card(1), card(2)));
+                List.of(counterCard(1), counterCard(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.selectCounter(prompt, 1, 1)); // total 2, need 3
     }
@@ -318,7 +338,7 @@ class ResponseValidatorTest {
     @Test
     void selectCounterWrongCardCount() {
         var prompt = new DuelMessage.SelectCounter(0, 0x1, 3,
-                List.of(card(1), card(2)));
+                List.of(counterCard(1), counterCard(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.selectCounter(prompt, 3)); // 1 entry, need 2
     }
@@ -326,7 +346,7 @@ class ResponseValidatorTest {
     @Test
     void selectCounterNegative() {
         var prompt = new DuelMessage.SelectCounter(0, 0x1, 3,
-                List.of(card(1), card(2)));
+                List.of(counterCard(1), counterCard(2)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.selectCounter(prompt, 4, -1));
     }
@@ -336,7 +356,7 @@ class ResponseValidatorTest {
     @Test
     void selectTributeValid() {
         var prompt = new DuelMessage.SelectTribute(0, false, 1, 2,
-                List.of(card(1), card(2), card(3)));
+                List.of(tribute(1), tribute(2), tribute(3)));
         assertDoesNotThrow(() -> ResponseValidator.selectTribute(prompt, 0));
         assertDoesNotThrow(() -> ResponseValidator.selectTribute(prompt, 0, 2));
     }
@@ -344,7 +364,7 @@ class ResponseValidatorTest {
     @Test
     void selectTributeDuplicate() {
         var prompt = new DuelMessage.SelectTribute(0, false, 2, 2,
-                List.of(card(1), card(2), card(3)));
+                List.of(tribute(1), tribute(2), tribute(3)));
         assertThrows(IllegalArgumentException.class,
                 () -> ResponseValidator.selectTribute(prompt, 1, 1));
     }

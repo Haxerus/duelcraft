@@ -88,8 +88,8 @@ public sealed interface DuelMessage {
 
     // ---- Chain ----
 
-    record Chaining(int code, LocInfo location, int chainIndex,
-                    long desc, int chainCount) implements DuelMessage {
+    record Chaining(int code, LocInfo location, int trigController, int trigLocation,
+                    int trigSequence, long desc, int chainCount) implements DuelMessage {
         public int type() { return MSG_CHAINING; }
     }
 
@@ -141,8 +141,8 @@ public sealed interface DuelMessage {
         public int type() { return MSG_ATTACK; }
     }
 
-    record Battle(LocInfo attacker, int atkAtk, int atkDef,
-                  LocInfo defender, int defAtk, int defDef) implements DuelMessage {
+    record Battle(LocInfo attacker, int atkAtk, int atkDef, int atkDamage,
+                  LocInfo defender, int defAtk, int defDef, int defDamage) implements DuelMessage {
         public int type() { return MSG_BATTLE; }
     }
 
@@ -178,7 +178,7 @@ public sealed interface DuelMessage {
         public int type() { return MSG_HINT; }
     }
 
-    record CardHint(int code, LocInfo location, int chintType, long value) implements DuelMessage {
+    record CardHint(LocInfo location, int chintType, long value) implements DuelMessage {
         public int type() { return MSG_CARD_HINT; }
     }
 
@@ -192,13 +192,26 @@ public sealed interface DuelMessage {
 
     // ---- Selection (prompts that require a player response) ----
 
-    /** Main phase action menu. Raw body preserved for response building. */
-    record SelectIdleCmd(int player, byte[] rawBody) implements DuelMessage {
+    /** Main phase action menu. */
+    record SelectIdleCmd(int player,
+                         List<IdleCmdCard> summonable,
+                         List<IdleCmdCard> specialSummonable,
+                         List<ReposCard> repositionable,
+                         List<IdleCmdCard> settableMonsters,
+                         List<IdleCmdCard> settableSpells,
+                         List<ActivatableCard> activatable,
+                         boolean canBattle,
+                         boolean canEnd,
+                         boolean canShuffle) implements DuelMessage {
         public int type() { return MSG_SELECT_IDLECMD; }
     }
 
-    /** Battle phase action menu. Raw body preserved for response building. */
-    record SelectBattleCmd(int player, byte[] rawBody) implements DuelMessage {
+    /** Battle phase action menu. */
+    record SelectBattleCmd(int player,
+                           List<ActivatableCard> activatable,
+                           List<AttackCard> attackable,
+                           boolean canMain2,
+                           boolean canEnd) implements DuelMessage {
         public int type() { return MSG_SELECT_BATTLECMD; }
     }
 
@@ -207,9 +220,10 @@ public sealed interface DuelMessage {
         public int type() { return MSG_SELECT_CARD; }
     }
 
-    record SelectChain(int player, int count, boolean forced,
-                       byte[] rawBody) implements DuelMessage {
+    record SelectChain(int player, int speCount, boolean forced,
+                       int hint0, int hint1, List<ActivatableCard> chains) implements DuelMessage {
         public int type() { return MSG_SELECT_CHAIN; }
+        public int count() { return chains.size(); }
     }
 
     record SelectEffectYn(int player, int code, LocInfo location,
@@ -234,12 +248,12 @@ public sealed interface DuelMessage {
     }
 
     record SelectTribute(int player, boolean cancelable, int min, int max,
-                         List<CardInfo> cards) implements DuelMessage {
+                         List<TributeCard> cards) implements DuelMessage {
         public int type() { return MSG_SELECT_TRIBUTE; }
     }
 
     record SelectCounter(int player, int counterType, int count,
-                         List<CardInfo> cards) implements DuelMessage {
+                         List<CounterCard> cards) implements DuelMessage {
         public int type() { return MSG_SELECT_COUNTER; }
     }
 
@@ -254,11 +268,11 @@ public sealed interface DuelMessage {
         public int type() { return MSG_SELECT_UNSELECT_CARD; }
     }
 
-    record SortCard(int player, List<CardInfo> cards) implements DuelMessage {
+    record SortCard(int player, List<SortableCard> cards) implements DuelMessage {
         public int type() { return MSG_SORT_CARD; }
     }
 
-    record SortChain(int player, List<CardInfo> cards) implements DuelMessage {
+    record SortChain(int player, List<SortableCard> cards) implements DuelMessage {
         public int type() { return MSG_SORT_CHAIN; }
     }
 
@@ -300,13 +314,13 @@ public sealed interface DuelMessage {
         public int type() { return MSG_CANCEL_TARGET; }
     }
 
-    record AddCounter(int counterType, int player, LocInfo location,
-                      int count) implements DuelMessage {
+    record AddCounter(int counterType, int controller, int location,
+                      int sequence, int count) implements DuelMessage {
         public int type() { return MSG_ADD_COUNTER; }
     }
 
-    record RemoveCounter(int counterType, int player, LocInfo location,
-                         int count) implements DuelMessage {
+    record RemoveCounter(int counterType, int controller, int location,
+                         int sequence, int count) implements DuelMessage {
         public int type() { return MSG_REMOVE_COUNTER; }
     }
 
@@ -318,7 +332,7 @@ public sealed interface DuelMessage {
         public int type() { return MSG_TOSS_DICE; }
     }
 
-    // ---- Shared sub-record for cards within selection messages ----
+    // ---- Shared sub-records for cards within selection messages ----
 
     record CardInfo(int code, int controller, int location, int sequence, int position) {
         public static CardInfo read(BufferReader reader) {
@@ -328,6 +342,84 @@ public sealed interface DuelMessage {
                 reader.readUint8(),
                 reader.readInt32(),
                 reader.readInt32()
+            );
+        }
+    }
+
+    /** Card entry in tribute selection: code + con + loc + seq(uint32) + tributeCount(uint8). */
+    record TributeCard(int code, int controller, int location, int sequence, int tributeCount) {
+        public static TributeCard read(BufferReader reader) {
+            return new TributeCard(
+                reader.readInt32(), reader.readUint8(), reader.readUint8(),
+                reader.readInt32(), reader.readUint8());
+        }
+    }
+
+    /** Card entry in counter selection: code + con + loc + seq(uint8) + counterCount(uint16). */
+    record CounterCard(int code, int controller, int location, int sequence, int counterCount) {
+        public static CounterCard read(BufferReader reader) {
+            return new CounterCard(
+                reader.readInt32(), reader.readUint8(), reader.readUint8(),
+                reader.readUint8(), reader.readUint16());
+        }
+    }
+
+    /** Card entry in sort messages: code + con + loc(uint32) + seq(uint32). */
+    record SortableCard(int code, int controller, int location, int sequence) {
+        public static SortableCard read(BufferReader reader) {
+            return new SortableCard(
+                reader.readInt32(), reader.readUint8(),
+                reader.readInt32(), reader.readInt32());
+        }
+    }
+
+    /** Card entry in idle cmd summon/set lists: code + con + loc + seq(uint32). No position. */
+    record IdleCmdCard(int code, int controller, int location, int sequence) {
+        public static IdleCmdCard read(BufferReader reader) {
+            return new IdleCmdCard(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readInt32()
+            );
+        }
+    }
+
+    /** Card entry in idle cmd reposition list: code + con + loc + seq(uint8). */
+    record ReposCard(int code, int controller, int location, int sequence) {
+        public static ReposCard read(BufferReader reader) {
+            return new ReposCard(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readUint8()
+            );
+        }
+    }
+
+    /** Card entry in battle cmd attack list: code + con + loc + seq(uint8) + diratt(uint8). */
+    record AttackCard(int code, int controller, int location, int sequence, int directAttack) {
+        public static AttackCard read(BufferReader reader) {
+            return new AttackCard(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readUint8()
+            );
+        }
+    }
+
+    /** A card that can be activated: code + con + loc + seq(uint32) + desc(uint64) + flag(uint8). */
+    record ActivatableCard(int code, int controller, int location, int sequence, long desc, int flag) {
+        public static ActivatableCard read(BufferReader reader) {
+            return new ActivatableCard(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readInt32(),
+                reader.readInt64(),
+                reader.readUint8()
             );
         }
     }

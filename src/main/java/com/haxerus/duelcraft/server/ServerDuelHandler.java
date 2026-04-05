@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft.server;
 
+import com.haxerus.duelcraft.core.OcgConstants;
 import com.haxerus.duelcraft.duel.DuelEventListener;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.mojang.logging.LogUtils;
@@ -7,6 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.UUID;
 
 public class ServerDuelHandler implements DuelEventListener {
@@ -64,9 +66,58 @@ public class ServerDuelHandler implements DuelEventListener {
     }
 
     private void broadcastToBoth(DuelMessage msg) {
-        var payload = new DuelMessagePayload(msg);
-        PacketDistributor.sendToPlayer(player0, payload);
-        PacketDistributor.sendToPlayer(player1, payload);
+        // Send each player a version with opponent's hidden info removed
+        PacketDistributor.sendToPlayer(player0, new DuelMessagePayload(hideInfo(msg, 0)));
+        PacketDistributor.sendToPlayer(player1, new DuelMessagePayload(hideInfo(msg, 1)));
+    }
+
+    /**
+     * Sanitize a message for a specific recipient by zeroing out card codes
+     * the player shouldn't see (opponent's hand cards, face-down cards).
+     */
+    private static DuelMessage hideInfo(DuelMessage msg, int recipient) {
+        return switch (msg) {
+            case DuelMessage.Draw draw -> {
+                if (draw.player() != recipient) {
+                    // Opponent drew — hide the codes
+                    yield new DuelMessage.Draw(draw.player(),
+                            draw.codes().stream().map(c -> 0).toList());
+                }
+                yield draw;
+            }
+            case DuelMessage.Move move -> {
+                // Hide code if the card is going face-down and we don't control it
+                if (move.to().controller() != recipient && isFaceDown(move.to().position())) {
+                    yield new DuelMessage.Move(0, move.from(), move.to(), move.reason());
+                }
+                // Hide code if it was in opponent's hand (source is hand, not ours)
+                if (move.from().controller() != recipient
+                        && move.from().location() == OcgConstants.LOCATION_HAND
+                        && isFaceDown(move.to().position())) {
+                    yield new DuelMessage.Move(0, move.from(), move.to(), move.reason());
+                }
+                yield move;
+            }
+            case DuelMessage.ShuffleHand sh -> {
+                if (sh.player() != recipient) {
+                    yield new DuelMessage.ShuffleHand(sh.player(),
+                            sh.codes().stream().map(c -> 0).toList());
+                }
+                yield sh;
+            }
+            case DuelMessage.Set set -> {
+                // Set cards are always face-down — hide code from opponent
+                if (set.location().controller() != recipient) {
+                    yield new DuelMessage.Set(0, set.location());
+                }
+                yield set;
+            }
+            default -> msg;
+        };
+    }
+
+    private static boolean isFaceDown(int position) {
+        return (position & OcgConstants.POS_FACEDOWN) != 0;
     }
 
     @Override
