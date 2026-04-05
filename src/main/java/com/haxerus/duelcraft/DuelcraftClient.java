@@ -3,6 +3,7 @@ package com.haxerus.duelcraft;
 import com.haxerus.duelcraft.client.ClientPayloadHandler;
 import com.haxerus.duelcraft.server.DuelEndPayload;
 import com.haxerus.duelcraft.server.DuelMessagePayload;
+import com.haxerus.duelcraft.server.DuelStartPayload;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -35,6 +36,7 @@ public class DuelcraftClient {
 
     @SubscribeEvent
     static void onRegisterClientPayloads(RegisterClientPayloadHandlersEvent event) {
+        event.register(DuelStartPayload.TYPE, ClientPayloadHandler::handleStart);
         event.register(DuelMessagePayload.TYPE, ClientPayloadHandler::handleMessage);
         event.register(DuelEndPayload.TYPE, ClientPayloadHandler::handleEnd);
     }

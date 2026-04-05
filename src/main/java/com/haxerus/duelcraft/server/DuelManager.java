@@ -7,6 +7,7 @@ import com.haxerus.duelcraft.core.DuelOptions;
 import com.haxerus.duelcraft.core.OcgCore;
 import com.haxerus.duelcraft.duel.DuelSession;
 import com.mojang.logging.LogUtils;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -84,6 +85,10 @@ public class DuelManager {
         activeDuels.put(duelId, session);
         playerToDuel.put(p1.getUUID(), duelId);
         playerToDuel.put(p2.getUUID(), duelId);
+
+        // Tell each client which player they are and who their opponent is
+        PacketDistributor.sendToPlayer(p1, new DuelStartPayload(0, p2.getName().getString()));
+        PacketDistributor.sendToPlayer(p2, new DuelStartPayload(1, p1.getName().getString()));
 
         session.setupDuel(team1deck, team2Deck);
         session.process();

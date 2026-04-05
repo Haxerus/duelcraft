@@ -26,9 +26,8 @@ public class ServerDuelHandler implements DuelEventListener {
     public int onMessage(DuelMessage msg, byte[] rawData) {
         switch (msg) {
             case DuelMessage.Win win -> {
-                DuelEndPayload payload = new DuelEndPayload(win.winner(), win.reason());
-                PacketDistributor.sendToPlayer(player0, payload);
-                PacketDistributor.sendToPlayer(player1, payload);
+                PacketDistributor.sendToPlayer(player0, new DuelEndPayload(win.winner(), win.reason()));
+                PacketDistributor.sendToPlayer(player1, new DuelEndPayload(win.winner(), win.reason()));
                 return 2;
             }
             case DuelMessage.SelectIdleCmd sel -> {
