@@ -17,6 +17,11 @@ public sealed interface DuelMessage {
     /** Fallback for messages we don't parse yet. Carries the raw body bytes. */
     record Raw(int type, byte[] body) implements DuelMessage {}
 
+    /** Engine rejected the last response — re-prompt the player. */
+    record Retry() implements DuelMessage {
+        public int type() { return MSG_RETRY; }
+    }
+
     // ---- Lifecycle ----
 
     record Start(int playerType, int lp0, int lp1,

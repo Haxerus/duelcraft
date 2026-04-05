@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.duel;
 import com.haxerus.duelcraft.core.*;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.MessageParser;
+import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,12 +70,24 @@ public class DuelSession implements AutoCloseable {
 
         long eng = engine.getHandle();
         int status;
+        boolean autoResponded;
         do {
+            autoResponded = false;
             status = OcgCore.nDuelProcess(eng, duelHandle);
             byte[] messageBuffer = OcgCore.nDuelGetMessage(eng, duelHandle);
             if (messageBuffer != null && messageBuffer.length > 0) {
                 List<DuelMessage> messages = MessageParser.parse(messageBuffer);
                 for (DuelMessage msg : messages) {
+                    // Auto-pass empty chain prompts (no chainable cards, not forced)
+                    if (msg instanceof DuelMessage.SelectChain chain
+                            && chain.count() == 0 && !chain.forced()) {
+                        LOGGER.debug("[Session] Auto-passing empty chain for player {}", chain.player());
+                        OcgCore.nDuelSetResponse(eng, duelHandle,
+                                ResponseBuilder.selectChain(-1));
+                        autoResponded = true;
+                        break;
+                    }
+
                     int result = listener.onMessage(msg);
                     if (result != 0) {
                         if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
@@ -85,7 +98,7 @@ public class DuelSession implements AutoCloseable {
                     }
                 }
             }
-        } while (status == OcgConstants.DUEL_STATUS_CONTINUE);
+        } while (status == OcgConstants.DUEL_STATUS_CONTINUE || autoResponded);
 
         if (status == OcgConstants.DUEL_STATUS_END) {
             ended = true;

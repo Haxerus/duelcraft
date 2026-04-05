@@ -29,6 +29,9 @@ public class DuelMessageCodec {
         buf.writeByte(msg.type());
 
         switch (msg) {
+            // System
+            case DuelMessage.Retry ignored -> {}
+
             // Lifecycle
             case DuelMessage.Start m -> {
                 buf.writeInt(m.playerType());
@@ -233,6 +236,7 @@ public class DuelMessageCodec {
 
         return switch (type) {
             // Lifecycle
+            case MSG_RETRY -> new DuelMessage.Retry();
             case MSG_START -> new DuelMessage.Start(buf.readInt(), buf.readInt(), buf.readInt(),
                     buf.readShort(), buf.readShort(), buf.readShort(), buf.readShort());
             case MSG_WIN -> new DuelMessage.Win(buf.readByte(), buf.readByte());

@@ -40,24 +40,26 @@ public class ResponseBuilder {
 
     /**
      * MSG_SELECT_IDLECMD / MSG_SELECT_BATTLECMD response.
+     * Packed as a single int32: (index << 16) | (actionType & 0xFFFF).
      * @param actionType action category (0=summon, 1=spsummon, 2=reposition,
      *                   3=set monster, 4=set S/T, 5=activate, 6=to battle, 7=end turn
-     *                   for idle; 1=attack, 2=activate, 3=end battle for battle)
+     *                   for idle; 1=attack, 2=activate, 3=main2, 6=end battle for battle)
      * @param index index within that action category
      */
     public static byte[] selectCmd(int actionType, int index) {
-        return new ResponseBuilder(8)
-                .putInt32(actionType)
-                .putInt32(index)
+        return new ResponseBuilder(4)
+                .putInt32((index << 16) | (actionType & 0xFFFF))
                 .build();
     }
 
     /**
      * MSG_SELECT_CARD / MSG_SELECT_TRIBUTE response.
+     * Format: [int32 formatCode=0][int32 count][int32 indices...]
      * @param indices selected card indices (0-based, from the card list in the prompt)
      */
     public static byte[] selectCards(int... indices) {
-        var rb = new ResponseBuilder(4 + 4 * indices.length);
+        var rb = new ResponseBuilder(4 + 4 + 4 * indices.length);
+        rb.putInt32(0); // format code: 0 = uint32 indices
         rb.putInt32(indices.length);
         for (int idx : indices) {
             rb.putInt32(idx);

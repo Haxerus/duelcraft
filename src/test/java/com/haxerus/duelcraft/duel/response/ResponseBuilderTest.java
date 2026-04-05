@@ -29,43 +29,57 @@ class ResponseBuilderTest {
 
     @Test
     void selectCmdNormalSummon() {
+        // actionType=0 (summon), index=2 → packed: (2 << 16) | 0 = 0x00020000
         byte[] resp = ResponseBuilder.selectCmd(0, 2);
-        assertEquals(8, resp.length);
-        assertEquals(0, readInt32(resp, 0)); // action type
-        assertEquals(2, readInt32(resp, 4)); // index
+        assertEquals(4, resp.length);
+        assertEquals((2 << 16) | 0, readInt32(resp, 0));
     }
 
     @Test
     void selectCmdEndTurn() {
+        // actionType=7, index=0 → packed: (0 << 16) | 7 = 7
         byte[] resp = ResponseBuilder.selectCmd(7, 0);
+        assertEquals(4, resp.length);
         assertEquals(7, readInt32(resp, 0));
     }
 
     @Test
     void selectCmdAttack() {
+        // actionType=1 (attack), index=0 → packed: (0 << 16) | 1 = 1
         byte[] resp = ResponseBuilder.selectCmd(1, 0);
+        assertEquals(4, resp.length);
         assertEquals(1, readInt32(resp, 0));
-        assertEquals(0, readInt32(resp, 4));
+    }
+
+    @Test
+    void selectCmdAttackSecondMonster() {
+        // actionType=1 (attack), index=1 → packed: (1 << 16) | 1 = 0x00010001
+        byte[] resp = ResponseBuilder.selectCmd(1, 1);
+        assertEquals(4, resp.length);
+        assertEquals((1 << 16) | 1, readInt32(resp, 0));
     }
 
     // ---- selectCards ----
 
     @Test
     void selectCardsSingle() {
+        // format=0 + count=1 + index=3
         byte[] resp = ResponseBuilder.selectCards(3);
-        assertEquals(8, resp.length);
-        assertEquals(1, readInt32(resp, 0)); // count
-        assertEquals(3, readInt32(resp, 4)); // index
+        assertEquals(12, resp.length);
+        assertEquals(0, readInt32(resp, 0)); // format code
+        assertEquals(1, readInt32(resp, 4)); // count
+        assertEquals(3, readInt32(resp, 8)); // index
     }
 
     @Test
     void selectCardsMultiple() {
         byte[] resp = ResponseBuilder.selectCards(0, 2, 4);
-        assertEquals(16, resp.length);
-        assertEquals(3, readInt32(resp, 0));
-        assertEquals(0, readInt32(resp, 4));
-        assertEquals(2, readInt32(resp, 8));
-        assertEquals(4, readInt32(resp, 12));
+        assertEquals(20, resp.length);
+        assertEquals(0, readInt32(resp, 0));  // format code
+        assertEquals(3, readInt32(resp, 4));  // count
+        assertEquals(0, readInt32(resp, 8));
+        assertEquals(2, readInt32(resp, 12));
+        assertEquals(4, readInt32(resp, 16));
     }
 
     // ---- selectChain ----
@@ -217,9 +231,10 @@ class ResponseBuilderTest {
     @Test
     void selectSum() {
         byte[] resp = ResponseBuilder.selectSum(1, 3);
-        assertEquals(12, resp.length);
-        assertEquals(2, readInt32(resp, 0));
-        assertEquals(1, readInt32(resp, 4));
-        assertEquals(3, readInt32(resp, 8));
+        assertEquals(16, resp.length);
+        assertEquals(0, readInt32(resp, 0));  // format code
+        assertEquals(2, readInt32(resp, 4));  // count
+        assertEquals(1, readInt32(resp, 8));
+        assertEquals(3, readInt32(resp, 12));
     }
 }

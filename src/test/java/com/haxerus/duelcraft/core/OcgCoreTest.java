@@ -436,72 +436,72 @@ class OcgCoreTest {
 
         return switch (msg.type) {
             case MSG_SELECT_IDLECMD -> {
-                // Body: [uint8 player][...summon list...][...spsummon...][...reposition...][...setmonster...][...setspell...][...activate...]
-                // Response: int32 action_type + int32 index
-                // Action 5 = end phase (safest default), or we can try to summon/set/activate
-                // Parse to find if we have summonable monsters or activatable cards
+                // Response: single int32 packed as (index << 16) | actionType
                 int player = Byte.toUnsignedInt(bb.get());
-                // Count of summonable monsters
                 int summonCount = bb.getInt();
                 if (summonCount > 0) {
-                    // Action 0 = Normal Summon, pick first
-                    yield intResponse(0, 0);
+                    yield intResponse((0 << 16) | 0); // Summon first
                 }
-                // Skip summon entries to get to other options
+                // Skip summon entries (code:4 + con:1 + loc:1 + seq:4 = 10 bytes each)
                 for (int i = 0; i < summonCount; i++) {
-                    bb.getInt(); // code
-                    bb.get(); bb.get(); bb.getInt(); bb.getInt(); // loc_info: con, loc, seq, pos
+                    bb.getInt(); bb.get(); bb.get(); bb.getInt();
                 }
                 int spSummonCount = bb.getInt();
                 for (int i = 0; i < spSummonCount; i++) {
-                    bb.getInt(); bb.get(); bb.get(); bb.getInt(); bb.getInt();
+                    bb.getInt(); bb.get(); bb.get(); bb.getInt();
                 }
+                // Repos entries (code:4 + con:1 + loc:1 + seq:1 = 7 bytes each)
                 int repositionCount = bb.getInt();
                 for (int i = 0; i < repositionCount; i++) {
-                    bb.getInt(); bb.get(); bb.get(); bb.getInt(); bb.getInt();
+                    bb.getInt(); bb.get(); bb.get(); bb.get();
                 }
                 int setMonsterCount = bb.getInt();
                 if (setMonsterCount > 0) {
-                    yield intResponse(3, 0); // Action 3 = Set monster
+                    yield intResponse((0 << 16) | 3); // Set monster first
                 }
                 for (int i = 0; i < setMonsterCount; i++) {
-                    bb.getInt(); bb.get(); bb.get(); bb.getInt(); bb.getInt();
+                    bb.getInt(); bb.get(); bb.get(); bb.getInt();
                 }
                 int setSpellCount = bb.getInt();
                 if (setSpellCount > 0) {
-                    yield intResponse(4, 0); // Action 4 = Set S/T
+                    yield intResponse((0 << 16) | 4); // Set S/T first
                 }
                 for (int i = 0; i < setSpellCount; i++) {
-                    bb.getInt(); bb.get(); bb.get(); bb.getInt(); bb.getInt();
+                    bb.getInt(); bb.get(); bb.get(); bb.getInt();
                 }
+                // Activatable entries (code:4 + con:1 + loc:1 + seq:4 + desc:8 + flag:1 = 19 bytes)
                 int activateCount = bb.getInt();
                 if (activateCount > 0) {
-                    yield intResponse(5, 0); // Action 5 = Activate
+                    yield intResponse((0 << 16) | 5); // Activate first
                 }
-                // Nothing to do — go to battle phase (6) or end turn (7)
-                yield intResponse(7, 0); // End turn
+                yield intResponse(7); // End turn
             }
 
             case MSG_SELECT_BATTLECMD -> {
-                // Response: int32 action_type + int32 index
-                // Parse to check for attackable monsters
+                // Response: single int32 packed as (index << 16) | actionType
                 int player = Byte.toUnsignedInt(bb.get());
+                // Skip activatable entries (code:4 + con:1 + loc:1 + seq:4 + desc:8 + flag:1 = 19 bytes)
+                int activateCount = bb.getInt();
+                for (int i = 0; i < activateCount; i++) {
+                    bb.getInt(); bb.get(); bb.get(); bb.getInt(); bb.getLong(); bb.get();
+                }
+                // Attack entries (code:4 + con:1 + loc:1 + seq:1 + diratt:1 = 8 bytes)
                 int attackCount = bb.getInt();
                 if (attackCount > 0) {
-                    yield intResponse(1, 0); // Action 1 = Attack with first monster
+                    yield intResponse((0 << 16) | 1); // Attack with first
                 }
-                yield intResponse(3, 0); // Action 3 = End battle phase
+                yield intResponse(3); // End battle
             }
 
             case MSG_SELECT_CARD -> {
-                // Body: [uint8 player][uint8 cancelable][uint32 min][uint32 max][uint32 count][...cards...]
+                // Response: [int32 formatCode=0][int32 count][int32 indices...]
                 int player = Byte.toUnsignedInt(bb.get());
                 int cancelable = Byte.toUnsignedInt(bb.get());
                 int min = bb.getInt();
                 int max = bb.getInt();
                 int count = bb.getInt();
-                // Select the minimum number of cards, picking the first ones
-                ByteBuffer resp = ByteBuffer.allocate(4 + 4 * min).order(ByteOrder.LITTLE_ENDIAN);
+                ByteBuffer resp = ByteBuffer.allocate(4 + 4 + 4 * min).order(ByteOrder.LITTLE_ENDIAN);
+                resp.putInt(0); // format code
                 resp.putInt(min);
                 for (int i = 0; i < min; i++) {
                     resp.putInt(i);
@@ -576,13 +576,14 @@ class OcgCoreTest {
             }
 
             case MSG_SELECT_TRIBUTE -> {
-                // Same structure as SELECT_CARD
+                // Response: [int32 formatCode=0][int32 count][int32 indices...]
                 int player = Byte.toUnsignedInt(bb.get());
                 int cancelable = Byte.toUnsignedInt(bb.get());
                 int min = bb.getInt();
                 int max = bb.getInt();
                 int count = bb.getInt();
-                ByteBuffer resp = ByteBuffer.allocate(4 + 4 * min).order(ByteOrder.LITTLE_ENDIAN);
+                ByteBuffer resp = ByteBuffer.allocate(4 + 4 + 4 * min).order(ByteOrder.LITTLE_ENDIAN);
+                resp.putInt(0); // format code
                 resp.putInt(min);
                 for (int i = 0; i < min; i++) {
                     resp.putInt(i);
@@ -591,16 +592,17 @@ class OcgCoreTest {
             }
 
             case MSG_SELECT_SUM -> {
-                // Body: [uint8 player][uint8 must_just][uint32 total_sum][uint32 min][uint32 max]
-                //       [uint32 must_count][...must cards...][uint32 select_count][...select cards...]
-                // Response: int32 count + int32[] indices (of the selectable cards)
+                // Response: [int32 formatCode=0][int32 count][int32 indices...]
                 int player = Byte.toUnsignedInt(bb.get());
                 int mustJust = Byte.toUnsignedInt(bb.get());
                 int totalSum = bb.getInt();
                 int min = bb.getInt();
                 int max = bb.getInt();
-                // Just pick the first selectable card
-                yield intResponse(1, 0);
+                ByteBuffer resp = ByteBuffer.allocate(4 + 4 + 4).order(ByteOrder.LITTLE_ENDIAN);
+                resp.putInt(0); // format code
+                resp.putInt(1); // count: pick 1
+                resp.putInt(0); // first selectable card
+                yield resp.array();
             }
 
             case MSG_SELECT_UNSELECT_CARD -> {

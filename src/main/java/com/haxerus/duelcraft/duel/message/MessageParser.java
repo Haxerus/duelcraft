@@ -26,6 +26,9 @@ public class MessageParser {
             DuelMessage msg;
             try {
                 msg = switch (type) {
+                // System
+                case MSG_RETRY         -> new DuelMessage.Retry();
+
                 // Lifecycle
                 case MSG_START         -> parseStart(reader);
                 case MSG_WIN           -> parseWin(reader, bodyLength);

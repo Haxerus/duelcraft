@@ -27,6 +27,11 @@ public class ServerDuelHandler implements DuelEventListener {
     @Override
     public int onMessage(DuelMessage msg) {
         switch (msg) {
+            case DuelMessage.Retry ignored -> {
+                // Bad response — broadcast retry so the client re-prompts
+                broadcastToBoth(msg);
+                return 1; // stop processing, wait for corrected response
+            }
             case DuelMessage.Win win -> {
                 var payload = new DuelEndPayload(win.winner(), win.reason());
                 PacketDistributor.sendToPlayer(player0, payload);

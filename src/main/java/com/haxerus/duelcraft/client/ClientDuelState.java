@@ -7,7 +7,9 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -54,8 +56,17 @@ public class ClientDuelState {
     // Pending selection prompt (null = no prompt)
     public DuelMessage pendingPrompt;
 
+    // Card actions: maps card location → available actions (for click-on-card UI)
+    public record CardAction(int actionType, int listIndex, String label) {}
+    public record CardLocation(int controller, int location, int sequence) {}
+    public final Map<CardLocation, List<CardAction>> cardActions = new HashMap<>();
+
     // Last game action message (for UI display)
     public DuelMessage lastAction;
+
+    // Last hint (provides context for next selection, e.g., "Select a monster")
+    public int lastHintType;
+    public long lastHintData;
 
     // Winner (-1 = ongoing)
     public int winner = -1;
@@ -81,6 +92,20 @@ public class ClientDuelState {
         lastAction = msg;
 
         switch (msg) {
+            // ---- System ----
+            case DuelMessage.Retry ignored -> {
+                // Engine rejected last response — re-show the current prompt
+                LOGGER.warn("[State] RETRY — last response was invalid, re-prompting");
+                // pendingPrompt is still set from the last selection message, UI will re-show it
+            }
+
+            // ---- UI/Info ----
+            case DuelMessage.Hint hint -> {
+                lastHintType = hint.hintType();
+                lastHintData = hint.data();
+                LOGGER.debug("[State] Hint: type={}, player={}, data={}", hint.hintType(), hint.player(), hint.data());
+            }
+
             // ---- Lifecycle ----
             case DuelMessage.Start start -> {
                 lp[0] = start.lp0();
@@ -194,8 +219,16 @@ public class ClientDuelState {
             case DuelMessage.DamageStepEnd ignored -> { }
 
             // ---- Selection prompts — set pendingPrompt for the UI ----
-            case DuelMessage.SelectIdleCmd sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectIdleCmd player={}", sel.player()); }
-            case DuelMessage.SelectBattleCmd sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectBattleCmd player={}", sel.player()); }
+            case DuelMessage.SelectIdleCmd sel -> {
+                pendingPrompt = msg;
+                buildIdleCmdActions(sel);
+                LOGGER.debug("[State] Prompt: SelectIdleCmd player={}, actions={}", sel.player(), cardActions.size());
+            }
+            case DuelMessage.SelectBattleCmd sel -> {
+                pendingPrompt = msg;
+                buildBattleCmdActions(sel);
+                LOGGER.debug("[State] Prompt: SelectBattleCmd player={}, actions={}", sel.player(), cardActions.size());
+            }
             case DuelMessage.SelectCard sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectCard player={}, min={}, max={}, cards={}", sel.player(), sel.min(), sel.max(), sel.cards().stream().map(c -> String.valueOf(c.code())).toList()); }
             case DuelMessage.SelectChain sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
             case DuelMessage.SelectEffectYn sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
@@ -305,6 +338,57 @@ public class ClientDuelState {
             case PHASE_END -> "End";
             default -> "---";
         };
+    }
+
+    public void clearCardActions() {
+        cardActions.clear();
+    }
+
+    private void addAction(int controller, int location, int sequence,
+                           int actionType, int listIndex, String label) {
+        var key = new CardLocation(controller, location, sequence);
+        cardActions.computeIfAbsent(key, k -> new ArrayList<>())
+                .add(new CardAction(actionType, listIndex, label));
+    }
+
+    private void buildIdleCmdActions(DuelMessage.SelectIdleCmd sel) {
+        cardActions.clear();
+        for (int i = 0; i < sel.summonable().size(); i++) {
+            var c = sel.summonable().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 0, i, "Summon");
+        }
+        for (int i = 0; i < sel.specialSummonable().size(); i++) {
+            var c = sel.specialSummonable().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 1, i, "Sp. Summon");
+        }
+        for (int i = 0; i < sel.repositionable().size(); i++) {
+            var c = sel.repositionable().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 2, i, "Reposition");
+        }
+        for (int i = 0; i < sel.settableMonsters().size(); i++) {
+            var c = sel.settableMonsters().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 3, i, "Set");
+        }
+        for (int i = 0; i < sel.settableSpells().size(); i++) {
+            var c = sel.settableSpells().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 4, i, "Set S/T");
+        }
+        for (int i = 0; i < sel.activatable().size(); i++) {
+            var c = sel.activatable().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 5, i, "Activate");
+        }
+    }
+
+    private void buildBattleCmdActions(DuelMessage.SelectBattleCmd sel) {
+        cardActions.clear();
+        for (int i = 0; i < sel.attackable().size(); i++) {
+            var c = sel.attackable().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 1, i, "Attack");
+        }
+        for (int i = 0; i < sel.activatable().size(); i++) {
+            var c = sel.activatable().get(i);
+            addAction(c.controller(), c.location(), c.sequence(), 2, i, "Activate");
+        }
     }
 
     public record ChainLink(int code, LocInfo location, int chainIndex) {}
