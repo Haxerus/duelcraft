@@ -11,12 +11,14 @@ public interface DuelEventListener {
     /**
      * Called for each message produced by the duel engine during processing.
      *
-     * @param msg the parsed duel message
+     * @param msg the parsed duel message (for flow control and game logic)
+     * @param rawData the raw bytes of this message from the engine buffer
+     *                (for network forwarding to clients)
      * @return 0 to continue processing the next message,
      *         1 to stop (awaiting player response),
      *         2 to stop (duel ended)
      */
-    int onMessage(DuelMessage msg);
+    int onMessage(DuelMessage msg, byte[] rawData);
 
     /**
      * Called when the duel has ended (either by MSG_WIN or engine status END).

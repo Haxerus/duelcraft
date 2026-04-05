@@ -10,10 +10,10 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
  *
  * Query result format per card:
  * <pre>
- *   [uint32 total_size]  — size of remaining data for this card (0 = empty slot)
+ *   [uint32 total_size]  — size of remaining response for this card (0 = empty slot)
  *   For each QUERY_* flag present (ordered low bit to high bit):
  *     [uint32 field_size] — size including this uint32
- *     [field data...]     — field_size - 4 bytes
+ *     [field response...]     — field_size - 4 bytes
  * </pre>
  */
 public class QueryParser {
@@ -161,7 +161,7 @@ public class QueryParser {
             }
             case QUERY_IS_HIDDEN -> card.isHidden = r.readInt32() != 0;
             case QUERY_COVER -> card.cover = r.readInt32();
-            case QUERY_END -> { /* terminal marker, no data */ }
+            case QUERY_END -> { /* terminal marker, no response */ }
             default -> r.skip(dataSize);
         }
     }

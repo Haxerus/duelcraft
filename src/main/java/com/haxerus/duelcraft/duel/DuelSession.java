@@ -1,8 +1,8 @@
 package com.haxerus.duelcraft.duel;
 
 import com.haxerus.duelcraft.core.*;
-import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.MessageParser;
+import com.haxerus.duelcraft.duel.message.ParsedEntry;
 
 import java.util.List;
 
@@ -70,9 +70,9 @@ public class DuelSession implements AutoCloseable {
             status = OcgCore.nDuelProcess(eng, duelHandle);
             byte[] messageBuffer = OcgCore.nDuelGetMessage(eng, duelHandle);
             if (messageBuffer != null && messageBuffer.length > 0) {
-                List<DuelMessage> messages = MessageParser.parse(messageBuffer);
-                for (DuelMessage msg : messages) {
-                    int result = listener.onMessage(msg);
+                List<ParsedEntry> entries = MessageParser.parse(messageBuffer);
+                for (ParsedEntry entry : entries) {
+                    int result = listener.onMessage(entry.message(), entry.raw());
                     if (result != 0) {
                         if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
                             ended = true;

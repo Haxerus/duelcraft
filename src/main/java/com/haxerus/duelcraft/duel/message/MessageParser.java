@@ -1,17 +1,19 @@
 package com.haxerus.duelcraft.duel.message;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 public class MessageParser {
 
-    public static List<DuelMessage> parse(byte[] buffer) {
-        List<DuelMessage> messages = new ArrayList<>();
+    public static List<ParsedEntry> parse(byte[] buffer) {
+        List<ParsedEntry> entries = new ArrayList<>();
         BufferReader reader = new BufferReader(buffer);
 
         while (reader.remaining() >= 5) { // at least length(4) + type(1)
+            int rawStart = reader.position(); // start of this message (before length)
             int length = reader.readInt32();
             if (length < 1 || reader.remaining() < length) break;
 
@@ -116,10 +118,13 @@ public class MessageParser {
                 }
             };
 
-            messages.add(msg);
+            // Slice the raw bytes for this message (length header + type + body)
+            int rawEnd = reader.position();
+            byte[] raw = Arrays.copyOfRange(buffer, rawStart, rawEnd);
+            entries.add(new ParsedEntry(msg, raw));
         }
 
-        return messages;
+        return entries;
     }
 
     // ---- Lifecycle ----

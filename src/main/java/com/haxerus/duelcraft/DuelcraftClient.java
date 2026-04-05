@@ -1,5 +1,8 @@
 package com.haxerus.duelcraft;
 
+import com.haxerus.duelcraft.client.ClientPayloadHandler;
+import com.haxerus.duelcraft.server.DuelEndPayload;
+import com.haxerus.duelcraft.server.DuelMessagePayload;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -9,6 +12,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
 @Mod(value = Duelcraft.MODID, dist = Dist.CLIENT)
@@ -27,5 +31,11 @@ public class DuelcraftClient {
         // Some client setup code
         Duelcraft.LOGGER.info("HELLO FROM CLIENT SETUP");
         Duelcraft.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    }
+
+    @SubscribeEvent
+    static void onRegisterClientPayloads(RegisterClientPayloadHandlersEvent event) {
+        event.register(DuelMessagePayload.TYPE, ClientPayloadHandler::handleMessage);
+        event.register(DuelEndPayload.TYPE, ClientPayloadHandler::handleEnd);
     }
 }

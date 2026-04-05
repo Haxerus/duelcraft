@@ -17,5 +17,6 @@ public class BufferReader {
     public long readUint32() { return Integer.toUnsignedLong(buf.getInt()); }
     public long readInt64() { return buf.getLong(); }
     public int remaining() { return buf.remaining(); }
+    public int position() { return buf.position(); }
     public void skip(int n) { buf.position(buf.position() + n); }
 }

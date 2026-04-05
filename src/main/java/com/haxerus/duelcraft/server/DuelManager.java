@@ -23,6 +23,9 @@ public class DuelManager {
     private Map<UUID, DuelSession> activeDuels;
     private Map<UUID, UUID> playerToDuel;
 
+    // FIXME: Temporary for testing
+    public Map<UUID, UUID> duelInvites; // target -> challenger
+
     public static DuelManager get() { return instance; }
 
     public static void onServerStarting(ServerStartingEvent event) {
@@ -45,6 +48,7 @@ public class DuelManager {
 
         activeDuels = new HashMap<>();
         playerToDuel = new HashMap<>();
+        duelInvites = new HashMap<>();
 
         int[] version = OcgCore.nGetVersion();
         LOGGER.info("DuelManager initialized — OCG core v{}.{}", version[0], version[1]);
@@ -100,5 +104,9 @@ public class DuelManager {
             // Also clean up playerToDuel entries
             playerToDuel.values().removeIf(id -> id.equals(duelId));
         }
+    }
+
+    public UUID getPlayerActiveDuel(ServerPlayer player) {
+        return playerToDuel.get(player.getUUID());
     }
 }

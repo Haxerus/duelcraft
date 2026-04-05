@@ -121,11 +121,10 @@ tasks.register('configureJniBridge', Exec) {
 
     inputs.file("${jniBridgeSrcDir}/CMakeLists.txt")
     outputs.file("${jniBridgeBuildDir}/duelcraft_jni.vcxproj")
-
-    doFirst {
-        mkdir jniBridgeBuildDir
-    }
 }
+
+// Ensure the build directory exists before CMake runs
+jniBridgeBuildDir.mkdirs()
 
 tasks.register('buildJniBridge', Exec) {
     description = 'Build JNI bridge shared library (Windows x64 Release)'
@@ -190,6 +189,13 @@ neoForge {
 
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        client2 {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            programArgument '--username'
+            programArgument 'Player2'
         }
 
         server {

@@ -354,10 +354,10 @@ class OcgCoreTest {
     @Order(7)
     void testQueryField() {
         assertNotEquals(0, duel, "Duel must exist");
-        // Query the full field — just verify it returns data without crashing
+        // Query the full field — just verify it returns response without crashing
         byte[] fieldData = OcgCore.nDuelQueryField(engine, duel);
-        assertNotNull(fieldData, "Field query should return data");
-        assertTrue(fieldData.length > 0, "Field query data should not be empty");
+        assertNotNull(fieldData, "Field query should return response");
+        assertTrue(fieldData.length > 0, "Field query response should not be empty");
         System.out.println("Field query: " + fieldData.length + " bytes");
     }
 
