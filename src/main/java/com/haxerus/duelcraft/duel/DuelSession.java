@@ -1,12 +1,15 @@
 package com.haxerus.duelcraft.duel;
 
 import com.haxerus.duelcraft.core.*;
+import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.MessageParser;
-import com.haxerus.duelcraft.duel.message.ParsedEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class DuelSession implements AutoCloseable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DuelSession.class);
     private final DuelEngine engine;
     private final long duelHandle;
     private final DuelEventListener listener;
@@ -70,9 +73,9 @@ public class DuelSession implements AutoCloseable {
             status = OcgCore.nDuelProcess(eng, duelHandle);
             byte[] messageBuffer = OcgCore.nDuelGetMessage(eng, duelHandle);
             if (messageBuffer != null && messageBuffer.length > 0) {
-                List<ParsedEntry> entries = MessageParser.parse(messageBuffer);
-                for (ParsedEntry entry : entries) {
-                    int result = listener.onMessage(entry.message(), entry.raw());
+                List<DuelMessage> messages = MessageParser.parse(messageBuffer);
+                for (DuelMessage msg : messages) {
+                    int result = listener.onMessage(msg);
                     if (result != 0) {
                         if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
                             ended = true;
@@ -95,6 +98,7 @@ public class DuelSession implements AutoCloseable {
      */
     public void setResponse(byte[] response) {
         if (ended) return;
+        LOGGER.debug("[Session] setResponse: {} bytes", response.length);
         OcgCore.nDuelSetResponse(engine.getHandle(), duelHandle, response);
         process();
     }

@@ -86,9 +86,15 @@ public class DuelManager {
         playerToDuel.put(p1.getUUID(), duelId);
         playerToDuel.put(p2.getUUID(), duelId);
 
-        // Tell each client which player they are and who their opponent is
-        PacketDistributor.sendToPlayer(p1, new DuelStartPayload(0, p2.getName().getString()));
-        PacketDistributor.sendToPlayer(p2, new DuelStartPayload(1, p1.getName().getString()));
+        // Tell each client which player they are, the opponent's name, and initial game state
+        int lp0 = options.team1().lp();
+        int lp1 = options.team2().lp();
+        int deckSize = team1deck.main().size();
+        int extraSize = team1deck.extra().size();
+        PacketDistributor.sendToPlayer(p1, new DuelStartPayload(0, p2.getName().getString(),
+                lp0, lp1, deckSize, extraSize));
+        PacketDistributor.sendToPlayer(p2, new DuelStartPayload(1, p1.getName().getString(),
+                lp0, lp1, deckSize, extraSize));
 
         session.setupDuel(team1deck, team2Deck);
         session.process();

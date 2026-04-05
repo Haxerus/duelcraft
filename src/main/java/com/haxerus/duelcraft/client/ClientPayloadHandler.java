@@ -12,14 +12,15 @@ public class ClientPayloadHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public static void handleStart(DuelStartPayload payload, IPayloadContext context) {
-        LOGGER.info("Duel starting — we are player {}, opponent: {}",
-                payload.localPlayer(), payload.opponentName());
-        Minecraft.getInstance().setScreen(new DuelScreen(payload.localPlayer(), payload.opponentName()));
+        LOGGER.info("Duel starting — player {}, opponent: {}, LP={}|{}, deck={}, extra={}",
+                payload.localPlayer(), payload.opponentName(),
+                payload.lp0(), payload.lp1(), payload.deckSize(), payload.extraSize());
+        Minecraft.getInstance().setScreen(new DuelScreen(payload));
     }
 
     public static void handleMessage(DuelMessagePayload payload, IPayloadContext context) {
         if (Minecraft.getInstance().screen instanceof DuelScreen screen) {
-            screen.applyMessage(payload);
+            screen.applyMessage(payload.message());
         }
     }
 

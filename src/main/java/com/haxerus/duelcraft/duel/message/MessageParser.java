@@ -1,19 +1,21 @@
 package com.haxerus.duelcraft.duel.message;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 public class MessageParser {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessageParser.class);
 
-    public static List<ParsedEntry> parse(byte[] buffer) {
-        List<ParsedEntry> entries = new ArrayList<>();
+    public static List<DuelMessage> parse(byte[] buffer) {
+        List<DuelMessage> messages = new ArrayList<>();
         BufferReader reader = new BufferReader(buffer);
 
         while (reader.remaining() >= 5) { // at least length(4) + type(1)
-            int rawStart = reader.position(); // start of this message (before length)
             int length = reader.readInt32();
             if (length < 1 || reader.remaining() < length) break;
 
@@ -122,24 +124,25 @@ public class MessageParser {
             };
 
             } catch (Exception e) {
-                // Parse error — treat as raw message and ensure position is correct
-                byte[] body = new byte[0];
-                msg = new DuelMessage.Raw(type, body);
+                LOGGER.warn("[Parse] FAILED msg type {} (body {} bytes): {}",
+                        type, bodyLength, e.getMessage());
+                msg = new DuelMessage.Raw(type, new byte[0]);
             }
 
             // Ensure we're at the expected position regardless of how much the parser read.
-            // This prevents one malformed message from corrupting all subsequent messages.
-            if (reader.position() != messageEnd) {
-                reader.skip(messageEnd - reader.position());
+            int drift = messageEnd - reader.position();
+            if (drift != 0) {
+                LOGGER.debug("[Parse] msg type {} drifted {} bytes (body={}, consumed={})",
+                        type, drift, bodyLength, bodyLength - drift);
+                reader.skip(drift);
             }
 
-            // Slice the raw bytes for this message (length header + type + body)
-            int rawEnd = reader.position();
-            byte[] raw = Arrays.copyOfRange(buffer, rawStart, rawEnd);
-            entries.add(new ParsedEntry(msg, raw));
+            LOGGER.debug("[Parse] {} (type={}, body={} bytes)",
+                    msg.getClass().getSimpleName(), type, bodyLength);
+            messages.add(msg);
         }
 
-        return entries;
+        return messages;
     }
 
     // ---- Lifecycle ----
@@ -177,6 +180,7 @@ public class MessageParser {
         List<Integer> codes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             codes.add(r.readInt32());
+            r.readInt32(); // position info (not needed for draw)
         }
         return new DuelMessage.Draw(player, codes);
     }

@@ -1,0 +1,400 @@
+package com.haxerus.duelcraft.duel.message;
+
+import net.minecraft.network.FriendlyByteBuf;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static com.haxerus.duelcraft.core.OcgConstants.*;
+
+/**
+ * Encodes/decodes DuelMessage records for network transport.
+ * This is our own serialization format — independent of the ygopro-core binary format.
+ * The server parses engine bytes via MessageParser, then encodes typed messages here.
+ * The client decodes them directly — no re-parsing.
+ */
+public class DuelMessageCodec {
+
+    // ---- Encode ----
+
+    public static void encode(FriendlyByteBuf buf, DuelMessage msg) {
+        buf.writeByte(msg.type());
+
+        switch (msg) {
+            // Lifecycle
+            case DuelMessage.Start m -> {
+                buf.writeInt(m.playerType());
+                buf.writeInt(m.lp0());
+                buf.writeInt(m.lp1());
+                buf.writeShort(m.deckCount0());
+                buf.writeShort(m.extraCount0());
+                buf.writeShort(m.deckCount1());
+                buf.writeShort(m.extraCount1());
+            }
+            case DuelMessage.Win m -> { buf.writeByte(m.winner()); buf.writeByte(m.reason()); }
+            case DuelMessage.NewTurn m -> buf.writeByte(m.player());
+            case DuelMessage.NewPhase m -> buf.writeShort(m.phase());
+
+            // Card movement
+            case DuelMessage.Draw m -> {
+                buf.writeByte(m.player());
+                writeIntList(buf, m.codes());
+            }
+            case DuelMessage.Move m -> {
+                buf.writeInt(m.code());
+                writeLocInfo(buf, m.from());
+                writeLocInfo(buf, m.to());
+                buf.writeInt(m.reason());
+            }
+            case DuelMessage.PosChange m -> {
+                buf.writeInt(m.code());
+                buf.writeByte(m.controller());
+                buf.writeByte(m.location());
+                buf.writeByte(m.sequence());
+                buf.writeByte(m.prevPosition());
+                buf.writeByte(m.newPosition());
+            }
+            case DuelMessage.Set m -> { buf.writeInt(m.code()); writeLocInfo(buf, m.location()); }
+            case DuelMessage.Swap m -> {
+                buf.writeInt(m.code1()); writeLocInfo(buf, m.loc1());
+                buf.writeInt(m.code2()); writeLocInfo(buf, m.loc2());
+            }
+
+            // Summons
+            case DuelMessage.Summoning m -> { buf.writeInt(m.code()); writeLocInfo(buf, m.location()); }
+            case DuelMessage.Summoned ignored -> {}
+            case DuelMessage.SpSummoning m -> { buf.writeInt(m.code()); writeLocInfo(buf, m.location()); }
+            case DuelMessage.SpSummoned ignored -> {}
+            case DuelMessage.FlipSummoning m -> { buf.writeInt(m.code()); writeLocInfo(buf, m.location()); }
+            case DuelMessage.FlipSummoned ignored -> {}
+
+            // Chain
+            case DuelMessage.Chaining m -> {
+                buf.writeInt(m.code());
+                writeLocInfo(buf, m.location());
+                buf.writeByte(m.chainIndex());
+                buf.writeLong(m.desc());
+                buf.writeByte(m.chainCount());
+            }
+            case DuelMessage.Chained m -> buf.writeByte(m.chainIndex());
+            case DuelMessage.ChainSolving m -> buf.writeByte(m.chainIndex());
+            case DuelMessage.ChainSolved m -> buf.writeByte(m.chainIndex());
+            case DuelMessage.ChainEnd ignored -> {}
+            case DuelMessage.ChainNegated m -> buf.writeByte(m.chainIndex());
+            case DuelMessage.ChainDisabled m -> buf.writeByte(m.chainIndex());
+
+            // LP
+            case DuelMessage.Damage m -> { buf.writeByte(m.player()); buf.writeInt(m.amount()); }
+            case DuelMessage.Recover m -> { buf.writeByte(m.player()); buf.writeInt(m.amount()); }
+            case DuelMessage.LpUpdate m -> { buf.writeByte(m.player()); buf.writeInt(m.lp()); }
+            case DuelMessage.PayLpCost m -> { buf.writeByte(m.player()); buf.writeInt(m.amount()); }
+
+            // Battle
+            case DuelMessage.Attack m -> { writeLocInfo(buf, m.attacker()); writeLocInfo(buf, m.target()); }
+            case DuelMessage.Battle m -> {
+                writeLocInfo(buf, m.attacker());
+                buf.writeInt(m.atkAtk()); buf.writeInt(m.atkDef());
+                writeLocInfo(buf, m.defender());
+                buf.writeInt(m.defAtk()); buf.writeInt(m.defDef());
+            }
+            case DuelMessage.AttackDisabled ignored -> {}
+            case DuelMessage.DamageStepStart ignored -> {}
+            case DuelMessage.DamageStepEnd ignored -> {}
+
+            // Deck/Hand
+            case DuelMessage.ShuffleDeck m -> buf.writeByte(m.player());
+            case DuelMessage.ShuffleHand m -> { buf.writeByte(m.player()); writeIntList(buf, m.codes()); }
+            case DuelMessage.ShuffleExtra m -> buf.writeByte(m.player());
+
+            // UI/Info
+            case DuelMessage.Hint m -> { buf.writeByte(m.hintType()); buf.writeByte(m.player()); buf.writeLong(m.data()); }
+            case DuelMessage.CardHint m -> {
+                buf.writeInt(m.code()); writeLocInfo(buf, m.location());
+                buf.writeByte(m.chintType()); buf.writeLong(m.value());
+            }
+            case DuelMessage.FieldDisabled m -> buf.writeInt(m.field());
+            case DuelMessage.BecomeTarget m -> writeLocInfoList(buf, m.targets());
+
+            // Selection prompts
+            case DuelMessage.SelectIdleCmd m -> { buf.writeByte(m.player()); writeByteArray(buf, m.rawBody()); }
+            case DuelMessage.SelectBattleCmd m -> { buf.writeByte(m.player()); writeByteArray(buf, m.rawBody()); }
+            case DuelMessage.SelectCard m -> {
+                buf.writeByte(m.player());
+                buf.writeBoolean(m.cancelable());
+                buf.writeInt(m.min()); buf.writeInt(m.max());
+                writeCardInfoList(buf, m.cards());
+            }
+            case DuelMessage.SelectChain m -> {
+                buf.writeByte(m.player());
+                buf.writeByte(m.count());
+                buf.writeBoolean(m.forced());
+                writeByteArray(buf, m.rawBody());
+            }
+            case DuelMessage.SelectEffectYn m -> {
+                buf.writeByte(m.player()); buf.writeInt(m.code());
+                writeLocInfo(buf, m.location()); buf.writeLong(m.desc());
+            }
+            case DuelMessage.SelectYesNo m -> { buf.writeByte(m.player()); buf.writeLong(m.desc()); }
+            case DuelMessage.SelectOption m -> {
+                buf.writeByte(m.player());
+                writeLongList(buf, m.options());
+            }
+            case DuelMessage.SelectPlace m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeInt(m.field()); }
+            case DuelMessage.SelectPosition m -> { buf.writeByte(m.player()); buf.writeInt(m.code()); buf.writeByte(m.positions()); }
+            case DuelMessage.SelectTribute m -> {
+                buf.writeByte(m.player());
+                buf.writeBoolean(m.cancelable());
+                buf.writeInt(m.min()); buf.writeInt(m.max());
+                writeCardInfoList(buf, m.cards());
+            }
+            case DuelMessage.SelectCounter m -> {
+                buf.writeByte(m.player());
+                buf.writeShort(m.counterType());
+                buf.writeShort(m.count());
+                writeCardInfoList(buf, m.cards());
+            }
+            case DuelMessage.SelectSum m -> {
+                buf.writeByte(m.player());
+                buf.writeBoolean(m.mustExact());
+                buf.writeInt(m.totalSum());
+                buf.writeInt(m.min()); buf.writeInt(m.max());
+                writeByteArray(buf, m.rawBody());
+            }
+            case DuelMessage.SelectUnselectCard m -> {
+                buf.writeByte(m.player());
+                buf.writeBoolean(m.finishable());
+                buf.writeBoolean(m.cancelable());
+                buf.writeInt(m.min()); buf.writeInt(m.max());
+                writeCardInfoList(buf, m.selectableCards());
+                writeCardInfoList(buf, m.unselectableCards());
+            }
+            case DuelMessage.SortCard m -> { buf.writeByte(m.player()); writeCardInfoList(buf, m.cards()); }
+            case DuelMessage.SortChain m -> { buf.writeByte(m.player()); writeCardInfoList(buf, m.cards()); }
+            case DuelMessage.AnnounceRace m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeLong(m.available()); }
+            case DuelMessage.AnnounceAttrib m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeInt(m.available()); }
+            case DuelMessage.AnnounceNumber m -> { buf.writeByte(m.player()); writeLongList(buf, m.options()); }
+            case DuelMessage.AnnounceCard m -> { buf.writeByte(m.player()); writeByteArray(buf, m.rawBody()); }
+            case DuelMessage.RockPaperScissors m -> buf.writeByte(m.player());
+
+            // Misc
+            case DuelMessage.Equip m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
+            case DuelMessage.Unequip m -> writeLocInfo(buf, m.card());
+            case DuelMessage.CardTarget m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
+            case DuelMessage.CancelTarget m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
+            case DuelMessage.AddCounter m -> { buf.writeShort(m.counterType()); buf.writeByte(m.player()); writeLocInfo(buf, m.location()); buf.writeShort(m.count()); }
+            case DuelMessage.RemoveCounter m -> { buf.writeShort(m.counterType()); buf.writeByte(m.player()); writeLocInfo(buf, m.location()); buf.writeShort(m.count()); }
+            case DuelMessage.TossCoin m -> { buf.writeByte(m.player()); writeSmallIntList(buf, m.results()); }
+            case DuelMessage.TossDice m -> { buf.writeByte(m.player()); writeSmallIntList(buf, m.results()); }
+
+            // Raw fallback
+            case DuelMessage.Raw m -> writeByteArray(buf, m.body());
+        }
+    }
+
+    // ---- Decode ----
+
+    public static DuelMessage decode(FriendlyByteBuf buf) {
+        int type = buf.readUnsignedByte();
+
+        return switch (type) {
+            // Lifecycle
+            case MSG_START -> new DuelMessage.Start(buf.readInt(), buf.readInt(), buf.readInt(),
+                    buf.readShort(), buf.readShort(), buf.readShort(), buf.readShort());
+            case MSG_WIN -> new DuelMessage.Win(buf.readByte(), buf.readByte());
+            case MSG_NEW_TURN -> new DuelMessage.NewTurn(buf.readByte());
+            case MSG_NEW_PHASE -> new DuelMessage.NewPhase(buf.readUnsignedShort());
+
+            // Card movement
+            case MSG_DRAW -> new DuelMessage.Draw(buf.readByte(), readIntList(buf));
+            case MSG_MOVE -> new DuelMessage.Move(buf.readInt(), readLocInfo(buf), readLocInfo(buf), buf.readInt());
+            case MSG_POS_CHANGE -> new DuelMessage.PosChange(buf.readInt(),
+                    buf.readByte(), buf.readByte(), buf.readByte(), buf.readByte(), buf.readByte());
+            case MSG_SET -> new DuelMessage.Set(buf.readInt(), readLocInfo(buf));
+            case MSG_SWAP -> new DuelMessage.Swap(buf.readInt(), readLocInfo(buf), buf.readInt(), readLocInfo(buf));
+
+            // Summons
+            case MSG_SUMMONING -> new DuelMessage.Summoning(buf.readInt(), readLocInfo(buf));
+            case MSG_SUMMONED -> new DuelMessage.Summoned();
+            case MSG_SPSUMMONING -> new DuelMessage.SpSummoning(buf.readInt(), readLocInfo(buf));
+            case MSG_SPSUMMONED -> new DuelMessage.SpSummoned();
+            case MSG_FLIPSUMMONING -> new DuelMessage.FlipSummoning(buf.readInt(), readLocInfo(buf));
+            case MSG_FLIPSUMMONED -> new DuelMessage.FlipSummoned();
+
+            // Chain
+            case MSG_CHAINING -> new DuelMessage.Chaining(buf.readInt(), readLocInfo(buf),
+                    buf.readByte(), buf.readLong(), buf.readByte());
+            case MSG_CHAINED -> new DuelMessage.Chained(buf.readByte());
+            case MSG_CHAIN_SOLVING -> new DuelMessage.ChainSolving(buf.readByte());
+            case MSG_CHAIN_SOLVED -> new DuelMessage.ChainSolved(buf.readByte());
+            case MSG_CHAIN_END -> new DuelMessage.ChainEnd();
+            case MSG_CHAIN_NEGATED -> new DuelMessage.ChainNegated(buf.readByte());
+            case MSG_CHAIN_DISABLED -> new DuelMessage.ChainDisabled(buf.readByte());
+
+            // LP
+            case MSG_DAMAGE -> new DuelMessage.Damage(buf.readByte(), buf.readInt());
+            case MSG_RECOVER -> new DuelMessage.Recover(buf.readByte(), buf.readInt());
+            case MSG_LPUPDATE -> new DuelMessage.LpUpdate(buf.readByte(), buf.readInt());
+            case MSG_PAY_LPCOST -> new DuelMessage.PayLpCost(buf.readByte(), buf.readInt());
+
+            // Battle
+            case MSG_ATTACK -> new DuelMessage.Attack(readLocInfo(buf), readLocInfo(buf));
+            case MSG_BATTLE -> new DuelMessage.Battle(readLocInfo(buf), buf.readInt(), buf.readInt(),
+                    readLocInfo(buf), buf.readInt(), buf.readInt());
+            case MSG_ATTACK_DISABLED -> new DuelMessage.AttackDisabled();
+            case MSG_DAMAGE_STEP_START -> new DuelMessage.DamageStepStart();
+            case MSG_DAMAGE_STEP_END -> new DuelMessage.DamageStepEnd();
+
+            // Deck/Hand
+            case MSG_SHUFFLE_DECK -> new DuelMessage.ShuffleDeck(buf.readByte());
+            case MSG_SHUFFLE_HAND -> new DuelMessage.ShuffleHand(buf.readByte(), readIntList(buf));
+            case MSG_SHUFFLE_EXTRA -> new DuelMessage.ShuffleExtra(buf.readByte());
+
+            // UI/Info
+            case MSG_HINT -> new DuelMessage.Hint(buf.readByte(), buf.readByte(), buf.readLong());
+            case MSG_CARD_HINT -> new DuelMessage.CardHint(buf.readInt(), readLocInfo(buf), buf.readByte(), buf.readLong());
+            case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(buf.readInt());
+            case MSG_BECOME_TARGET -> new DuelMessage.BecomeTarget(readLocInfoList(buf));
+
+            // Selection prompts
+            case MSG_SELECT_IDLECMD -> new DuelMessage.SelectIdleCmd(buf.readByte(), readByteArray(buf));
+            case MSG_SELECT_BATTLECMD -> new DuelMessage.SelectBattleCmd(buf.readByte(), readByteArray(buf));
+            case MSG_SELECT_CARD -> new DuelMessage.SelectCard(buf.readByte(), buf.readBoolean(),
+                    buf.readInt(), buf.readInt(), readCardInfoList(buf));
+            case MSG_SELECT_CHAIN -> new DuelMessage.SelectChain(buf.readByte(), buf.readByte(),
+                    buf.readBoolean(), readByteArray(buf));
+            case MSG_SELECT_EFFECTYN -> new DuelMessage.SelectEffectYn(buf.readByte(), buf.readInt(),
+                    readLocInfo(buf), buf.readLong());
+            case MSG_SELECT_YESNO -> new DuelMessage.SelectYesNo(buf.readByte(), buf.readLong());
+            case MSG_SELECT_OPTION -> new DuelMessage.SelectOption(buf.readByte(), readLongList(buf));
+            case MSG_SELECT_PLACE -> new DuelMessage.SelectPlace(buf.readByte(), buf.readByte(), buf.readInt());
+            case MSG_SELECT_POSITION -> new DuelMessage.SelectPosition(buf.readByte(), buf.readInt(), buf.readByte());
+            case MSG_SELECT_TRIBUTE -> new DuelMessage.SelectTribute(buf.readByte(), buf.readBoolean(),
+                    buf.readInt(), buf.readInt(), readCardInfoList(buf));
+            case MSG_SELECT_COUNTER -> new DuelMessage.SelectCounter(buf.readByte(), buf.readUnsignedShort(),
+                    buf.readUnsignedShort(), readCardInfoList(buf));
+            case MSG_SELECT_SUM -> new DuelMessage.SelectSum(buf.readByte(), buf.readBoolean(),
+                    buf.readInt(), buf.readInt(), buf.readInt(), readByteArray(buf));
+            case MSG_SELECT_UNSELECT_CARD -> new DuelMessage.SelectUnselectCard(buf.readByte(),
+                    buf.readBoolean(), buf.readBoolean(), buf.readInt(), buf.readInt(),
+                    readCardInfoList(buf), readCardInfoList(buf));
+            case MSG_SORT_CARD -> new DuelMessage.SortCard(buf.readByte(), readCardInfoList(buf));
+            case MSG_SORT_CHAIN -> new DuelMessage.SortChain(buf.readByte(), readCardInfoList(buf));
+            case MSG_ANNOUNCE_RACE -> new DuelMessage.AnnounceRace(buf.readByte(), buf.readByte(), buf.readLong());
+            case MSG_ANNOUNCE_ATTRIB -> new DuelMessage.AnnounceAttrib(buf.readByte(), buf.readByte(), buf.readInt());
+            case MSG_ANNOUNCE_NUMBER -> new DuelMessage.AnnounceNumber(buf.readByte(), readLongList(buf));
+            case MSG_ANNOUNCE_CARD -> new DuelMessage.AnnounceCard(buf.readByte(), readByteArray(buf));
+            case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(buf.readByte());
+
+            // Misc
+            case MSG_EQUIP -> new DuelMessage.Equip(readLocInfo(buf), readLocInfo(buf));
+            case MSG_UNEQUIP -> new DuelMessage.Unequip(readLocInfo(buf));
+            case MSG_CARD_TARGET -> new DuelMessage.CardTarget(readLocInfo(buf), readLocInfo(buf));
+            case MSG_CANCEL_TARGET -> new DuelMessage.CancelTarget(readLocInfo(buf), readLocInfo(buf));
+            case MSG_ADD_COUNTER -> new DuelMessage.AddCounter(buf.readUnsignedShort(), buf.readByte(), readLocInfo(buf), buf.readUnsignedShort());
+            case MSG_REMOVE_COUNTER -> new DuelMessage.RemoveCounter(buf.readUnsignedShort(), buf.readByte(), readLocInfo(buf), buf.readUnsignedShort());
+            case MSG_TOSS_COIN -> new DuelMessage.TossCoin(buf.readByte(), readSmallIntList(buf));
+            case MSG_TOSS_DICE -> new DuelMessage.TossDice(buf.readByte(), readSmallIntList(buf));
+
+            // Raw fallback
+            default -> new DuelMessage.Raw(type, readByteArray(buf));
+        };
+    }
+
+    // ---- Helpers ----
+
+    private static void writeLocInfo(FriendlyByteBuf buf, LocInfo loc) {
+        buf.writeByte(loc.controller());
+        buf.writeByte(loc.location());
+        buf.writeInt(loc.sequence());
+        buf.writeInt(loc.position());
+    }
+
+    private static LocInfo readLocInfo(FriendlyByteBuf buf) {
+        return new LocInfo(buf.readByte(), buf.readByte(), buf.readInt(), buf.readInt());
+    }
+
+    private static void writeCardInfo(FriendlyByteBuf buf, DuelMessage.CardInfo ci) {
+        buf.writeInt(ci.code());
+        buf.writeByte(ci.controller());
+        buf.writeByte(ci.location());
+        buf.writeInt(ci.sequence());
+        buf.writeInt(ci.position());
+    }
+
+    private static DuelMessage.CardInfo readCardInfo(FriendlyByteBuf buf) {
+        return new DuelMessage.CardInfo(buf.readInt(), buf.readByte(), buf.readByte(), buf.readInt(), buf.readInt());
+    }
+
+    private static void writeByteArray(FriendlyByteBuf buf, byte[] data) {
+        buf.writeInt(data.length);
+        buf.writeBytes(data);
+    }
+
+    private static byte[] readByteArray(FriendlyByteBuf buf) {
+        int len = buf.readInt();
+        byte[] data = new byte[len];
+        buf.readBytes(data);
+        return data;
+    }
+
+    private static void writeIntList(FriendlyByteBuf buf, List<Integer> list) {
+        buf.writeInt(list.size());
+        for (int v : list) buf.writeInt(v);
+    }
+
+    private static List<Integer> readIntList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        List<Integer> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add(buf.readInt());
+        return list;
+    }
+
+    private static void writeLongList(FriendlyByteBuf buf, List<Long> list) {
+        buf.writeInt(list.size());
+        for (long v : list) buf.writeLong(v);
+    }
+
+    private static List<Long> readLongList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        List<Long> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add(buf.readLong());
+        return list;
+    }
+
+    /** For small int lists where values fit in a byte (coin/dice results). */
+    private static void writeSmallIntList(FriendlyByteBuf buf, List<Integer> list) {
+        buf.writeByte(list.size());
+        for (int v : list) buf.writeByte(v);
+    }
+
+    private static List<Integer> readSmallIntList(FriendlyByteBuf buf) {
+        int count = buf.readUnsignedByte();
+        List<Integer> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add((int) buf.readByte());
+        return list;
+    }
+
+    private static void writeCardInfoList(FriendlyByteBuf buf, List<DuelMessage.CardInfo> list) {
+        buf.writeInt(list.size());
+        for (var ci : list) writeCardInfo(buf, ci);
+    }
+
+    private static List<DuelMessage.CardInfo> readCardInfoList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        List<DuelMessage.CardInfo> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add(readCardInfo(buf));
+        return list;
+    }
+
+    private static void writeLocInfoList(FriendlyByteBuf buf, List<LocInfo> list) {
+        buf.writeInt(list.size());
+        for (var loc : list) writeLocInfo(buf, loc);
+    }
+
+    private static List<LocInfo> readLocInfoList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        List<LocInfo> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add(readLocInfo(buf));
+        return list;
+    }
+}

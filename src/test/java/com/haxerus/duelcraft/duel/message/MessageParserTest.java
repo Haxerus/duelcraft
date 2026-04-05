@@ -11,12 +11,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class MessageParserTest {
 
-    /** Extract just the DuelMessage list from parse results. */
-    static List<DuelMessage> parseMessages(byte[] buffer) {
-        return MessageParser.parse(buffer).stream()
-                .map(ParsedEntry::message).toList();
-    }
-
     // ---- Helpers to build little-endian message buffers ----
 
     /**
@@ -77,7 +71,7 @@ class MessageParserTest {
         b.putShort((short) 40); // deck1
         b.putShort((short) 15); // extra1
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_START, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_START, b.array()));
         assertEquals(1, msgs.size());
         assertInstanceOf(DuelMessage.Start.class, msgs.getFirst());
         var start = (DuelMessage.Start) msgs.getFirst();
@@ -97,7 +91,7 @@ class MessageParserTest {
         b.put((byte) 1); // winner = player 1
         b.put((byte) 3); // reason
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_WIN, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_WIN, b.array()));
         assertEquals(1, msgs.size());
         var win = (DuelMessage.Win) msgs.getFirst();
         assertEquals(1, win.winner());
@@ -106,7 +100,7 @@ class MessageParserTest {
 
     @Test
     void parseNewTurn() {
-        List<DuelMessage> msgs = parseMessages(msg(MSG_NEW_TURN, new byte[]{0}));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_NEW_TURN, new byte[]{0}));
         assertEquals(1, msgs.size());
         var turn = (DuelMessage.NewTurn) msgs.getFirst();
         assertEquals(0, turn.player());
@@ -116,7 +110,7 @@ class MessageParserTest {
     void parseNewPhase() {
         ByteBuffer b = body(2);
         b.putShort((short) PHASE_MAIN1);
-        List<DuelMessage> msgs = parseMessages(msg(MSG_NEW_PHASE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_NEW_PHASE, b.array()));
         var phase = (DuelMessage.NewPhase) msgs.getFirst();
         assertEquals(PHASE_MAIN1, phase.phase());
     }
@@ -125,15 +119,15 @@ class MessageParserTest {
 
     @Test
     void parseDraw() {
-        // [uint8 player][int32 count][int32[] codes]
-        ByteBuffer b = body(1 + 4 + 4 * 3);
+        // [uint8 player][int32 count][(int32 code + int32 position) per card]
+        ByteBuffer b = body(1 + 4 + 8 * 3);
         b.put((byte) 0);     // player
         b.putInt(3);          // count
-        b.putInt(89631139);   // Blue-Eyes White Dragon
-        b.putInt(46986414);   // Dark Magician
-        b.putInt(55144522);   // Pot of Greed
+        b.putInt(89631139); b.putInt(POS_FACEDOWN_DEFENSE);  // Blue-Eyes
+        b.putInt(46986414); b.putInt(POS_FACEDOWN_DEFENSE);  // Dark Magician
+        b.putInt(55144522); b.putInt(POS_FACEDOWN_DEFENSE);  // Pot of Greed
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_DRAW, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_DRAW, b.array()));
         var draw = (DuelMessage.Draw) msgs.getFirst();
         assertEquals(0, draw.player());
         assertEquals(List.of(89631139, 46986414, 55144522), draw.codes());
@@ -148,7 +142,7 @@ class MessageParserTest {
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);  // to
         b.putInt(REASON_SUMMON);                              // reason
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_MOVE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_MOVE, b.array()));
         var move = (DuelMessage.Move) msgs.getFirst();
         assertEquals(89631139, move.code());
         assertEquals(LOCATION_HAND, move.from().location());
@@ -168,7 +162,7 @@ class MessageParserTest {
         b.put((byte) POS_FACEUP_ATTACK);   // prev
         b.put((byte) POS_FACEUP_DEFENSE);  // new
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_POS_CHANGE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_POS_CHANGE, b.array()));
         var pc = (DuelMessage.PosChange) msgs.getFirst();
         assertEquals(89631139, pc.code());
         assertEquals(POS_FACEUP_ATTACK, pc.prevPosition());
@@ -181,7 +175,7 @@ class MessageParserTest {
         b.putInt(44095762);  // Mirror Force
         putLocInfo(b, 0, LOCATION_SZONE, 1, POS_FACEDOWN_DEFENSE);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SET, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SET, b.array()));
         var set = (DuelMessage.Set) msgs.getFirst();
         assertEquals(44095762, set.code());
         assertEquals(LOCATION_SZONE, set.location().location());
@@ -196,7 +190,7 @@ class MessageParserTest {
         b.putInt(89631139);
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SUMMONING, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SUMMONING, b.array()));
         var summon = (DuelMessage.Summoning) msgs.getFirst();
         assertEquals(89631139, summon.code());
         assertEquals(LOCATION_MZONE, summon.location().location());
@@ -205,7 +199,7 @@ class MessageParserTest {
     @Test
     void parseSummonedNoBody() {
         // MSG_SUMMONED has no body
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SUMMONED, new byte[0]));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SUMMONED, new byte[0]));
         assertInstanceOf(DuelMessage.Summoned.class, msgs.getFirst());
     }
 
@@ -221,7 +215,7 @@ class MessageParserTest {
         b.putLong(0L);      // desc
         b.put((byte) 1);    // chain count
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_CHAINING, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CHAINING, b.array()));
         var chain = (DuelMessage.Chaining) msgs.getFirst();
         assertEquals(44095762, chain.code());
         assertEquals(1, chain.chainIndex());
@@ -229,7 +223,7 @@ class MessageParserTest {
 
     @Test
     void parseChainEnd() {
-        List<DuelMessage> msgs = parseMessages(msg(MSG_CHAIN_END, new byte[0]));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CHAIN_END, new byte[0]));
         assertInstanceOf(DuelMessage.ChainEnd.class, msgs.getFirst());
     }
 
@@ -237,13 +231,13 @@ class MessageParserTest {
     void parseChainedSolvedNegated() {
         // These all have a single uint8 chain index
         List<DuelMessage> msgs;
-        msgs = parseMessages(msg(MSG_CHAINED, new byte[]{2}));
+        msgs = MessageParser.parse(msg(MSG_CHAINED, new byte[]{2}));
         assertEquals(2, ((DuelMessage.Chained) msgs.getFirst()).chainIndex());
 
-        msgs = parseMessages(msg(MSG_CHAIN_SOLVING, new byte[]{3}));
+        msgs = MessageParser.parse(msg(MSG_CHAIN_SOLVING, new byte[]{3}));
         assertEquals(3, ((DuelMessage.ChainSolving) msgs.getFirst()).chainIndex());
 
-        msgs = parseMessages(msg(MSG_CHAIN_NEGATED, new byte[]{1}));
+        msgs = MessageParser.parse(msg(MSG_CHAIN_NEGATED, new byte[]{1}));
         assertEquals(1, ((DuelMessage.ChainNegated) msgs.getFirst()).chainIndex());
     }
 
@@ -255,7 +249,7 @@ class MessageParserTest {
         b.put((byte) 1);  // player
         b.putInt(2400);    // amount
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_DAMAGE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_DAMAGE, b.array()));
         var dmg = (DuelMessage.Damage) msgs.getFirst();
         assertEquals(1, dmg.player());
         assertEquals(2400, dmg.amount());
@@ -267,7 +261,7 @@ class MessageParserTest {
         b.put((byte) 0);
         b.putInt(1000);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_RECOVER, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_RECOVER, b.array()));
         var rec = (DuelMessage.Recover) msgs.getFirst();
         assertEquals(0, rec.player());
         assertEquals(1000, rec.amount());
@@ -279,7 +273,7 @@ class MessageParserTest {
         b.put((byte) 0);
         b.putInt(5600);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_LPUPDATE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_LPUPDATE, b.array()));
         var lp = (DuelMessage.LpUpdate) msgs.getFirst();
         assertEquals(5600, lp.lp());
     }
@@ -292,7 +286,7 @@ class MessageParserTest {
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);  // attacker
         putLocInfo(b, 1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK);  // target
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_ATTACK, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ATTACK, b.array()));
         var atk = (DuelMessage.Attack) msgs.getFirst();
         assertEquals(0, atk.attacker().controller());
         assertEquals(1, atk.target().controller());
@@ -308,7 +302,7 @@ class MessageParserTest {
         b.putInt(2500);  // defender ATK
         b.putInt(2100);  // defender DEF
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_BATTLE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_BATTLE, b.array()));
         var battle = (DuelMessage.Battle) msgs.getFirst();
         assertEquals(3000, battle.atkAtk());
         assertEquals(2500, battle.defAtk());
@@ -318,11 +312,11 @@ class MessageParserTest {
     void parseBattleStepMarkers() {
         // No-body messages
         assertInstanceOf(DuelMessage.AttackDisabled.class,
-                parseMessages(msg(MSG_ATTACK_DISABLED, new byte[0])).getFirst());
+                MessageParser.parse(msg(MSG_ATTACK_DISABLED, new byte[0])).getFirst());
         assertInstanceOf(DuelMessage.DamageStepStart.class,
-                parseMessages(msg(MSG_DAMAGE_STEP_START, new byte[0])).getFirst());
+                MessageParser.parse(msg(MSG_DAMAGE_STEP_START, new byte[0])).getFirst());
         assertInstanceOf(DuelMessage.DamageStepEnd.class,
-                parseMessages(msg(MSG_DAMAGE_STEP_END, new byte[0])).getFirst());
+                MessageParser.parse(msg(MSG_DAMAGE_STEP_END, new byte[0])).getFirst());
     }
 
     // ---- Hint ----
@@ -334,7 +328,7 @@ class MessageParserTest {
         b.put((byte) 0);
         b.putLong(560L);  // string code
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_HINT, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_HINT, b.array()));
         var hint = (DuelMessage.Hint) msgs.getFirst();
         assertEquals(HINT_SELECTMSG, hint.hintType());
         assertEquals(0, hint.player());
@@ -345,7 +339,7 @@ class MessageParserTest {
 
     @Test
     void parseShuffleDeck() {
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SHUFFLE_DECK, new byte[]{1}));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SHUFFLE_DECK, new byte[]{1}));
         var sd = (DuelMessage.ShuffleDeck) msgs.getFirst();
         assertEquals(1, sd.player());
     }
@@ -358,7 +352,7 @@ class MessageParserTest {
         b.putInt(89631139);
         b.putInt(46986414);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SHUFFLE_HAND, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SHUFFLE_HAND, b.array()));
         var sh = (DuelMessage.ShuffleHand) msgs.getFirst();
         assertEquals(0, sh.player());
         assertEquals(List.of(89631139, 46986414), sh.codes());
@@ -374,7 +368,7 @@ class MessageParserTest {
         putLocInfo(b, 0, LOCATION_SZONE, 1, POS_FACEDOWN_DEFENSE);
         b.putLong(44095762L);  // desc
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_EFFECTYN, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_EFFECTYN, b.array()));
         var yn = (DuelMessage.SelectEffectYn) msgs.getFirst();
         assertEquals(0, yn.player());
         assertEquals(44095762, yn.code());
@@ -387,7 +381,7 @@ class MessageParserTest {
         b.put((byte) 1);
         b.putLong(200L);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_YESNO, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_YESNO, b.array()));
         var yn = (DuelMessage.SelectYesNo) msgs.getFirst();
         assertEquals(1, yn.player());
         assertEquals(200L, yn.desc());
@@ -401,7 +395,7 @@ class MessageParserTest {
         b.putLong(100L);   // option 1
         b.putLong(200L);   // option 2
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_OPTION, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_OPTION, b.array()));
         var opt = (DuelMessage.SelectOption) msgs.getFirst();
         assertEquals(0, opt.player());
         assertEquals(List.of(100L, 200L), opt.options());
@@ -419,7 +413,7 @@ class MessageParserTest {
         putCardInfo(b, 89631139, 0, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE);
         putCardInfo(b, 46986414, 0, LOCATION_HAND, 1, POS_FACEDOWN_DEFENSE);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_CARD, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_CARD, b.array()));
         var sc = (DuelMessage.SelectCard) msgs.getFirst();
         assertEquals(0, sc.player());
         assertFalse(sc.cancelable());
@@ -437,7 +431,7 @@ class MessageParserTest {
         b.put((byte) 1);      // count
         b.putInt(0x0000001F);  // field bitmask
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_PLACE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_PLACE, b.array()));
         var sp = (DuelMessage.SelectPlace) msgs.getFirst();
         assertEquals(0, sp.player());
         assertEquals(1, sp.count());
@@ -451,7 +445,7 @@ class MessageParserTest {
         b.putInt(89631139);         // code
         b.put((byte) (POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE)); // available positions
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_POSITION, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_POSITION, b.array()));
         var sp = (DuelMessage.SelectPosition) msgs.getFirst();
         assertEquals(89631139, sp.code());
         assertEquals(POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE, sp.positions());
@@ -467,7 +461,7 @@ class MessageParserTest {
         b.putInt(1);       // count
         putCardInfo(b, 69247929, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_TRIBUTE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_TRIBUTE, b.array()));
         var st = (DuelMessage.SelectTribute) msgs.getFirst();
         assertEquals(1, st.min());
         assertEquals(1, st.cards().size());
@@ -484,7 +478,7 @@ class MessageParserTest {
         // Remaining bytes are raw chain response
         b.put(new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_CHAIN, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_CHAIN, b.array()));
         var sc = (DuelMessage.SelectChain) msgs.getFirst();
         assertEquals(0, sc.player());
         assertEquals(2, sc.count());
@@ -505,7 +499,7 @@ class MessageParserTest {
         b.putInt(1);         // unselectable count
         putCardInfo(b, 46986414, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_SELECT_UNSELECT_CARD, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_UNSELECT_CARD, b.array()));
         var su = (DuelMessage.SelectUnselectCard) msgs.getFirst();
         assertTrue(su.finishable());
         assertFalse(su.cancelable());
@@ -522,7 +516,7 @@ class MessageParserTest {
         b.put((byte) 1);  // count
         b.putLong(RACE_DRAGON | RACE_SPELLCASTER);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_ANNOUNCE_RACE, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ANNOUNCE_RACE, b.array()));
         var ar = (DuelMessage.AnnounceRace) msgs.getFirst();
         assertEquals(1, ar.count());
         assertTrue((ar.available() & RACE_DRAGON) != 0);
@@ -531,7 +525,7 @@ class MessageParserTest {
 
     @Test
     void parseRockPaperScissors() {
-        List<DuelMessage> msgs = parseMessages(msg(MSG_ROCK_PAPER_SCISSORS, new byte[]{0}));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ROCK_PAPER_SCISSORS, new byte[]{0}));
         var rps = (DuelMessage.RockPaperScissors) msgs.getFirst();
         assertEquals(0, rps.player());
     }
@@ -544,7 +538,7 @@ class MessageParserTest {
         putLocInfo(b, 0, LOCATION_SZONE, 1, POS_FACEUP_ATTACK);
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_EQUIP, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_EQUIP, b.array()));
         var eq = (DuelMessage.Equip) msgs.getFirst();
         assertEquals(LOCATION_SZONE, eq.card().location());
         assertEquals(LOCATION_MZONE, eq.target().location());
@@ -559,7 +553,7 @@ class MessageParserTest {
         b.put((byte) 0);  // tails
         b.put((byte) 1);  // heads
 
-        List<DuelMessage> msgs = parseMessages(msg(MSG_TOSS_COIN, b.array()));
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_TOSS_COIN, b.array()));
         var tc = (DuelMessage.TossCoin) msgs.getFirst();
         assertEquals(0, tc.player());
         assertEquals(List.of(1, 0, 1), tc.results());
@@ -575,7 +569,7 @@ class MessageParserTest {
                 msg(MSG_SHUFFLE_DECK, new byte[]{0})
         );
 
-        List<DuelMessage> msgs = parseMessages(buf);
+        List<DuelMessage> msgs = MessageParser.parse(buf);
         assertEquals(3, msgs.size());
         assertInstanceOf(DuelMessage.NewTurn.class, msgs.get(0));
         assertInstanceOf(DuelMessage.NewPhase.class, msgs.get(1));
@@ -585,7 +579,7 @@ class MessageParserTest {
     @Test
     void unknownMessageBecomesRaw() {
         byte[] unknownBody = {0x01, 0x02, 0x03};
-        List<DuelMessage> msgs = parseMessages(msg(255, unknownBody));
+        List<DuelMessage> msgs = MessageParser.parse(msg(255, unknownBody));
         assertEquals(1, msgs.size());
         assertInstanceOf(DuelMessage.Raw.class, msgs.getFirst());
         var raw = (DuelMessage.Raw) msgs.getFirst();
@@ -594,30 +588,9 @@ class MessageParserTest {
     }
 
     @Test
-    void rawBytesPreservedPerMessage() {
-        byte[] msgBytes = msg(MSG_NEW_TURN, new byte[]{1});
-        List<ParsedEntry> entries = MessageParser.parse(msgBytes);
-        assertEquals(1, entries.size());
-        // Raw bytes should be the complete message: length(4) + type(1) + body(1)
-        assertArrayEquals(msgBytes, entries.getFirst().raw());
-    }
-
-    @Test
-    void rawBytesPreservedForMultipleMessages() {
-        byte[] msg1 = msg(MSG_NEW_TURN, new byte[]{0});
-        byte[] msg2 = msg(MSG_SHUFFLE_DECK, new byte[]{1});
-        byte[] buf = concat(msg1, msg2);
-
-        List<ParsedEntry> entries = MessageParser.parse(buf);
-        assertEquals(2, entries.size());
-        assertArrayEquals(msg1, entries.get(0).raw());
-        assertArrayEquals(msg2, entries.get(1).raw());
-    }
-
-    @Test
     void emptyBufferReturnsEmptyList() {
-        assertEquals(List.of(), MessageParser.parse(new byte[0]).stream().map(ParsedEntry::message).toList());
-        assertEquals(List.of(), MessageParser.parse(new byte[3]).stream().map(ParsedEntry::message).toList());
+        assertEquals(List.of(), MessageParser.parse(new byte[0]));
+        assertEquals(List.of(), MessageParser.parse(new byte[3]));
     }
 
     @Test
@@ -629,7 +602,7 @@ class MessageParserTest {
                 msg(MSG_NEW_TURN, new byte[]{1})
         );
 
-        List<DuelMessage> msgs = parseMessages(buf);
+        List<DuelMessage> msgs = MessageParser.parse(buf);
         assertEquals(2, msgs.size());
         assertInstanceOf(DuelMessage.Raw.class, msgs.get(0));
         assertInstanceOf(DuelMessage.NewTurn.class, msgs.get(1));

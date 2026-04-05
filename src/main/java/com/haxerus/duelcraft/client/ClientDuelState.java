@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
@@ -60,9 +61,17 @@ public class ClientDuelState {
     public int winner = -1;
     public int winReason;
 
-    public ClientDuelState(int localPlayer, String opponentName) {
-        this.localPlayer = localPlayer;
-        this.opponentName = opponentName;
+    public ClientDuelState(DuelStartPayload startInfo) {
+        this.localPlayer = startInfo.localPlayer();
+        this.opponentName = startInfo.opponentName();
+        this.lp[0] = startInfo.lp0();
+        this.lp[1] = startInfo.lp1();
+        this.deckCount[0] = startInfo.deckSize();
+        this.deckCount[1] = startInfo.deckSize();
+        this.extraCount[0] = startInfo.extraSize();
+        this.extraCount[1] = startInfo.extraSize();
+        LOGGER.debug("[State] Init: localPlayer={}, LP={}|{}, deck={}|{}, extra={}|{}",
+                localPlayer, lp[0], lp[1], deckCount[0], deckCount[1], extraCount[0], extraCount[1]);
     }
 
     /**
@@ -80,23 +89,38 @@ public class ClientDuelState {
                 deckCount[1] = start.deckCount1();
                 extraCount[0] = start.extraCount0();
                 extraCount[1] = start.extraCount1();
+                LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
+                        lp[0], lp[1], deckCount[0], deckCount[1], extraCount[0], extraCount[1]);
             }
             case DuelMessage.Win win -> {
                 winner = win.winner();
                 winReason = win.reason();
+                LOGGER.info("[State] Win: player={}, reason={}", winner, winReason);
             }
             case DuelMessage.NewTurn nt -> {
                 currentTurn = nt.player();
                 turnCount++;
+                LOGGER.debug("[State] NewTurn: player={}, turnCount={}", currentTurn, turnCount);
             }
-            case DuelMessage.NewPhase np -> currentPhase = np.phase();
+            case DuelMessage.NewPhase np -> {
+                currentPhase = np.phase();
+                LOGGER.debug("[State] NewPhase: {}", phaseName());
+            }
 
             // ---- Card Movement ----
             case DuelMessage.Draw draw -> {
                 hand[draw.player()].addAll(draw.codes());
                 deckCount[draw.player()] -= draw.codes().size();
+                LOGGER.debug("[State] Draw: player={}, codes={}", draw.player(), draw.codes());
             }
-            case DuelMessage.Move move -> applyMove(move);
+            case DuelMessage.Move move -> {
+                LOGGER.debug("[State] Move: code={}, from=[p{} loc=0x{} seq={}] to=[p{} loc=0x{} seq={} pos=0x{}], reason=0x{}",
+                        move.code(),
+                        move.from().controller(), Integer.toHexString(move.from().location()), move.from().sequence(),
+                        move.to().controller(), Integer.toHexString(move.to().location()), move.to().sequence(),
+                        Integer.toHexString(move.to().position()), Integer.toHexString(move.reason()));
+                applyMove(move);
+            }
             case DuelMessage.PosChange pc -> {
                 if (pc.location() == LOCATION_MZONE) {
                     mzonePos[pc.controller()][pc.sequence()] = pc.newPosition();
@@ -104,7 +128,12 @@ public class ClientDuelState {
                     szonePos[pc.controller()][pc.sequence()] = pc.newPosition();
                 }
             }
-            case DuelMessage.Set set -> placeCard(set.location(), set.code());
+            case DuelMessage.Set set -> {
+                LOGGER.debug("[State] Set: code={}, loc=[p{} loc=0x{} seq={}]",
+                        set.code(), set.location().controller(),
+                        Integer.toHexString(set.location().location()), set.location().sequence());
+                placeCard(set.location(), set.code());
+            }
             case DuelMessage.Swap swap -> swapCards(swap.loc1(), swap.loc2());
 
             // ---- Summons ----
@@ -134,11 +163,19 @@ public class ClientDuelState {
             // ---- LP ----
             case DuelMessage.Damage dmg -> {
                 lp[dmg.player()] = Math.max(0, lp[dmg.player()] - dmg.amount());
+                LOGGER.debug("[State] Damage: player={}, amount={}, lp now={}", dmg.player(), dmg.amount(), lp[dmg.player()]);
             }
-            case DuelMessage.Recover rec -> lp[rec.player()] += rec.amount();
-            case DuelMessage.LpUpdate upd -> lp[upd.player()] = upd.lp();
+            case DuelMessage.Recover rec -> {
+                lp[rec.player()] += rec.amount();
+                LOGGER.debug("[State] Recover: player={}, amount={}, lp now={}", rec.player(), rec.amount(), lp[rec.player()]);
+            }
+            case DuelMessage.LpUpdate upd -> {
+                lp[upd.player()] = upd.lp();
+                LOGGER.debug("[State] LpUpdate: player={}, lp={}", upd.player(), upd.lp());
+            }
             case DuelMessage.PayLpCost pay -> {
                 lp[pay.player()] = Math.max(0, lp[pay.player()] - pay.amount());
+                LOGGER.debug("[State] PayLpCost: player={}, amount={}, lp now={}", pay.player(), pay.amount(), lp[pay.player()]);
             }
 
             // ---- Deck/Hand ----
@@ -157,29 +194,29 @@ public class ClientDuelState {
             case DuelMessage.DamageStepEnd ignored -> { }
 
             // ---- Selection prompts — set pendingPrompt for the UI ----
-            case DuelMessage.SelectIdleCmd sel -> pendingPrompt = msg;
-            case DuelMessage.SelectBattleCmd sel -> pendingPrompt = msg;
-            case DuelMessage.SelectCard sel -> pendingPrompt = msg;
-            case DuelMessage.SelectChain sel -> pendingPrompt = msg;
-            case DuelMessage.SelectEffectYn sel -> pendingPrompt = msg;
-            case DuelMessage.SelectYesNo sel -> pendingPrompt = msg;
-            case DuelMessage.SelectOption sel -> pendingPrompt = msg;
-            case DuelMessage.SelectPlace sel -> pendingPrompt = msg;
-            case DuelMessage.SelectPosition sel -> pendingPrompt = msg;
-            case DuelMessage.SelectTribute sel -> pendingPrompt = msg;
-            case DuelMessage.SelectCounter sel -> pendingPrompt = msg;
-            case DuelMessage.SelectSum sel -> pendingPrompt = msg;
-            case DuelMessage.SelectUnselectCard sel -> pendingPrompt = msg;
-            case DuelMessage.SortCard sel -> pendingPrompt = msg;
-            case DuelMessage.SortChain sel -> pendingPrompt = msg;
-            case DuelMessage.AnnounceRace sel -> pendingPrompt = msg;
-            case DuelMessage.AnnounceAttrib sel -> pendingPrompt = msg;
-            case DuelMessage.AnnounceNumber sel -> pendingPrompt = msg;
-            case DuelMessage.AnnounceCard sel -> pendingPrompt = msg;
-            case DuelMessage.RockPaperScissors sel -> pendingPrompt = msg;
+            case DuelMessage.SelectIdleCmd sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectIdleCmd player={}", sel.player()); }
+            case DuelMessage.SelectBattleCmd sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectBattleCmd player={}", sel.player()); }
+            case DuelMessage.SelectCard sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectCard player={}, min={}, max={}, cards={}", sel.player(), sel.min(), sel.max(), sel.cards().stream().map(c -> String.valueOf(c.code())).toList()); }
+            case DuelMessage.SelectChain sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
+            case DuelMessage.SelectEffectYn sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
+            case DuelMessage.SelectYesNo sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
+            case DuelMessage.SelectOption sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectOption player={}, options={}", sel.player(), sel.options()); }
+            case DuelMessage.SelectPlace sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectPlace player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
+            case DuelMessage.SelectPosition sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectPosition player={}, code={}, pos=0x{}", sel.player(), sel.code(), Integer.toHexString(sel.positions())); }
+            case DuelMessage.SelectTribute sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
+            case DuelMessage.SelectCounter sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }
+            case DuelMessage.SelectSum sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectSum player={}", sel.player()); }
+            case DuelMessage.SelectUnselectCard sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SelectUnselectCard player={}", sel.player()); }
+            case DuelMessage.SortCard sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SortCard player={}", sel.player()); }
+            case DuelMessage.SortChain sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: SortChain player={}", sel.player()); }
+            case DuelMessage.AnnounceRace sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: AnnounceRace player={}", sel.player()); }
+            case DuelMessage.AnnounceAttrib sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: AnnounceAttrib player={}", sel.player()); }
+            case DuelMessage.AnnounceNumber sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: AnnounceNumber player={}", sel.player()); }
+            case DuelMessage.AnnounceCard sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: AnnounceCard player={}", sel.player()); }
+            case DuelMessage.RockPaperScissors sel -> { pendingPrompt = msg; LOGGER.debug("[State] Prompt: RockPaperScissors player={}", sel.player()); }
 
             // ---- Everything else ----
-            default -> LOGGER.trace("Unhandled message type {} in ClientDuelState", msg.type());
+            default -> LOGGER.debug("[State] Unhandled: {} (type={})", msg.getClass().getSimpleName(), msg.type());
         }
     }
 
