@@ -17,10 +17,13 @@ public class MessageParser {
             int length = reader.readInt32();
             if (length < 1 || reader.remaining() < length) break;
 
+            int messageEnd = reader.position() + length; // expected position after this message
             int type = reader.readUint8();
             int bodyLength = length - 1;
 
-            DuelMessage msg = switch (type) {
+            DuelMessage msg;
+            try {
+                msg = switch (type) {
                 // Lifecycle
                 case MSG_START         -> parseStart(reader);
                 case MSG_WIN           -> parseWin(reader, bodyLength);
@@ -117,6 +120,18 @@ public class MessageParser {
                     yield new DuelMessage.Raw(type, body);
                 }
             };
+
+            } catch (Exception e) {
+                // Parse error — treat as raw message and ensure position is correct
+                byte[] body = new byte[0];
+                msg = new DuelMessage.Raw(type, body);
+            }
+
+            // Ensure we're at the expected position regardless of how much the parser read.
+            // This prevents one malformed message from corrupting all subsequent messages.
+            if (reader.position() != messageEnd) {
+                reader.skip(messageEnd - reader.position());
+            }
 
             // Slice the raw bytes for this message (length header + type + body)
             int rawEnd = reader.position();
