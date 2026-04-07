@@ -27,7 +27,7 @@ sourceSets.main.resources {
 }
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
+    maven { url = "https://maven.firstdark.dev/snapshots" }
 }
 
 base {
@@ -257,6 +257,8 @@ configurations {
 }
 
 dependencies {
+    implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-1.21.1:2.2.5:all")
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.16'
