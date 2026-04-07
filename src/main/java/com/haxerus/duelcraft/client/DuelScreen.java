@@ -165,9 +165,8 @@ public class DuelScreen extends Screen {
                 g.drawString(font, label, x + 2, localHandY + 2, 0xFFFFFFFF, false);
 
                 if (hovered) {
-                    g.setTooltipForNextFrame(font,
-                            List.of(Component.literal("Card: " + code).getVisualOrderText()),
-                            mouseX, mouseY);
+                    this.setTooltipForNextRenderPass(
+                            List.of(Component.literal("Card: " + code).getVisualOrderText()));
                 }
             }
         }
@@ -234,9 +233,8 @@ public class DuelScreen extends Screen {
 
                 // Tooltip
                 if (hovered) {
-                    g.setTooltipForNextFrame(font,
-                            List.of(Component.literal(action.label()).getVisualOrderText()),
-                            mouseX, mouseY);
+                    this.setTooltipForNextRenderPass(
+                            List.of(Component.literal(action.label()).getVisualOrderText()));
                 }
 
                 ix += itemSize + menuGap;
@@ -302,9 +300,8 @@ public class DuelScreen extends Screen {
 
             if (hovered && occupied) {
                 String tip = "Card: " + code + (faceDown ? " (face-down)" : "");
-                g.setTooltipForNextFrame(font,
-                        List.of(Component.literal(tip).getVisualOrderText()),
-                        mouseX, mouseY);
+                this.setTooltipForNextRenderPass(
+                        List.of(Component.literal(tip).getVisualOrderText()));
             }
         }
     }
