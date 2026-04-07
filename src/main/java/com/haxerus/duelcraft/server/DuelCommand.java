@@ -24,6 +24,8 @@ public class DuelCommand {
                                 .executes(DuelCommand::accept))
                         .then(Commands.literal("forfeit")
                                 .executes(DuelCommand::forfeit))
+                        .then(Commands.literal("test")
+                                .executes(DuelCommand::test))
         );
     }
 
@@ -65,6 +67,19 @@ public class DuelCommand {
         }
         DuelManager.get().startDuel(player, challenger, DuelOptions.standard(), Deck.standard(), Deck.standard());
         DuelManager.get().duelInvites.remove(player.getUUID());
+        return 1;
+    }
+
+    private static int test(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+
+        if (DuelManager.get().getPlayerActiveDuel(player) != null) {
+            player.sendSystemMessage(Component.literal("You are already in a duel!"));
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal("Starting solo test duel vs AI..."));
+        DuelManager.get().startSoloDuel(player, DuelOptions.standard(), Deck.standard(), Deck.standard());
         return 1;
     }
 

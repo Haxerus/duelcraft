@@ -23,6 +23,7 @@ public class DuelManager {
     private DuelEngine engine;
     private Map<UUID, DuelSession> activeDuels;
     private Map<UUID, UUID> playerToDuel;
+    private Map<UUID, SoloDuelHandler> soloHandlers;
 
     // FIXME: Temporary for testing
     public Map<UUID, UUID> duelInvites; // target -> challenger
@@ -49,6 +50,7 @@ public class DuelManager {
 
         activeDuels = new HashMap<>();
         playerToDuel = new HashMap<>();
+        soloHandlers = new HashMap<>();
         duelInvites = new HashMap<>();
 
         int[] version = OcgCore.nGetVersion();
@@ -69,6 +71,71 @@ public class DuelManager {
             } catch (Exception e) {
                 LOGGER.error("{}{}", "Failed to shutdown DuelManager ", e);
             }
+        }
+    }
+
+    /**
+     * Start a solo test duel where player 1 is AI-controlled.
+     */
+    public void startSoloDuel(ServerPlayer player, DuelOptions options, Deck playerDeck, Deck aiDeck) {
+        if (playerToDuel.containsKey(player.getUUID())) {
+            LOGGER.warn("Cannot start solo duel - player is already in a duel!");
+            return;
+        }
+
+        UUID duelId = UUID.randomUUID();
+        var handler = new SoloDuelHandler(player, duelId);
+        var session = new DuelSession(engine, options, handler);
+
+        activeDuels.put(duelId, session);
+        playerToDuel.put(player.getUUID(), duelId);
+        soloHandlers.put(duelId, handler);
+
+        int lp0 = options.team1().lp();
+        int lp1 = options.team2().lp();
+        PacketDistributor.sendToPlayer(player, new DuelStartPayload(0, "AI Opponent",
+                lp0, lp1, playerDeck.main().size(), playerDeck.extra().size()));
+
+        session.setupDuel(playerDeck, aiDeck);
+        session.process();
+
+        // Check if the AI needs to respond first (e.g., if AI goes first)
+        processSoloAutoResponse(duelId, handler);
+    }
+
+    /**
+     * Handle a queued auto-response from the solo AI.
+     * Called by SoloDuelHandler when the AI player receives a prompt.
+     */
+    public void handleSoloAutoResponse(UUID duelId, byte[] response) {
+        DuelSession session = activeDuels.get(duelId);
+        if (session == null || session.isEnded()) return;
+        session.setResponse(response);
+
+        // Check if the AI needs to respond again (chained prompts)
+        // Find the handler — it's the listener on the session
+        // We need to check for pending auto-responses after each setResponse
+        for (var entry : activeDuels.entrySet()) {
+            if (entry.getKey().equals(duelId) && entry.getValue() == session) {
+                // Look up the handler through the duelId
+                processSoloAutoResponseByDuelId(duelId);
+                break;
+            }
+        }
+    }
+
+    private void processSoloAutoResponse(UUID duelId, SoloDuelHandler handler) {
+        Runnable autoResponse = handler.consumePendingAutoResponse();
+        if (autoResponse != null) {
+            autoResponse.run();
+        }
+    }
+
+    private void processSoloAutoResponseByDuelId(UUID duelId) {
+        // We need a way to get the handler. Let's track solo handlers.
+        var handler = soloHandlers.get(duelId);
+        if (handler != null) {
+            processSoloAutoResponse(duelId, handler);
         }
     }
 
@@ -110,9 +177,9 @@ public class DuelManager {
 
     public void endDuel(UUID duelId) {
         DuelSession session = activeDuels.remove(duelId);
+        soloHandlers.remove(duelId);
         if (session != null) {
             session.close();
-            // Also clean up playerToDuel entries
             playerToDuel.values().removeIf(id -> id.equals(duelId));
         }
     }
