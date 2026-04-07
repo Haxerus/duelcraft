@@ -3,4 +3,4 @@
 # are changed when only line endings change.
 src/generated/**/.cache/* text eol=lf
 src/generated/**/*.json text eol=lf
-native/jni-bridge/deps linguist-vendored
+native/jni-bridge/deps/* linguist-vendored
