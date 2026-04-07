@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Server → Client: sent when a duel begins, before any duel messages.
@@ -20,7 +20,7 @@ public record DuelStartPayload(
 ) implements CustomPacketPayload {
 
     public static final Type<DuelStartPayload> TYPE =
-            new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("duelcraft", "duel_start"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("duelcraft", "duel_start"));
 
     public static final StreamCodec<ByteBuf, DuelStartPayload> STREAM_CODEC =
             StreamCodec.composite(

@@ -4,12 +4,12 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public record DuelEndPayload(int winner, int reason) implements CustomPacketPayload {
 
     public static final Type<DuelEndPayload> TYPE =
-            new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("duelcraft", "duel_end"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("duelcraft", "duel_end"));
 
     public static final StreamCodec<ByteBuf, DuelEndPayload> STREAM_CODEC =
             StreamCodec.composite(
