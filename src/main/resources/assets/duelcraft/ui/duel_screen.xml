@@ -1,0 +1,662 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ldlib2-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/Low-Drag-MC/LDLib2/refs/heads/1.21/ldlib2-ui.xsd">
+    <stylesheet location="ldlib2:lss/gdp.lss" />
+    <style>
+        /* ── Root ── */
+        #duel-root {
+        flex-direction: column;
+        flex: 1;
+        width: 640;
+        height: 320;
+        }
+
+        /* ── Field Area ── */
+        #field-area {
+        max-width: 50%;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        align-self: center;
+        gap-all: 2;
+        padding-all: 8;
+        //margin-all: 8;
+        background: built-in(ui-gdp:BORDER_THICK_RT1)
+        }
+
+        .field-bg-half {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 50%;
+        display: none;
+        }
+
+        #field-bg-opp {
+        top: 0;
+        background: sprite(minecraft:textures/block/dirt.png);
+        }
+
+        #field-bg-plr {
+        bottom: 0;
+        background: sprite(minecraft:textures/block/magma.png);
+        }
+
+        /* ── Player Side Containers ── */
+        .player-side {
+        flex-direction: row;
+        align-items: center;
+        gap-all: 2;
+        }
+
+        #opponent-side {
+        flex-direction: row_reverse;
+        }
+
+        #opp-st-row {
+        flex-direction: row_reverse;
+        }
+
+        #opp-mon-row {
+        flex-direction: row_reverse;
+        }
+
+        #opponent-side .zone-icon {
+        transform: rotate(180);
+        }
+
+        #opponent-side .card-image {
+        transform: rotate(180);
+        }
+
+        /* ── Pile Columns (left/right of zones) ── */
+        .pile-column {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 2;
+        padding-horizontal: 4;
+        }
+
+        #opp-banished {
+        margin-right: 8;
+        }
+
+        #plr-banished {
+        margin-left: 8;
+        }
+
+        /* ── Zone Grid (rectangle background behind zones) ── */
+        .zone-grid {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 2;
+        padding-all: 4;
+        background: built-in(ui-gdp:RECT_RD_DARK);
+        }
+
+        /* ── Zone Rows Container ── */
+        .zone-rows {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 2;
+        }
+
+        /* ── A single row of 5 zones ── */
+        .zone-row {
+        flex-direction: row;
+        gap-all: 2;
+        }
+
+        /* ── Card slot (shared base for all card zones) ── */
+        .card-slot {
+        min-width: 24;
+        min-height: 32;
+        aspect-rate: 0.75;
+        align-items: center;
+        justify-content: center;
+        }
+
+        /* ── Square slot ── */
+        .square-slot {
+        min-width: 32;
+        min-height: 32;
+        aspect-rate: 1;
+        align-items: center;
+        justify-content: center;
+        background: rect(#16000000);
+        }
+
+        .zone-icon {
+        width: 16;
+        height: 16;
+        }
+
+        .zone-icon.hidden {
+        display: none;
+        }
+
+        .zone-slot {
+        //background: rect(#20ffffff);
+        }
+
+        .pile-slot {
+        background: built-in(ui-gdp:RECT_RD_DARK);
+        }
+
+        .emz-slot {
+        background: built-in(ui-gdp:RECT_RD_DARK);
+        }
+
+        /* ── Center Row (EMZ + Controls) ── */
+        #center-row {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap-all: 8;
+        }
+
+        /* ── Phase buttons ── */
+
+        .phase-btn {
+        width: 20;
+        height: 16;
+        }
+
+        /* ── Status Label (centered overlay) ── */
+        #status-label {
+        position: absolute;
+        bottom: 50;
+        left: 0;
+        width: 100%;
+        font-size: 8;
+        text-color: #FFAA00;
+        horizontal-align: center;
+        padding-vertical: 2;
+        background: rect(#aa000000);
+        }
+
+        #status-label.hidden {
+        display: none;
+        }
+
+        /* ── Card count label ── */
+        .card-count {
+        position: absolute;
+        bottom: 1;
+        left: 0;
+        width: 100%;
+        font-size: 7;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        vertical-align: bottom;
+        background: rect(#77000000);
+        }
+
+        /* ── Card back ── */
+        .card-back {
+        background: sdf(#1a3a6a, 3, 2);
+        }
+
+        /* ── Defense position ── */
+        .defense {
+        transform: rotate(90);
+        }
+
+        /* ── Hand Row ── */
+        .hand-card {
+        //background: built-in(ui-gdp:RECT);
+        background: sdf(#914d03, 5, 3);
+        //margin-horizontal: -8;
+        transition: background 0.3 quad_in_out,
+        transform 0.2;
+        }
+
+        .hand-card.__hovered__ {
+        background: sdf(#b8650a, 5, 3);
+        transform: scale(1.05);
+        }
+
+        .hand-row {
+        align-self: stretch;
+        scroller-view-mode: HORIZONTAL;
+        scroller-horizontal-display: ALWAYS;
+        }
+
+        #opponent-hand .__scroller_view_view-container__ {
+        flex-direction: row;
+        gap-all: 2;
+        }
+
+        #player-hand .__scroller_view_view-container__ {
+        flex-direction: row;
+        gap-all: 2;
+        }
+
+        #opponent-hand .__scroller_view_view-port__, #player-hand .__scroller_view_view-port__ {
+        background: built-in(ui-gdp:RECT_LIGHT);
+        min-height: 42;
+        }
+
+        /* ── HUD Bar (absolute overlay at top) ── */
+        #hud-bar {
+        width: 100%;
+        height: 20;
+        flex-direction: row;
+        align-items: center;
+        gap-all: 4;
+        padding-left: 4;
+        padding-right: 4;
+        background: rect(#88000000);
+        }
+
+        .lp-bar {
+        flex: 1;
+        height: 18;
+        }
+
+        .__progress-bar_bar__ {
+        background: rect(#ff00ff00);
+        }
+
+        #hud-info {
+        flex-direction: column;
+        width: 40%;
+        }
+
+        #duel-title-label {
+        font-size: 8;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        #hud-turn-phase {
+        font-size: 7;
+        text-color: #AAAAAA;
+        horizontal-align: center;
+        }
+        /* ── Card Info Banner (left overlay) ── */
+        #card-info-banner {
+        position: absolute;
+        left: 0;
+        top: 20;
+        bottom: 20;
+        width: 130;
+        flex-direction: column;
+        gap-all: 2;
+        padding-all: 4;
+        background: built-in(ui-gdp:RECT);
+        }
+
+        #card-info-banner.hidden {
+        width: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #card-image-area {
+        width: 112;
+        height: 112;
+        align-self: center;
+        //background: rect(#3c3c50);
+        background: sprite(minecraft:textures/item/ender_eye.png);
+        }
+
+        .card-label {
+        adaptive-height: true;
+        text-wrap: wrap;
+        }
+
+        #card-name-label {
+        height: 10;
+        font-size: 9;
+        text-color: #FFFF00;
+        horizontal-align: center;
+        }
+
+        #card-stats-label {
+        height: 10;
+        font-size: 8;
+        text-color: #CCCCCC;
+        horizontal-align: center;
+        }
+
+        #card-atk-def-label {
+        horizontal-align: center;
+        }
+
+        #card-text-scroll {
+        flex: 1;
+        }
+
+        #card-text {
+        flex: 1;
+        text-wrap: wrap;
+        adaptive-height: true;
+        }
+
+        /* ── Zone Inspector (right overlay) ── */
+        #zone-inspector {
+        position: absolute;
+        right: 0;
+        top: 20;
+        bottom: 20;
+        width: 130;
+        flex-direction: column;
+        gap-all: 2;
+        padding-all: 4;
+        background: built-in(ui-gdp:RECT);
+        }
+
+        #zone-inspector.hidden {
+        width: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #zone-inspector-title {
+        height: 12;
+        font-size: 9;
+        text-color: #FFFFFF;
+        }
+
+        #zone-inspector-list {
+        flex: 1;
+        gap-all: 2;
+        }
+
+        #zone-inspector-list .__scroller_view_view-container__ {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap-all: 2;
+        padding-all: 2;
+        }
+
+        .insp-slot {
+        flex-basis: 1;
+        background: built-in(ui-gdp:RECT);
+        }
+
+        .inspector-card-entry {
+        flex-direction: row;
+        align-items: center;
+        height: 20;
+        gap-all: 2;
+        padding-left: 2;
+        }
+
+        /* ── Prompt Dialog (centered overlay) ── */
+        #prompt-overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background: rect(#64000000);
+        }
+
+        #prompt-overlay.hidden {
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #prompt-dialog {
+        flex-direction: column;
+        align-content: center;
+
+        gap-all: 4;
+        padding-all: 8;
+        width: 200;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        #prompt-title {
+        height: 12;
+        font-size: 9;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        #prompt-body {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 2;
+        width: 100%;
+        }
+
+        #prompt-buttons {
+        flex-direction: row;
+        justify-content: center;
+        gap-all: 4;
+        }
+
+        .prompt-btn {
+        width: 60;
+        height: 16;
+        }
+
+        .target {
+        overlay: sprite(minecraft:textures/item/diamond.png);
+        }
+    </style>
+
+    <root id="duel-root">
+
+        <!-- HUD Bar (top overlay: LP bars + duel title) -->
+        <element id="hud-bar">
+            <progress-bar id="opp-lp-bar" class="lp-bar" value="100" text="8000" />
+            <element id="hud-info">
+                <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
+                <label id="duel-title-label">Joey vs. Weevil</label>
+            </element>
+            <progress-bar id="plr-lp-bar" class="lp-bar" value="100" text="8000" />
+        </element>
+
+        <!-- ══════════ Field Area ══════════ -->
+        <element id="field-area" class="panel_bg">
+            <!-- Background layers -->
+            <element id="field-bg-opp" class="field-bg-half" />
+            <element id="field-bg-plr" class="field-bg-half" />
+
+            <scroller-view id="opponent-hand" class="hand-row">
+            </scroller-view>
+
+            <!-- ── Opponent Side ── -->
+            <element id="opponent-side" class="player-side">
+                <!-- Opponent Left Piles: Extra Deck, Field Spell -->
+                <element id="opp-piles-left" class="pile-column">
+                    <element id="opp-extra-deck" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/block/spawner.png);" />
+                        <label class="card-count">0</label>
+                    </element>
+                    <element id="opp-field-spell" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/seagrass.png);" />
+                    </element>
+                </element>
+
+                <!-- Opponent Zone Rows -->
+                <element id="opp-zones" class="zone-grid">
+                    <!-- Opponent S/T Row (far side) -->
+                    <element id="opp-st-row" class="zone-row">
+                        <element id="opp-st-0" class="square-slot zone-slot">
+                            <element class="zone-icon"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
+                        <element id="opp-st-1" class="square-slot zone-slot" />
+                        <element id="opp-st-2" class="square-slot zone-slot" />
+                        <element id="opp-st-3" class="square-slot zone-slot" />
+                        <element id="opp-st-4" class="square-slot zone-slot">
+                            <element class="zone-icon"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
+                    </element>
+                    <!-- Opponent Monster Row -->
+                    <element id="opp-mon-row" class="zone-row">
+                        <element id="opp-mon-0" class="square-slot zone-slot" />
+                        <element id="opp-mon-1" class="square-slot zone-slot" />
+                        <element id="opp-mon-2" class="square-slot zone-slot" />
+                        <element id="opp-mon-3" class="square-slot zone-slot" />
+                        <element id="opp-mon-4" class="square-slot zone-slot" />
+                    </element>
+                </element>
+
+                <!-- Opponent Right Piles: Deck, GY, Banished -->
+                <element id="opp-piles-right" class="pile-column">
+                    <element id="opp-deck" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/book.png);" />
+                        <label class="card-count">40</label>
+                    </element>
+                    <element id="opp-graveyard" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/bone.png);" />
+                        <label class="card-count">0</label>
+                    </element>
+                </element>
+            </element>
+
+            <!-- ── Center Row: Extra Monster Zones + Controls ── -->
+            <element id="center-row">
+                <element id="opp-banished" class="card-slot pile-slot">
+                    <label class="card-count">0</label>
+                </element>
+                <button id="phase-btn-left" class="phase-btn" text="SP" />
+                <element id="emz-left" class="square-slot emz-slot" />
+                <button id="phase-btn-center" class="phase-btn" text="BP" />
+                <element id="emz-right" class="square-slot emz-slot" />
+                <button id="phase-btn-right" class="phase-btn" text="EP" />
+                <element id="plr-banished" class="card-slot pile-slot">
+                    <label class="card-count">0</label>
+                </element>
+            </element>
+
+            <!-- ── Player Side ── -->
+            <element id="player-side" class="player-side">
+                <!-- Player Left Piles: Extra Deck, Field Spell -->
+                <element id="plr-piles-left" class="pile-column">
+                    <element id="plr-field-spell" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/seagrass.png)" />
+                    </element>
+                    <element id="plr-extra-deck" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/block/spawner.png)" />
+                        <label class="card-count">0</label>
+                    </element>
+                </element>
+
+                <!-- Player Zone Rows -->
+                <element id="plr-zones" class="zone-grid">
+                    <!-- Player Monster Row -->
+                    <element id="plr-mon-row" class="zone-row">
+                        <element id="plr-mon-0" class="square-slot zone-slot" />
+                        <element id="plr-mon-1" class="square-slot zone-slot" />
+                        <element id="plr-mon-2" class="square-slot zone-slot" />
+                        <element id="plr-mon-3" class="square-slot zone-slot" />
+                        <element id="plr-mon-4" class="square-slot zone-slot" />
+                    </element>
+                    <!-- Player S/T Row -->
+                    <element id="plr-st-row" class="zone-row">
+                        <element id="plr-st-0" class="square-slot zone-slot">
+                            <element class="zone-icon"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
+                        <element id="plr-st-1" class="square-slot zone-slot" />
+                        <element id="plr-st-2" class="square-slot zone-slot" />
+                        <element id="plr-st-3" class="square-slot zone-slot" />
+                        <element id="plr-st-4" class="square-slot zone-slot">
+                            <element class="zone-icon"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
+                    </element>
+                </element>
+
+                <!-- Player Right Piles: Deck, GY, Banished -->
+                <element id="plr-piles-right" class="pile-column">
+                    <element id="plr-graveyard" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/bone.png);" />
+                        <label class="card-count">0</label>
+                    </element>
+                    <element id="plr-deck" class="card-slot pile-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/book.png);" />
+                        <label class="card-count">40</label>
+                    </element>
+                </element>
+            </element>
+
+            <!-- ── Player Hand ── -->
+            <scroller-view id="player-hand" class="hand-row">
+                <!-- Hand cards are added dynamically in Java -->
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+                <element class="card-slot hand-card" />
+            </scroller-view>
+        </element>
+
+        <!-- ══════════ OVERLAYS (absolute positioned) ══════════ -->
+
+        <!-- Status Label (chain / waiting overlay) -->
+        <label id="status-label" class="hidden">Waiting...</label>
+
+        <!-- Card Info Banner (left, shown on hover) -->
+        <element id="card-info-banner" class="hidden">
+            <element id="card-image-area" />
+            <text id="card-name-label" class="card-label">Number 11: Big Eye</text>
+            <text id="card-stats-label" class="card-label">DARK / Rank 7 / Spellcaster / Xyz /
+                Effect</text>
+            <scroller-view id="card-text-scroll">
+                <text id="card-text">Pendulum Effect: You can remove 6 Spell Counters from your
+                    field; Special Summon this card from the Pendulum Zone, then count the number of
+                    cards you control that can have a Spell Counter, destroy up to that many cards
+                    on the field, and if you do, place Spell Counters on this card equal to the
+                    number of cards destroyed. You can only use this effect of "Endymion, the Mighty
+                    Master of Magic" once per turn. Monster Effect: Once per turn, when a Spell/Trap
+                    Card or effect is activated (Quick Effect): You can return 1 card you control
+                    with a Spell Counter to the hand, and if you do, negate the activation, and if
+                    you do that, destroy it. Then, you can place the same number of Spell Counters
+                    on this card that the returned card had. While this card has a Spell Counter,
+                    your opponent cannot target it with card effects, also it cannot be destroyed by
+                    your opponent's card effects. When this card with a Spell Counter is destroyed
+                    by battle: You can add 1 Normal Spell from your Deck to your hand. </text>
+            </scroller-view>
+            <text id="card-atk-def-label" class="card-label">ATK 2600 / DEF 2000</text>
+        </element>
+
+        <!-- Zone Inspector (right, toggled by clicking a pile) -->
+        <element id="zone-inspector" class="hidden">
+            <label id="zone-inspector-title">Graveyard (#)</label>
+            <scroller-view id="zone-inspector-list">
+                <!-- Inspector entries added dynamically in Java -->
+            </scroller-view>
+            <button id="zone-inspector-close" text="Close" />
+        </element>
+
+        <!-- Prompt Dialog (centered overlay for selections) -->
+        <element id="prompt-overlay" class="hidden">
+            <element id="prompt-dialog">
+                <label id="prompt-title">Select an option</label>
+                <element id="prompt-body">
+                    <!-- Prompt-specific content added dynamically -->
+                </element>
+                <element id="prompt-buttons">
+                    <!-- Confirm/Cancel buttons added dynamically -->
+                </element>
+            </element>
+        </element>
+
+    </root>
+</ldlib2-ui>
