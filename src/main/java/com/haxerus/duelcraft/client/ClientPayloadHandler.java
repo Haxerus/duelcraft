@@ -15,17 +15,16 @@ public class ClientPayloadHandler {
         LOGGER.info("Duel starting — player {}, opponent: {}, LP={}|{}, deck={}, extra={}",
                 payload.localPlayer(), payload.opponentName(),
                 payload.lp0(), payload.lp1(), payload.deckSize(), payload.extraSize());
-        Minecraft.getInstance().setScreen(new DuelScreen(payload));
+        LDLibDuelScreen.open(payload);
     }
 
     public static void handleMessage(DuelMessagePayload payload, IPayloadContext context) {
-        if (Minecraft.getInstance().screen instanceof DuelScreen screen) {
-            screen.applyMessage(payload.message());
-        }
+        LDLibDuelScreen.applyMessage(payload.message());
     }
 
     public static void handleEnd(DuelEndPayload payload, IPayloadContext context) {
         LOGGER.info("Duel ended — winner: {}, reason: {}", payload.winner(), payload.reason());
+        LDLibDuelScreen.close();
         Minecraft.getInstance().setScreen(null);
     }
 }
