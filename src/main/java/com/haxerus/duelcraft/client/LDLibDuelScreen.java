@@ -798,6 +798,7 @@ public class LDLibDuelScreen {
             var actions = state.cardActions.get(loc);
 
             if (actions != null && !actions.isEmpty()) {
+                event.stopPropagation();
                 showContextMenu(actions, event.x, event.y);
                 return;
             }
