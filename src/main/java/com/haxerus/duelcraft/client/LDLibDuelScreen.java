@@ -681,6 +681,7 @@ public class LDLibDuelScreen {
         private void exitFieldSelectionMode() {
             if (!inFieldSelectionMode) return;
             inFieldSelectionMode = false;
+            selectedIndices.clear();
             ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));
             if (statusLabel != null) statusLabel.addClass("hidden");
         }
