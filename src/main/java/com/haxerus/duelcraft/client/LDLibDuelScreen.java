@@ -402,7 +402,10 @@ public class LDLibDuelScreen {
 
                 case DuelMessage.SelectChain sel -> buildChainPrompt(sel);
 
-                case DuelMessage.SelectCard sel -> buildCardSelectionPrompt(sel);
+                case DuelMessage.SelectCard sel -> {
+                    if (isFieldOnlySelection(sel)) enterFieldSelectionMode(sel);
+                    else buildCardSelectionPrompt(sel);
+                }
                 case DuelMessage.SelectTribute sel -> buildTributePrompt(sel);
 
                 case DuelMessage.SelectPosition sel -> buildPositionPrompt(sel);
