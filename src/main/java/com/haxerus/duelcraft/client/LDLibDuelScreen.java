@@ -641,15 +641,17 @@ public class LDLibDuelScreen {
 
         private void highlightValidPlaces(int field) {
             ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
+            // Bitmask is relative: p=0 = asking player (self), p=1 = opponent
             for (int p = 0; p < 2; p++) {
+                int absPlayer = (p == 0) ? state.localPlayer : state.opponent();
                 for (int i = 0; i < 5; i++) {
                     int mBit = 1 << (p * 16 + i);
-                    if ((field & mBit) == 0 && monsterSlots[p][i] != null)
-                        monsterSlots[p][i].addClass("target");
+                    if ((field & mBit) == 0 && monsterSlots[absPlayer][i] != null)
+                        monsterSlots[absPlayer][i].addClass("target");
 
                     int sBit = 1 << (p * 16 + 8 + i);
-                    if ((field & sBit) == 0 && spellSlots[p][i] != null)
-                        spellSlots[p][i].addClass("target");
+                    if ((field & sBit) == 0 && spellSlots[absPlayer][i] != null)
+                        spellSlots[absPlayer][i].addClass("target");
                 }
             }
         }
@@ -893,7 +895,9 @@ public class LDLibDuelScreen {
         }
 
         private int getFieldBit(int player, int location, int sequence) {
-            int offset = player * 16;
+            // Bitmask is relative: self=0, opponent=1. Map absolute player to bitmask position.
+            int bitmaskPlayer = (player == state.localPlayer) ? 0 : 1;
+            int offset = bitmaskPlayer * 16;
             if (location == LOCATION_SZONE) offset += 8;
             return 1 << (offset + sequence);
         }
