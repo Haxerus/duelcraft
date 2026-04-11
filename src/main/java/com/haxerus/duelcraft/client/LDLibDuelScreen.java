@@ -148,6 +148,7 @@ public class LDLibDuelScreen {
 
         // Card Selection
         private final List<Integer> selectedIndices = new ArrayList<>();
+        private boolean isBattleCmd;
 
         UIRefresher(ModularUI modularUI, ClientDuelState state) {
             this.ui = modularUI.ui;
@@ -363,10 +364,12 @@ public class LDLibDuelScreen {
             switch (state.pendingPrompt) {
                 // Idle/Battle Cmds
                 case DuelMessage.SelectIdleCmd ignored -> {
+                    isBattleCmd = false;
                     promptOverlay.addClass("hidden");
                     refreshTargetHighlights();
                 }
                 case DuelMessage.SelectBattleCmd ignored -> {
+                    isBattleCmd = true;
                     promptOverlay.addClass("hidden");
                     refreshTargetHighlights();
                 }
@@ -982,6 +985,52 @@ public class LDLibDuelScreen {
                 case 5 -> new ActionIconInfo("#FF6644", "Activate");
                 default -> new ActionIconInfo("#AAAAAA", "Action");
             };
+        }
+
+        private void hideContextMenu() {
+            if (contextMenu != null) contextMenu.addClass("hidden");
+        }
+
+        private void showContextMenu(List<ClientDuelState.CardAction> actions, float mouseX, float mouseY) {
+            if (contextMenu == null) return;
+
+            contextMenu.clearAllChildren();
+
+            for (var action : actions) {
+                var icon = new UIElement();
+                icon.addClass("ctx-action");
+
+                var info = getActionIconInfo(action.actionType(), isBattleCmd);
+                icon.lss("background", "sdf(" + info.color() + ", 3, 2)");
+                icon.lss("tooltips", info.tooltip());
+
+                icon.addEventListener(UIEvents.CLICK, e -> {
+                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(action.actionType(),
+                            action.listIndex()));
+                });
+
+                contextMenu.addChild(icon);
+            }
+
+            // Flip/nudge positioning
+            var root = ui.rootElement;
+            float rootW = root.getSizeWidth();
+            float rootH = root.getSizeHeight();
+            // Estimate menu size: each icon is 14 wide + 1 gap + 1 padding each side
+            float menuW = actions.size() * 15f + 2f;
+            float menuH = 16f;
+
+            float x = mouseX;
+            float y = mouseY;
+            if (x + menuW > rootW) x = mouseX - menuW;
+            if (y + menuH > rootH) y = mouseY - menuH;
+            // Clamp to not go negative
+            if (x < 0) x = 0;
+            if (y < 0) y = 0;
+
+            contextMenu.lss("left", String.valueOf((int) x));
+            contextMenu.lss("top", String.valueOf((int) y));
+            contextMenu.removeClass("hidden");
         }
     }
 }
