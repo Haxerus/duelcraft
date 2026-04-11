@@ -150,6 +150,7 @@ public class LDLibDuelScreen {
         // Card Selection
         private final List<Integer> selectedIndices = new ArrayList<>();
         private boolean isBattleCmd;
+        private boolean inFieldSelectionMode;
 
         UIRefresher(ModularUI modularUI, ClientDuelState state) {
             this.ui = modularUI.ui;
@@ -637,6 +638,37 @@ public class LDLibDuelScreen {
                         spellSlots[p][i].addClass("target");
                 }
             }
+        }
+
+        private void enterFieldSelectionMode(DuelMessage.SelectCard sel) {
+            inFieldSelectionMode = true;
+            selectedIndices.clear();
+            promptOverlay.addClass("hidden");
+
+            // Highlight valid targets on the field
+            for (var card : sel.cards()) {
+                var loc = new ClientDuelState.CardLocation(
+                        card.controller(), card.location(), card.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selectable");
+            }
+
+            // Show minimal indicator via status label
+            if (statusLabel instanceof Label lbl) {
+                String text = sel.min() == sel.max()
+                        ? "Select " + sel.min() + " card(s)"
+                        : "Select " + sel.min() + "-" + sel.max() + " card(s)";
+                if (sel.cancelable()) text += "  (Right-click to cancel)";
+                lbl.setText(Component.literal(text));
+                statusLabel.removeClass("hidden");
+            }
+        }
+
+        private void exitFieldSelectionMode() {
+            if (!inFieldSelectionMode) return;
+            inFieldSelectionMode = false;
+            ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));
+            if (statusLabel != null) statusLabel.addClass("hidden");
         }
 
         private void wirePhaseButtons() {
