@@ -21,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -391,16 +392,12 @@ public class LDLibDuelScreen {
                     buildYesNoPrompt("Activate effect? (Card " + sel.code() + ")");
 
                 // Option
-                case DuelMessage.SelectOption sel -> {
-                    buildOptionPrompt("Choose Option",
-                            sel.options().stream().map(String::valueOf).toList(),
-                            i -> LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectOption(i)));
-                }
-                case DuelMessage.RockPaperScissors sel -> {
-                    buildOptionPrompt("Rock Paper Scissors",
-                            List.of("Rock", "Paper", "Scissors"),
-                            i -> LDLibDuelScreen.sendResponse(state, ResponseBuilder.rockPaperScissors(i + 1)));
-                }
+                case DuelMessage.SelectOption sel -> buildOptionPrompt("Choose Option",
+                        sel.options().stream().map(String::valueOf).toList(),
+                        i -> LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectOption(i)));
+                case DuelMessage.RockPaperScissors ignored -> buildOptionPrompt("Rock Paper Scissors",
+                        List.of("Rock", "Paper", "Scissors"),
+                        i -> LDLibDuelScreen.sendResponse(state, ResponseBuilder.rockPaperScissors(i + 1)));
 
                 case DuelMessage.SelectChain sel -> buildChainPrompt(sel);
 
@@ -506,19 +503,7 @@ public class LDLibDuelScreen {
             clearPromptContent();
 
             for (int i = 0; i < sel.cards().size(); i++) {
-                int idx = i;
-                var card = sel.cards().get(i);
-                var entry = new Button();
-                entry.setText(Component.literal("Card" + card.code()));
-                entry.setOnClick(e -> {
-                    if (selectedIndices.contains(idx)) {
-                        selectedIndices.remove(Integer.valueOf(idx));
-                        entry.removeClass("target");
-                    } else if (selectedIndices.size() < sel.max()) {
-                        selectedIndices.add(idx);
-                        entry.addClass("target");
-                    }
-                });
+                var entry = getButton(sel, i);
                 promptBody.addChild(entry);
             }
 
@@ -542,6 +527,22 @@ public class LDLibDuelScreen {
                         LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCards()));
                 promptButtons.addChild(cancelBtn);
             }
+        }
+
+        private @NotNull Button getButton(DuelMessage.SelectCard sel, int i) {
+            var card = sel.cards().get(i);
+            var entry = new Button();
+            entry.setText(Component.literal("Card" + card.code()));
+            entry.setOnClick(e -> {
+                if (selectedIndices.contains(i)) {
+                    selectedIndices.remove(Integer.valueOf(i));
+                    entry.removeClass("target");
+                } else if (selectedIndices.size() < sel.max()) {
+                    selectedIndices.add(i);
+                    entry.addClass("target");
+                }
+            });
+            return entry;
         }
 
         private void buildPositionPrompt(DuelMessage.SelectPosition sel) {
@@ -718,8 +719,6 @@ public class LDLibDuelScreen {
             } else {
                 slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
             }
-
-            // Target highlights are handled by refreshTargetHighlights()
         }
 
         private void updateStatusLabel() {
@@ -888,7 +887,35 @@ public class LDLibDuelScreen {
                    var titleLabel = byId("zone-inspector-title");
                    var zoneInspectorList = byId("zone-inspector-list", ScrollerView.class);
                    if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(title));
-                   // TODO: populate zone-inspector-list with cards from the pile
+
+                   if (zoneInspectorList != null) {
+                       List<Integer> cards = location == LOCATION_GRAVE
+                               ? state.grave[player] : state.banished[player];
+
+                       zoneInspectorList.clearAllScrollViewChildren();
+                       for (int i = 0; i < cards.size(); i++) {
+                           int code = cards.get(i);
+                           int seq = i;
+
+                           var card = new UIElement();
+                           card.addClasses("card-slot", "hand-card");
+
+                           var label = new Label();
+                           label.setText(Component.literal(String.valueOf(code)));
+                           label.lss("font-size", "6");
+                           label.lss("horizontal-align", "center");
+                           card.addChild(label);
+
+                           card.addEventListener(UIEvents.CLICK, ev -> {
+                               ev.stopPropagation();
+                               onCardClicked(player, location, seq, ev);
+                           });
+                           card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                           card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+
+                           zoneInspectorList.addScrollViewChild(card);
+                       }
+                   }
                 });
             }
         }
@@ -930,6 +957,12 @@ public class LDLibDuelScreen {
                 }
                 default -> null;
             };
+        }
+
+        private boolean isFieldOnlySelection(DuelMessage.SelectCard sel) {
+            return !sel.cards().isEmpty()
+                    && sel.cards().stream()
+                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
         }
 
         private Label findCardCountLabel(String parentId) {
