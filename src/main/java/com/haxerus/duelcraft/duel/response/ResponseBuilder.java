@@ -41,9 +41,10 @@ public class ResponseBuilder {
     /**
      * MSG_SELECT_IDLECMD / MSG_SELECT_BATTLECMD response.
      * Packed as a single int32: (index << 16) | (actionType & 0xFFFF).
-     * @param actionType action category (0=summon, 1=spsummon, 2=reposition,
-     *                   3=set monster, 4=set S/T, 5=activate, 6=to battle, 7=end turn
-     *                   for idle; 1=attack, 2=activate, 3=main2, 6=end battle for battle)
+     * @param actionType action category.
+     *                   IdleCmd: 0=summon, 1=spsummon, 2=reposition, 3=mset, 4=sset,
+     *                            5=activate, 6=to battle, 7=end turn, 8=shuffle hand.
+     *                   BattleCmd: 0=activate, 1=attack, 2=main phase 2, 3=end battle.
      * @param index index within that action category
      */
     public static byte[] selectCmd(int actionType, int index) {
@@ -143,7 +144,8 @@ public class ResponseBuilder {
 
     /**
      * MSG_SORT_CARD / MSG_SORT_CHAIN response.
-     * @param order permutation of indices (e.g., {2, 0, 1} means card 2 first)
+     * @param order permutation of indices (e.g., {2, 0, 1} means card 2 first).
+     *              Must be a valid permutation (each index 0..n-1 appears exactly once).
      */
     public static byte[] sortCards(int... order) {
         var rb = new ResponseBuilder(order.length);
@@ -154,11 +156,32 @@ public class ResponseBuilder {
     }
 
     /**
-     * MSG_SELECT_UNSELECT_CARD response.
-     * @param index card index to select, or -1 to finish (if finishable)
+     * MSG_SORT_CARD / MSG_SORT_CHAIN response — accept default order.
+     * Format: [int8 -1]
+     */
+    public static byte[] sortCardsDefault() {
+        return new ResponseBuilder(1).putInt8(-1).build();
+    }
+
+    /**
+     * MSG_SELECT_UNSELECT_CARD selection response.
+     * Format: [int32 formatCode=1][int32 cardIndex]
+     * Engine rejects formatCode 0 and >1; only 1 is valid for selection.
+     * @param index card index to select (0-based, from combined selectable+unselectable list)
      */
     public static byte[] selectUnselectCard(int index) {
-        return new ResponseBuilder(4).putInt32(index).build();
+        return new ResponseBuilder(8)
+                .putInt32(1)
+                .putInt32(index)
+                .build();
+    }
+
+    /**
+     * MSG_SELECT_UNSELECT_CARD cancel/finish response.
+     * Format: [int32 -1] — only valid when finishable or cancelable.
+     */
+    public static byte[] selectUnselectCardFinish() {
+        return new ResponseBuilder(4).putInt32(-1).build();
     }
 
     /**

@@ -195,15 +195,15 @@ public class SoloDuelHandler implements DuelEventListener {
 
             case DuelMessage.SelectUnselectCard sel -> {
                 if (sel.finishable())
-                    yield ResponseBuilder.selectUnselectCard(-1);
+                    yield ResponseBuilder.selectUnselectCardFinish();
                 yield ResponseBuilder.selectUnselectCard(0);
             }
 
             case DuelMessage.SortCard sel ->
-                    ResponseBuilder.sortCards(new int[sel.cards().size()]); // identity order
+                    ResponseBuilder.sortCardsDefault();
 
             case DuelMessage.SortChain sel ->
-                    ResponseBuilder.sortCards(new int[sel.cards().size()]);
+                    ResponseBuilder.sortCardsDefault();
 
             case DuelMessage.AnnounceRace sel -> {
                 // Pick first N available races
