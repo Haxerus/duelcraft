@@ -446,6 +446,10 @@
         overlay: rect(#6600FFFF);
         }
 
+        .selectable {
+        overlay: rect(#66FF4444);
+        }
+
         /* ── Card Action Context Menu ── */
         #context-menu {
             position: absolute;
