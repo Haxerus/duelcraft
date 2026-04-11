@@ -226,6 +226,17 @@ public class LDLibDuelScreen {
                 }
             });
 
+            // Right-click to cancel field selection
+            ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
+                if (e.button == 1 && inFieldSelectionMode
+                        && state.pendingPrompt instanceof DuelMessage.SelectCard sel
+                        && sel.cancelable()) {
+                    e.stopPropagation();
+                    exitFieldSelectionMode();
+                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCards());
+                }
+            });
+
             LOGGER.info("UIRefresher initialized — all elements bound");
         }
 
@@ -822,6 +833,7 @@ public class LDLibDuelScreen {
         void onResponseSent() {
             if (promptOverlay != null) promptOverlay.addClass("hidden");
             hideContextMenu();
+            exitFieldSelectionMode();
             ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
             updatePhaseButtons();
         }
