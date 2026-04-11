@@ -7,20 +7,19 @@
         #duel-root {
         flex-direction: column;
         flex: 1;
-        width: 640;
-        height: 320;
+        width: 100%;
+        height: 100%;
         }
 
         /* ── Field Area ── */
         #field-area {
-        max-width: 50%;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         align-self: center;
         gap-all: 2;
         padding-all: 8;
-        //margin-all: 8;
+        margin-vertical: 8%;
         background: built-in(ui-gdp:BORDER_THICK_RT1)
         }
 
@@ -162,6 +161,10 @@
         height: 16;
         }
 
+        .phase-btn.hidden {
+        opacity: 0;
+        }
+
         /* ── Status Label (centered overlay) ── */
         #status-label {
         position: absolute;
@@ -220,6 +223,7 @@
         align-self: stretch;
         scroller-view-mode: HORIZONTAL;
         scroller-horizontal-display: ALWAYS;
+        max-width: 244;
         }
 
         #opponent-hand .__scroller_view_view-container__ {
@@ -279,8 +283,8 @@
         position: absolute;
         left: 0;
         top: 20;
-        bottom: 20;
-        width: 130;
+        bottom: 0;
+        width: 200;
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
@@ -294,11 +298,11 @@
         }
 
         #card-image-area {
-        width: 112;
-        height: 112;
+        width: 150;
+        height: 150;
         align-self: center;
         //background: rect(#3c3c50);
-        background: sprite(minecraft:textures/item/ender_eye.png);
+        background: sprite(duelcraft:textures/test.png);
         }
 
         .card-label {
@@ -339,8 +343,8 @@
         position: absolute;
         right: 0;
         top: 20;
-        bottom: 20;
-        width: 130;
+        bottom: 0;
+        width: 200;
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
@@ -439,7 +443,28 @@
         }
 
         .target {
-        overlay: sprite(minecraft:textures/item/diamond.png);
+        overlay: rect(#6600FFFF);
+        }
+
+        /* ── Card Action Context Menu ── */
+        #context-menu {
+            position: absolute;
+            flex-direction: row;
+            gap-all: 1;
+            padding-all: 1;
+            background: rect(#1A1A2E, 2, 1, #4444AA);
+            z-index: 10;
+        }
+
+        #context-menu.hidden {
+            display: none;
+        }
+
+        .ctx-action {
+            width: 14;
+            height: 14;
+            align-items: center;
+            justify-content: center;
         }
     </style>
 
@@ -594,16 +619,6 @@
             <!-- ── Player Hand ── -->
             <scroller-view id="player-hand" class="hand-row">
                 <!-- Hand cards are added dynamically in Java -->
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
-                <element class="card-slot hand-card" />
             </scroller-view>
         </element>
 
@@ -657,6 +672,9 @@
                 </element>
             </element>
         </element>
+
+        <!-- Card Action Context Menu (positioned at cursor on card click) -->
+        <element id="context-menu" class="hidden" />
 
     </root>
 </ldlib2-ui>
