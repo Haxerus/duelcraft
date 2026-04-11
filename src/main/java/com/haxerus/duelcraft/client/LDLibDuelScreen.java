@@ -214,6 +214,16 @@ public class LDLibDuelScreen {
             handleZoneClicks();
             handlePileClicks();
 
+            // Dismiss context menu when clicking outside it
+            ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
+                if (contextMenu != null && !contextMenu.hasClass("hidden")) {
+                    // Check if the click target is inside the context menu
+                    if (!contextMenu.isAncestorOf(e.target)) {
+                        hideContextMenu();
+                    }
+                }
+            });
+
             LOGGER.info("UIRefresher initialized — all elements bound");
         }
 
@@ -342,7 +352,7 @@ public class LDLibDuelScreen {
 
                 // Click handler
                 if (isLocal) {
-                    card.addEventListener(UIEvents.CLICK, e -> onCardClicked(player, LOCATION_HAND, seq));
+                    card.addEventListener(UIEvents.CLICK, e -> onCardClicked(player, LOCATION_HAND, seq, e));
                 }
 
                 // Hover to display card info
@@ -777,19 +787,23 @@ public class LDLibDuelScreen {
 
         void onResponseSent() {
             if (promptOverlay != null) promptOverlay.addClass("hidden");
+            hideContextMenu();
             ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
             updatePhaseButtons();
         }
 
         // ── Handlers ──
-        private void onCardClicked(int player, int location, int sequence) {
+        private void onCardClicked(int player, int location, int sequence, UIEvent event) {
             var loc = new ClientDuelState.CardLocation(player, location, sequence);
             var actions = state.cardActions.get(loc);
 
             if (actions != null && !actions.isEmpty()) {
-                showActionMenu(actions);
+                showContextMenu(actions, event.x, event.y);
                 return;
             }
+
+            // No actions — dismiss context menu if open
+            hideContextMenu();
 
             if (state.pendingPrompt instanceof DuelMessage.SelectCard) {
                 handleCardSelection(player, location, sequence);
@@ -843,11 +857,11 @@ public class LDLibDuelScreen {
                     int seq = i;
                     if (monsterSlots[p][i] != null) {
                         monsterSlots[p][i].addEventListener(UIEvents.CLICK,
-                                e -> onCardClicked(player, LOCATION_MZONE, seq));
+                                e -> onCardClicked(player, LOCATION_MZONE, seq, e));
                     }
                     if (spellSlots[p][i] != null) {
                         spellSlots[p][i].addEventListener(UIEvents.CLICK,
-                                e -> onCardClicked(player, LOCATION_SZONE, seq));
+                                e -> onCardClicked(player, LOCATION_SZONE, seq, e));
                     }
                 }
             }
@@ -915,34 +929,6 @@ public class LDLibDuelScreen {
                 }
                 default -> null;
             };
-        }
-
-        private void showActionMenu(List<ClientDuelState.CardAction> actions) {
-            promptOverlay.removeClass("hidden");
-            if (promptTitle instanceof Label title)
-                title.setText(Component.literal("Choose Action"));
-            if (promptBody != null)
-                promptBody.clearAllChildren();
-            if (promptButtons != null) {
-                promptButtons.clearAllChildren();
-
-                for (var action : actions) {
-                    var btn = new Button();
-                    btn.setText(Component.literal(action.label()));
-                    btn.addClass("prompt-btn");
-                    btn.setOnClick(e -> {
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(action.actionType(),
-                                action.listIndex()));
-                    });
-                    promptButtons.addChild(btn);
-                }
-
-                var cancelBtn = new Button();
-                cancelBtn.setText(Component.literal("Cancel"));
-                cancelBtn.addClass("prompt-btn");
-                cancelBtn.setOnClick(e -> promptOverlay.addClass("hidden"));
-                promptButtons.addChild(cancelBtn);
-            }
         }
 
         private Label findCardCountLabel(String parentId) {
