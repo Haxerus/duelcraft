@@ -991,6 +991,7 @@ public class LDLibDuelScreen {
                 icon.lss("tooltips", info.tooltip());
 
                 icon.addEventListener(UIEvents.CLICK, e -> {
+                    e.stopPropagation();
                     LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(action.actionType(),
                             action.listIndex()));
                 });
@@ -1002,7 +1003,10 @@ public class LDLibDuelScreen {
             var root = ui.rootElement;
             float rootW = root.getSizeWidth();
             float rootH = root.getSizeHeight();
-            // Estimate menu size: each icon is 14 wide + 1 gap + 1 padding each side
+            // Estimated menu size — must stay in sync with #context-menu and .ctx-action CSS:
+            //   width per icon = 14 (.ctx-action width) + 1 (gap-all) = 15
+            //   total padding = 1 (padding-all) * 2 sides = 2
+            //   height = 14 (.ctx-action height) + 2 (padding-all * 2) = 16
             float menuW = actions.size() * 15f + 2f;
             float menuH = 16f;
 
