@@ -68,6 +68,14 @@ public class ResponseBuilder {
     }
 
     /**
+     * MSG_SELECT_CARD cancel response.
+     * Format: [int32 formatCode=-1] — only valid when the prompt is cancelable.
+     */
+    public static byte[] selectCardsCancel() {
+        return new ResponseBuilder(4).putInt32(-1).build();
+    }
+
+    /**
      * MSG_SELECT_CHAIN response.
      * @param index chain index to activate, or -1 to decline
      */

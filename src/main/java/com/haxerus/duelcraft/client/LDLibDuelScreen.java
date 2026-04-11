@@ -233,7 +233,7 @@ public class LDLibDuelScreen {
                         && sel.cancelable()) {
                     e.stopPropagation();
                     exitFieldSelectionMode();
-                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCards());
+                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCardsCancel());
                 }
             });
 
@@ -539,7 +539,7 @@ public class LDLibDuelScreen {
                 cancelBtn.setText(Component.literal("Cancel"));
                 cancelBtn.addClasses("prompt-btn");
                 cancelBtn.setOnClick(e ->
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCards()));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCardsCancel()));
                 promptButtons.addChild(cancelBtn);
             }
         }
@@ -634,7 +634,7 @@ public class LDLibDuelScreen {
                 cancelBtn.setText(Component.literal("Cancel"));
                 cancelBtn.addClasses("prompt-btn");
                 cancelBtn.setOnClick(e ->
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCards()));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCardsCancel()));
                 promptButtons.addChild(cancelBtn);
             }
         }
@@ -698,7 +698,7 @@ public class LDLibDuelScreen {
             if (phaseBtnCenter != null) {
                 phaseBtnCenter.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canMain2())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(3, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(2, 0));
                 });
             }
             if (phaseBtnRight != null) {
@@ -706,7 +706,7 @@ public class LDLibDuelScreen {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canEnd())
                         LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(7, 0));
                     else if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(6, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(3, 0));
                 });
             }
         }
