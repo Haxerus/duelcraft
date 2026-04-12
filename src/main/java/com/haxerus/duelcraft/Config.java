@@ -39,7 +39,7 @@ public class Config {
 
     public static final ModConfigSpec.ConfigValue<List<? extends String>> SCRIPT_SEARCH_PATHS = BUILDER
             .comment("Paths to your Yu-Gi-Oh! card script files")
-            .defineList("scriptPaths", List.of("C:/ProjectIgnis/script;C:/ProjectIgnis/script/official"), () -> "",  Config::validateNonEmpty);
+            .defineList("scriptPaths", List.of("C:/ProjectIgnis/script", "C:/ProjectIgnis/script/official"), () -> "",  Config::validateNonEmpty);
 
     public static final ModConfigSpec.ConfigValue<String> CARD_DATABASE_URL = BUILDER
             .comment("URL to download the card database from (BabelCDB)")
