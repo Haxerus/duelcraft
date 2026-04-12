@@ -617,13 +617,18 @@ public class DuelMessageCodec {
 
     private static void writeQueriedCardList(FriendlyByteBuf buf, List<QueriedCard> list) {
         buf.writeInt(list.size());
-        for (var c : list) writeQueriedCard(buf, c);
+        for (var c : list) {
+            buf.writeBoolean(c != null);
+            if (c != null) writeQueriedCard(buf, c);
+        }
     }
 
     private static List<QueriedCard> readQueriedCardList(FriendlyByteBuf buf) {
         int count = buf.readInt();
         List<QueriedCard> list = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) list.add(readQueriedCard(buf));
+        for (int i = 0; i < count; i++) {
+            list.add(buf.readBoolean() ? readQueriedCard(buf) : null);
+        }
         return list;
     }
 }
