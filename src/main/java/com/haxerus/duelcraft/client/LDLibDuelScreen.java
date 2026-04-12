@@ -369,6 +369,8 @@ public class LDLibDuelScreen {
                 updateStatusLabel();
             if (flags.contains(DirtyFlag.WINNER))
                 showWinOverlay();
+            if (flags.contains(DirtyFlag.CONFIRM))
+                showConfirmCards();
         }
 
         // ── Rebuilders ──
@@ -915,6 +917,16 @@ public class LDLibDuelScreen {
 
         private void updateStatusLabel() {
             if (statusLabel == null) return;
+            if (state.rpsHand0 > 0 && state.rpsHand1 > 0) {
+                statusLabel.removeClass("hidden");
+                int local = state.localPlayer == 0 ? state.rpsHand0 : state.rpsHand1;
+                int remote = state.localPlayer == 0 ? state.rpsHand1 : state.rpsHand0;
+                if (statusLabel instanceof Label lbl)
+                    lbl.setText(Component.literal("You: " + rpsName(local) + " vs " + rpsName(remote)));
+                state.rpsHand0 = 0;
+                state.rpsHand1 = 0;
+                return;
+            }
             if (!state.chain.isEmpty()) {
                 statusLabel.removeClass("hidden");
                 if (statusLabel instanceof Label lbl)
@@ -926,6 +938,43 @@ public class LDLibDuelScreen {
             } else {
                 statusLabel.addClass("hidden");
             }
+        }
+
+        private void showConfirmCards() {
+            if (state.confirmCards == null || state.confirmCards.isEmpty()) return;
+            if (zoneInspector == null) return;
+
+            zoneInspector.removeClass("hidden");
+            var titleLabel = byId("zone-inspector-title");
+            var zoneInspectorList = byId("zone-inspector-list", ScrollerView.class);
+            if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(state.confirmTitle));
+
+            if (zoneInspectorList != null) {
+                zoneInspectorList.clearAllScrollViewChildren();
+                for (var confirmCard : state.confirmCards) {
+                    int code = confirmCard.code();
+
+                    var card = new UIElement();
+                    card.addClasses("card-slot", "hand-card");
+                    setCardImageBackground(card, code);
+
+                    card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                    card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+
+                    zoneInspectorList.addScrollViewChild(card);
+                }
+            }
+
+            state.confirmCards = null;
+        }
+
+        private static String rpsName(int hand) {
+            return switch (hand) {
+                case 1 -> "Rock";
+                case 2 -> "Paper";
+                case 3 -> "Scissors";
+                default -> "???";
+            };
         }
 
         private void showWinOverlay() {
