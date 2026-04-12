@@ -73,7 +73,7 @@ LDLib2's `sprite()` stretches the texture to fill the element bounds via GPU bil
 
 - Card art (624x624) in 150x150 banner area: 1:1 aspect, clean downscale
 - Full card (168x246) in 24x32 hand slot: slight aspect stretch (0.683 vs 0.75), negligible at this size
-- Full card (168x246) in 32x32 field zone: stretched to square, produces the "blurry YDM" aesthetic
+- Full card (168x246) in field zone: the `card-image` child element inside the square slot must use `aspect-rate: 0.75` and `height: 100%` so the card keeps its natural proportions within the square zone. The square slot provides the clickable/hoverable area; the card visual inside it stays card-shaped.
 
 ## Files Changed
 
