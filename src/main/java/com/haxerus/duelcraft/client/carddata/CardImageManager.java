@@ -27,63 +27,98 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Two-tier card image cache: disk files + GPU-registered DynamicTextures.
- * Downloads card art on-demand from ygoprodeck API in a background thread pool.
- * Returns null while loading (caller should show fallback).
+ * Dual-channel card image cache with rate-limited downloads.
+ * <p>
+ * Two channels:
+ * <ul>
+ *   <li><b>Card art</b> (cropped artwork) — for the card info banner</li>
+ *   <li><b>Card texture</b> (full card, small) — for hand/field/inspector</li>
+ * </ul>
+ * Both use async download, JPEG→PNG conversion, disk caching, and DynamicTexture registration.
+ * A 50ms delay between HTTP requests keeps us polite to ygoprodeck's CDN.
  */
 public class CardImageManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CardImageManager.class);
+    private static final long THROTTLE_MS = 50;
 
-    private final String baseUrl;
-    private final Path cacheDir;
-    private final Map<Integer, ResourceLocation> textureCache = new ConcurrentHashMap<>();
-    private final Set<Integer> loading = ConcurrentHashMap.newKeySet();
-    private final Set<Integer> failed = ConcurrentHashMap.newKeySet();
-    private final ExecutorService executor = Executors.newFixedThreadPool(2,
-            r -> { Thread t = new Thread(r, "CardImageLoader"); t.setDaemon(true); return t; });
+    // Shared infrastructure
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
+    private final ExecutorService executor = Executors.newFixedThreadPool(2,
+            r -> { Thread t = new Thread(r, "CardImageLoader"); t.setDaemon(true); return t; });
+    private volatile long lastRequestTime = 0;
 
-    public CardImageManager(String baseUrl, Path cacheDir) {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
-        this.cacheDir = cacheDir;
+    // Card art channel (cropped artwork for info banner)
+    private final String artUrl;
+    private final Path artCacheDir;
+    private final Map<Integer, ResourceLocation> artCache = new ConcurrentHashMap<>();
+    private final Set<Integer> artLoading = ConcurrentHashMap.newKeySet();
+    private final Set<Integer> artFailed = ConcurrentHashMap.newKeySet();
+
+    // Card texture channel (full card for hand/field/inspector)
+    private final String cardUrl;
+    private final Path cardCacheDir;
+    private final Map<Integer, ResourceLocation> cardCache = new ConcurrentHashMap<>();
+    private final Set<Integer> cardLoading = ConcurrentHashMap.newKeySet();
+    private final Set<Integer> cardFailed = ConcurrentHashMap.newKeySet();
+
+    /**
+     * @param cardBaseUrl base URL for full card images (e.g. ".../cards_small/")
+     * @param cacheDir    root cache directory; subdirs "art" and "cards" are created
+     */
+    public CardImageManager(String cardBaseUrl, Path cacheDir) {
+        cardBaseUrl = cardBaseUrl.endsWith("/") ? cardBaseUrl : cardBaseUrl + "/";
+        this.cardUrl = cardBaseUrl;
+        this.artUrl = cardBaseUrl.replace("cards_small", "cards_cropped");
+
+        this.cardCacheDir = cacheDir.resolve("cards");
+        this.artCacheDir = cacheDir.resolve("art");
         try {
-            Files.createDirectories(cacheDir);
+            Files.createDirectories(cardCacheDir);
+            Files.createDirectories(artCacheDir);
         } catch (IOException e) {
-            LOGGER.warn("Failed to create image cache directory: {}", e.getMessage());
+            LOGGER.warn("Failed to create image cache directories: {}", e.getMessage());
         }
     }
 
-    /**
-     * Get the texture ResourceLocation for a card image.
-     * Returns null if the image is not yet loaded (triggers async download).
-     * Returns null for code 0 (face-down/unknown) or previously failed downloads.
-     */
+    /** Cropped artwork for the card info banner. Returns null while loading. */
+    public ResourceLocation getCardArt(int code) {
+        return getTexture(code, artCache, artLoading, artFailed, artCacheDir, artUrl, "art_");
+    }
+
+    /** Full card image for hand/field/inspector. Returns null while loading. */
     public ResourceLocation getCardTexture(int code) {
+        return getTexture(code, cardCache, cardLoading, cardFailed, cardCacheDir, cardUrl, "card_");
+    }
+
+    private ResourceLocation getTexture(int code,
+                                         Map<Integer, ResourceLocation> cache,
+                                         Set<Integer> loadingSet,
+                                         Set<Integer> failedSet,
+                                         Path diskDir,
+                                         String urlBase,
+                                         String locPrefix) {
         if (code == 0) return null;
 
-        // L1: Already registered as DynamicTexture
-        ResourceLocation cached = textureCache.get(code);
+        ResourceLocation cached = cache.get(code);
         if (cached != null) return cached;
 
-        // Don't retry known failures
-        if (failed.contains(code)) return null;
+        if (failedSet.contains(code)) return null;
 
-        // L2/L3: Async load from disk cache or download
-        if (loading.add(code)) {
-            Path diskFile = cacheDir.resolve(code + ".png");
+        if (loadingSet.add(code)) {
+            Path diskFile = diskDir.resolve(code + ".png");
             executor.submit(() -> {
                 try {
                     if (Files.exists(diskFile)) {
-                        loadFromDiskAsync(code, diskFile);
+                        loadFromDisk(code, diskFile, cache, locPrefix);
                     } else {
-                        downloadAndCache(code);
+                        download(code, urlBase, diskDir, cache, failedSet, locPrefix);
                     }
                 } finally {
-                    loading.remove(code);
+                    loadingSet.remove(code);
                 }
             });
         }
@@ -91,23 +126,23 @@ public class CardImageManager {
         return null;
     }
 
-    /** Check if a specific card's image is loaded and ready. */
-    public boolean isLoaded(int code) {
-        return textureCache.containsKey(code);
-    }
-
-    private void loadFromDiskAsync(int code, Path file) {
+    private void loadFromDisk(int code, Path file,
+                              Map<Integer, ResourceLocation> cache, String locPrefix) {
         try {
             byte[] data = Files.readAllBytes(file);
-            Minecraft.getInstance().execute(() -> registerTexture(code, data));
+            Minecraft.getInstance().execute(() -> registerTexture(code, data, cache, locPrefix));
         } catch (IOException e) {
             LOGGER.warn("Failed to load cached card image {}: {}", code, e.getMessage());
         }
     }
 
-    private void downloadAndCache(int code) {
+    private void download(int code, String urlBase, Path diskDir,
+                          Map<Integer, ResourceLocation> cache,
+                          Set<Integer> failedSet, String locPrefix) {
         try {
-            String url = baseUrl + code + ".jpg";
+            throttle();
+
+            String url = urlBase + code + ".jpg";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(15))
@@ -117,29 +152,48 @@ public class CardImageManager {
                     HttpResponse.BodyHandlers.ofByteArray());
 
             if (response.statusCode() == 200) {
-                // Convert JPEG → PNG (NativeImage only reads PNG)
                 byte[] pngData = convertToPng(response.body());
                 if (pngData == null) {
                     LOGGER.warn("Failed to convert card image for {}", code);
-                    failed.add(code);
+                    failedSet.add(code);
                     return;
                 }
-                // Save PNG to disk cache
-                Files.write(cacheDir.resolve(code + ".png"), pngData);
-                // Register texture on the render thread
-                Minecraft.getInstance().execute(() -> registerTexture(code, pngData));
-                LOGGER.debug("Downloaded card image for {}", code);
+                Files.write(diskDir.resolve(code + ".png"), pngData);
+                Minecraft.getInstance().execute(() -> registerTexture(code, pngData, cache, locPrefix));
+                LOGGER.debug("Downloaded card image for {} ({})", code, locPrefix);
             } else {
                 LOGGER.debug("Card image not found for {}: HTTP {}", code, response.statusCode());
-                failed.add(code);
+                failedSet.add(code);
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to download card image for {}: {}", code, e.getMessage());
-            failed.add(code);
+            failedSet.add(code);
         }
     }
 
-    /** Convert any image format (JPEG, etc.) to PNG bytes for NativeImage compatibility. */
+    private synchronized void throttle() throws InterruptedException {
+        long now = System.currentTimeMillis();
+        long elapsed = now - lastRequestTime;
+        if (elapsed < THROTTLE_MS) {
+            Thread.sleep(THROTTLE_MS - elapsed);
+        }
+        lastRequestTime = System.currentTimeMillis();
+    }
+
+    private void registerTexture(int code, byte[] data,
+                                 Map<Integer, ResourceLocation> cache, String locPrefix) {
+        try {
+            NativeImage image = NativeImage.read(new ByteArrayInputStream(data));
+            DynamicTexture texture = new DynamicTexture(image);
+            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath("duelcraft",
+                    "dynamic/" + locPrefix + code);
+            Minecraft.getInstance().getTextureManager().register(loc, texture);
+            cache.put(code, loc);
+        } catch (IOException e) {
+            LOGGER.warn("Failed to decode card image for {}: {}", code, e.getMessage());
+        }
+    }
+
     private static byte[] convertToPng(byte[] imageData) {
         try {
             BufferedImage buffered = ImageIO.read(new ByteArrayInputStream(imageData));
@@ -152,22 +206,6 @@ public class CardImageManager {
         }
     }
 
-    private ResourceLocation registerTexture(int code, byte[] data) {
-        try {
-            NativeImage image = NativeImage.read(new ByteArrayInputStream(data));
-            DynamicTexture texture = new DynamicTexture(image);
-            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath("duelcraft",
-                    "dynamic/card_" + code);
-            Minecraft.getInstance().getTextureManager().register(loc, texture);
-            textureCache.put(code, loc);
-            return loc;
-        } catch (IOException e) {
-            LOGGER.warn("Failed to decode card image for {}: {}", code, e.getMessage());
-            failed.add(code);
-            return null;
-        }
-    }
-
     public void close() {
         executor.shutdown();
         try {
@@ -176,9 +214,9 @@ public class CardImageManager {
             Thread.currentThread().interrupt();
         }
         var textureManager = Minecraft.getInstance().getTextureManager();
-        for (ResourceLocation loc : textureCache.values()) {
-            textureManager.release(loc);
-        }
-        textureCache.clear();
+        for (ResourceLocation loc : artCache.values()) textureManager.release(loc);
+        for (ResourceLocation loc : cardCache.values()) textureManager.release(loc);
+        artCache.clear();
+        cardCache.clear();
     }
 }

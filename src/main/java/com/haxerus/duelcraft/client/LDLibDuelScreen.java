@@ -358,12 +358,7 @@ public class LDLibDuelScreen {
                 card.addClasses("card-slot", "hand-card");
 
                 if (isLocal && code != 0) {
-                    var label = new Label();
-                    label.setText(Component.literal(cardDisplayName(code)));
-                    label.lss("font-size", "5");
-                    label.lss("horizontal-align", "center");
-                    label.lss("text-wrap", "wrap");
-                    card.addChild(label);
+                    setCardImageBackground(card, code);
                 } else {
                     var back = new UIElement();
                     back.addClasses("card-back");
@@ -758,11 +753,9 @@ public class LDLibDuelScreen {
                     cardVisual.addClass("card-back");
                 } else {
                     cardVisual.addClass("card-image");
-                    var label = new Label();
-                    label.setText(Component.literal(cardDisplayName(code)));
-                    label.lss("font-size", "5");
-                    label.lss("text-wrap", "wrap");
-                    cardVisual.addChild(label);
+                    cardVisual.lss("aspect-rate", "0.75");
+                    cardVisual.lss("height", "100%");
+                    setCardImageBackground(cardVisual, code);
                 }
 
                 if (defense) {
@@ -958,12 +951,7 @@ public class LDLibDuelScreen {
 
                            var card = new UIElement();
                            card.addClasses("card-slot", "hand-card");
-
-                           var label = new Label();
-                           label.setText(Component.literal(cardDisplayName(code)));
-                           label.lss("font-size", "6");
-                           label.lss("horizontal-align", "center");
-                           card.addChild(label);
+                           setCardImageBackground(card, code);
 
                            card.addEventListener(UIEvents.CLICK, ev -> {
                                ev.stopPropagation();
@@ -1002,10 +990,10 @@ public class LDLibDuelScreen {
                 setTextElement("card-text", card.desc());
                 setTextElement("card-atk-def-label", CardStringHelper.atkDefLine(card));
 
-                // Card image
+                // Card art (cropped artwork)
                 CardImageManager images = DuelcraftClient.getCardImageManager();
                 if (images != null && imageArea != null) {
-                    var loc = images.getCardTexture(code);
+                    var loc = images.getCardArt(code);
                     if (loc != null) {
                         imageArea.lss("background", "sprite(" + loc + ")");
                     } else {
@@ -1019,6 +1007,23 @@ public class LDLibDuelScreen {
                 setTextElement("card-atk-def-label", "");
                 if (imageArea != null)
                     imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+            }
+        }
+
+        /** Set a card's full image as the element background, with name fallback. */
+        private void setCardImageBackground(UIElement elem, int code) {
+            CardImageManager images = DuelcraftClient.getCardImageManager();
+            ResourceLocation loc = images != null ? images.getCardTexture(code) : null;
+            if (loc != null) {
+                elem.lss("background", "sprite(" + loc + ")");
+            } else {
+                // Fallback: show card name until image loads
+                var label = new Label();
+                label.setText(Component.literal(cardDisplayName(code)));
+                label.lss("font-size", "5");
+                label.lss("horizontal-align", "center");
+                label.lss("text-wrap", "wrap");
+                elem.addChild(label);
             }
         }
 
