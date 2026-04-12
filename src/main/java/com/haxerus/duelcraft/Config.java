@@ -41,6 +41,16 @@ public class Config {
             .comment("Paths to your Yu-Gi-Oh! card script files")
             .defineList("scriptPaths", List.of("C:/ProjectIgnis/script;C:/ProjectIgnis/script/official"), () -> "",  Config::validateNonEmpty);
 
+    public static final ModConfigSpec.ConfigValue<String> CARD_DATABASE_URL = BUILDER
+            .comment("URL to download the card database from (BabelCDB)")
+            .define("cardDatabaseUrl",
+                    "https://raw.githubusercontent.com/ProjectIgnis/BabelCDB/master/cards.cdb");
+
+    public static final ModConfigSpec.ConfigValue<String> CARD_IMAGE_BASE_URL = BUILDER
+            .comment("Base URL for card images (code.jpg appended)")
+            .define("cardImageBaseUrl",
+                    "https://images.ygoprodeck.com/images/cards_small/");
+
     static final ModConfigSpec SPEC = BUILDER.build();
 
     private static boolean validateNonEmpty(final Object obj) {

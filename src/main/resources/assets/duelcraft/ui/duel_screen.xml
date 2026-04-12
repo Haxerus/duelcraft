@@ -197,7 +197,9 @@
 
         /* ── Card back ── */
         .card-back {
-        background: sdf(#1a3a6a, 3, 2);
+        background: sprite(duelcraft:textures/card_back.png);
+        height: 100%;
+        aspect-rate: 0.75;
         }
 
         /* ── Defense position ── */
@@ -207,15 +209,11 @@
 
         /* ── Hand Row ── */
         .hand-card {
-        //background: built-in(ui-gdp:RECT);
-        background: sdf(#914d03, 5, 3);
-        //margin-horizontal: -8;
         transition: background 0.3 quad_in_out,
         transform 0.2;
         }
 
-        .hand-card.__hovered__ {
-        background: sdf(#b8650a, 5, 3);
+        #player-hand .hand-card.__hovered__ {
         transform: scale(1.05);
         }
 
@@ -298,8 +296,8 @@
         }
 
         #card-image-area {
-        width: 150;
-        height: 150;
+        width: 192;
+        height: 192;
         align-self: center;
         //background: rect(#3c3c50);
         background: sprite(duelcraft:textures/test.png);
@@ -476,12 +474,12 @@
 
         <!-- HUD Bar (top overlay: LP bars + duel title) -->
         <element id="hud-bar">
-            <progress-bar id="opp-lp-bar" class="lp-bar" value="100" text="8000" />
+            <progress-bar id="plr-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
             <element id="hud-info">
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
-            <progress-bar id="plr-lp-bar" class="lp-bar" value="100" text="8000" />
+            <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
         </element>
 
         <!-- ══════════ Field Area ══════════ -->

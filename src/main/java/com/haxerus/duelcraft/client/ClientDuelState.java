@@ -42,6 +42,14 @@ public class ClientDuelState {
         return !dirtyFlags.isEmpty();
     }
 
+    /** Mark all visual zones dirty (used when card images finish loading). */
+    public void markAllVisualsDirty() {
+        dirtyFlags.addAll(EnumSet.of(
+                DirtyFlag.HAND_0, DirtyFlag.HAND_1,
+                DirtyFlag.MZONE_0, DirtyFlag.MZONE_1,
+                DirtyFlag.SZONE_0, DirtyFlag.SZONE_1));
+    }
+
     private DirtyFlag handFlag(int player) {
         return player == 0 ? DirtyFlag.HAND_0 : DirtyFlag.HAND_1;
     }
@@ -173,7 +181,6 @@ public class ClientDuelState {
                 extra[1].clear();
                 for (int i = 0; i < start.extraCount0(); i++) extra[0].add(0);
                 for (int i = 0; i < start.extraCount1(); i++) extra[1].add(0);
-                dirtyFlags.add(DirtyFlag.LP);
                 dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
                         lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
@@ -268,22 +275,18 @@ public class ClientDuelState {
             // ---- LP ----
             case DuelMessage.Damage dmg -> {
                 lp[dmg.player()] = Math.max(0, lp[dmg.player()] - dmg.amount());
-                dirtyFlags.add(DirtyFlag.LP);
                 LOGGER.debug("[State] Damage: player={}, amount={}, lp now={}", dmg.player(), dmg.amount(), lp[dmg.player()]);
             }
             case DuelMessage.Recover rec -> {
                 lp[rec.player()] += rec.amount();
-                dirtyFlags.add(DirtyFlag.LP);
                 LOGGER.debug("[State] Recover: player={}, amount={}, lp now={}", rec.player(), rec.amount(), lp[rec.player()]);
             }
             case DuelMessage.LpUpdate upd -> {
                 lp[upd.player()] = upd.lp();
-                dirtyFlags.add(DirtyFlag.LP);
                 LOGGER.debug("[State] LpUpdate: player={}, lp={}", upd.player(), upd.lp());
             }
             case DuelMessage.PayLpCost pay -> {
                 lp[pay.player()] = Math.max(0, lp[pay.player()] - pay.amount());
-                dirtyFlags.add(DirtyFlag.LP);
                 LOGGER.debug("[State] PayLpCost: player={}, amount={}, lp now={}", pay.player(), pay.amount(), lp[pay.player()]);
             }
 

@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
+import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.DataBindingBuilder;
 import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.SupplierDataSource;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
@@ -13,6 +14,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ProgressBar;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.utils.XmlUtils;
@@ -22,6 +24,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
+import com.haxerus.duelcraft.DuelcraftClient;
+import com.haxerus.duelcraft.client.carddata.CardDatabase;
+import com.haxerus.duelcraft.client.carddata.CardImageManager;
+import com.haxerus.duelcraft.client.carddata.CardInfo;
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import org.slf4j.Logger;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -122,11 +129,15 @@ public class LDLibDuelScreen {
         private final UIElement[] emzSlots = new UIElement[2];
         private final UIElement[] fieldSpellSlots = new UIElement[2];
 
-        // Pile count labels
+        // Pile count labels + slot elements
         private final Label[] deckCountLabels = new Label[2];
         private final Label[] graveCountLabels = new Label[2];
         private final Label[] extraCountLabels = new Label[2];
         private final Label[] banishedCountLabels = new Label[2];
+        private final UIElement[] deckSlots = new UIElement[2];
+        private final UIElement[] graveSlots = new UIElement[2];
+        private final UIElement[] extraSlots = new UIElement[2];
+        private final UIElement[] banishedSlots = new UIElement[2];
 
         // Hands
         private final ScrollerView oppHandContainer;
@@ -187,6 +198,14 @@ public class LDLibDuelScreen {
             extraCountLabels[plr] = findCardCountLabel("plr-extra-deck");
             banishedCountLabels[opp] = findCardCountLabel("opp-banished");
             banishedCountLabels[plr] = findCardCountLabel("plr-banished");
+            deckSlots[opp] = byId("opp-deck");
+            deckSlots[plr] = byId("plr-deck");
+            graveSlots[opp] = byId("opp-graveyard");
+            graveSlots[plr] = byId("plr-graveyard");
+            extraSlots[opp] = byId("opp-extra-deck");
+            extraSlots[plr] = byId("plr-extra-deck");
+            banishedSlots[opp] = byId("opp-banished");
+            banishedSlots[plr] = byId("plr-banished");
 
             // ── Hands ──
             oppHandContainer = byId("opponent-hand", ScrollerView.class);
@@ -215,6 +234,12 @@ public class LDLibDuelScreen {
             wirePhaseButtons();
             handleZoneClicks();
             handlePileClicks();
+
+            // Refresh hand/field when card images finish downloading
+            CardImageManager images = DuelcraftClient.getCardImageManager();
+            if (images != null) {
+                images.setOnTextureLoaded(state::markAllVisualsDirty);
+            }
 
             // Dismiss context menu when clicking outside it
             ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
@@ -256,15 +281,19 @@ public class LDLibDuelScreen {
             int plr = state.localPlayer;
             int opp = state.opponent();
 
-            // LP bars
-            if (oppLpBar != null) {
-                oppLpBar.bindDataSource(SupplierDataSource.of(() ->
-                        state.startingLP > 0 ? (float) state.lp[opp] / state.startingLP : 1.0f));
-            }
-            if (plrLpBar != null) {
-                plrLpBar.bindDataSource(SupplierDataSource.of(() ->
-                        state.startingLP > 0 ? (float) state.lp[plr] / state.startingLP : 1.0f));
-            }
+            String localName = Minecraft.getInstance().getUser().getName();
+
+            plrLpBar.bindDataSource(SupplierDataSource.of(
+                    () -> (float) state.lp[plr]
+            )).label(label -> label.bindDataSource(SupplierDataSource.of(
+                    () -> Component.literal(localName + ": ").append(String.valueOf(state.lp[plr]))
+            )));
+
+            oppLpBar.bindDataSource(SupplierDataSource.of(
+                    () -> (float) state.lp[opp]
+            )).label(label -> label.bindDataSource(SupplierDataSource.of(
+                    () -> Component.literal(state.opponentName + ": ").append(String.valueOf(state.lp[opp]))
+            )));
 
             // Title and turn/phase labels
             bindLabel(titleLabel, () -> "You vs. " + state.opponentName);
@@ -323,6 +352,9 @@ public class LDLibDuelScreen {
             if (flags.contains(opp == 0 ? DirtyFlag.SZONE_0 : DirtyFlag.SZONE_1))
                 refreshSpellZones(opp);
 
+            if (flags.contains(DirtyFlag.PILE_COUNTS))
+                refreshPiles();
+
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
                 rebuildPrompt();
                 updatePhaseButtons();
@@ -352,25 +384,16 @@ public class LDLibDuelScreen {
                 card.addClasses("card-slot", "hand-card");
 
                 if (isLocal && code != 0) {
-                    var label = new Label();
-                    label.setText(Component.literal(String.valueOf(code)));
-                    label.lss("font-size", "6");
-                    label.lss("horizontal-align", "center");
-                    card.addChild(label);
+                    setCardImageBackground(card, code);
                 } else {
-                    var back = new UIElement();
-                    back.addClasses("card-back");
-                    card.addChild(back);
+                    card.lss("background", CARD_BACK_SPRITE);
                 }
 
-                // Click handler
                 if (isLocal) {
                     card.addEventListener(UIEvents.CLICK, e -> onCardClicked(player, LOCATION_HAND, seq, e));
+                    card.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(code));
+                    card.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
                 }
-
-                // Hover to display card info
-                card.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(code));
-                card.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
 
                 container.addScrollViewChild(card);
             }
@@ -749,16 +772,24 @@ public class LDLibDuelScreen {
                 var cardVisual = new UIElement();
                 if (faceDown) {
                     cardVisual.addClass("card-back");
+
+                    if (player == state.localPlayer) {
+                        int hoverCode = code;
+                        cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(hoverCode));
+                        cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
+                    }
                 } else {
                     cardVisual.addClass("card-image");
-                    // TODO: Replace with card image
-                    var label = new Label();
-                    label.setText(Component.literal(String.valueOf(code)));
-                    label.lss("font-size", "6");
-                    cardVisual.addChild(label);
+                    cardVisual.lss("aspect-rate", "0.75");
+                    cardVisual.lss("height", "100%");
+                    setCardImageBackground(cardVisual, code);
+
+                    int hoverCode = code;
+                    cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(hoverCode));
+                    cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
                 }
 
-                if (defense) {
+                if (defense && locationType == LOCATION_MZONE) {
                     cardVisual.addClass("defense");
                 }
 
@@ -766,6 +797,47 @@ public class LDLibDuelScreen {
 
                 slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
             } else {
+                slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
+            }
+        }
+
+        private void refreshPiles() {
+            for (int p = 0; p < 2; p++) {
+                // Deck & Extra: card back when non-empty
+                setPileBackground(deckSlots[p], state.deckCount[p] > 0 ? CARD_BACK_SPRITE : null);
+                setPileBackground(extraSlots[p], !state.extra[p].isEmpty() ? CARD_BACK_SPRITE : null);
+
+                // Graveyard & Banished: top card image when non-empty
+                setPileTopCard(graveSlots[p], state.grave[p]);
+                setPileTopCard(banishedSlots[p], state.banished[p]);
+            }
+        }
+
+        private void setPileBackground(UIElement slot, String background) {
+            if (slot == null) return;
+            if (background != null) {
+                slot.lss("background", background);
+                slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+            } else {
+                slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
+                slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
+            }
+        }
+
+        private void setPileTopCard(UIElement slot, List<Integer> cards) {
+            if (slot == null) return;
+            if (!cards.isEmpty()) {
+                int topCode = cards.getLast();
+                CardImageManager images = DuelcraftClient.getCardImageManager();
+                ResourceLocation loc = images != null ? images.getCardTexture(topCode) : null;
+                if (loc != null) {
+                    slot.lss("background", "sprite(" + loc + ")");
+                } else {
+                    slot.lss("background", CARD_BACK_SPRITE);
+                }
+                slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+            } else {
+                slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
                 slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
             }
         }
@@ -924,11 +996,21 @@ public class LDLibDuelScreen {
             handlePileClick("opp-graveyard", "Opponent's Graveyard", state.opponent(), LOCATION_GRAVE);
             handlePileClick("plr-banished", "Your Banished", state.localPlayer, LOCATION_REMOVED);
             handlePileClick("opp-banished", "Opponent's Banished", state.opponent(), LOCATION_REMOVED);
+            handlePileClick("plr-extra-deck", "Your Extra Deck", state.localPlayer, LOCATION_EXTRA);
 
             var closeBtn = byId("zone-inspector-close");
             if (closeBtn instanceof Button btn) {
                 btn.setOnClick(e -> zoneInspector.addClass("hidden"));
             }
+        }
+
+        private List<Integer> getPileCards(int player, int location) {
+            return switch (location) {
+                case LOCATION_GRAVE -> state.grave[player];
+                case LOCATION_REMOVED -> state.banished[player];
+                case LOCATION_EXTRA -> state.extra[player];
+                default -> List.of();
+            };
         }
 
         private void handlePileClick(String elementId, String title, int player, int location) {
@@ -941,8 +1023,7 @@ public class LDLibDuelScreen {
                    if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(title));
 
                    if (zoneInspectorList != null) {
-                       List<Integer> cards = location == LOCATION_GRAVE
-                               ? state.grave[player] : state.banished[player];
+                       List<Integer> cards = getPileCards(player, location);
 
                        zoneInspectorList.clearAllScrollViewChildren();
                        for (int i = 0; i < cards.size(); i++) {
@@ -951,12 +1032,7 @@ public class LDLibDuelScreen {
 
                            var card = new UIElement();
                            card.addClasses("card-slot", "hand-card");
-
-                           var label = new Label();
-                           label.setText(Component.literal(String.valueOf(code)));
-                           label.lss("font-size", "6");
-                           label.lss("horizontal-align", "center");
-                           card.addChild(label);
+                           setCardImageBackground(card, code);
 
                            card.addEventListener(UIEvents.CLICK, ev -> {
                                ev.stopPropagation();
@@ -974,12 +1050,61 @@ public class LDLibDuelScreen {
 
         // ── Helpers ──
 
+        private String cardDisplayName(int code) {
+            CardDatabase db = DuelcraftClient.getCardDatabase();
+            CardInfo info = db != null ? db.getCard(code) : null;
+            return info != null ? info.name() : String.valueOf(code);
+        }
+
         private void showCardInfo(int code) {
             if (code == 0 || cardInfoBanner == null) return;
             cardInfoBanner.removeClass("hidden");
-            var nameLabel = byId("card-name-label");
-            if (nameLabel instanceof Label lbl) lbl.setText(Component.literal("Card #" + code));
-            // TODO: Actually look up card info from database
+
+            CardDatabase db = DuelcraftClient.getCardDatabase();
+            CardInfo card = db != null ? db.getCard(code) : null;
+
+            var imageArea = byId("card-image-area");
+
+            if (card != null) {
+                setTextElement("card-name-label", card.name());
+                setTextElement("card-stats-label", CardStringHelper.typeLine(card));
+                setTextElement("card-text", card.desc());
+                setTextElement("card-atk-def-label", CardStringHelper.atkDefLine(card));
+
+                // Card art (cropped artwork)
+                CardImageManager images = DuelcraftClient.getCardImageManager();
+                if (images != null && imageArea != null) {
+                    var loc = images.getCardArt(code);
+                    if (loc != null) {
+                        imageArea.lss("background", "sprite(" + loc + ")");
+                    } else {
+                        imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+                    }
+                }
+            } else {
+                setTextElement("card-name-label", "Card #" + code);
+                setTextElement("card-stats-label", "");
+                setTextElement("card-text", "");
+                setTextElement("card-atk-def-label", "");
+                if (imageArea != null)
+                    imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+            }
+        }
+
+        private static final String CARD_BACK_SPRITE = "sprite(duelcraft:textures/card_back.png)";
+
+        /** Set a card's full image as the element background, card back as fallback. */
+        private void setCardImageBackground(UIElement elem, int code) {
+            CardImageManager images = DuelcraftClient.getCardImageManager();
+            ResourceLocation loc = images != null ? images.getCardTexture(code) : null;
+            elem.lss("background", loc != null ? "sprite(" + loc + ")" : CARD_BACK_SPRITE);
+        }
+
+        /** Set text on an element that could be either a Label or TextElement (XML <text> tag). */
+        private void setTextElement(String id, String text) {
+            var elem = byId(id);
+            if (elem instanceof TextElement te) te.setText(Component.literal(text));
+            else if (elem instanceof Label lbl) lbl.setText(Component.literal(text));
         }
 
         private void hideCardInfo() {
