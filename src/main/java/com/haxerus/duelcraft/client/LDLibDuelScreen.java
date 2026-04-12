@@ -453,6 +453,10 @@ public class LDLibDuelScreen {
                     buildUnselectCardPrompt(sel);
                 }
 
+                case DuelMessage.SelectSum sel -> {
+                    buildSelectSumPrompt(sel);
+                }
+
                 case DuelMessage.SelectPosition sel -> buildPositionPrompt(sel);
 
                 case DuelMessage.SelectPlace sel -> {
@@ -751,6 +755,99 @@ public class LDLibDuelScreen {
                 UIElement slot = findSlotForLocation(loc);
                 if (slot != null) slot.addClass("selected");
             }
+        }
+
+        private void buildSelectSumPrompt(DuelMessage.SelectSum sel) {
+            selectedIndices.clear();
+            promptOverlay.removeClass("hidden");
+            clearPromptContent();
+
+            // Calculate must-select sum
+            int mustSum = 0;
+            for (var c : sel.mustSelect()) {
+                mustSum += c.value1();
+            }
+            final int[] runningSum = { mustSum };
+
+            // Title with running sum
+            Runnable updateTitle = () -> {
+                if (promptTitle instanceof Label t)
+                    t.setText(Component.literal("Select Materials (Sum: " + runningSum[0] + " / " + sel.targetSum() + ")"));
+            };
+            updateTitle.run();
+
+            // Must-select cards (locked, shown with .selected, no click)
+            for (var mustCard : sel.mustSelect()) {
+                var card = new UIElement();
+                card.addClasses("card", "selected");
+                setCardImageBackground(card, mustCard.code());
+                int code = mustCard.code();
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+                promptBody.addChild(card);
+            }
+
+            // Selectable cards (toggleable)
+            for (int i = 0; i < sel.selectable().size(); i++) {
+                var sumCard = sel.selectable().get(i);
+                int code = sumCard.code();
+                int value = sumCard.value1();
+                int index = i;
+
+                var card = new UIElement();
+                card.addClass("card");
+                setCardImageBackground(card, code);
+
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+                card.addEventListener(UIEvents.CLICK, ev -> {
+                    ev.stopPropagation();
+                    if (selectedIndices.contains(index)) {
+                        selectedIndices.remove(Integer.valueOf(index));
+                        card.removeClass("selected");
+                        runningSum[0] -= value;
+                    } else {
+                        selectedIndices.add(index);
+                        card.addClass("selected");
+                        runningSum[0] += value;
+                    }
+                    updateTitle.run();
+                });
+
+                promptBody.addChild(card);
+            }
+
+            // Highlight on-field targets
+            for (var sumCard : sel.selectable()) {
+                var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("target");
+            }
+            for (var mustCard : sel.mustSelect()) {
+                var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selected");
+            }
+
+            // Confirm button
+            var confirmBtn = new Button();
+            confirmBtn.setText(Component.literal("Confirm"));
+            confirmBtn.addClasses("prompt-btn");
+            confirmBtn.setOnClick(e -> {
+                int totalSelected = sel.mustSelect().size() + selectedIndices.size();
+                if (runningSum[0] == sel.targetSum()
+                        && totalSelected >= sel.min() && totalSelected <= sel.max()) {
+                    int mustCount = sel.mustSelect().size();
+                    int[] allIndices = new int[totalSelected];
+                    for (int i = 0; i < mustCount; i++) allIndices[i] = i;
+                    int j = mustCount;
+                    for (int idx : selectedIndices) {
+                        allIndices[j++] = mustCount + idx;
+                    }
+                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectSum(allIndices));
+                }
+            });
+            promptButtons.addChild(confirmBtn);
         }
 
         private void highlightValidPlaces(int field) {
@@ -1147,6 +1244,19 @@ public class LDLibDuelScreen {
                     if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
                         LDLibDuelScreen.sendResponse(state,
                                 ResponseBuilder.selectUnselectCard(sel.selectableCards().size() + i));
+                        return;
+                    }
+                }
+            } else if (state.pendingPrompt instanceof DuelMessage.SelectSum sel) {
+                for (int i = 0; i < sel.selectable().size(); i++) {
+                    var c = sel.selectable().get(i);
+                    if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
+                        if (selectedIndices.contains(i)) {
+                            selectedIndices.remove(Integer.valueOf(i));
+                        } else {
+                            selectedIndices.add(i);
+                        }
+                        rebuildPrompt();
                         return;
                     }
                 }
