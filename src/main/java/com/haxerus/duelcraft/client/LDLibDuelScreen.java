@@ -22,6 +22,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
+import com.haxerus.duelcraft.DuelcraftClient;
+import com.haxerus.duelcraft.client.carddata.CardDatabase;
+import com.haxerus.duelcraft.client.carddata.CardImageManager;
+import com.haxerus.duelcraft.client.carddata.CardInfo;
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import org.slf4j.Logger;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -353,9 +358,13 @@ public class LDLibDuelScreen {
 
                 if (isLocal && code != 0) {
                     var label = new Label();
-                    label.setText(Component.literal(String.valueOf(code)));
-                    label.lss("font-size", "6");
+                    CardDatabase db = DuelcraftClient.getCardDatabase();
+                    CardInfo cardInfo = db != null ? db.getCard(code) : null;
+                    String displayName = cardInfo != null ? cardInfo.name() : String.valueOf(code);
+                    label.setText(Component.literal(displayName));
+                    label.lss("font-size", "5");
                     label.lss("horizontal-align", "center");
+                    label.lss("text-wrap", "wrap");
                     card.addChild(label);
                 } else {
                     var back = new UIElement();
@@ -751,10 +760,13 @@ public class LDLibDuelScreen {
                     cardVisual.addClass("card-back");
                 } else {
                     cardVisual.addClass("card-image");
-                    // TODO: Replace with card image
                     var label = new Label();
-                    label.setText(Component.literal(String.valueOf(code)));
-                    label.lss("font-size", "6");
+                    CardDatabase db = DuelcraftClient.getCardDatabase();
+                    CardInfo cardInfo = db != null ? db.getCard(code) : null;
+                    String displayName = cardInfo != null ? cardInfo.name() : String.valueOf(code);
+                    label.setText(Component.literal(displayName));
+                    label.lss("font-size", "5");
+                    label.lss("text-wrap", "wrap");
                     cardVisual.addChild(label);
                 }
 
@@ -953,7 +965,10 @@ public class LDLibDuelScreen {
                            card.addClasses("card-slot", "hand-card");
 
                            var label = new Label();
-                           label.setText(Component.literal(String.valueOf(code)));
+                           CardDatabase db = DuelcraftClient.getCardDatabase();
+                           CardInfo cardInfo = db != null ? db.getCard(code) : null;
+                           String displayName = cardInfo != null ? cardInfo.name() : String.valueOf(code);
+                           label.setText(Component.literal(displayName));
                            label.lss("font-size", "6");
                            label.lss("horizontal-align", "center");
                            card.addChild(label);
@@ -977,9 +992,48 @@ public class LDLibDuelScreen {
         private void showCardInfo(int code) {
             if (code == 0 || cardInfoBanner == null) return;
             cardInfoBanner.removeClass("hidden");
+
+            CardDatabase db = DuelcraftClient.getCardDatabase();
+            CardInfo card = db != null ? db.getCard(code) : null;
+
             var nameLabel = byId("card-name-label");
-            if (nameLabel instanceof Label lbl) lbl.setText(Component.literal("Card #" + code));
-            // TODO: Actually look up card info from database
+            var statsLabel = byId("card-stats-label");
+            var textLabel = byId("card-text");
+            var atkDefLabel = byId("card-atk-def-label");
+            var imageArea = byId("card-image-area");
+
+            if (card != null) {
+                if (nameLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(card.name()));
+                if (statsLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(CardStringHelper.typeLine(card)));
+                if (textLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(card.desc()));
+                if (atkDefLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(CardStringHelper.atkDefLine(card)));
+
+                // Card image
+                CardImageManager images = DuelcraftClient.getCardImageManager();
+                if (images != null && imageArea != null) {
+                    var loc = images.getCardTexture(code);
+                    if (loc != null) {
+                        imageArea.lss("background", "sprite(" + loc + ")");
+                    } else {
+                        imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+                    }
+                }
+            } else {
+                if (nameLabel instanceof Label lbl)
+                    lbl.setText(Component.literal("Card #" + code));
+                if (statsLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(""));
+                if (textLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(""));
+                if (atkDefLabel instanceof Label lbl)
+                    lbl.setText(Component.literal(""));
+                if (imageArea != null)
+                    imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+            }
         }
 
         private void hideCardInfo() {
