@@ -10,6 +10,11 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+
 import java.util.List;
 
 public class DuelSession implements AutoCloseable {
@@ -154,12 +159,12 @@ public class DuelSession implements AutoCloseable {
      * </pre>
      * Each field block has u16 fieldSize = sizeof(u32 flag) + sizeof(data).
      */
-    private static java.util.List<QueriedCard> parseNativeLocationQuery(byte[] data) {
-        var buf = java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    private static List<QueriedCard> parseNativeLocationQuery(byte[] data) {
+        var buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
         int totalSize = buf.getInt(); // u32 total data size
         int endPos = 4 + totalSize;
 
-        var cards = new java.util.ArrayList<QueriedCard>();
+        var cards = new ArrayList<QueriedCard>();
         while (buf.position() < endPos && buf.remaining() >= 2) {
             int firstU16 = Short.toUnsignedInt(buf.getShort());
             if (firstU16 == 0) {
@@ -202,7 +207,7 @@ public class DuelSession implements AutoCloseable {
     }
 
     /** Read one field block: given u16 fieldSize already read, read [u32 flag][data]. */
-    private static void readFieldBlock(java.nio.ByteBuffer buf, QueriedCard card, int fieldSize) {
+    private static void readFieldBlock(ByteBuffer buf, QueriedCard card, int fieldSize) {
         int flag = buf.getInt();
         card.flags |= flag;
         int dataSize = fieldSize - 4; // fieldSize includes the flag
