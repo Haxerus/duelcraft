@@ -198,7 +198,6 @@
         /* ── Card back ── */
         .card-back {
         background: sprite(duelcraft:textures/card_back.png);
-        width: 100%;
         height: 100%;
         aspect-rate: 0.75;
         }
