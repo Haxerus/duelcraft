@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.server;
 import com.haxerus.duelcraft.core.OcgConstants;
 import com.haxerus.duelcraft.duel.DuelEventListener;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -117,8 +118,35 @@ public class ServerDuelHandler implements DuelEventListener {
                 }
                 yield set;
             }
+            case DuelMessage.UpdateData upd -> {
+                if (upd.player() != recipient) {
+                    var sanitized = upd.cards().stream()
+                            .map(ServerDuelHandler::sanitizeCard)
+                            .toList();
+                    yield new DuelMessage.UpdateData(upd.player(), upd.location(), sanitized);
+                }
+                yield upd;
+            }
+            case DuelMessage.UpdateCard upd -> {
+                if (upd.player() != recipient) {
+                    yield new DuelMessage.UpdateCard(upd.player(), upd.location(),
+                            upd.sequence(), sanitizeCard(upd.card()));
+                }
+                yield upd;
+            }
             default -> msg;
         };
+    }
+
+    private static QueriedCard sanitizeCard(QueriedCard card) {
+        if (card == null) return null;
+        boolean faceDown = (card.position & OcgConstants.POS_FACEDOWN) != 0;
+        if (!faceDown || card.isPublic) return card;
+
+        var sanitized = new QueriedCard();
+        sanitized.flags = card.flags;
+        sanitized.position = card.position;
+        return sanitized;
     }
 
     private static boolean isFaceDown(int position) {
