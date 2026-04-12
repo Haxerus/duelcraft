@@ -134,6 +134,14 @@ public class ServerDuelHandler implements DuelEventListener {
                 }
                 yield upd;
             }
+            case DuelMessage.PosChange pc -> {
+                // Hide code from opponent when card transitions to face-down
+                if (pc.controller() != recipient && isFaceDown(pc.newPosition())) {
+                    yield new DuelMessage.PosChange(0, pc.controller(), pc.location(),
+                            pc.sequence(), pc.prevPosition(), pc.newPosition());
+                }
+                yield pc;
+            }
             default -> msg;
         };
     }

@@ -237,9 +237,11 @@ public class ClientDuelState {
             }
             case DuelMessage.PosChange pc -> {
                 if (pc.location() == LOCATION_MZONE) {
+                    if (pc.code() != 0) mzone[pc.controller()][pc.sequence()] = pc.code();
                     mzonePos[pc.controller()][pc.sequence()] = pc.newPosition();
                     dirtyFlags.add(mzoneFlag(pc.controller()));
                 } else if (pc.location() == LOCATION_SZONE) {
+                    if (pc.code() != 0) szone[pc.controller()][pc.sequence()] = pc.code();
                     szonePos[pc.controller()][pc.sequence()] = pc.newPosition();
                     dirtyFlags.add(szoneFlag(pc.controller()));
                 }

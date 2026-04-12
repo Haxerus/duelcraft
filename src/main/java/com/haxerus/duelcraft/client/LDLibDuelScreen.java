@@ -962,6 +962,15 @@ public class LDLibDuelScreen {
                         spellSlots[absPlayer][i].addClass("target");
                 }
             }
+
+            // Extra Monster Zones: bit 5 = local player's seq 5, bit 6 = local player's seq 6
+            // Physical mapping: local player's seq 5 → emzSlots[localPlayer],
+            //                   local player's seq 6 → emzSlots[1-localPlayer]
+            int lp = state.localPlayer;
+            if ((field & (1 << 5)) == 0 && emzSlots[lp] != null)
+                emzSlots[lp].addClass("target");
+            if ((field & (1 << 6)) == 0 && emzSlots[1 - lp] != null)
+                emzSlots[1 - lp].addClass("target");
         }
 
         private void enterFieldSelectionMode(DuelMessage.SelectCard sel) {
@@ -1026,9 +1035,29 @@ public class LDLibDuelScreen {
                 refreshZoneSlot(slot, state.mzone[player][i], state.mzonePos[player][i], player, LOCATION_MZONE, i);
             }
 
-            // EMZ slots (indices 5 and 6)
-            refreshZoneSlot(emzSlots[0], state.mzone[0][5], state.mzonePos[0][5], 0, LOCATION_MZONE, 5);
-            refreshZoneSlot(emzSlots[1], state.mzone[1][5], state.mzonePos[1][5], 1, LOCATION_MZONE, 5);
+            // EMZ: each physical slot is shared — player 0 seq 5 <-> player 1 seq 6 (left),
+            //       player 1 seq 5 <-> player 0 seq 6 (right)
+            refreshEmzSlot(0, 0, 5, 1, 6);
+            refreshEmzSlot(1, 1, 5, 0, 6);
+        }
+
+        /** Refresh a physical EMZ slot. It can be occupied by (p1,s1) or (p2,s2). */
+        private void refreshEmzSlot(int slotIdx, int p1, int s1, int p2, int s2) {
+            if (emzSlots[slotIdx] == null) return;
+            if (state.mzone[p1][s1] != 0 || state.mzonePos[p1][s1] != 0) {
+                refreshZoneSlot(emzSlots[slotIdx], state.mzone[p1][s1], state.mzonePos[p1][s1], p1, LOCATION_MZONE, s1);
+            } else {
+                refreshZoneSlot(emzSlots[slotIdx], state.mzone[p2][s2], state.mzonePos[p2][s2], p2, LOCATION_MZONE, s2);
+            }
+        }
+
+        private void updateEmzStats(int slotIdx, int p1, int s1, int p2, int s2) {
+            if (emzSlots[slotIdx] == null) return;
+            if (state.mzone[p1][s1] != 0 || state.mzonePos[p1][s1] != 0) {
+                updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p1][s1], state.mzone[p1][s1]);
+            } else {
+                updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p2][s2], state.mzone[p2][s2]);
+            }
         }
 
         private void refreshSpellZones(int player) {
@@ -1049,9 +1078,9 @@ public class LDLibDuelScreen {
                     updateMonsterStats(monsterSlots[p][i], state.mzoneStats[p][i], state.mzone[p][i]);
                 }
             }
-            // EMZ slots
-            updateMonsterStats(emzSlots[0], state.mzoneStats[0][5], state.mzone[0][5]);
-            updateMonsterStats(emzSlots[1], state.mzoneStats[1][5], state.mzone[1][5]);
+            // EMZ slots — check both cross-mapped sources
+            updateEmzStats(0, 0, 5, 1, 6);
+            updateEmzStats(1, 1, 5, 0, 6);
         }
 
         private void updateMonsterStats(UIElement slot, QueriedCard stats, int code) {
@@ -1116,15 +1145,18 @@ public class LDLibDuelScreen {
                     .toList()
                     .forEach(slot::removeChild);
 
-            if (code != 0) {
-                boolean faceDown = (position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
+            // A card is present if we know the code OR if a non-zero position is set
+            // (opponent's face-down cards have code=0 but position is still set)
+            if (code != 0 || position != 0) {
+                boolean faceDown = code == 0
+                        || (position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
                 boolean defense = (position & (POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE)) != 0;
 
                 var cardVisual = new UIElement();
                 if (faceDown) {
                     cardVisual.addClass("card-back");
 
-                    if (player == state.localPlayer) {
+                    if (player == state.localPlayer && code != 0) {
                         int hoverCode = code;
                         cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(hoverCode));
                         cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
@@ -1318,7 +1350,10 @@ public class LDLibDuelScreen {
             var loc = new ClientDuelState.CardLocation(player, location, sequence);
             var actions = state.cardActions.get(loc);
 
-            if (actions != null && !actions.isEmpty()) {
+            // Only show context menu during idle/battle command (not during sub-prompts like SelectPlace)
+            if (actions != null && !actions.isEmpty()
+                    && (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd
+                        || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) {
                 event.stopPropagation();
                 showContextMenu(actions, event.x, event.y);
                 return;
@@ -1417,6 +1452,7 @@ public class LDLibDuelScreen {
 
         private void handlePlaceSelection(int player, int location, int sequence) {
             if (!(state.pendingPrompt instanceof DuelMessage.SelectPlace sel)) return;
+            if (location != LOCATION_MZONE && location != LOCATION_SZONE) return;
 
             int bit = getFieldBit(player, location, sequence);
             if ((sel.field() & bit) != 0) return; // zone is blocked
@@ -1446,6 +1482,26 @@ public class LDLibDuelScreen {
                         spellSlots[p][i].addEventListener(UIEvents.CLICK,
                                 e -> onCardClicked(player, LOCATION_SZONE, seq, e));
                     }
+                }
+
+                // Extra Monster Zone — dynamically resolve occupant at click time
+                int slotIdx = p;
+                if (emzSlots[p] != null) {
+                    // Physical left (idx 0): player 0 seq 5 or player 1 seq 6
+                    // Physical right (idx 1): player 1 seq 5 or player 0 seq 6
+                    int pri = slotIdx;       // primary player
+                    int alt = 1 - slotIdx;   // alternate player
+                    emzSlots[p].addEventListener(UIEvents.CLICK, e -> {
+                        if (state.mzone[pri][5] != 0 || state.mzonePos[pri][5] != 0) {
+                            onCardClicked(pri, LOCATION_MZONE, 5, e);
+                        } else if (state.mzone[alt][6] != 0 || state.mzonePos[alt][6] != 0) {
+                            onCardClicked(alt, LOCATION_MZONE, 6, e);
+                        } else {
+                            // Empty — send local player's mapping for placement
+                            int lp = state.localPlayer;
+                            onCardClicked(lp, LOCATION_MZONE, lp == pri ? 5 : 6, e);
+                        }
+                    });
                 }
             }
         }
@@ -1621,6 +1677,7 @@ public class LDLibDuelScreen {
                 case LOCATION_MZONE -> {
                     if (loc.sequence() < 5) yield monsterSlots[p][loc.sequence()];
                     else if (loc.sequence() == 5) yield emzSlots[p];
+                    else if (loc.sequence() == 6) yield emzSlots[1 - p];
                     else yield null;
                 }
                 case LOCATION_SZONE -> {
@@ -1638,7 +1695,8 @@ public class LDLibDuelScreen {
         private boolean isFieldOnlySelection(DuelMessage.SelectCard sel) {
             return !sel.cards().isEmpty()
                     && sel.cards().stream()
-                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
+                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0
+                                    && (c.location() & LOCATION_OVERLAY) == 0);
         }
 
         private boolean isFieldOnlyUnselectCard(DuelMessage.SelectUnselectCard sel) {
