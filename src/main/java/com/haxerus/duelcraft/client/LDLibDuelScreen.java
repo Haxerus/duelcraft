@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
+import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.DataBindingBuilder;
 import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.SupplierDataSource;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
@@ -280,7 +281,19 @@ public class LDLibDuelScreen {
             int plr = state.localPlayer;
             int opp = state.opponent();
 
-            // LP bars — updated via refreshLP() on DirtyFlag.LP, not reactive binding
+            String localName = Minecraft.getInstance().getUser().getName();
+
+            plrLpBar.bindDataSource(SupplierDataSource.of(
+                    () -> (float) state.lp[plr]
+            )).label(label -> label.bindDataSource(SupplierDataSource.of(
+                    () -> Component.literal(localName + ": ").append(String.valueOf(state.lp[plr]))
+            )));
+
+            oppLpBar.bindDataSource(SupplierDataSource.of(
+                    () -> (float) state.lp[opp]
+            )).label(label -> label.bindDataSource(SupplierDataSource.of(
+                    () -> Component.literal(state.opponentName + ": ").append(String.valueOf(state.lp[opp]))
+            )));
 
             // Title and turn/phase labels
             bindLabel(titleLabel, () -> "You vs. " + state.opponentName);
@@ -339,8 +352,6 @@ public class LDLibDuelScreen {
             if (flags.contains(opp == 0 ? DirtyFlag.SZONE_0 : DirtyFlag.SZONE_1))
                 refreshSpellZones(opp);
 
-            if (flags.contains(DirtyFlag.LP))
-                refreshLP();
             if (flags.contains(DirtyFlag.PILE_COUNTS))
                 refreshPiles();
 
@@ -788,27 +799,6 @@ public class LDLibDuelScreen {
             } else {
                 slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
             }
-        }
-
-        private void refreshLP() {
-            int plr = state.localPlayer;
-            int opp = state.opponent();
-            updateLpBar(oppLpBar, state.lp[opp], state.opponentName);
-            String localName = Minecraft.getInstance().getUser().getName();
-            updateLpBar(plrLpBar, state.lp[plr], localName);
-        }
-
-        private void updateLpBar(ProgressBar bar, int lp, String playerName) {
-            if (bar == null) return;
-            // Normalize to 0.0-1.0 (default ProgressBar range)
-            // Use max(startingLP, lp) as denominator so LP gain beyond 8000 still fits
-            float max = Math.max(state.startingLP, lp);
-            float normalized = max > 0 ? (float) lp / max : 1.0f;
-            bar.setProgress(normalized);
-            // LDLib2 bug: layout() doesn't call markTaffyStyleDirty(), so
-            // ProgressBar's internal bar width change is invisible to Taffy.
-            bar.bar.markTaffyStyleDirty();
-            bar.label.setText(Component.literal(playerName + ": " + lp));
         }
 
         private void refreshPiles() {
