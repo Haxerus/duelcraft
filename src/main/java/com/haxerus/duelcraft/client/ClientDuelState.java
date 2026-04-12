@@ -42,6 +42,14 @@ public class ClientDuelState {
         return !dirtyFlags.isEmpty();
     }
 
+    /** Mark all visual zones dirty (used when card images finish loading). */
+    public void markAllVisualsDirty() {
+        dirtyFlags.addAll(EnumSet.of(
+                DirtyFlag.HAND_0, DirtyFlag.HAND_1,
+                DirtyFlag.MZONE_0, DirtyFlag.MZONE_1,
+                DirtyFlag.SZONE_0, DirtyFlag.SZONE_1));
+    }
+
     private DirtyFlag handFlag(int player) {
         return player == 0 ? DirtyFlag.HAND_0 : DirtyFlag.HAND_1;
     }

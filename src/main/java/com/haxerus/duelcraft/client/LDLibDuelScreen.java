@@ -222,6 +222,12 @@ public class LDLibDuelScreen {
             handleZoneClicks();
             handlePileClicks();
 
+            // Refresh hand/field when card images finish downloading
+            CardImageManager images = DuelcraftClient.getCardImageManager();
+            if (images != null) {
+                images.setOnTextureLoaded(state::markAllVisualsDirty);
+            }
+
             // Dismiss context menu when clicking outside it
             ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
                 if (contextMenu != null && !contextMenu.hasClass("hidden")) {

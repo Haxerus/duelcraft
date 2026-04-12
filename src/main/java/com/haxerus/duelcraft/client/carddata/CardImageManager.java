@@ -50,6 +50,7 @@ public class CardImageManager {
     private final ExecutorService executor = Executors.newFixedThreadPool(2,
             r -> { Thread t = new Thread(r, "CardImageLoader"); t.setDaemon(true); return t; });
     private volatile long lastRequestTime = 0;
+    private volatile Runnable onTextureLoaded;
 
     // Card art channel (cropped artwork for info banner)
     private final String artUrl;
@@ -82,6 +83,11 @@ public class CardImageManager {
         } catch (IOException e) {
             LOGGER.warn("Failed to create image cache directories: {}", e.getMessage());
         }
+    }
+
+    /** Called on the render thread when any texture finishes loading. */
+    public void setOnTextureLoaded(Runnable callback) {
+        this.onTextureLoaded = callback;
     }
 
     /** Cropped artwork for the card info banner. Returns null while loading. */
@@ -189,6 +195,7 @@ public class CardImageManager {
                     "dynamic/" + locPrefix + code);
             Minecraft.getInstance().getTextureManager().register(loc, texture);
             cache.put(code, loc);
+            if (onTextureLoaded != null) onTextureLoaded.run();
         } catch (IOException e) {
             LOGGER.warn("Failed to decode card image for {}: {}", code, e.getMessage());
         }
