@@ -7,9 +7,12 @@ import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import javax.imageio.ImageIO;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -71,7 +74,7 @@ public class CardImageManager {
 
         // L2/L3: Async load from disk cache or download
         if (loading.add(code)) {
-            Path diskFile = cacheDir.resolve(code + ".jpg");
+            Path diskFile = cacheDir.resolve(code + ".png");
             executor.submit(() -> {
                 try {
                     if (Files.exists(diskFile)) {
@@ -114,11 +117,17 @@ public class CardImageManager {
                     HttpResponse.BodyHandlers.ofByteArray());
 
             if (response.statusCode() == 200) {
-                byte[] data = response.body();
-                // Save to disk cache
-                Files.write(cacheDir.resolve(code + ".jpg"), data);
+                // Convert JPEG → PNG (NativeImage only reads PNG)
+                byte[] pngData = convertToPng(response.body());
+                if (pngData == null) {
+                    LOGGER.warn("Failed to convert card image for {}", code);
+                    failed.add(code);
+                    return;
+                }
+                // Save PNG to disk cache
+                Files.write(cacheDir.resolve(code + ".png"), pngData);
                 // Register texture on the render thread
-                Minecraft.getInstance().execute(() -> registerTexture(code, data));
+                Minecraft.getInstance().execute(() -> registerTexture(code, pngData));
                 LOGGER.debug("Downloaded card image for {}", code);
             } else {
                 LOGGER.debug("Card image not found for {}: HTTP {}", code, response.statusCode());
@@ -127,6 +136,19 @@ public class CardImageManager {
         } catch (Exception e) {
             LOGGER.warn("Failed to download card image for {}: {}", code, e.getMessage());
             failed.add(code);
+        }
+    }
+
+    /** Convert any image format (JPEG, etc.) to PNG bytes for NativeImage compatibility. */
+    private static byte[] convertToPng(byte[] imageData) {
+        try {
+            BufferedImage buffered = ImageIO.read(new ByteArrayInputStream(imageData));
+            if (buffered == null) return null;
+            var out = new ByteArrayOutputStream();
+            ImageIO.write(buffered, "PNG", out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            return null;
         }
     }
 

@@ -13,6 +13,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ProgressBar;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.utils.XmlUtils;
@@ -993,21 +994,13 @@ public class LDLibDuelScreen {
             CardDatabase db = DuelcraftClient.getCardDatabase();
             CardInfo card = db != null ? db.getCard(code) : null;
 
-            var nameLabel = byId("card-name-label");
-            var statsLabel = byId("card-stats-label");
-            var textLabel = byId("card-text");
-            var atkDefLabel = byId("card-atk-def-label");
             var imageArea = byId("card-image-area");
 
             if (card != null) {
-                if (nameLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(card.name()));
-                if (statsLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(CardStringHelper.typeLine(card)));
-                if (textLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(card.desc()));
-                if (atkDefLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(CardStringHelper.atkDefLine(card)));
+                setTextElement("card-name-label", card.name());
+                setTextElement("card-stats-label", CardStringHelper.typeLine(card));
+                setTextElement("card-text", card.desc());
+                setTextElement("card-atk-def-label", CardStringHelper.atkDefLine(card));
 
                 // Card image
                 CardImageManager images = DuelcraftClient.getCardImageManager();
@@ -1020,17 +1013,20 @@ public class LDLibDuelScreen {
                     }
                 }
             } else {
-                if (nameLabel instanceof Label lbl)
-                    lbl.setText(Component.literal("Card #" + code));
-                if (statsLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(""));
-                if (textLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(""));
-                if (atkDefLabel instanceof Label lbl)
-                    lbl.setText(Component.literal(""));
+                setTextElement("card-name-label", "Card #" + code);
+                setTextElement("card-stats-label", "");
+                setTextElement("card-text", "");
+                setTextElement("card-atk-def-label", "");
                 if (imageArea != null)
                     imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
             }
+        }
+
+        /** Set text on an element that could be either a Label or TextElement (XML <text> tag). */
+        private void setTextElement(String id, String text) {
+            var elem = byId(id);
+            if (elem instanceof TextElement te) te.setText(Component.literal(text));
+            else if (elem instanceof Label lbl) lbl.setText(Component.literal(text));
         }
 
         private void hideCardInfo() {
