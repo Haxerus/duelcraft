@@ -135,75 +135,40 @@ public class DuelSession implements AutoCloseable {
     }
 
     private void sendLocationStats(long eng, int flags, int player, int location) {
-        byte[] data = OcgCore.nDuelQueryLocation(eng, duelHandle, flags, player, location);
-        if (data == null || data.length < 4) return;
+        int slotCount = (location == LOCATION_MZONE) ? 7 : 8;
+        var cards = new ArrayList<QueriedCard>(slotCount);
 
-        try {
-            var cards = parseNativeLocationQuery(data);
-            if (!cards.isEmpty()) {
-                listener.onMessage(new DuelMessage.UpdateData(player, location, cards));
+        for (int seq = 0; seq < slotCount; seq++) {
+            byte[] data = OcgCore.nDuelQuery(eng, duelHandle, flags, player, location, seq, 0);
+            if (data == null || data.length == 0) {
+                cards.add(null);
+            } else {
+                try {
+                    cards.add(parseSingleNativeQuery(data));
+                } catch (Exception e) {
+                    LOGGER.warn("[Query] Failed to parse slot p={} loc=0x{} seq={}: {}",
+                            player, Integer.toHexString(location), seq, e.getMessage());
+                    cards.add(null);
+                }
             }
-        } catch (Exception e) {
-            LOGGER.warn("[Query] Failed to parse location stats player={} loc=0x{}: {}",
-                    player, Integer.toHexString(location), e.getMessage());
         }
+
+        listener.onMessage(new DuelMessage.UpdateData(player, location, cards));
     }
 
     /**
-     * Parse the native nDuelQueryLocation format:
-     * <pre>
-     * [u32 totalDataSize]
-     * Per slot:
-     *   empty:    [i16 = 0]  (2 bytes)
-     *   occupied: [u16 fieldSize][u32 flag][data] × N fields
-     * </pre>
-     * Each field block has u16 fieldSize = sizeof(u32 flag) + sizeof(data).
+     * Parse a single-card native query result: sequential field blocks
+     * [u16 fieldSize][u32 flag][data] with no per-card header.
      */
-    private static List<QueriedCard> parseNativeLocationQuery(byte[] data) {
+    private static QueriedCard parseSingleNativeQuery(byte[] data) {
         var buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        int totalSize = buf.getInt(); // u32 total data size
-        int endPos = 4 + totalSize;
-
-        var cards = new ArrayList<QueriedCard>();
-        while (buf.position() < endPos && buf.remaining() >= 2) {
-            int firstU16 = Short.toUnsignedInt(buf.getShort());
-            if (firstU16 == 0) {
-                // Empty slot
-                cards.add(null);
-                continue;
-            }
-
-            // Occupied slot: firstU16 is the first field's size.
-            // Read field blocks until we've consumed all requested fields.
-            var card = new QueriedCard();
-            readFieldBlock(buf, card, firstU16);
-
-            // Continue reading field blocks for this card
-            while (buf.position() < endPos && buf.remaining() >= 2) {
-                // Peek at next u16 to see if it's a field or empty slot marker
-                int peekPos = buf.position();
-                int nextU16 = Short.toUnsignedInt(buf.getShort());
-                if (nextU16 == 0) {
-                    // This is the NEXT slot (empty) — put it back and break
-                    buf.position(peekPos);
-                    break;
-                }
-                // Check if this looks like a new card's first field (QUERY_CODE = 0x1)
-                // by peeking at the flag
-                if (buf.remaining() >= 4) {
-                    int peekFlag = buf.getInt(buf.position()); // peek without advancing
-                    if (peekFlag == QUERY_CODE && (card.flags & QUERY_CODE) != 0) {
-                        // We already read QUERY_CODE for this card — this is a new card
-                        buf.position(peekPos);
-                        break;
-                    }
-                }
-                readFieldBlock(buf, card, nextU16);
-            }
-
-            cards.add(card);
+        var card = new QueriedCard();
+        while (buf.remaining() >= 6) { // at least u16 + u32
+            int fieldSize = Short.toUnsignedInt(buf.getShort());
+            if (fieldSize == 0) break;
+            readFieldBlock(buf, card, fieldSize);
         }
-        return cards;
+        return card;
     }
 
     /** Read one field block: given u16 fieldSize already read, read [u32 flag][data]. */
