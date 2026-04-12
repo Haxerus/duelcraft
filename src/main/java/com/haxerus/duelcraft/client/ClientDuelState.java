@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
@@ -27,7 +28,8 @@ public class ClientDuelState {
         HAND_0, HAND_1,
         MZONE_0, MZONE_1,
         SZONE_0, SZONE_1,
-        PILE_COUNTS, CHAIN, PROMPT, WINNER
+        PILE_COUNTS, CHAIN, PROMPT, WINNER,
+        FIELD_STATS
     }
 
     private final EnumSet<DirtyFlag> dirtyFlags = EnumSet.noneOf(DirtyFlag.class);
@@ -86,6 +88,10 @@ public class ClientDuelState {
     // Spell/Trap zones: [player][0-4 = S/T, 5 = field zone] — card code, 0 = empty
     public final int[][] szone = new int[2][6];
     public final int[][] szonePos = new int[2][6];
+
+    // Per-zone card stats (updated by MSG_UPDATE_DATA/CARD)
+    public final QueriedCard[][] mzoneStats = new QueriedCard[2][7];
+    public final QueriedCard[][] szoneStats = new QueriedCard[2][6];
 
     // Deck — count only (face-down, not browsable)
     public final int[] deckCount = new int[2];
@@ -290,6 +296,29 @@ public class ClientDuelState {
                 LOGGER.debug("[State] PayLpCost: player={}, amount={}, lp now={}", pay.player(), pay.amount(), lp[pay.player()]);
             }
 
+            // ---- Field stat updates ----
+            case DuelMessage.UpdateData upd -> {
+                var cards = upd.cards();
+                if (upd.location() == LOCATION_MZONE) {
+                    for (int i = 0; i < Math.min(cards.size(), mzoneStats[upd.player()].length); i++) {
+                        mzoneStats[upd.player()][i] = cards.get(i);
+                    }
+                } else if (upd.location() == LOCATION_SZONE) {
+                    for (int i = 0; i < Math.min(cards.size(), szoneStats[upd.player()].length); i++) {
+                        szoneStats[upd.player()][i] = cards.get(i);
+                    }
+                }
+                dirtyFlags.add(DirtyFlag.FIELD_STATS);
+            }
+            case DuelMessage.UpdateCard upd -> {
+                if (upd.location() == LOCATION_MZONE && upd.sequence() < mzoneStats[upd.player()].length) {
+                    mzoneStats[upd.player()][upd.sequence()] = upd.card();
+                } else if (upd.location() == LOCATION_SZONE && upd.sequence() < szoneStats[upd.player()].length) {
+                    szoneStats[upd.player()][upd.sequence()] = upd.card();
+                }
+                dirtyFlags.add(DirtyFlag.FIELD_STATS);
+            }
+
             // ---- Deck/Hand ----
             case DuelMessage.ShuffleDeck ignored -> { }
             case DuelMessage.ShuffleHand sh -> {
@@ -379,10 +408,18 @@ public class ClientDuelState {
                 mzone[loc.controller()][loc.sequence()] = 0;
                 mzonePos[loc.controller()][loc.sequence()] = 0;
                 overlay[loc.controller()][loc.sequence()].clear();
+                // Clear stats for source zone
+                if (loc.sequence() < mzoneStats[loc.controller()].length) {
+                    mzoneStats[loc.controller()][loc.sequence()] = null;
+                }
             }
             case LOCATION_SZONE -> {
                 szone[loc.controller()][loc.sequence()] = 0;
                 szonePos[loc.controller()][loc.sequence()] = 0;
+                // Clear stats for source zone
+                if (loc.sequence() < szoneStats[loc.controller()].length) {
+                    szoneStats[loc.controller()][loc.sequence()] = null;
+                }
             }
             case LOCATION_DECK -> deckCount[loc.controller()]--;
             case LOCATION_EXTRA -> {
