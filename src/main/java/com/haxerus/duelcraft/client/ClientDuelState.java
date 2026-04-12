@@ -348,7 +348,15 @@ public class ClientDuelState {
                 pendingPrompt = msg;
                 buildIdleCmdActions(sel);
                 dirtyFlags.add(DirtyFlag.PROMPT);
-                LOGGER.debug("[State] Prompt: SelectIdleCmd player={}, actions={}", sel.player(), cardActions.size());
+                LOGGER.info("[State] SelectIdleCmd: summon={}, spSummon={}, repos={}, setMon={}, setST={}, activate={}, battle={}, end={}",
+                        sel.summonable().size(), sel.specialSummonable().size(),
+                        sel.repositionable().size(), sel.settableMonsters().size(),
+                        sel.settableSpells().size(), sel.activatable().size(),
+                        sel.canBattle(), sel.canEnd());
+                for (var a : sel.activatable()) {
+                    LOGGER.info("[State]   activatable: code={}, loc=0x{}, seq={}, desc={}, flag={}",
+                            a.code(), Integer.toHexString(a.location()), a.sequence(), a.desc(), a.flag());
+                }
             }
             case DuelMessage.SelectBattleCmd sel -> {
                 pendingPrompt = msg;

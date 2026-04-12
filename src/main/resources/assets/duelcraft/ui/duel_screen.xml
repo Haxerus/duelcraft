@@ -19,7 +19,7 @@
         align-self: center;
         gap-all: 2;
         padding-all: 8;
-        margin-vertical: 8;
+        margin-vertical: 16;
         background: built-in(ui-gdp:BORDER_THICK_RT1)
         }
 
@@ -108,7 +108,7 @@
 
         /* ── Card slot (zone container with card proportions) ── */
         .card-slot {
-        min-width: 32;
+        min-width: 36;
         min-height: 48;
         aspect-rate: 0.75;
         align-items: center;
@@ -117,7 +117,7 @@
 
         /* ── Unified card element (programmatic cards in hand/inspector/field) ── */
         .card {
-        min-width: 32;
+        min-width: 36;
         min-height: 48;
         aspect-rate: 0.75;
         align-items: center;
@@ -320,7 +320,7 @@
         left: 0;
         top: 20;
         bottom: 0;
-        width: 200;
+        width: 210;
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
@@ -380,7 +380,7 @@
         right: 0;
         top: 20;
         bottom: 0;
-        width: 200;
+        width: 210;
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
@@ -407,6 +407,7 @@
         #zone-inspector-list .__scroller_view_view-container__ {
         flex-direction: row;
         flex-wrap: wrap;
+        align-items: center;
         gap-all: 2;
         padding-all: 2;
         }
