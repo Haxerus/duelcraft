@@ -358,10 +358,7 @@ public class LDLibDuelScreen {
 
                 if (isLocal && code != 0) {
                     var label = new Label();
-                    CardDatabase db = DuelcraftClient.getCardDatabase();
-                    CardInfo cardInfo = db != null ? db.getCard(code) : null;
-                    String displayName = cardInfo != null ? cardInfo.name() : String.valueOf(code);
-                    label.setText(Component.literal(displayName));
+                    label.setText(Component.literal(cardDisplayName(code)));
                     label.lss("font-size", "5");
                     label.lss("horizontal-align", "center");
                     label.lss("text-wrap", "wrap");
@@ -761,10 +758,7 @@ public class LDLibDuelScreen {
                 } else {
                     cardVisual.addClass("card-image");
                     var label = new Label();
-                    CardDatabase db = DuelcraftClient.getCardDatabase();
-                    CardInfo cardInfo = db != null ? db.getCard(code) : null;
-                    String displayName = cardInfo != null ? cardInfo.name() : String.valueOf(code);
-                    label.setText(Component.literal(displayName));
+                    label.setText(Component.literal(cardDisplayName(code)));
                     label.lss("font-size", "5");
                     label.lss("text-wrap", "wrap");
                     cardVisual.addChild(label);
@@ -965,10 +959,7 @@ public class LDLibDuelScreen {
                            card.addClasses("card-slot", "hand-card");
 
                            var label = new Label();
-                           CardDatabase db = DuelcraftClient.getCardDatabase();
-                           CardInfo cardInfo = db != null ? db.getCard(code) : null;
-                           String displayName = cardInfo != null ? cardInfo.name() : String.valueOf(code);
-                           label.setText(Component.literal(displayName));
+                           label.setText(Component.literal(cardDisplayName(code)));
                            label.lss("font-size", "6");
                            label.lss("horizontal-align", "center");
                            card.addChild(label);
@@ -988,6 +979,12 @@ public class LDLibDuelScreen {
         }
 
         // ── Helpers ──
+
+        private String cardDisplayName(int code) {
+            CardDatabase db = DuelcraftClient.getCardDatabase();
+            CardInfo info = db != null ? db.getCard(code) : null;
+            return info != null ? info.name() : String.valueOf(code);
+        }
 
         private void showCardInfo(int code) {
             if (code == 0 || cardInfoBanner == null) return;

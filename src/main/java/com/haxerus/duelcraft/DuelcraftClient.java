@@ -28,7 +28,7 @@ public class DuelcraftClient {
 
     private static void onClientSetup(FMLClientSetupEvent event) {
         Duelcraft.LOGGER.info("Duelcraft client setup");
-        event.enqueueWork(DuelcraftClient::initCardData);
+        java.util.concurrent.CompletableFuture.runAsync(DuelcraftClient::initCardData);
     }
 
     private static void initCardData() {
@@ -47,6 +47,13 @@ public class DuelcraftClient {
             Path imageDir = cacheDir.resolve("images");
             cardImageManager = new CardImageManager(imageBaseUrl, imageDir);
             Duelcraft.LOGGER.info("Card image manager initialized");
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                if (cardImageManager != null) cardImageManager.close();
+                if (cardDatabase != null) {
+                    try { cardDatabase.close(); } catch (Exception e) { /* ignore */ }
+                }
+            }, "DuelcraftShutdown"));
 
         } catch (Exception e) {
             Duelcraft.LOGGER.error("Failed to initialize card data pipeline", e);

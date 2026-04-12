@@ -48,13 +48,16 @@ public final class CardDatabaseDownloader {
                     .timeout(Duration.ofSeconds(60))
                     .build();
 
+            Path tempFile = cacheDir.resolve("cards.cdb.tmp");
             HttpResponse<Path> response = client.send(request,
-                    HttpResponse.BodyHandlers.ofFile(dbFile));
+                    HttpResponse.BodyHandlers.ofFile(tempFile));
 
             if (response.statusCode() != 200) {
-                Files.deleteIfExists(dbFile);
+                Files.deleteIfExists(tempFile);
                 throw new IOException("Failed to download card database: HTTP " + response.statusCode());
             }
+
+            Files.move(tempFile, dbFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
             LOGGER.info("Card database downloaded ({} bytes)", Files.size(dbFile));
             return dbFile;

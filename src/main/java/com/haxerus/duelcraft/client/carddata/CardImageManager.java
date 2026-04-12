@@ -69,16 +69,20 @@ public class CardImageManager {
         // Don't retry known failures
         if (failed.contains(code)) return null;
 
-        // L2: Check disk cache
-        Path diskFile = cacheDir.resolve(code + ".jpg");
-        if (Files.exists(diskFile)) {
-            ResourceLocation loc = loadFromDisk(code, diskFile);
-            if (loc != null) return loc;
-        }
-
-        // L3: Start async download
+        // L2/L3: Async load from disk cache or download
         if (loading.add(code)) {
-            executor.submit(() -> downloadAndCache(code));
+            Path diskFile = cacheDir.resolve(code + ".jpg");
+            executor.submit(() -> {
+                try {
+                    if (Files.exists(diskFile)) {
+                        loadFromDiskAsync(code, diskFile);
+                    } else {
+                        downloadAndCache(code);
+                    }
+                } finally {
+                    loading.remove(code);
+                }
+            });
         }
 
         return null;
@@ -89,13 +93,12 @@ public class CardImageManager {
         return textureCache.containsKey(code);
     }
 
-    private ResourceLocation loadFromDisk(int code, Path file) {
+    private void loadFromDiskAsync(int code, Path file) {
         try {
             byte[] data = Files.readAllBytes(file);
-            return registerTexture(code, data);
+            Minecraft.getInstance().execute(() -> registerTexture(code, data));
         } catch (IOException e) {
             LOGGER.warn("Failed to load cached card image {}: {}", code, e.getMessage());
-            return null;
         }
     }
 
@@ -124,8 +127,6 @@ public class CardImageManager {
         } catch (Exception e) {
             LOGGER.warn("Failed to download card image for {}: {}", code, e.getMessage());
             failed.add(code);
-        } finally {
-            loading.remove(code);
         }
     }
 

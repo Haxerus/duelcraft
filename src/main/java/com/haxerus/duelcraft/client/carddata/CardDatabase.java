@@ -35,7 +35,14 @@ public class CardDatabase implements AutoCloseable {
      */
     public CardInfo getCard(int code) {
         if (code == 0) return null;
-        return cache.computeIfAbsent(code, this::queryCard);
+        CardInfo cached = cache.get(code);
+        if (cached != null) return cached;
+        CardInfo result = queryCard(code);
+        if (result != null) {
+            cache.putIfAbsent(code, result);
+            return cache.get(code);
+        }
+        return null;
     }
 
     private CardInfo queryCard(int code) {
