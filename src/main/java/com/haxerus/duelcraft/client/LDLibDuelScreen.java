@@ -24,7 +24,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
-import org.jetbrains.annotations.NotNull;
 import com.haxerus.duelcraft.DuelcraftClient;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardImageManager;
@@ -37,7 +36,9 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 import com.haxerus.duelcraft.client.ClientDuelState.DirtyFlag;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.IntConsumer;
 
 /**
@@ -160,7 +161,11 @@ public class LDLibDuelScreen {
         private final UIElement contextMenu;
 
         // Card Selection
+        private final Map<UIElement, Integer> pendingCardImages = new LinkedHashMap<>();
+        private UIElement pendingArtElement;
+        private int pendingArtCode;
         private final List<Integer> selectedIndices = new ArrayList<>();
+        private final List<UIElement> sumSelectableCards = new ArrayList<>();
         private boolean isBattleCmd;
         private boolean inFieldSelectionMode;
 
@@ -239,7 +244,10 @@ public class LDLibDuelScreen {
             // Refresh hand/field when card images finish downloading
             CardImageManager images = DuelcraftClient.getCardImageManager();
             if (images != null) {
-                images.setOnTextureLoaded(state::markAllVisualsDirty);
+                images.setOnTextureLoaded(() -> {
+                    state.markAllVisualsDirty();
+                    retryPendingCardImages();
+                });
             }
 
             // Dismiss context menu when clicking outside it
@@ -252,14 +260,21 @@ public class LDLibDuelScreen {
                 }
             });
 
-            // Right-click to cancel field selection
+            // Right-click to cancel/finish field selection
             ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
-                if (e.button == 1 && inFieldSelectionMode
+                if (e.button != 1) return;
+                if (inFieldSelectionMode
                         && state.pendingPrompt instanceof DuelMessage.SelectCard sel
                         && sel.cancelable()) {
                     e.stopPropagation();
                     exitFieldSelectionMode();
                     LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCardsCancel());
+                } else if (state.pendingPrompt instanceof DuelMessage.SelectUnselectCard sel
+                        && promptOverlay.hasClass("hidden")
+                        && (sel.finishable() || sel.cancelable())
+                        && !sel.unselectableCards().isEmpty()) {
+                    e.stopPropagation();
+                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectUnselectCardFinish());
                 }
             });
 
@@ -431,7 +446,7 @@ public class LDLibDuelScreen {
                 case DuelMessage.SelectYesNo sel ->
                     buildYesNoPrompt("Yes or No? (desc=" + sel.desc() + ")");
                 case DuelMessage.SelectEffectYn sel ->
-                    buildYesNoPrompt("Activate effect? (Card " + sel.code() + ")");
+                    buildYesNoPrompt("Activate effect of " + cardDisplayName(sel.code()) + "?");
 
                 // Option
                 case DuelMessage.SelectOption sel -> buildOptionPrompt("Choose Option",
@@ -450,11 +465,13 @@ public class LDLibDuelScreen {
                 case DuelMessage.SelectTribute sel -> buildTributePrompt(sel);
 
                 case DuelMessage.SelectUnselectCard sel -> {
-                    buildUnselectCardPrompt(sel);
+                    if (isFieldOnlyUnselectCard(sel)) buildFieldUnselectCardPrompt(sel);
+                    else buildUnselectCardPrompt(sel);
                 }
 
                 case DuelMessage.SelectSum sel -> {
-                    buildSelectSumPrompt(sel);
+                    if (isFieldOnlySum(sel)) buildFieldSumPrompt(sel);
+                    else buildSelectSumPrompt(sel);
                 }
 
                 case DuelMessage.SelectPosition sel -> buildPositionPrompt(sel);
@@ -526,16 +543,22 @@ public class LDLibDuelScreen {
             if (promptTitle instanceof Label t) t.setText(Component.literal("Activate Chain?"));
             clearPromptContent();
 
+            var scroller = createPromptCardScroller();
             for (int i = 0; i < sel.chains().size(); i++) {
                 int idx = i;
                 var chain = sel.chains().get(i);
-                var btn = new Button();
-                // TODO: Replace with card images
-                btn.setText(Component.literal("Card" + chain.code()));
-                btn.addClasses("prompt-btn");
-                btn.setOnClick(e -> LDLibDuelScreen.sendResponse(state,
-                        ResponseBuilder.selectChain(idx)));
-                promptButtons.addChild(btn);
+                int code = chain.code();
+
+                var card = new UIElement();
+                card.addClass("card");
+                setCardImageBackground(card, code);
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+                card.addEventListener(UIEvents.CLICK, ev -> {
+                    ev.stopPropagation();
+                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectChain(idx));
+                });
+                scroller.addScrollViewChild(card);
             }
 
             if (!sel.forced()) {
@@ -555,9 +578,28 @@ public class LDLibDuelScreen {
                 t.setText(Component.literal("Select " + sel.min() + "-" + sel.max() + " card(s)"));
             clearPromptContent();
 
+            var scroller = createPromptCardScroller();
             for (int i = 0; i < sel.cards().size(); i++) {
-                var entry = getButton(sel, i);
-                promptBody.addChild(entry);
+                int idx = i;
+                var cardInfo = sel.cards().get(i);
+                int code = cardInfo.code();
+
+                var card = new UIElement();
+                card.addClass("card");
+                setCardImageBackground(card, code);
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+                card.addEventListener(UIEvents.CLICK, ev -> {
+                    ev.stopPropagation();
+                    if (selectedIndices.contains(idx)) {
+                        selectedIndices.remove(Integer.valueOf(idx));
+                        card.removeClass("target");
+                    } else if (selectedIndices.size() < sel.max()) {
+                        selectedIndices.add(idx);
+                        card.addClass("target");
+                    }
+                });
+                scroller.addScrollViewChild(card);
             }
 
             var confirmBtn = new Button();
@@ -582,29 +624,13 @@ public class LDLibDuelScreen {
             }
         }
 
-        private @NotNull Button getButton(DuelMessage.SelectCard sel, int i) {
-            var card = sel.cards().get(i);
-            var entry = new Button();
-            entry.setText(Component.literal("Card" + card.code()));
-            entry.setOnClick(e -> {
-                if (selectedIndices.contains(i)) {
-                    selectedIndices.remove(Integer.valueOf(i));
-                    entry.removeClass("target");
-                } else if (selectedIndices.size() < sel.max()) {
-                    selectedIndices.add(i);
-                    entry.addClass("target");
-                }
-            });
-            return entry;
-        }
-
         private void buildPositionPrompt(DuelMessage.SelectPosition sel) {
             promptOverlay.removeClass("hidden");
             if (promptTitle instanceof Label t) {
                 t.setText(Component.literal("Choose Position"));
             }
             clearPromptContent();
-            // TODO: Replace with card images
+            // TODO: Replace with card images (face up attack and face up defense)
             if (((sel.positions()) & POS_FACEUP_ATTACK) != 0) {
                 addPositionButton("Face-up ATK", POS_FACEUP_ATTACK);
             }
@@ -638,21 +664,28 @@ public class LDLibDuelScreen {
                 t.setText(Component.literal("Tribute " + sel.min() + "-" + sel.max() + " card(s)"));
             clearPromptContent();
 
+            var scroller = createPromptCardScroller();
             for (int i = 0; i < sel.cards().size(); i++) {
                 int idx = i;
-                var card = sel.cards().get(i);
-                var entry = new Button();
-                entry.setText(Component.literal("Card " + card.code()));
-                entry.setOnClick(e -> {
+                var tributeCard = sel.cards().get(i);
+                int code = tributeCard.code();
+
+                var card = new UIElement();
+                card.addClass("card");
+                setCardImageBackground(card, code);
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+                card.addEventListener(UIEvents.CLICK, ev -> {
+                    ev.stopPropagation();
                     if (selectedIndices.contains(idx)) {
                         selectedIndices.remove(Integer.valueOf(idx));
-                        entry.removeClass("target");
+                        card.removeClass("target");
                     } else if (selectedIndices.size() < sel.max()) {
                         selectedIndices.add(idx);
-                        entry.addClass("target");
+                        card.addClass("target");
                     }
                 });
-                promptBody.addChild(entry);
+                scroller.addScrollViewChild(card);
             }
 
             var confirmBtn = new Button();
@@ -677,12 +710,42 @@ public class LDLibDuelScreen {
             }
         }
 
+        private void buildFieldUnselectCardPrompt(DuelMessage.SelectUnselectCard sel) {
+            promptOverlay.addClass("hidden");
+
+            // Highlight selectable cards on field
+            for (var cardInfo : sel.selectableCards()) {
+                var loc = new ClientDuelState.CardLocation(cardInfo.controller(), cardInfo.location(), cardInfo.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selectable");
+            }
+
+            // Highlight already-selected cards on field
+            for (var cardInfo : sel.unselectableCards()) {
+                var loc = new ClientDuelState.CardLocation(cardInfo.controller(), cardInfo.location(), cardInfo.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selected");
+            }
+
+            // Status label
+            if (statusLabel instanceof Label lbl) {
+                int totalSelected = sel.unselectableCards().size();
+                String text = "Select Materials (" + totalSelected + " selected)";
+                if (sel.finishable() && !sel.unselectableCards().isEmpty())
+                    text += "  (Right-click to finish)";
+                lbl.setText(Component.literal(text));
+                statusLabel.removeClass("hidden");
+            }
+        }
+
         private void buildUnselectCardPrompt(DuelMessage.SelectUnselectCard sel) {
             promptOverlay.removeClass("hidden");
             int totalSelected = sel.unselectableCards().size();
             if (promptTitle instanceof Label t)
                 t.setText(Component.literal("Select Materials (" + totalSelected + " selected)"));
             clearPromptContent();
+
+            var scroller = createPromptCardScroller();
 
             // Show selectable cards (can toggle ON)
             for (int i = 0; i < sel.selectableCards().size(); i++) {
@@ -702,7 +765,7 @@ public class LDLibDuelScreen {
                             ResponseBuilder.selectUnselectCard(index));
                 });
 
-                promptBody.addChild(card);
+                scroller.addScrollViewChild(card);
             }
 
             // Show already-selected cards (can toggle OFF) with .selected indicator
@@ -723,7 +786,7 @@ public class LDLibDuelScreen {
                             ResponseBuilder.selectUnselectCard(sel.selectableCards().size() + index));
                 });
 
-                promptBody.addChild(card);
+                scroller.addScrollViewChild(card);
             }
 
             // Finish/Cancel buttons
@@ -757,6 +820,38 @@ public class LDLibDuelScreen {
             }
         }
 
+        private void buildFieldSumPrompt(DuelMessage.SelectSum sel) {
+            selectedIndices.clear();
+            sumSelectableCards.clear();
+            promptOverlay.addClass("hidden");
+
+            // Highlight must-select cards on field
+            for (var mustCard : sel.mustSelect()) {
+                var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selected");
+            }
+
+            // Highlight selectable cards on field
+            for (var sumCard : sel.selectable()) {
+                var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selectable");
+            }
+
+            // Show status label with running sum
+            updateFieldSumStatus(sel);
+        }
+
+        private void updateFieldSumStatus(DuelMessage.SelectSum sel) {
+            if (!(statusLabel instanceof Label lbl)) return;
+            int sum = 0;
+            for (var c : sel.mustSelect()) sum += c.value1();
+            for (int idx : selectedIndices) sum += sel.selectable().get(idx).value1();
+            lbl.setText(Component.literal("Select Materials (Sum: " + sum + " / " + sel.targetSum() + ")"));
+            statusLabel.removeClass("hidden");
+        }
+
         private void buildSelectSumPrompt(DuelMessage.SelectSum sel) {
             selectedIndices.clear();
             promptOverlay.removeClass("hidden");
@@ -776,6 +871,9 @@ public class LDLibDuelScreen {
             };
             updateTitle.run();
 
+            var scroller = createPromptCardScroller();
+            sumSelectableCards.clear();
+
             // Must-select cards (locked, shown with .selected, no click)
             for (var mustCard : sel.mustSelect()) {
                 var card = new UIElement();
@@ -784,10 +882,14 @@ public class LDLibDuelScreen {
                 int code = mustCard.code();
                 card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
                 card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
-                promptBody.addChild(card);
+                scroller.addScrollViewChild(card);
+
+                var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("selected");
             }
 
-            // Selectable cards (toggleable)
+            // Selectable cards (toggleable via scroller or field click)
             for (int i = 0; i < sel.selectable().size(); i++) {
                 var sumCard = sel.selectable().get(i);
                 int code = sumCard.code();
@@ -798,6 +900,10 @@ public class LDLibDuelScreen {
                 card.addClass("card");
                 setCardImageBackground(card, code);
 
+                var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
+                UIElement slot = findSlotForLocation(loc);
+                if (slot != null) slot.addClass("target");
+
                 card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
                 card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
                 card.addEventListener(UIEvents.CLICK, ev -> {
@@ -805,28 +911,19 @@ public class LDLibDuelScreen {
                     if (selectedIndices.contains(index)) {
                         selectedIndices.remove(Integer.valueOf(index));
                         card.removeClass("selected");
+                        if (slot != null) slot.removeClass("selected");
                         runningSum[0] -= value;
                     } else {
                         selectedIndices.add(index);
                         card.addClass("selected");
+                        if (slot != null) slot.addClass("selected");
                         runningSum[0] += value;
                     }
                     updateTitle.run();
                 });
 
-                promptBody.addChild(card);
-            }
-
-            // Highlight on-field targets
-            for (var sumCard : sel.selectable()) {
-                var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
-                UIElement slot = findSlotForLocation(loc);
-                if (slot != null) slot.addClass("target");
-            }
-            for (var mustCard : sel.mustSelect()) {
-                var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
-                UIElement slot = findSlotForLocation(loc);
-                if (slot != null) slot.addClass("selected");
+                sumSelectableCards.add(card);
+                scroller.addScrollViewChild(card);
             }
 
             // Confirm button
@@ -1003,7 +1100,7 @@ public class LDLibDuelScreen {
                     var levelLabel = new Label();
                     levelLabel.addClass("stat-level");
                     boolean isXyz = cardInfo.isXyz();
-                    levelLabel.setText(Component.literal((isXyz ? "R" : "\u2605") + currentLevel));
+                    levelLabel.setText(Component.literal((isXyz ? "R" : "★") + currentLevel));
                     if (currentLevel > originalLevel) levelLabel.addClass("stat-buffed");
                     else if (currentLevel < originalLevel) levelLabel.addClass("stat-debuffed");
                     slot.addChild(levelLabel);
@@ -1210,6 +1307,9 @@ public class LDLibDuelScreen {
             hideContextMenu();
             exitFieldSelectionMode();
             ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
+            ui.rootElement.select(".selected").forEach(e -> e.removeClass("selected"));
+            ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));
+            if (statusLabel != null) statusLabel.addClass("hidden");
             updatePhaseButtons();
         }
 
@@ -1251,12 +1351,42 @@ public class LDLibDuelScreen {
                 for (int i = 0; i < sel.selectable().size(); i++) {
                     var c = sel.selectable().get(i);
                     if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
+                        UIElement slot = findSlotForLocation(loc);
+                        UIElement scrollerCard = i < sumSelectableCards.size() ? sumSelectableCards.get(i) : null;
+
                         if (selectedIndices.contains(i)) {
                             selectedIndices.remove(Integer.valueOf(i));
+                            if (slot != null) slot.removeClass("selected");
+                            if (scrollerCard != null) scrollerCard.removeClass("selected");
                         } else {
                             selectedIndices.add(i);
+                            if (slot != null) slot.addClass("selected");
+                            if (scrollerCard != null) scrollerCard.addClass("selected");
                         }
-                        rebuildPrompt();
+
+                        // Compute running sum
+                        int sum = 0;
+                        for (var m : sel.mustSelect()) sum += m.value1();
+                        for (int idx : selectedIndices) sum += sel.selectable().get(idx).value1();
+
+                        // Field mode: update status label and auto-submit when sum matches
+                        if (isFieldOnlySum(sel)) {
+                            updateFieldSumStatus(sel);
+                            int totalSelected = sel.mustSelect().size() + selectedIndices.size();
+                            if (sum == sel.targetSum()
+                                    && totalSelected >= sel.min() && totalSelected <= sel.max()) {
+                                int mustCount = sel.mustSelect().size();
+                                int[] allIndices = new int[totalSelected];
+                                for (int j = 0; j < mustCount; j++) allIndices[j] = j;
+                                int k = mustCount;
+                                for (int idx : selectedIndices) allIndices[k++] = mustCount + idx;
+                                LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectSum(allIndices));
+                            }
+                        } else {
+                            // Dialog mode: update prompt title
+                            if (promptTitle instanceof Label t)
+                                t.setText(Component.literal("Select Materials (Sum: " + sum + " / " + sel.targetSum() + ")"));
+                        }
                         return;
                     }
                 }
@@ -1406,8 +1536,11 @@ public class LDLibDuelScreen {
                     var loc = images.getCardArt(code);
                     if (loc != null) {
                         imageArea.lss("background", "sprite(" + loc + ")");
+                        pendingArtElement = null;
                     } else {
                         imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+                        pendingArtElement = imageArea;
+                        pendingArtCode = code;
                     }
                 }
             } else {
@@ -1422,11 +1555,43 @@ public class LDLibDuelScreen {
 
         private static final String CARD_BACK_SPRITE = "sprite(duelcraft:textures/card_back.png)";
 
-        /** Set a card's full image as the element background, card back as fallback. */
+        /** Set a card's full image as the element background, card back as fallback.
+         *  If the image isn't cached yet, the element is tracked for lazy update. */
         private void setCardImageBackground(UIElement elem, int code) {
             CardImageManager images = DuelcraftClient.getCardImageManager();
             ResourceLocation loc = images != null ? images.getCardTexture(code) : null;
-            elem.lss("background", loc != null ? "sprite(" + loc + ")" : CARD_BACK_SPRITE);
+            if (loc != null) {
+                elem.lss("background", "sprite(" + loc + ")");
+                pendingCardImages.remove(elem);
+            } else {
+                elem.lss("background", CARD_BACK_SPRITE);
+                if (code != 0) pendingCardImages.put(elem, code);
+            }
+        }
+
+        /** Retry setting backgrounds for elements whose images weren't cached at build time. */
+        private void retryPendingCardImages() {
+            CardImageManager images = DuelcraftClient.getCardImageManager();
+            if (images == null) return;
+
+            var it = pendingCardImages.entrySet().iterator();
+            while (it.hasNext()) {
+                var entry = it.next();
+                ResourceLocation loc = images.getCardTexture(entry.getValue());
+                if (loc != null) {
+                    entry.getKey().lss("background", "sprite(" + loc + ")");
+                    it.remove();
+                }
+            }
+
+            // Retry card art in info banner
+            if (pendingArtElement != null) {
+                ResourceLocation loc = images.getCardArt(pendingArtCode);
+                if (loc != null) {
+                    pendingArtElement.lss("background", "sprite(" + loc + ")");
+                    pendingArtElement = null;
+                }
+            }
         }
 
         /** Set text on an element that could be either a Label or TextElement (XML <text> tag). */
@@ -1476,6 +1641,20 @@ public class LDLibDuelScreen {
                             .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
         }
 
+        private boolean isFieldOnlyUnselectCard(DuelMessage.SelectUnselectCard sel) {
+            return sel.selectableCards().stream()
+                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
+                    && sel.unselectableCards().stream()
+                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
+        }
+
+        private boolean isFieldOnlySum(DuelMessage.SelectSum sel) {
+            return sel.selectable().stream()
+                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
+                    && sel.mustSelect().stream()
+                            .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
+        }
+
         private Label findCardCountLabel(String parentId) {
             var parent = byId(parentId);
             if (parent == null) return null;
@@ -1495,6 +1674,13 @@ public class LDLibDuelScreen {
             if (promptButtons != null) {
                 promptButtons.clearAllChildren();
             }
+        }
+
+        private ScrollerView createPromptCardScroller() {
+            var scroller = new ScrollerView();
+            scroller.addClass("prompt-card-scroller");
+            promptBody.addChild(scroller);
+            return scroller;
         }
 
         private record ActionIconInfo(String color, String tooltip) {}

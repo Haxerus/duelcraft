@@ -219,11 +219,11 @@
         bottom: 0;
         left: 0;
         width: 100%;
-        font-size: 5;
+        font-size: 6;
         horizontal-align: center;
+        vertical-align: center;
         background: rect(#cc000000);
         text-color: #FFFFFF;
-        z-index: 10;
         }
 
         .stat-level {
@@ -234,7 +234,6 @@
         background: rect(#cc000000);
         text-color: #FFFFFF;
         padding-horizontal: 1;
-        z-index: 10;
         }
 
         .stat-buffed {
@@ -477,6 +476,23 @@
         .prompt-btn {
         width: 60;
         height: 16;
+        }
+
+        /* ── Horizontal card scroller inside prompt dialogs ── */
+        .prompt-card-scroller {
+        scroller-view-mode: HORIZONTAL;
+        scroller-horizontal-display: ALWAYS;
+        align-self: stretch;
+        }
+
+        .prompt-card-scroller .__scroller_view_view-container__ {
+        flex-direction: row;
+        gap-all: 2;
+        }
+
+        .prompt-card-scroller .__scroller_view_view-port__ {
+        background: built-in(ui-gdp:RECT_LIGHT);
+        min-height: 48;
         }
 
         .target {
