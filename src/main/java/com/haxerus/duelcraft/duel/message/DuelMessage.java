@@ -185,6 +185,14 @@ public sealed interface DuelMessage {
         public int type() { return MSG_SHUFFLE_EXTRA; }
     }
 
+    record ConfirmDeckTop(int player, List<ConfirmCard> cards) implements DuelMessage {
+        public int type() { return MSG_CONFIRM_DECKTOP; }
+    }
+
+    record ConfirmCards(int player, List<ConfirmCard> cards) implements DuelMessage {
+        public int type() { return MSG_CONFIRM_CARDS; }
+    }
+
     // ---- UI / Info ----
 
     record Hint(int hintType, int player, long data) implements DuelMessage {
@@ -309,6 +317,10 @@ public sealed interface DuelMessage {
         public int type() { return MSG_ROCK_PAPER_SCISSORS; }
     }
 
+    record HandResult(int hand0, int hand1) implements DuelMessage {
+        public int type() { return MSG_HAND_RES; }
+    }
+
     // ---- Misc Action ----
 
     record Equip(LocInfo card, LocInfo target) implements DuelMessage {
@@ -346,6 +358,17 @@ public sealed interface DuelMessage {
     }
 
     // ---- Shared sub-records for cards within selection messages ----
+
+    record ConfirmCard(int code, int controller, int location, int sequence) {
+        public static ConfirmCard read(BufferReader reader) {
+            return new ConfirmCard(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readInt32()
+            );
+        }
+    }
 
     record CardInfo(int code, int controller, int location, int sequence, int position) {
         public static CardInfo read(BufferReader reader) {
