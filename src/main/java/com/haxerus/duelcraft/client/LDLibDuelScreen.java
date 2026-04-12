@@ -128,11 +128,15 @@ public class LDLibDuelScreen {
         private final UIElement[] emzSlots = new UIElement[2];
         private final UIElement[] fieldSpellSlots = new UIElement[2];
 
-        // Pile count labels
+        // Pile count labels + slot elements
         private final Label[] deckCountLabels = new Label[2];
         private final Label[] graveCountLabels = new Label[2];
         private final Label[] extraCountLabels = new Label[2];
         private final Label[] banishedCountLabels = new Label[2];
+        private final UIElement[] deckSlots = new UIElement[2];
+        private final UIElement[] graveSlots = new UIElement[2];
+        private final UIElement[] extraSlots = new UIElement[2];
+        private final UIElement[] banishedSlots = new UIElement[2];
 
         // Hands
         private final ScrollerView oppHandContainer;
@@ -193,6 +197,14 @@ public class LDLibDuelScreen {
             extraCountLabels[plr] = findCardCountLabel("plr-extra-deck");
             banishedCountLabels[opp] = findCardCountLabel("opp-banished");
             banishedCountLabels[plr] = findCardCountLabel("plr-banished");
+            deckSlots[opp] = byId("opp-deck");
+            deckSlots[plr] = byId("plr-deck");
+            graveSlots[opp] = byId("opp-graveyard");
+            graveSlots[plr] = byId("plr-graveyard");
+            extraSlots[opp] = byId("opp-extra-deck");
+            extraSlots[plr] = byId("plr-extra-deck");
+            banishedSlots[opp] = byId("opp-banished");
+            banishedSlots[plr] = byId("plr-banished");
 
             // ── Hands ──
             oppHandContainer = byId("opponent-hand", ScrollerView.class);
@@ -334,6 +346,11 @@ public class LDLibDuelScreen {
                 refreshSpellZones(plr);
             if (flags.contains(opp == 0 ? DirtyFlag.SZONE_0 : DirtyFlag.SZONE_1))
                 refreshSpellZones(opp);
+
+            if (flags.contains(DirtyFlag.LP))
+                refreshLP();
+            if (flags.contains(DirtyFlag.PILE_COUNTS))
+                refreshPiles();
 
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
                 rebuildPrompt();
@@ -771,6 +788,62 @@ public class LDLibDuelScreen {
             }
         }
 
+        private void refreshLP() {
+            int plr = state.localPlayer;
+            int opp = state.opponent();
+            if (oppLpBar != null) {
+                float pct = state.startingLP > 0 ? (float) state.lp[opp] / state.startingLP * 100f : 100f;
+                oppLpBar.setValue(pct);
+                oppLpBar.label.setText(Component.literal(String.valueOf(state.lp[opp])));
+            }
+            if (plrLpBar != null) {
+                float pct = state.startingLP > 0 ? (float) state.lp[plr] / state.startingLP * 100f : 100f;
+                plrLpBar.setValue(pct);
+                plrLpBar.label.setText(Component.literal(String.valueOf(state.lp[plr])));
+            }
+        }
+
+        private void refreshPiles() {
+            for (int p = 0; p < 2; p++) {
+                // Deck & Extra: card back when non-empty
+                setPileBackground(deckSlots[p], state.deckCount[p] > 0 ? CARD_BACK_SPRITE : null);
+                setPileBackground(extraSlots[p], !state.extra[p].isEmpty() ? CARD_BACK_SPRITE : null);
+
+                // Graveyard & Banished: top card image when non-empty
+                setPileTopCard(graveSlots[p], state.grave[p]);
+                setPileTopCard(banishedSlots[p], state.banished[p]);
+            }
+        }
+
+        private void setPileBackground(UIElement slot, String background) {
+            if (slot == null) return;
+            if (background != null) {
+                slot.lss("background", background);
+                slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+            } else {
+                slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
+                slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
+            }
+        }
+
+        private void setPileTopCard(UIElement slot, List<Integer> cards) {
+            if (slot == null) return;
+            if (!cards.isEmpty()) {
+                int topCode = cards.getLast();
+                CardImageManager images = DuelcraftClient.getCardImageManager();
+                ResourceLocation loc = images != null ? images.getCardTexture(topCode) : null;
+                if (loc != null) {
+                    slot.lss("background", "sprite(" + loc + ")");
+                } else {
+                    slot.lss("background", CARD_BACK_SPRITE);
+                }
+                slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+            } else {
+                slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
+                slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
+            }
+        }
+
         private void updateStatusLabel() {
             if (statusLabel == null) return;
             if (!state.chain.isEmpty()) {
@@ -957,11 +1030,22 @@ public class LDLibDuelScreen {
             handlePileClick("opp-graveyard", "Opponent's Graveyard", state.opponent(), LOCATION_GRAVE);
             handlePileClick("plr-banished", "Your Banished", state.localPlayer, LOCATION_REMOVED);
             handlePileClick("opp-banished", "Opponent's Banished", state.opponent(), LOCATION_REMOVED);
+            handlePileClick("plr-extra-deck", "Your Extra Deck", state.localPlayer, LOCATION_EXTRA);
+            handlePileClick("opp-extra-deck", "Opponent's Extra Deck", state.opponent(), LOCATION_EXTRA);
 
             var closeBtn = byId("zone-inspector-close");
             if (closeBtn instanceof Button btn) {
                 btn.setOnClick(e -> zoneInspector.addClass("hidden"));
             }
+        }
+
+        private List<Integer> getPileCards(int player, int location) {
+            return switch (location) {
+                case LOCATION_GRAVE -> state.grave[player];
+                case LOCATION_REMOVED -> state.banished[player];
+                case LOCATION_EXTRA -> state.extra[player];
+                default -> List.of();
+            };
         }
 
         private void handlePileClick(String elementId, String title, int player, int location) {
@@ -974,8 +1058,7 @@ public class LDLibDuelScreen {
                    if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(title));
 
                    if (zoneInspectorList != null) {
-                       List<Integer> cards = location == LOCATION_GRAVE
-                               ? state.grave[player] : state.banished[player];
+                       List<Integer> cards = getPileCards(player, location);
 
                        zoneInspectorList.clearAllScrollViewChildren();
                        for (int i = 0; i < cards.size(); i++) {

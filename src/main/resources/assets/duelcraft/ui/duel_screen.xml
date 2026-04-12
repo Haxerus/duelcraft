@@ -198,6 +198,9 @@
         /* ── Card back ── */
         .card-back {
         background: sprite(duelcraft:textures/card_back.png);
+        width: 100%;
+        height: 100%;
+        aspect-rate: 0.75;
         }
 
         /* ── Defense position ── */
@@ -207,15 +210,11 @@
 
         /* ── Hand Row ── */
         .hand-card {
-        //background: built-in(ui-gdp:RECT);
-        background: sdf(#914d03, 5, 3);
-        //margin-horizontal: -8;
         transition: background 0.3 quad_in_out,
         transform 0.2;
         }
 
-        .hand-card.__hovered__ {
-        background: sdf(#b8650a, 5, 3);
+        #player-hand .hand-card.__hovered__ {
         transform: scale(1.05);
         }
 
