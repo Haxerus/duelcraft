@@ -1016,21 +1016,13 @@ public class LDLibDuelScreen {
             }
         }
 
-        /** Set a card's full image as the element background, with name fallback. */
+        private static final String CARD_BACK_SPRITE = "sprite(duelcraft:textures/card_back.png)";
+
+        /** Set a card's full image as the element background, card back as fallback. */
         private void setCardImageBackground(UIElement elem, int code) {
             CardImageManager images = DuelcraftClient.getCardImageManager();
             ResourceLocation loc = images != null ? images.getCardTexture(code) : null;
-            if (loc != null) {
-                elem.lss("background", "sprite(" + loc + ")");
-            } else {
-                // Fallback: show card name until image loads
-                var label = new Label();
-                label.setText(Component.literal(cardDisplayName(code)));
-                label.lss("font-size", "5");
-                label.lss("horizontal-align", "center");
-                label.lss("text-wrap", "wrap");
-                elem.addChild(label);
-            }
+            elem.lss("background", loc != null ? "sprite(" + loc + ")" : CARD_BACK_SPRITE);
         }
 
         /** Set text on an element that could be either a Label or TextElement (XML <text> tag). */

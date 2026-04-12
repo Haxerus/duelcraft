@@ -197,7 +197,7 @@
 
         /* ── Card back ── */
         .card-back {
-        background: sdf(#1a3a6a, 3, 2);
+        background: sprite(duelcraft:textures/card_back.png);
         }
 
         /* ── Defense position ── */
@@ -298,8 +298,8 @@
         }
 
         #card-image-area {
-        width: 150;
-        height: 150;
+        width: 192;
+        height: 192;
         align-self: center;
         //background: rect(#3c3c50);
         background: sprite(duelcraft:textures/test.png);
