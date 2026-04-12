@@ -388,7 +388,7 @@ public class LDLibDuelScreen {
                 int code = codes.get(i);
                 int seq = i;
                 var card = new UIElement();
-                card.addClasses("card-slot", "hand-card");
+                card.addClass("card");
 
                 if (isLocal && code != 0) {
                     setCardImageBackground(card, code);
@@ -833,7 +833,7 @@ public class LDLibDuelScreen {
         private void refreshZoneSlot(UIElement slot, int code, int position, int player, int locationType, int sequence) {
             if (slot == null) return;
             slot.getChildren().stream()
-                    .filter(c -> c.hasClass("card-image") || c.hasClass("card-back")
+                    .filter(c -> c.hasClass("card") || c.hasClass("card-back")
                             || c.hasClass("stat-atk-def") || c.hasClass("stat-level"))
                     .toList()
                     .forEach(slot::removeChild);
@@ -852,8 +852,7 @@ public class LDLibDuelScreen {
                         cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
                     }
                 } else {
-                    cardVisual.addClass("card-image");
-                    cardVisual.lss("aspect-rate", "0.75");
+                    cardVisual.addClass("card");
                     cardVisual.lss("height", "100%");
                     setCardImageBackground(cardVisual, code);
 
@@ -955,7 +954,7 @@ public class LDLibDuelScreen {
                     int code = confirmCard.code();
 
                     var card = new UIElement();
-                    card.addClasses("card-slot", "hand-card");
+                    card.addClass("card");
                     setCardImageBackground(card, code);
 
                     card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
@@ -1151,7 +1150,7 @@ public class LDLibDuelScreen {
                            int seq = i;
 
                            var card = new UIElement();
-                           card.addClasses("card-slot", "hand-card");
+                           card.addClass("card");
                            setCardImageBackground(card, code);
 
                            card.addEventListener(UIEvents.CLICK, ev -> {
