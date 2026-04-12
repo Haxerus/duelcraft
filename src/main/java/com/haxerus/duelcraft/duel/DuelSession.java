@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.duel;
 import com.haxerus.duelcraft.core.*;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.MessageParser;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.duel.message.QueryParser;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -123,19 +124,116 @@ public class DuelSession implements AutoCloseable {
                 | QUERY_LINK | QUERY_IS_PUBLIC;
 
         for (int player = 0; player < 2; player++) {
-            byte[] mzoneData = OcgCore.nDuelQueryLocation(eng, duelHandle, flags, player, LOCATION_MZONE);
-            if (mzoneData != null && mzoneData.length > 0) {
-                var cards = QueryParser.parseLocation(mzoneData);
-                if (!cards.isEmpty()) {
-                    listener.onMessage(new DuelMessage.UpdateData(player, LOCATION_MZONE, cards));
-                }
+            sendLocationStats(eng, flags, player, LOCATION_MZONE);
+            sendLocationStats(eng, flags, player, LOCATION_SZONE);
+        }
+    }
+
+    private void sendLocationStats(long eng, int flags, int player, int location) {
+        byte[] data = OcgCore.nDuelQueryLocation(eng, duelHandle, flags, player, location);
+        if (data == null || data.length < 4) return;
+
+        try {
+            var cards = parseNativeLocationQuery(data);
+            if (!cards.isEmpty()) {
+                listener.onMessage(new DuelMessage.UpdateData(player, location, cards));
+            }
+        } catch (Exception e) {
+            LOGGER.warn("[Query] Failed to parse location stats player={} loc=0x{}: {}",
+                    player, Integer.toHexString(location), e.getMessage());
+        }
+    }
+
+    /**
+     * Parse the native nDuelQueryLocation format:
+     * <pre>
+     * [u32 totalDataSize]
+     * Per slot:
+     *   empty:    [i16 = 0]  (2 bytes)
+     *   occupied: [u16 fieldSize][u32 flag][data] × N fields
+     * </pre>
+     * Each field block has u16 fieldSize = sizeof(u32 flag) + sizeof(data).
+     */
+    private static java.util.List<QueriedCard> parseNativeLocationQuery(byte[] data) {
+        var buf = java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        int totalSize = buf.getInt(); // u32 total data size
+        int endPos = 4 + totalSize;
+
+        var cards = new java.util.ArrayList<QueriedCard>();
+        while (buf.position() < endPos && buf.remaining() >= 2) {
+            int firstU16 = Short.toUnsignedInt(buf.getShort());
+            if (firstU16 == 0) {
+                // Empty slot
+                cards.add(null);
+                continue;
             }
 
-            byte[] szoneData = OcgCore.nDuelQueryLocation(eng, duelHandle, flags, player, LOCATION_SZONE);
-            if (szoneData != null && szoneData.length > 0) {
-                var cards = QueryParser.parseLocation(szoneData);
-                if (!cards.isEmpty()) {
-                    listener.onMessage(new DuelMessage.UpdateData(player, LOCATION_SZONE, cards));
+            // Occupied slot: firstU16 is the first field's size.
+            // Read field blocks until we've consumed all requested fields.
+            var card = new QueriedCard();
+            readFieldBlock(buf, card, firstU16);
+
+            // Continue reading field blocks for this card
+            while (buf.position() < endPos && buf.remaining() >= 2) {
+                // Peek at next u16 to see if it's a field or empty slot marker
+                int peekPos = buf.position();
+                int nextU16 = Short.toUnsignedInt(buf.getShort());
+                if (nextU16 == 0) {
+                    // This is the NEXT slot (empty) — put it back and break
+                    buf.position(peekPos);
+                    break;
+                }
+                // Check if this looks like a new card's first field (QUERY_CODE = 0x1)
+                // by peeking at the flag
+                if (buf.remaining() >= 4) {
+                    int peekFlag = buf.getInt(buf.position()); // peek without advancing
+                    if (peekFlag == QUERY_CODE && (card.flags & QUERY_CODE) != 0) {
+                        // We already read QUERY_CODE for this card — this is a new card
+                        buf.position(peekPos);
+                        break;
+                    }
+                }
+                readFieldBlock(buf, card, nextU16);
+            }
+
+            cards.add(card);
+        }
+        return cards;
+    }
+
+    /** Read one field block: given u16 fieldSize already read, read [u32 flag][data]. */
+    private static void readFieldBlock(java.nio.ByteBuffer buf, QueriedCard card, int fieldSize) {
+        int flag = buf.getInt();
+        card.flags |= flag;
+        int dataSize = fieldSize - 4; // fieldSize includes the flag
+
+        switch (flag) {
+            case QUERY_CODE         -> card.code = buf.getInt();
+            case QUERY_POSITION     -> card.position = buf.getInt();
+            case QUERY_ALIAS        -> card.alias = buf.getInt();
+            case QUERY_TYPE         -> card.type = buf.getInt();
+            case QUERY_LEVEL        -> card.level = buf.getInt();
+            case QUERY_RANK         -> card.rank = buf.getInt();
+            case QUERY_ATTRIBUTE    -> card.attribute = buf.getInt();
+            case QUERY_RACE         -> card.race = buf.getLong();
+            case QUERY_ATTACK       -> card.attack = buf.getInt();
+            case QUERY_DEFENSE      -> card.defense = buf.getInt();
+            case QUERY_BASE_ATTACK  -> card.baseAttack = buf.getInt();
+            case QUERY_BASE_DEFENSE -> card.baseDefense = buf.getInt();
+            case QUERY_REASON       -> card.reason = buf.getInt();
+            case QUERY_STATUS       -> card.status = buf.getInt();
+            case QUERY_IS_PUBLIC    -> card.isPublic = buf.getInt() != 0;
+            case QUERY_LSCALE       -> card.lscale = buf.getInt();
+            case QUERY_RSCALE       -> card.rscale = buf.getInt();
+            case QUERY_COVER        -> card.cover = buf.getInt();
+            case QUERY_LINK -> {
+                card.linkRating = buf.getInt();
+                card.linkMarker = buf.getInt();
+            }
+            default -> {
+                // Skip unknown field data
+                if (dataSize > 0 && buf.remaining() >= dataSize) {
+                    buf.position(buf.position() + dataSize);
                 }
             }
         }
