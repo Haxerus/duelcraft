@@ -16,6 +16,17 @@ public class CardDatabase implements AutoCloseable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CardDatabase.class);
 
+    // Explicitly load the SQLite JDBC driver. NeoForge's modular classloader
+    // prevents automatic SPI discovery (META-INF/services), so DriverManager
+    // won't find the driver without this.
+    static {
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            LOGGER.error("sqlite-jdbc driver not found — is it bundled via JarJar?", e);
+        }
+    }
+
     private static final String QUERY = """
             SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute
             FROM datas d JOIN texts t ON d.id = t.id
