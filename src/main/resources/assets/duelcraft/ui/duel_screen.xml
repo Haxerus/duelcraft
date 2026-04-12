@@ -202,6 +202,36 @@
         aspect-rate: 0.75;
         }
 
+        /* ── Monster stat labels ── */
+        .stat-atk-def {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        font-size: 5;
+        horizontal-align: center;
+        background: rect(#cc000000);
+        text-color: #FFFFFF;
+        }
+
+        .stat-level {
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 5;
+        background: rect(#cc000000);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        .stat-buffed {
+        text-color: #55FF55;
+        }
+
+        .stat-debuffed {
+        text-color: #FF5555;
+        }
+
         /* ── Defense position ── */
         .defense {
         transform: rotate(90);

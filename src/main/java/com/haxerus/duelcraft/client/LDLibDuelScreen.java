@@ -1,6 +1,7 @@
 package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
@@ -351,6 +352,9 @@ public class LDLibDuelScreen {
                 refreshSpellZones(plr);
             if (flags.contains(opp == 0 ? DirtyFlag.SZONE_0 : DirtyFlag.SZONE_1))
                 refreshSpellZones(opp);
+
+            if (flags.contains(DirtyFlag.FIELD_STATS))
+                refreshFieldStats();
 
             if (flags.contains(DirtyFlag.PILE_COUNTS))
                 refreshPiles();
@@ -755,6 +759,71 @@ public class LDLibDuelScreen {
 
             if (fieldSpellSlots[player] != null) {
                 refreshZoneSlot(fieldSpellSlots[player], state.szone[player][5], state.szonePos[player][5], player, LOCATION_SZONE, 5);
+            }
+        }
+
+        private void refreshFieldStats() {
+            for (int p = 0; p < 2; p++) {
+                for (int i = 0; i < 5; i++) {
+                    updateMonsterStats(monsterSlots[p][i], state.mzoneStats[p][i], state.mzone[p][i]);
+                }
+            }
+            // EMZ slots
+            updateMonsterStats(emzSlots[0], state.mzoneStats[0][5], state.mzone[0][5]);
+            updateMonsterStats(emzSlots[1], state.mzoneStats[1][5], state.mzone[1][5]);
+        }
+
+        private void updateMonsterStats(UIElement slot, QueriedCard stats, int code) {
+            if (slot == null) return;
+
+            // Remove old stat labels
+            slot.getChildren().stream()
+                    .filter(c -> c.hasClass("stat-atk-def") || c.hasClass("stat-level"))
+                    .toList()
+                    .forEach(slot::removeChild);
+
+            if (code == 0 || stats == null) return;
+
+            boolean faceDown = (stats.position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
+            if (faceDown) return;
+
+            // Only show stats for monsters (check if QUERY_ATTACK was present in the flags)
+            if ((stats.flags & QUERY_ATTACK) == 0) return;
+
+            // ATK/DEF label at bottom
+            var atkDefLabel = new Label();
+            atkDefLabel.addClass("stat-atk-def");
+            String atkText = stats.attack == -2 ? "?" : String.valueOf(stats.attack);
+            String defText;
+            if (stats.linkRating > 0) {
+                defText = "L" + stats.linkRating;
+            } else {
+                defText = stats.defense == -2 ? "?" : String.valueOf(stats.defense);
+            }
+            atkDefLabel.setText(Component.literal(atkText + "/" + defText));
+
+            // Color based on buff/debuff (ATK takes priority)
+            if (stats.baseAttack > 0 && stats.attack != stats.baseAttack) {
+                if (stats.attack > stats.baseAttack) atkDefLabel.addClass("stat-buffed");
+                else atkDefLabel.addClass("stat-debuffed");
+            }
+            slot.addChild(atkDefLabel);
+
+            // Level/Rank label at top-right — only if modified from original
+            CardDatabase db = DuelcraftClient.getCardDatabase();
+            CardInfo cardInfo = db != null ? db.getCard(code) : null;
+            if (cardInfo != null && cardInfo.isMonster() && !cardInfo.isLink()) {
+                int originalLevel = cardInfo.levelOrRank();
+                int currentLevel = stats.rank > 0 ? stats.rank : stats.level;
+                if (currentLevel != originalLevel && currentLevel > 0) {
+                    var levelLabel = new Label();
+                    levelLabel.addClass("stat-level");
+                    boolean isXyz = cardInfo.isXyz();
+                    levelLabel.setText(Component.literal((isXyz ? "R" : "\u2605") + currentLevel));
+                    if (currentLevel > originalLevel) levelLabel.addClass("stat-buffed");
+                    else if (currentLevel < originalLevel) levelLabel.addClass("stat-debuffed");
+                    slot.addChild(levelLabel);
+                }
             }
         }
 
