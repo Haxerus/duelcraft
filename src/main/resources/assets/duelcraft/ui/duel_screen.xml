@@ -474,12 +474,12 @@
 
         <!-- HUD Bar (top overlay: LP bars + duel title) -->
         <element id="hud-bar">
-            <progress-bar id="opp-lp-bar" class="lp-bar" value="100" text="8000" />
+            <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
             <element id="hud-info">
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
-            <progress-bar id="plr-lp-bar" class="lp-bar" value="100" text="8000" />
+            <progress-bar id="plr-lp-bar" class="lp-bar" min="0" max="8000" value="8000" text="8000" />
         </element>
 
         <!-- ══════════ Field Area ══════════ -->

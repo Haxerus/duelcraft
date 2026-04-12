@@ -280,15 +280,7 @@ public class LDLibDuelScreen {
             int plr = state.localPlayer;
             int opp = state.opponent();
 
-            // LP bars
-            if (oppLpBar != null) {
-                oppLpBar.bindDataSource(SupplierDataSource.of(() ->
-                        state.startingLP > 0 ? (float) state.lp[opp] / state.startingLP : 1.0f));
-            }
-            if (plrLpBar != null) {
-                plrLpBar.bindDataSource(SupplierDataSource.of(() ->
-                        state.startingLP > 0 ? (float) state.lp[plr] / state.startingLP : 1.0f));
-            }
+            // LP bars — updated via refreshLP() on DirtyFlag.LP, not reactive binding
 
             // Title and turn/phase labels
             bindLabel(titleLabel, () -> "You vs. " + state.opponentName);
@@ -791,16 +783,17 @@ public class LDLibDuelScreen {
         private void refreshLP() {
             int plr = state.localPlayer;
             int opp = state.opponent();
-            if (oppLpBar != null) {
-                float pct = state.startingLP > 0 ? (float) state.lp[opp] / state.startingLP * 100f : 100f;
-                oppLpBar.setValue(pct);
-                oppLpBar.label.setText(Component.literal(String.valueOf(state.lp[opp])));
-            }
-            if (plrLpBar != null) {
-                float pct = state.startingLP > 0 ? (float) state.lp[plr] / state.startingLP * 100f : 100f;
-                plrLpBar.setValue(pct);
-                plrLpBar.label.setText(Component.literal(String.valueOf(state.lp[plr])));
-            }
+            updateLpBar(oppLpBar, state.lp[opp]);
+            updateLpBar(plrLpBar, state.lp[plr]);
+        }
+
+        private void updateLpBar(ProgressBar bar, int lp) {
+            if (bar == null) return;
+            // If LP exceeds starting LP (e.g. LP gain), raise the max so the bar doesn't overflow
+            float max = Math.max(state.startingLP, lp);
+            bar.setMaxValue(max);
+            bar.setProgress(lp);
+            bar.label.setText(Component.literal(String.valueOf(lp)));
         }
 
         private void refreshPiles() {
