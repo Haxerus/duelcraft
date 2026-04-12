@@ -766,9 +766,14 @@ public class LDLibDuelScreen {
                     cardVisual.lss("aspect-rate", "0.75");
                     cardVisual.lss("height", "100%");
                     setCardImageBackground(cardVisual, code);
+
+                    // Hover on the card visual (not the slot — card covers the slot)
+                    int hoverCode = code;
+                    cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(hoverCode));
+                    cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
                 }
 
-                if (defense) {
+                if (defense && locationType == LOCATION_MZONE) {
                     cardVisual.addClass("defense");
                 }
 
@@ -789,10 +794,11 @@ public class LDLibDuelScreen {
 
         private void updateLpBar(ProgressBar bar, int lp) {
             if (bar == null) return;
-            // If LP exceeds starting LP (e.g. LP gain), raise the max so the bar doesn't overflow
+            // Normalize to 0.0-1.0 (default ProgressBar range)
+            // Use max(startingLP, lp) as denominator so LP gain beyond 8000 still fits
             float max = Math.max(state.startingLP, lp);
-            bar.setMaxValue(max);
-            bar.setProgress(lp);
+            float normalized = max > 0 ? (float) lp / max : 1.0f;
+            bar.setProgress(normalized);
             bar.label.setText(Component.literal(String.valueOf(lp)));
         }
 
@@ -977,45 +983,13 @@ public class LDLibDuelScreen {
                     if (monsterSlots[p][i] != null) {
                         monsterSlots[p][i].addEventListener(UIEvents.CLICK,
                                 e -> onCardClicked(player, LOCATION_MZONE, seq, e));
-                        addZoneHover(monsterSlots[p][i], () -> faceUpCode(state.mzone[player][seq], state.mzonePos[player][seq]));
                     }
                     if (spellSlots[p][i] != null) {
                         spellSlots[p][i].addEventListener(UIEvents.CLICK,
                                 e -> onCardClicked(player, LOCATION_SZONE, seq, e));
-                        addZoneHover(spellSlots[p][i], () -> faceUpCode(state.szone[player][seq], state.szonePos[player][seq]));
                     }
                 }
             }
-            // EMZ slots
-            for (int e = 0; e < 2; e++) {
-                int idx = e;
-                if (emzSlots[e] != null) {
-                    addZoneHover(emzSlots[e], () -> faceUpCode(state.mzone[idx][5], state.mzonePos[idx][5]));
-                }
-            }
-            // Field spell slots
-            for (int p = 0; p < 2; p++) {
-                int player = p;
-                if (fieldSpellSlots[p] != null) {
-                    addZoneHover(fieldSpellSlots[p], () -> faceUpCode(state.szone[player][5], state.szonePos[player][5]));
-                }
-            }
-        }
-
-        /** Add hover-to-inspect on a zone slot. codeSupplier reads the current card code dynamically. */
-        private void addZoneHover(UIElement slot, java.util.function.IntSupplier codeSupplier) {
-            slot.addEventListener(UIEvents.MOUSE_ENTER, e -> {
-                int code = codeSupplier.getAsInt();
-                if (code != 0) showCardInfo(code);
-            });
-            slot.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
-        }
-
-        /** Return the card code only if it's face-up, 0 otherwise. */
-        private static int faceUpCode(int code, int position) {
-            if (code == 0) return 0;
-            if ((position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0) return 0;
-            return code;
         }
 
         private void handlePileClicks() {
