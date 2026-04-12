@@ -43,6 +43,17 @@ public class DuelMessageCodec {
                 buf.writeShort(m.extraCount1());
             }
             case DuelMessage.Win m -> { buf.writeByte(m.winner()); buf.writeByte(m.reason()); }
+            case DuelMessage.UpdateData m -> {
+                buf.writeByte(m.player());
+                buf.writeByte(m.location());
+                writeQueriedCardList(buf, m.cards());
+            }
+            case DuelMessage.UpdateCard m -> {
+                buf.writeByte(m.player());
+                buf.writeByte(m.location());
+                buf.writeInt(m.sequence());
+                writeQueriedCard(buf, m.card());
+            }
             case DuelMessage.NewTurn m -> buf.writeByte(m.player());
             case DuelMessage.NewPhase m -> buf.writeShort(m.phase());
 
@@ -240,6 +251,8 @@ public class DuelMessageCodec {
             case MSG_START -> new DuelMessage.Start(buf.readInt(), buf.readInt(), buf.readInt(),
                     buf.readShort(), buf.readShort(), buf.readShort(), buf.readShort());
             case MSG_WIN -> new DuelMessage.Win(buf.readByte(), buf.readByte());
+            case MSG_UPDATE_DATA -> new DuelMessage.UpdateData(buf.readByte(), buf.readByte(), readQueriedCardList(buf));
+            case MSG_UPDATE_CARD -> new DuelMessage.UpdateCard(buf.readByte(), buf.readByte(), buf.readInt(), readQueriedCard(buf));
             case MSG_NEW_TURN -> new DuelMessage.NewTurn(buf.readByte());
             case MSG_NEW_PHASE -> new DuelMessage.NewPhase(buf.readUnsignedShort());
 
@@ -530,6 +543,87 @@ public class DuelMessageCodec {
         int count = buf.readInt();
         List<DuelMessage.SortableCard> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) list.add(new DuelMessage.SortableCard(buf.readInt(), buf.readByte(), buf.readInt(), buf.readInt()));
+        return list;
+    }
+
+    // QueriedCard serialization
+    private static void writeQueriedCard(FriendlyByteBuf buf, QueriedCard c) {
+        buf.writeInt(c.flags);
+        buf.writeInt(c.code);
+        buf.writeInt(c.position);
+        buf.writeInt(c.alias);
+        buf.writeInt(c.type);
+        buf.writeInt(c.level);
+        buf.writeInt(c.rank);
+        buf.writeInt(c.attribute);
+        buf.writeLong(c.race);
+        buf.writeInt(c.attack);
+        buf.writeInt(c.defense);
+        buf.writeInt(c.baseAttack);
+        buf.writeInt(c.baseDefense);
+        buf.writeInt(c.reason);
+        buf.writeInt(c.owner);
+        buf.writeInt(c.status);
+        buf.writeBoolean(c.isPublic);
+        buf.writeBoolean(c.isHidden);
+        buf.writeInt(c.lscale);
+        buf.writeInt(c.rscale);
+        buf.writeInt(c.linkRating);
+        buf.writeInt(c.linkMarker);
+        buf.writeInt(c.cover);
+        writeIntList(buf, c.overlayCards);
+        writeIntList(buf, c.counters);
+        boolean hasReasonCard = c.reasonCard != null;
+        buf.writeBoolean(hasReasonCard);
+        if (hasReasonCard) writeLocInfo(buf, c.reasonCard);
+        boolean hasEquipCard = c.equipCard != null;
+        buf.writeBoolean(hasEquipCard);
+        if (hasEquipCard) writeLocInfo(buf, c.equipCard);
+        writeLocInfoList(buf, c.targetCards);
+    }
+
+    private static QueriedCard readQueriedCard(FriendlyByteBuf buf) {
+        QueriedCard c = new QueriedCard();
+        c.flags = buf.readInt();
+        c.code = buf.readInt();
+        c.position = buf.readInt();
+        c.alias = buf.readInt();
+        c.type = buf.readInt();
+        c.level = buf.readInt();
+        c.rank = buf.readInt();
+        c.attribute = buf.readInt();
+        c.race = buf.readLong();
+        c.attack = buf.readInt();
+        c.defense = buf.readInt();
+        c.baseAttack = buf.readInt();
+        c.baseDefense = buf.readInt();
+        c.reason = buf.readInt();
+        c.owner = buf.readInt();
+        c.status = buf.readInt();
+        c.isPublic = buf.readBoolean();
+        c.isHidden = buf.readBoolean();
+        c.lscale = buf.readInt();
+        c.rscale = buf.readInt();
+        c.linkRating = buf.readInt();
+        c.linkMarker = buf.readInt();
+        c.cover = buf.readInt();
+        c.overlayCards = readIntList(buf);
+        c.counters = readIntList(buf);
+        if (buf.readBoolean()) c.reasonCard = readLocInfo(buf);
+        if (buf.readBoolean()) c.equipCard = readLocInfo(buf);
+        c.targetCards = readLocInfoList(buf);
+        return c;
+    }
+
+    private static void writeQueriedCardList(FriendlyByteBuf buf, List<QueriedCard> list) {
+        buf.writeInt(list.size());
+        for (var c : list) writeQueriedCard(buf, c);
+    }
+
+    private static List<QueriedCard> readQueriedCardList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        List<QueriedCard> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add(readQueriedCard(buf));
         return list;
     }
 }
