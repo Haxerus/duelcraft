@@ -1451,16 +1451,21 @@ public class LDLibDuelScreen {
         }
 
         private UIElement findSlotForLocation(ClientDuelState.CardLocation loc) {
+            int p = loc.controller();
             return switch (loc.location()) {
                 case LOCATION_MZONE -> {
-                    if (loc.sequence() < 5) yield monsterSlots[loc.controller()][loc.sequence()];
-                    else if (loc.sequence() == 5) yield emzSlots[loc.controller()];
+                    if (loc.sequence() < 5) yield monsterSlots[p][loc.sequence()];
+                    else if (loc.sequence() == 5) yield emzSlots[p];
                     else yield null;
                 }
                 case LOCATION_SZONE -> {
-                    if (loc.sequence() < 5) yield spellSlots[loc.controller()][loc.sequence()];
-                    else yield fieldSpellSlots[loc.controller()];
+                    if (loc.sequence() < 5) yield spellSlots[p][loc.sequence()];
+                    else yield fieldSpellSlots[p];
                 }
+                case LOCATION_EXTRA -> extraSlots[p];
+                case LOCATION_GRAVE -> graveSlots[p];
+                case LOCATION_REMOVED -> banishedSlots[p];
+                case LOCATION_DECK -> deckSlots[p];
                 default -> null;
             };
         }
