@@ -131,11 +131,16 @@ public class DuelSession implements AutoCloseable {
         for (int player = 0; player < 2; player++) {
             sendLocationStats(eng, flags, player, LOCATION_MZONE);
             sendLocationStats(eng, flags, player, LOCATION_SZONE);
+            sendLocationStats(eng, flags, player, LOCATION_EXTRA);
         }
     }
 
     private void sendLocationStats(long eng, int flags, int player, int location) {
-        int slotCount = (location == LOCATION_MZONE) ? 7 : 8;
+        int slotCount = switch (location) {
+            case LOCATION_MZONE -> 7;
+            case LOCATION_SZONE -> 8;
+            default -> OcgCore.nDuelQueryCount(eng, duelHandle, player, location);
+        };
         var cards = new ArrayList<QueriedCard>(slotCount);
 
         for (int seq = 0; seq < slotCount; seq++) {
