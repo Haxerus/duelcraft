@@ -29,7 +29,7 @@ public class ClientDuelState {
         MZONE_0, MZONE_1,
         SZONE_0, SZONE_1,
         PILE_COUNTS, CHAIN, PROMPT, WINNER,
-        FIELD_STATS
+        FIELD_STATS, CONFIRM
     }
 
     private final EnumSet<DirtyFlag> dirtyFlags = EnumSet.noneOf(DirtyFlag.class);
@@ -130,6 +130,14 @@ public class ClientDuelState {
     // Last hint (provides context for next selection, e.g., "Select a monster")
     public int lastHintType;
     public long lastHintData;
+
+    // Confirm/reveal card display
+    public String confirmTitle;
+    public List<DuelMessage.ConfirmCard> confirmCards;
+
+    // RPS result display
+    public int rpsHand0;
+    public int rpsHand1;
 
     // Winner (-1 = ongoing)
     public int winner = -1;
@@ -366,6 +374,26 @@ public class ClientDuelState {
             case DuelMessage.AnnounceNumber sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceNumber player={}", sel.player()); }
             case DuelMessage.AnnounceCard sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceCard player={}", sel.player()); }
             case DuelMessage.RockPaperScissors sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: RockPaperScissors player={}", sel.player()); }
+
+            // ---- Confirm/reveal ----
+            case DuelMessage.ConfirmDeckTop confirm -> {
+                confirmTitle = "Revealed Cards";
+                confirmCards = confirm.cards();
+                dirtyFlags.add(DirtyFlag.CONFIRM);
+                LOGGER.debug("[State] ConfirmDeckTop: player={}, cards={}", confirm.player(), confirm.cards().size());
+            }
+            case DuelMessage.ConfirmCards confirm -> {
+                confirmTitle = "Confirmed Cards";
+                confirmCards = confirm.cards();
+                dirtyFlags.add(DirtyFlag.CONFIRM);
+                LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());
+            }
+            case DuelMessage.HandResult res -> {
+                rpsHand0 = res.hand0();
+                rpsHand1 = res.hand1();
+                dirtyFlags.add(DirtyFlag.CHAIN);
+                LOGGER.debug("[State] HandResult: hand0={}, hand1={}", res.hand0(), res.hand1());
+            }
 
             // ---- Everything else ----
             default -> LOGGER.debug("[State] Unhandled: {} (type={})", msg.getClass().getSimpleName(), msg.type());

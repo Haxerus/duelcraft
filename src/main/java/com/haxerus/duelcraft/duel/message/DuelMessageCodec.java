@@ -129,6 +129,8 @@ public class DuelMessageCodec {
             case DuelMessage.ShuffleDeck m -> buf.writeByte(m.player());
             case DuelMessage.ShuffleHand m -> { buf.writeByte(m.player()); writeIntList(buf, m.codes()); }
             case DuelMessage.ShuffleExtra m -> buf.writeByte(m.player());
+            case DuelMessage.ConfirmDeckTop m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
+            case DuelMessage.ConfirmCards m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
 
             // UI/Info
             case DuelMessage.Hint m -> { buf.writeByte(m.hintType()); buf.writeByte(m.player()); buf.writeLong(m.data()); }
@@ -218,6 +220,7 @@ public class DuelMessageCodec {
             case DuelMessage.AnnounceNumber m -> { buf.writeByte(m.player()); writeLongList(buf, m.options()); }
             case DuelMessage.AnnounceCard m -> { buf.writeByte(m.player()); writeByteArray(buf, m.rawBody()); }
             case DuelMessage.RockPaperScissors m -> buf.writeByte(m.player());
+            case DuelMessage.HandResult m -> { buf.writeByte(m.hand0()); buf.writeByte(m.hand1()); }
 
             // Misc
             case DuelMessage.Equip m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
@@ -300,6 +303,8 @@ public class DuelMessageCodec {
             case MSG_SHUFFLE_DECK -> new DuelMessage.ShuffleDeck(buf.readByte());
             case MSG_SHUFFLE_HAND -> new DuelMessage.ShuffleHand(buf.readByte(), readIntList(buf));
             case MSG_SHUFFLE_EXTRA -> new DuelMessage.ShuffleExtra(buf.readByte());
+            case MSG_CONFIRM_DECKTOP -> new DuelMessage.ConfirmDeckTop(buf.readByte(), readConfirmCardList(buf));
+            case MSG_CONFIRM_CARDS -> new DuelMessage.ConfirmCards(buf.readByte(), readConfirmCardList(buf));
 
             // UI/Info
             case MSG_HINT -> new DuelMessage.Hint(buf.readByte(), buf.readByte(), buf.readLong());
@@ -341,6 +346,7 @@ public class DuelMessageCodec {
             case MSG_ANNOUNCE_NUMBER -> new DuelMessage.AnnounceNumber(buf.readByte(), readLongList(buf));
             case MSG_ANNOUNCE_CARD -> new DuelMessage.AnnounceCard(buf.readByte(), readByteArray(buf));
             case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(buf.readByte());
+            case MSG_HAND_RES -> new DuelMessage.HandResult(buf.readByte(), buf.readByte());
 
             // Misc
             case MSG_EQUIP -> new DuelMessage.Equip(readLocInfo(buf), readLocInfo(buf));
@@ -440,6 +446,29 @@ public class DuelMessageCodec {
         int count = buf.readInt();
         List<DuelMessage.CardInfo> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) list.add(readCardInfo(buf));
+        return list;
+    }
+
+    private static void writeConfirmCard(FriendlyByteBuf buf, DuelMessage.ConfirmCard card) {
+        buf.writeInt(card.code());
+        buf.writeByte(card.controller());
+        buf.writeByte(card.location());
+        buf.writeInt(card.sequence());
+    }
+
+    private static DuelMessage.ConfirmCard readConfirmCard(FriendlyByteBuf buf) {
+        return new DuelMessage.ConfirmCard(buf.readInt(), buf.readByte(), buf.readByte(), buf.readInt());
+    }
+
+    private static void writeConfirmCardList(FriendlyByteBuf buf, List<DuelMessage.ConfirmCard> list) {
+        buf.writeInt(list.size());
+        for (var c : list) writeConfirmCard(buf, c);
+    }
+
+    private static List<DuelMessage.ConfirmCard> readConfirmCardList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        var list = new ArrayList<DuelMessage.ConfirmCard>(count);
+        for (int i = 0; i < count; i++) list.add(readConfirmCard(buf));
         return list;
     }
 

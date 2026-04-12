@@ -19,7 +19,7 @@
         align-self: center;
         gap-all: 2;
         padding-all: 8;
-        margin-vertical: 8%;
+        margin-vertical: 8;
         background: built-in(ui-gdp:BORDER_THICK_RT1)
         }
 
@@ -64,7 +64,7 @@
         transform: rotate(180);
         }
 
-        #opponent-side .card-image {
+        #opponent-side .card {
         transform: rotate(180);
         }
 
@@ -106,19 +106,30 @@
         gap-all: 2;
         }
 
-        /* ── Card slot (shared base for all card zones) ── */
+        /* ── Card slot (zone container with card proportions) ── */
         .card-slot {
-        min-width: 24;
-        min-height: 32;
+        min-width: 32;
+        min-height: 48;
         aspect-rate: 0.75;
         align-items: center;
         justify-content: center;
         }
 
+        /* ── Unified card element (programmatic cards in hand/inspector/field) ── */
+        .card {
+        min-width: 32;
+        min-height: 48;
+        aspect-rate: 0.75;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.3 quad_in_out,
+        transform 0.2;
+        }
+
         /* ── Square slot ── */
         .square-slot {
-        min-width: 32;
-        min-height: 32;
+        min-width: 48;
+        min-height: 48;
         aspect-rate: 1;
         align-items: center;
         justify-content: center;
@@ -151,14 +162,14 @@
         flex-direction: row;
         align-items: center;
         justify-content: center;
-        gap-all: 8;
+        gap-all: 14;
         }
 
         /* ── Phase buttons ── */
 
         .phase-btn {
-        width: 20;
-        height: 16;
+        width: 24;
+        height: 24;
         }
 
         .phase-btn.hidden {
@@ -198,7 +209,7 @@
         /* ── Card back ── */
         .card-back {
         background: sprite(duelcraft:textures/card_back.png);
-        height: 100%;
+        height: 48;
         aspect-rate: 0.75;
         }
 
@@ -240,12 +251,7 @@
         }
 
         /* ── Hand Row ── */
-        .hand-card {
-        transition: background 0.3 quad_in_out,
-        transform 0.2;
-        }
-
-        #player-hand .hand-card.__hovered__ {
+        #player-hand .card.__hovered__ {
         transform: scale(1.05);
         }
 
@@ -253,7 +259,7 @@
         align-self: stretch;
         scroller-view-mode: HORIZONTAL;
         scroller-horizontal-display: ALWAYS;
-        max-width: 244;
+        max-width: 340;
         }
 
         #opponent-hand .__scroller_view_view-container__ {
@@ -482,23 +488,23 @@
 
         /* ── Card Action Context Menu ── */
         #context-menu {
-            position: absolute;
-            flex-direction: row;
-            gap-all: 1;
-            padding-all: 1;
-            background: rect(#1A1A2E, 2, 1, #4444AA);
-            z-index: 10;
+        position: absolute;
+        flex-direction: row;
+        gap-all: 1;
+        padding-all: 1;
+        background: rect(#1A1A2E, 2, 1, #4444AA);
+        z-index: 10;
         }
 
         #context-menu.hidden {
-            display: none;
+        display: none;
         }
 
         .ctx-action {
-            width: 14;
-            height: 14;
-            align-items: center;
-            justify-content: center;
+        width: 14;
+        height: 14;
+        align-items: center;
+        justify-content: center;
         }
     </style>
 

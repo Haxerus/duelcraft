@@ -105,6 +105,9 @@ public class MessageParser {
                 case MSG_ANNOUNCE_NUMBER  -> parseAnnounceNumber(reader);
                 case MSG_ANNOUNCE_CARD    -> parseRawSelection(reader, bodyLength, MSG_ANNOUNCE_CARD);
                 case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(reader.readUint8());
+                case MSG_CONFIRM_DECKTOP -> parseConfirmDeckTop(reader);
+                case MSG_CONFIRM_CARDS   -> parseConfirmCards(reader);
+                case MSG_HAND_RES        -> parseHandResult(reader);
 
                 // Misc action
                 case MSG_EQUIP         -> new DuelMessage.Equip(LocInfo.read(reader), LocInfo.read(reader));
@@ -603,6 +606,35 @@ public class MessageParser {
             rawBody[i] = (byte) r.readUint8();
         }
         return new DuelMessage.AnnounceCard(player, rawBody);
+    }
+
+    // ---- Confirm / Hand Result ----
+
+    private static DuelMessage.ConfirmDeckTop parseConfirmDeckTop(BufferReader r) {
+        int player = r.readUint8();
+        int count = r.readInt32();
+        var cards = new ArrayList<DuelMessage.ConfirmCard>(count);
+        for (int i = 0; i < count; i++) {
+            cards.add(DuelMessage.ConfirmCard.read(r));
+        }
+        return new DuelMessage.ConfirmDeckTop(player, cards);
+    }
+
+    private static DuelMessage.ConfirmCards parseConfirmCards(BufferReader r) {
+        int player = r.readUint8();
+        int count = r.readInt32();
+        var cards = new ArrayList<DuelMessage.ConfirmCard>(count);
+        for (int i = 0; i < count; i++) {
+            cards.add(DuelMessage.ConfirmCard.read(r));
+        }
+        return new DuelMessage.ConfirmCards(player, cards);
+    }
+
+    private static DuelMessage.HandResult parseHandResult(BufferReader r) {
+        int result = r.readUint8();
+        int hand0 = result & 0x3;
+        int hand1 = (result >> 2) & 0x3;
+        return new DuelMessage.HandResult(hand0, hand1);
     }
 
     // ---- Misc ----

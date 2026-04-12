@@ -653,6 +653,66 @@ class MessageParserTest {
         assertEquals(List.of(1, 0, 1), tc.results());
     }
 
+    // ---- Confirm / Hand Result ----
+
+    @Test
+    void parseConfirmDeckTop() {
+        ByteBuffer b = body(32);
+        b.put((byte) 0);       // player
+        b.putInt(2);            // count
+        b.putInt(89631139);     // code (Blue-Eyes)
+        b.put((byte) 0);       // controller
+        b.put((byte) LOCATION_DECK);
+        b.putInt(39);           // sequence
+        b.putInt(46986414);     // code (Dark Magician)
+        b.put((byte) 0);
+        b.put((byte) LOCATION_DECK);
+        b.putInt(38);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CONFIRM_DECKTOP, b.array()));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.ConfirmDeckTop.class, msgs.getFirst());
+        var confirm = (DuelMessage.ConfirmDeckTop) msgs.getFirst();
+        assertEquals(0, confirm.player());
+        assertEquals(2, confirm.cards().size());
+        assertEquals(89631139, confirm.cards().get(0).code());
+        assertEquals(46986414, confirm.cards().get(1).code());
+    }
+
+    @Test
+    void parseConfirmCards() {
+        ByteBuffer b = body(16);
+        b.put((byte) 1);
+        b.putInt(1);
+        b.putInt(12580477);
+        b.put((byte) 1);
+        b.put((byte) LOCATION_HAND);
+        b.putInt(0);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CONFIRM_CARDS, b.array()));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.ConfirmCards.class, msgs.getFirst());
+        var confirm = (DuelMessage.ConfirmCards) msgs.getFirst();
+        assertEquals(1, confirm.player());
+        assertEquals(1, confirm.cards().size());
+        assertEquals(12580477, confirm.cards().getFirst().code());
+    }
+
+    @Test
+    void parseHandResult() {
+        // Player 0 chose Rock (1), Player 1 chose Scissors (3)
+        // result = (3 << 2) | 1 = 13
+        ByteBuffer b = body(1);
+        b.put((byte) 13);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_HAND_RES, b.array()));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.HandResult.class, msgs.getFirst());
+        var res = (DuelMessage.HandResult) msgs.getFirst();
+        assertEquals(1, res.hand0());
+        assertEquals(3, res.hand1());
+    }
+
     // ---- Buffer-level tests ----
 
     @Test
