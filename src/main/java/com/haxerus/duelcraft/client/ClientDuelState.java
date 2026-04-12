@@ -315,6 +315,13 @@ public class ClientDuelState {
                     for (int i = 0; i < Math.min(cards.size(), szoneStats[upd.player()].length); i++) {
                         szoneStats[upd.player()][i] = cards.get(i);
                     }
+                } else if (upd.location() == LOCATION_EXTRA) {
+                    // Update extra deck card codes from query results
+                    extra[upd.player()].clear();
+                    for (var card : cards) {
+                        extra[upd.player()].add(card != null ? card.code : 0);
+                    }
+                    dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 }
                 dirtyFlags.add(DirtyFlag.FIELD_STATS);
             }

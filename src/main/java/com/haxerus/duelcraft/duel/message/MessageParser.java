@@ -516,19 +516,26 @@ public class MessageParser {
     }
 
     private static DuelMessage.SelectSum parseSelectSum(BufferReader r, int bodyLength) {
-        int startPos = r.remaining();
         int player = r.readUint8();
-        boolean mustExact = r.readUint8() != 0;
-        int totalSum = r.readInt32();
+        boolean selectMode = r.readUint8() != 0;
+        int targetSum = r.readInt32();
         int min = r.readInt32();
         int max = r.readInt32();
-        int consumed = startPos - r.remaining();
-        int remaining = bodyLength - consumed;
-        byte[] rawBody = new byte[remaining];
-        for (int i = 0; i < remaining; i++) {
-            rawBody[i] = (byte) r.readUint8();
+
+        int mustCount = r.readInt32();
+        var mustSelect = new ArrayList<DuelMessage.SumCard>(mustCount);
+        for (int i = 0; i < mustCount; i++) {
+            mustSelect.add(DuelMessage.SumCard.read(r));
         }
-        return new DuelMessage.SelectSum(player, mustExact, totalSum, min, max, rawBody);
+
+        int selectCount = r.readInt32();
+        var selectable = new ArrayList<DuelMessage.SumCard>(selectCount);
+        for (int i = 0; i < selectCount; i++) {
+            selectable.add(DuelMessage.SumCard.read(r));
+        }
+
+        return new DuelMessage.SelectSum(player, selectMode, targetSum,
+                min, max, mustSelect, selectable);
     }
 
     private static DuelMessage.SelectUnselectCard parseSelectUnselectCard(BufferReader r) {

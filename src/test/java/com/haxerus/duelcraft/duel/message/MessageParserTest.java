@@ -536,6 +536,47 @@ class MessageParserTest {
         assertEquals(0, rps.player());
     }
 
+    @Test
+    void parseSelectSum() {
+        ByteBuffer b = body(76);
+        b.put((byte) 0);       // player
+        b.put((byte) 0);       // selectMode
+        b.putInt(8);            // targetSum
+        b.putInt(1);            // min
+        b.putInt(3);            // max
+
+        // 1 must-select card
+        b.putInt(1);
+        b.putInt(56832966);     // code
+        b.put((byte) 0);       // controller
+        b.put((byte) LOCATION_MZONE);
+        b.putInt(0);            // sequence
+        b.putLong(4L);          // opParam
+
+        // 2 selectable cards
+        b.putInt(2);
+        b.putInt(89631139);
+        b.put((byte) 0);
+        b.put((byte) LOCATION_MZONE);
+        b.putInt(1);
+        b.putLong(8L);
+        b.putInt(46986414);
+        b.put((byte) 0);
+        b.put((byte) LOCATION_MZONE);
+        b.putInt(2);
+        b.putLong(7L);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_SUM, b.array()));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.SelectSum.class, msgs.getFirst());
+        var sum = (DuelMessage.SelectSum) msgs.getFirst();
+        assertEquals(0, sum.player());
+        assertEquals(8, sum.targetSum());
+        assertEquals(1, sum.mustSelect().size());
+        assertEquals(4, sum.mustSelect().getFirst().value1());
+        assertEquals(2, sum.selectable().size());
+    }
+
     // ---- State Update Messages ----
 
     /**

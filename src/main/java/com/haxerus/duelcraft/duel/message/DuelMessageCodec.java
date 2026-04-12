@@ -200,10 +200,11 @@ public class DuelMessageCodec {
             }
             case DuelMessage.SelectSum m -> {
                 buf.writeByte(m.player());
-                buf.writeBoolean(m.mustExact());
-                buf.writeInt(m.totalSum());
+                buf.writeBoolean(m.selectMode());
+                buf.writeInt(m.targetSum());
                 buf.writeInt(m.min()); buf.writeInt(m.max());
-                writeByteArray(buf, m.rawBody());
+                writeSumCardList(buf, m.mustSelect());
+                writeSumCardList(buf, m.selectable());
             }
             case DuelMessage.SelectUnselectCard m -> {
                 buf.writeByte(m.player());
@@ -335,7 +336,8 @@ public class DuelMessageCodec {
             case MSG_SELECT_COUNTER -> new DuelMessage.SelectCounter(buf.readByte(), buf.readUnsignedShort(),
                     buf.readUnsignedShort(), readCounterCardList(buf));
             case MSG_SELECT_SUM -> new DuelMessage.SelectSum(buf.readByte(), buf.readBoolean(),
-                    buf.readInt(), buf.readInt(), buf.readInt(), readByteArray(buf));
+                    buf.readInt(), buf.readInt(), buf.readInt(),
+                    readSumCardList(buf), readSumCardList(buf));
             case MSG_SELECT_UNSELECT_CARD -> new DuelMessage.SelectUnselectCard(buf.readByte(),
                     buf.readBoolean(), buf.readBoolean(), buf.readInt(), buf.readInt(),
                     readCardInfoList(buf), readCardInfoList(buf));
@@ -559,6 +561,32 @@ public class DuelMessageCodec {
         int count = buf.readInt();
         List<DuelMessage.CounterCard> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) list.add(new DuelMessage.CounterCard(buf.readInt(), buf.readByte(), buf.readByte(), buf.readByte(), buf.readUnsignedShort()));
+        return list;
+    }
+
+    // SumCard: code(4) + con(1) + loc(1) + seq(4) + opParam(8) = 18 bytes
+    private static void writeSumCard(FriendlyByteBuf buf, DuelMessage.SumCard card) {
+        buf.writeInt(card.code());
+        buf.writeByte(card.controller());
+        buf.writeByte(card.location());
+        buf.writeInt(card.sequence());
+        buf.writeLong(card.opParam());
+    }
+
+    private static DuelMessage.SumCard readSumCard(FriendlyByteBuf buf) {
+        return new DuelMessage.SumCard(buf.readInt(), buf.readByte(), buf.readByte(),
+                buf.readInt(), buf.readLong());
+    }
+
+    private static void writeSumCardList(FriendlyByteBuf buf, List<DuelMessage.SumCard> list) {
+        buf.writeInt(list.size());
+        for (var c : list) writeSumCard(buf, c);
+    }
+
+    private static List<DuelMessage.SumCard> readSumCardList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        var list = new ArrayList<DuelMessage.SumCard>(count);
+        for (int i = 0; i < count; i++) list.add(readSumCard(buf));
         return list;
     }
 
