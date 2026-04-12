@@ -41,3 +41,10 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+.claude/
+**/.superpowers/**
+
+CLAUDE.md
+
+logs/

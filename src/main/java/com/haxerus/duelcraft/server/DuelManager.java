@@ -173,6 +173,7 @@ public class DuelManager {
         DuelSession session = activeDuels.get(duelId);
         if (session == null || session.isEnded()) return;
         session.setResponse(response);
+        processSoloAutoResponseByDuelId(duelId);
     }
 
     public void endDuel(UUID duelId) {
