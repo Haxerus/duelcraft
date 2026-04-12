@@ -3,7 +3,9 @@ package com.haxerus.duelcraft.duel;
 import com.haxerus.duelcraft.core.*;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.MessageParser;
+import com.haxerus.duelcraft.duel.message.QueryParser;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import static com.haxerus.duelcraft.core.OcgConstants.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +92,7 @@ public class DuelSession implements AutoCloseable {
 
                     int result = listener.onMessage(msg);
                     if (result != 0) {
+                        sendFieldStats();
                         if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
                             ended = true;
                             listener.onDuelEnd();
@@ -100,9 +103,41 @@ public class DuelSession implements AutoCloseable {
             }
         } while (status == OcgConstants.DUEL_STATUS_CONTINUE || autoResponded);
 
+        sendFieldStats();
+
         if (status == OcgConstants.DUEL_STATUS_END) {
             ended = true;
             listener.onDuelEnd();
+        }
+    }
+
+    /**
+     * Query the engine for current field stats and send UpdateData messages
+     * to the listener. Called when the engine pauses (waiting for input or end).
+     */
+    private void sendFieldStats() {
+        long eng = engine.getHandle();
+        int flags = QUERY_CODE | QUERY_POSITION | QUERY_TYPE | QUERY_LEVEL | QUERY_RANK
+                | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
+                | QUERY_BASE_ATTACK | QUERY_BASE_DEFENSE | QUERY_STATUS
+                | QUERY_LINK | QUERY_IS_PUBLIC;
+
+        for (int player = 0; player < 2; player++) {
+            byte[] mzoneData = OcgCore.nDuelQueryLocation(eng, duelHandle, flags, player, LOCATION_MZONE);
+            if (mzoneData != null && mzoneData.length > 0) {
+                var cards = QueryParser.parseLocation(mzoneData);
+                if (!cards.isEmpty()) {
+                    listener.onMessage(new DuelMessage.UpdateData(player, LOCATION_MZONE, cards));
+                }
+            }
+
+            byte[] szoneData = OcgCore.nDuelQueryLocation(eng, duelHandle, flags, player, LOCATION_SZONE);
+            if (szoneData != null && szoneData.length > 0) {
+                var cards = QueryParser.parseLocation(szoneData);
+                if (!cards.isEmpty()) {
+                    listener.onMessage(new DuelMessage.UpdateData(player, LOCATION_SZONE, cards));
+                }
+            }
         }
     }
 
