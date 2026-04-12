@@ -353,7 +353,8 @@ public class LDLibDuelScreen {
             if (flags.contains(opp == 0 ? DirtyFlag.SZONE_0 : DirtyFlag.SZONE_1))
                 refreshSpellZones(opp);
 
-            if (flags.contains(DirtyFlag.FIELD_STATS))
+            if (flags.contains(DirtyFlag.FIELD_STATS)
+                    || flags.contains(DirtyFlag.MZONE_0) || flags.contains(DirtyFlag.MZONE_1))
                 refreshFieldStats();
 
             if (flags.contains(DirtyFlag.PILE_COUNTS))
@@ -830,7 +831,8 @@ public class LDLibDuelScreen {
         private void refreshZoneSlot(UIElement slot, int code, int position, int player, int locationType, int sequence) {
             if (slot == null) return;
             slot.getChildren().stream()
-                    .filter(c -> c.hasClass("card-image") || c.hasClass("card-back"))
+                    .filter(c -> c.hasClass("card-image") || c.hasClass("card-back")
+                            || c.hasClass("stat-atk-def") || c.hasClass("stat-level"))
                     .toList()
                     .forEach(slot::removeChild);
 
