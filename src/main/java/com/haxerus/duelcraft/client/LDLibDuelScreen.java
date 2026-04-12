@@ -1031,7 +1031,6 @@ public class LDLibDuelScreen {
             handlePileClick("plr-banished", "Your Banished", state.localPlayer, LOCATION_REMOVED);
             handlePileClick("opp-banished", "Opponent's Banished", state.opponent(), LOCATION_REMOVED);
             handlePileClick("plr-extra-deck", "Your Extra Deck", state.localPlayer, LOCATION_EXTRA);
-            handlePileClick("opp-extra-deck", "Opponent's Extra Deck", state.opponent(), LOCATION_EXTRA);
 
             var closeBtn = byId("zone-inspector-close");
             if (closeBtn instanceof Button btn) {
