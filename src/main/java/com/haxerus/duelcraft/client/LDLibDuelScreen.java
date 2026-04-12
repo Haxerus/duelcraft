@@ -761,13 +761,18 @@ public class LDLibDuelScreen {
                 var cardVisual = new UIElement();
                 if (faceDown) {
                     cardVisual.addClass("card-back");
+
+                    if (player == state.localPlayer) {
+                        int hoverCode = code;
+                        cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(hoverCode));
+                        cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
+                    }
                 } else {
                     cardVisual.addClass("card-image");
                     cardVisual.lss("aspect-rate", "0.75");
                     cardVisual.lss("height", "100%");
                     setCardImageBackground(cardVisual, code);
 
-                    // Hover on the card visual (not the slot — card covers the slot)
                     int hoverCode = code;
                     cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(hoverCode));
                     cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
@@ -788,18 +793,22 @@ public class LDLibDuelScreen {
         private void refreshLP() {
             int plr = state.localPlayer;
             int opp = state.opponent();
-            updateLpBar(oppLpBar, state.lp[opp]);
-            updateLpBar(plrLpBar, state.lp[plr]);
+            updateLpBar(oppLpBar, state.lp[opp], state.opponentName);
+            String localName = Minecraft.getInstance().getUser().getName();
+            updateLpBar(plrLpBar, state.lp[plr], localName);
         }
 
-        private void updateLpBar(ProgressBar bar, int lp) {
+        private void updateLpBar(ProgressBar bar, int lp, String playerName) {
             if (bar == null) return;
             // Normalize to 0.0-1.0 (default ProgressBar range)
             // Use max(startingLP, lp) as denominator so LP gain beyond 8000 still fits
             float max = Math.max(state.startingLP, lp);
             float normalized = max > 0 ? (float) lp / max : 1.0f;
             bar.setProgress(normalized);
-            bar.label.setText(Component.literal(String.valueOf(lp)));
+            // LDLib2 bug: layout() doesn't call markTaffyStyleDirty(), so
+            // ProgressBar's internal bar width change is invisible to Taffy.
+            bar.bar.markTaffyStyleDirty();
+            bar.label.setText(Component.literal(playerName + ": " + lp));
         }
 
         private void refreshPiles() {
