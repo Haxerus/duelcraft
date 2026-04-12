@@ -3,9 +3,17 @@ package com.haxerus.duelcraft.duel;
 import com.haxerus.duelcraft.core.*;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.MessageParser;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
+import com.haxerus.duelcraft.duel.message.QueryParser;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import static com.haxerus.duelcraft.core.OcgConstants.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 import java.util.List;
 
@@ -90,6 +98,7 @@ public class DuelSession implements AutoCloseable {
 
                     int result = listener.onMessage(msg);
                     if (result != 0) {
+                        sendFieldStats();
                         if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
                             ended = true;
                             listener.onDuelEnd();
@@ -100,9 +109,103 @@ public class DuelSession implements AutoCloseable {
             }
         } while (status == OcgConstants.DUEL_STATUS_CONTINUE || autoResponded);
 
+        sendFieldStats();
+
         if (status == OcgConstants.DUEL_STATUS_END) {
             ended = true;
             listener.onDuelEnd();
+        }
+    }
+
+    /**
+     * Query the engine for current field stats and send UpdateData messages
+     * to the listener. Called when the engine pauses (waiting for input or end).
+     */
+    private void sendFieldStats() {
+        long eng = engine.getHandle();
+        int flags = QUERY_CODE | QUERY_POSITION | QUERY_TYPE | QUERY_LEVEL | QUERY_RANK
+                | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
+                | QUERY_BASE_ATTACK | QUERY_BASE_DEFENSE | QUERY_STATUS
+                | QUERY_LINK | QUERY_IS_PUBLIC;
+
+        for (int player = 0; player < 2; player++) {
+            sendLocationStats(eng, flags, player, LOCATION_MZONE);
+            sendLocationStats(eng, flags, player, LOCATION_SZONE);
+        }
+    }
+
+    private void sendLocationStats(long eng, int flags, int player, int location) {
+        int slotCount = (location == LOCATION_MZONE) ? 7 : 8;
+        var cards = new ArrayList<QueriedCard>(slotCount);
+
+        for (int seq = 0; seq < slotCount; seq++) {
+            byte[] data = OcgCore.nDuelQuery(eng, duelHandle, flags, player, location, seq, 0);
+            if (data == null || data.length == 0) {
+                cards.add(null);
+            } else {
+                try {
+                    cards.add(parseSingleNativeQuery(data));
+                } catch (Exception e) {
+                    LOGGER.warn("[Query] Failed to parse slot p={} loc=0x{} seq={}: {}",
+                            player, Integer.toHexString(location), seq, e.getMessage());
+                    cards.add(null);
+                }
+            }
+        }
+
+        listener.onMessage(new DuelMessage.UpdateData(player, location, cards));
+    }
+
+    /**
+     * Parse a single-card native query result: sequential field blocks
+     * [u16 fieldSize][u32 flag][data] with no per-card header.
+     */
+    private static QueriedCard parseSingleNativeQuery(byte[] data) {
+        var buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        var card = new QueriedCard();
+        while (buf.remaining() >= 6) { // at least u16 + u32
+            int fieldSize = Short.toUnsignedInt(buf.getShort());
+            if (fieldSize == 0) break;
+            readFieldBlock(buf, card, fieldSize);
+        }
+        return card;
+    }
+
+    /** Read one field block: given u16 fieldSize already read, read [u32 flag][data]. */
+    private static void readFieldBlock(ByteBuffer buf, QueriedCard card, int fieldSize) {
+        int flag = buf.getInt();
+        card.flags |= flag;
+        int dataSize = fieldSize - 4; // fieldSize includes the flag
+
+        switch (flag) {
+            case QUERY_CODE         -> card.code = buf.getInt();
+            case QUERY_POSITION     -> card.position = buf.getInt();
+            case QUERY_ALIAS        -> card.alias = buf.getInt();
+            case QUERY_TYPE         -> card.type = buf.getInt();
+            case QUERY_LEVEL        -> card.level = buf.getInt();
+            case QUERY_RANK         -> card.rank = buf.getInt();
+            case QUERY_ATTRIBUTE    -> card.attribute = buf.getInt();
+            case QUERY_RACE         -> card.race = buf.getLong();
+            case QUERY_ATTACK       -> card.attack = buf.getInt();
+            case QUERY_DEFENSE      -> card.defense = buf.getInt();
+            case QUERY_BASE_ATTACK  -> card.baseAttack = buf.getInt();
+            case QUERY_BASE_DEFENSE -> card.baseDefense = buf.getInt();
+            case QUERY_REASON       -> card.reason = buf.getInt();
+            case QUERY_STATUS       -> card.status = buf.getInt();
+            case QUERY_IS_PUBLIC    -> card.isPublic = buf.getInt() != 0;
+            case QUERY_LSCALE       -> card.lscale = buf.getInt();
+            case QUERY_RSCALE       -> card.rscale = buf.getInt();
+            case QUERY_COVER        -> card.cover = buf.getInt();
+            case QUERY_LINK -> {
+                card.linkRating = buf.getInt();
+                card.linkMarker = buf.getInt();
+            }
+            default -> {
+                // Skip unknown field data
+                if (dataSize > 0 && buf.remaining() >= dataSize) {
+                    buf.position(buf.position() + dataSize);
+                }
+            }
         }
     }
 

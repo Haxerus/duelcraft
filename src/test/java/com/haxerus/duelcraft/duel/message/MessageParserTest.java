@@ -536,6 +536,94 @@ class MessageParserTest {
         assertEquals(0, rps.player());
     }
 
+    // ---- State Update Messages ----
+
+    /**
+     * Build a query block for a card with the given code, attack, and defense.
+     * QueryParser reads fields in FLAG_ORDER sequentially. To reach ATTACK (index 8)
+     * and DEFENSE (index 9), we must include all preceding fields:
+     * CODE (int32), POSITION (int32), ALIAS (int32), TYPE (int32), LEVEL (int32),
+     * RANK (int32), ATTRIBUTE (int32), RACE (int64=8 bytes), ATTACK (int32), DEFENSE (int32).
+     */
+    static byte[] buildCardQueryBlock(int code, int attack, int defense) {
+        // Field sizes: each int32 field = 4 (header) + 4 (data) = 8 bytes total
+        //              RACE (int64) = 4 (header) + 8 (data) = 12 bytes total
+        // Fields: CODE, POSITION, ALIAS, TYPE, LEVEL, RANK, ATTRIBUTE, RACE, ATTACK, DEFENSE
+        // Total field bytes = 8*7 (int32 fields before RACE) + 12 (RACE) + 8 + 8 = 56 + 12 + 8 + 8 = ... let's compute:
+        // CODE(8) + POSITION(8) + ALIAS(8) + TYPE(8) + LEVEL(8) + RANK(8) + ATTRIBUTE(8) + RACE(12) + ATTACK(8) + DEFENSE(8) = 84
+        int totalDataBytes = 8 + 8 + 8 + 8 + 8 + 8 + 8 + 12 + 8 + 8; // = 84
+        ByteBuffer q = ByteBuffer.allocate(4 + totalDataBytes).order(ByteOrder.LITTLE_ENDIAN);
+        q.putInt(totalDataBytes); // total_size (excludes itself)
+        // QUERY_CODE
+        q.putInt(8); q.putInt(code);
+        // QUERY_POSITION
+        q.putInt(8); q.putInt(0);
+        // QUERY_ALIAS
+        q.putInt(8); q.putInt(0);
+        // QUERY_TYPE
+        q.putInt(8); q.putInt(0);
+        // QUERY_LEVEL
+        q.putInt(8); q.putInt(0);
+        // QUERY_RANK
+        q.putInt(8); q.putInt(0);
+        // QUERY_ATTRIBUTE
+        q.putInt(8); q.putInt(0);
+        // QUERY_RACE (int64, fieldSize = 4 + 8 = 12)
+        q.putInt(12); q.putLong(0L);
+        // QUERY_ATTACK
+        q.putInt(8); q.putInt(attack);
+        // QUERY_DEFENSE
+        q.putInt(8); q.putInt(defense);
+        return q.array();
+    }
+
+    @Test
+    void parseUpdateData_monsterZone() {
+        byte[] queryData = buildCardQueryBlock(89631139, 3000, 2500);
+
+        // Build MSG_UPDATE_DATA body: [u8 player][u8 location][queryData...]
+        ByteBuffer b = body(2 + queryData.length);
+        b.put((byte) 0);             // player 0
+        b.put((byte) LOCATION_MZONE); // monster zone
+        b.put(queryData);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_UPDATE_DATA, b.array()));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.UpdateData.class, msgs.getFirst());
+        var update = (DuelMessage.UpdateData) msgs.getFirst();
+        assertEquals(0, update.player());
+        assertEquals(LOCATION_MZONE, update.location());
+        assertFalse(update.cards().isEmpty());
+
+        var card = update.cards().getFirst();
+        assertEquals(89631139, card.code);
+        assertEquals(3000, card.attack);
+        assertEquals(2500, card.defense);
+    }
+
+    @Test
+    void parseUpdateCard_single() {
+        byte[] queryData = buildCardQueryBlock(46986414, 2500, 2100);
+
+        // Build MSG_UPDATE_CARD body: [u8 player][u8 location][u8 sequence][queryData...]
+        ByteBuffer b = body(3 + queryData.length);
+        b.put((byte) 1);             // player 1
+        b.put((byte) LOCATION_MZONE); // monster zone
+        b.put((byte) 2);             // sequence 2
+        b.put(queryData);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_UPDATE_CARD, b.array()));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.UpdateCard.class, msgs.getFirst());
+        var update = (DuelMessage.UpdateCard) msgs.getFirst();
+        assertEquals(1, update.player());
+        assertEquals(LOCATION_MZONE, update.location());
+        assertEquals(2, update.sequence());
+        assertEquals(46986414, update.card().code);
+        assertEquals(2500, update.card().attack);
+        assertEquals(2100, update.card().defense);
+    }
+
     // ---- Misc ----
 
     @Test

@@ -116,6 +116,27 @@ public class MessageParser {
                 case MSG_TOSS_COIN     -> parseTossCoin(reader);
                 case MSG_TOSS_DICE     -> parseTossDice(reader);
 
+                // State updates
+                case MSG_UPDATE_DATA -> {
+                    int player = reader.readUint8();
+                    int location = reader.readUint8();
+                    int queryLen = bodyLength - 2;
+                    byte[] queryData = new byte[queryLen];
+                    for (int i = 0; i < queryLen; i++) queryData[i] = (byte) reader.readUint8();
+                    yield new DuelMessage.UpdateData(player, location, QueryParser.parseLocation(queryData));
+                }
+                case MSG_UPDATE_CARD -> {
+                    int player = reader.readUint8();
+                    int location = reader.readUint8();
+                    int sequence = reader.readUint8();
+                    int queryLen = bodyLength - 3;
+                    byte[] queryData = new byte[queryLen];
+                    for (int i = 0; i < queryLen; i++) queryData[i] = (byte) reader.readUint8();
+                    var card = QueryParser.parseSingle(queryData);
+                    yield new DuelMessage.UpdateCard(player, location, sequence,
+                            card != null ? card : new QueriedCard());
+                }
+
                 // Fallback
                 default -> {
                     byte[] body = new byte[bodyLength];

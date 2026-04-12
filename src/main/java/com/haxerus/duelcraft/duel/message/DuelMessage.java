@@ -34,6 +34,14 @@ public sealed interface DuelMessage {
         public int type() { return MSG_WIN; }
     }
 
+    record UpdateData(int player, int location, List<QueriedCard> cards) implements DuelMessage {
+        public int type() { return MSG_UPDATE_DATA; }
+    }
+
+    record UpdateCard(int player, int location, int sequence, QueriedCard card) implements DuelMessage {
+        public int type() { return MSG_UPDATE_CARD; }
+    }
+
     record NewTurn(int player) implements DuelMessage {
         public int type() { return MSG_NEW_TURN; }
     }
