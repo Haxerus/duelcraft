@@ -278,8 +278,9 @@ public sealed interface DuelMessage {
         public int type() { return MSG_SELECT_COUNTER; }
     }
 
-    record SelectSum(int player, boolean mustExact, int totalSum,
-                     int min, int max, byte[] rawBody) implements DuelMessage {
+    record SelectSum(int player, boolean selectMode, int targetSum,
+                     int min, int max, List<SumCard> mustSelect,
+                     List<SumCard> selectable) implements DuelMessage {
         public int type() { return MSG_SELECT_SUM; }
     }
 
@@ -380,6 +381,20 @@ public sealed interface DuelMessage {
                 reader.readInt32()
             );
         }
+    }
+
+    record SumCard(int code, int controller, int location, int sequence, long opParam) {
+        public static SumCard read(BufferReader reader) {
+            return new SumCard(
+                reader.readInt32(),
+                reader.readUint8(),
+                reader.readUint8(),
+                reader.readInt32(),
+                reader.readInt64()
+            );
+        }
+        public int value1() { return (int)(opParam & 0xFFFF); }
+        public int value2() { return (int)((opParam >> 16) & 0xFFFF); }
     }
 
     /** Card entry in tribute selection: code + con + loc + seq(uint32) + tributeCount(uint8). */
