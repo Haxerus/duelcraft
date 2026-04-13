@@ -79,6 +79,7 @@ public class MessageParser {
 
                 // UI/Info
                 case MSG_HINT          -> parseHint(reader);
+                case MSG_PLAYER_HINT   -> parseHint(reader);
                 case MSG_CARD_HINT     -> parseCardHint(reader);
                 case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(reader.readInt32());
                 case MSG_BECOME_TARGET -> parseBecomeTarget(reader);
