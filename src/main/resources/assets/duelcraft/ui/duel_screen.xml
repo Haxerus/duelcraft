@@ -249,6 +249,10 @@
         transform: rotate(90);
         }
 
+        #opponent-side .defense {
+        transform: rotate(270);
+        }
+
         /* ── Hand Row ── */
         #player-hand .card.__hovered__ {
         transform: scale(1.05);
