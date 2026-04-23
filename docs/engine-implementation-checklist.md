@@ -11,14 +11,14 @@ Generated 2026-04-11.
 
 ### Tier 1 — Will cause wrong game state or broken gameplay
 
-- [ ] **MSG_UPDATE_DATA (6)** — Bulk card stat updates after effects resolve. Without this, the client never learns about modified ATK/DEF, counters, type changes, or any stat modifications. **Most important missing message.**
-- [ ] **MSG_UPDATE_CARD (7)** — Single card stat update. Same issue as UPDATE_DATA but for individual cards.
-- [ ] **MSG_SELECT_SUM (23)** — No UI. Blocks Synchro/Ritual/XYZ material selection by level sum. Currently stored as raw bytes, needs full parsing + UI.
-- [ ] **MSG_SELECT_UNSELECT_CARD (26)** — No UI. Used for material selection in many summoning procedures. Needs select/deselect toggle with "finish" button.
-- [ ] **MSG_CONFIRM_DECKTOP (30)** — Not parsed. Player cannot see revealed deck cards (Pot of Duality, Sylvan effects, etc.).
-- [ ] **MSG_CONFIRM_CARDS (31)** — Not parsed. Player cannot see confirmed/revealed cards.
-- [ ] **MSG_SWAP_GRAVE_DECK (35)** — Not parsed. Client state becomes completely wrong when GY and deck are exchanged (Exchange of the Spirit).
-- [ ] **MSG_HAND_RES (133)** — Not parsed. RPS result never shown; players don't know who won.
+- [x] **MSG_UPDATE_DATA (6)** — Server queries engine per-slot via nDuelQuery, forwards UpdateData to client. Live ATK/DEF/Level/Rank on field.
+- [x] **MSG_UPDATE_CARD (7)** — Same pipeline, single card variant.
+- [x] **MSG_SELECT_SUM (23)** — Full parsing with SumCard/opParam. Prompt UI with running sum display and local toggle. Confirm when target reached.
+- [x] **MSG_SELECT_UNSELECT_CARD (26)** — Per-click prompt UI with immediate engine responses. Finish/cancel buttons. Field and overlay selection.
+- [x] **MSG_CONFIRM_DECKTOP (30)** — Parsed. Auto-opens zone inspector showing revealed cards.
+- [x] **MSG_CONFIRM_CARDS (31)** — Parsed. Auto-opens zone inspector showing confirmed cards.
+- [ ] **MSG_SWAP_GRAVE_DECK (35)** — Not parsed. Requires deck card tracking (deferred).
+- [x] **MSG_HAND_RES (133)** — Parsed. Display ready, awaiting lobby-level RPS flow.
 
 ### Tier 2 — Missing UI for uncommon but real prompts
 
@@ -76,11 +76,11 @@ SelectIdleCmd, SelectBattleCmd, SelectEffectYn, SelectYesNo, SelectOption, Selec
 
 ### Critical — Needed for basic playability
 
-- [ ] **Card data/name display** — Players see raw card codes (e.g., `46986421`) instead of names everywhere. The C++ bridge loads the card DB but exposes no query path to Java/client. **Single most impactful improvement** — unlocks card names in prompts, hover info, duel log, on-field stats. Options: (a) JNI method to query card data by code, (b) separate read-only SQLite on Java side.
-- [ ] **Card images** — No card artwork. Cards are colored rectangles with code numbers. Needs image loading system (local files by card code, potentially download from configurable URLs).
-- [ ] **Card tooltip with real data** — The card info banner UI shell exists (card-info-banner in XML) but `showCardInfo()` only shows `"Card #" + code`. Depends on card data system above.
-- [ ] **On-field ATK/DEF display** — Players can't see monster stats for combat decisions. edopro shows current ATK/DEF color-coded (green=buffed, red=debuffed). Depends on MSG_UPDATE_DATA parsing + card query pipeline.
-- [ ] **Card query pipeline to client** — JNI query infrastructure exists and works (DuelSession.query/queryLocation/queryField, QueryParser, 123 tests pass). But queries are never sent to the client. Server needs to forward query results after effects resolve.
+- [x] **Card data/name display** — Players see raw card codes (e.g., `46986421`) instead of names everywhere. The C++ bridge loads the card DB but exposes no query path to Java/client. **Single most impactful improvement** — unlocks card names in prompts, hover info, duel log, on-field stats. Options: (a) JNI method to query card data by code, (b) separate read-only SQLite on Java side.
+- [x] **Card images** — No card artwork. Cards are colored rectangles with code numbers. Needs image loading system (local files by card code, potentially download from configurable URLs).
+- [x] **Card tooltip with real data** — The card info banner UI shell exists (card-info-banner in XML) but `showCardInfo()` only shows `"Card #" + code`. Depends on card data system above.
+- [x] **On-field ATK/DEF display** — Players can't see monster stats for combat decisions. edopro shows current ATK/DEF color-coded (green=buffed, red=debuffed). Depends on MSG_UPDATE_DATA parsing + card query pipeline.
+- [x] **Card query pipeline to client** — JNI query infrastructure exists and works (DuelSession.query/queryLocation/queryField, QueryParser, 123 tests pass). But queries are never sent to the client. Server needs to forward query results after effects resolve.
 
 ### Important — Expected by players
 
@@ -93,7 +93,7 @@ SelectIdleCmd, SelectBattleCmd, SelectEffectYn, SelectYesNo, SelectOption, Selec
 
 ### Nice-to-have — Polish
 
-- [ ] **LP change animation** — LP values snap instantly. edopro animates over 10 frames with floating damage text.
+- [x] **LP change animation** — LP values snap instantly. edopro animates over 10 frames with floating damage text.
 - [ ] **Replay system** — No recording or playback. edopro saves replays with full packet stream.
 - [ ] **Spectator mode** — No way for other players to watch a duel. edopro has full observer support.
 - [ ] **Match mode (best-of-3)** — Only single duels. edopro supports matches with side decking between games.
