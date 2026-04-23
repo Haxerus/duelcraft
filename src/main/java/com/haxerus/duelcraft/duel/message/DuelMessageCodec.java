@@ -131,6 +131,10 @@ public class DuelMessageCodec {
             case DuelMessage.ShuffleExtra m -> buf.writeByte(m.player());
             case DuelMessage.ConfirmDeckTop m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
             case DuelMessage.ConfirmCards m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
+            case DuelMessage.CardSelected m -> {
+                buf.writeInt(m.cards().size());
+                for (var loc : m.cards()) writeLocInfo(buf, loc);
+            }
 
             // UI/Info
             case DuelMessage.Hint m -> { buf.writeByte(m.hintType()); buf.writeByte(m.player()); buf.writeLong(m.data()); }
@@ -306,6 +310,12 @@ public class DuelMessageCodec {
             case MSG_SHUFFLE_EXTRA -> new DuelMessage.ShuffleExtra(buf.readByte());
             case MSG_CONFIRM_DECKTOP -> new DuelMessage.ConfirmDeckTop(buf.readByte(), readConfirmCardList(buf));
             case MSG_CONFIRM_CARDS -> new DuelMessage.ConfirmCards(buf.readByte(), readConfirmCardList(buf));
+            case MSG_CARD_SELECTED -> {
+                int count = buf.readInt();
+                var list = new java.util.ArrayList<LocInfo>(count);
+                for (int i = 0; i < count; i++) list.add(readLocInfo(buf));
+                yield new DuelMessage.CardSelected(list);
+            }
 
             // UI/Info
             case MSG_HINT -> new DuelMessage.Hint(buf.readByte(), buf.readByte(), buf.readLong());

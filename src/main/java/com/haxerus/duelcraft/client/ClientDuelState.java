@@ -86,12 +86,12 @@ public class ClientDuelState {
     public final int[][] mzonePos = new int[2][7];
 
     // Spell/Trap zones: [player][0-4 = S/T, 5 = field zone] — card code, 0 = empty
-    public final int[][] szone = new int[2][6];
-    public final int[][] szonePos = new int[2][6];
+    public final int[][] szone = new int[2][8];     // 0-4: S/T, 5: field spell, 6-7: pendulum zones
+    public final int[][] szonePos = new int[2][8];
 
     // Per-zone card stats (updated by MSG_UPDATE_DATA/CARD)
     public final QueriedCard[][] mzoneStats = new QueriedCard[2][7];
-    public final QueriedCard[][] szoneStats = new QueriedCard[2][6];
+    public final QueriedCard[][] szoneStats = new QueriedCard[2][8];
 
     // Deck — count only (face-down, not browsable)
     public final int[] deckCount = new int[2];
@@ -373,7 +373,17 @@ public class ClientDuelState {
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.debug("[State] Prompt: SelectBattleCmd player={}, actions={}", sel.player(), cardActions.size());
             }
-            case DuelMessage.SelectCard sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCard player={}, min={}, max={}, cards={}", sel.player(), sel.min(), sel.max(), sel.cards().stream().map(c -> String.valueOf(c.code())).toList()); }
+            case DuelMessage.SelectCard sel -> {
+                pendingPrompt = msg;
+                dirtyFlags.add(DirtyFlag.PROMPT);
+                LOGGER.info("[State] Prompt: SelectCard player={}, min={}, max={}, cards={}",
+                        sel.player(), sel.min(), sel.max(), sel.cards().size());
+                for (var c : sel.cards()) {
+                    LOGGER.info("[State]   card: code={} ctrl={} loc=0x{} seq={} pos=0x{}",
+                            c.code(), c.controller(), Integer.toHexString(c.location()),
+                            c.sequence(), Integer.toHexString(c.position()));
+                }
+            }
             case DuelMessage.SelectChain sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
             case DuelMessage.SelectEffectYn sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
             case DuelMessage.SelectYesNo sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
@@ -383,7 +393,21 @@ public class ClientDuelState {
             case DuelMessage.SelectTribute sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
             case DuelMessage.SelectCounter sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }
             case DuelMessage.SelectSum sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectSum player={}", sel.player()); }
-            case DuelMessage.SelectUnselectCard sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectUnselectCard player={}", sel.player()); }
+            case DuelMessage.SelectUnselectCard sel -> {
+                pendingPrompt = msg;
+                dirtyFlags.add(DirtyFlag.PROMPT);
+                LOGGER.info("[State] Prompt: SelectUnselectCard player={} hint=0x{} selectable={} alreadySelected={}",
+                        sel.player(), Integer.toHexString(lastHintType),
+                        sel.selectableCards().size(), sel.unselectableCards().size());
+                for (var c : sel.selectableCards()) {
+                    LOGGER.info("[State]   selectable: code={} ctrl={} loc=0x{} seq={}",
+                            c.code(), c.controller(), Integer.toHexString(c.location()), c.sequence());
+                }
+                for (var c : sel.unselectableCards()) {
+                    LOGGER.info("[State]   alreadySelected: code={} ctrl={} loc=0x{} seq={}",
+                            c.code(), c.controller(), Integer.toHexString(c.location()), c.sequence());
+                }
+            }
             case DuelMessage.SortCard sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortCard player={}", sel.player()); }
             case DuelMessage.SortChain sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortChain player={}", sel.player()); }
             case DuelMessage.AnnounceRace sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceRace player={}", sel.player()); }
@@ -404,6 +428,15 @@ public class ClientDuelState {
                 confirmCards = confirm.cards();
                 dirtyFlags.add(DirtyFlag.CONFIRM);
                 LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());
+            }
+            case DuelMessage.CardSelected sel -> {
+                // Informational: engine reporting which cards were just selected
+                LOGGER.info("[State] CardSelected: count={}", sel.cards().size());
+                for (var loc : sel.cards()) {
+                    LOGGER.info("[State]   selected: ctrl={} loc=0x{} seq={} pos=0x{}",
+                            loc.controller(), Integer.toHexString(loc.location()),
+                            loc.sequence(), Integer.toHexString(loc.position()));
+                }
             }
             case DuelMessage.HandResult res -> {
                 rpsHand0 = res.hand0();

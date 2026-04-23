@@ -193,6 +193,11 @@ public sealed interface DuelMessage {
         public int type() { return MSG_CONFIRM_CARDS; }
     }
 
+    /** Informational: "the engine just selected these cards" — no action required. */
+    record CardSelected(List<LocInfo> cards) implements DuelMessage {
+        public int type() { return MSG_CARD_SELECTED; }
+    }
+
     // ---- UI / Info ----
 
     record Hint(int hintType, int player, long data) implements DuelMessage {

@@ -55,8 +55,18 @@ bool CardDatabase::loadFromFile(const std::string& path) {
         entry.attribute = static_cast<uint32_t>(sqlite3_column_int64(stmt, 5));
         entry.race      = static_cast<uint64_t>(sqlite3_column_int64(stmt, 6));
         entry.attack    = static_cast<int32_t>(sqlite3_column_int(stmt, 7));
-        entry.defense   = static_cast<int32_t>(sqlite3_column_int(stmt, 8));
-        entry.link_marker = 0; // not stored in standard datas table
+
+        // For Link monsters, the 'def' column encodes link markers instead of DEF
+        // (Link monsters have no DEF in the game rules)
+        static constexpr uint32_t TYPE_LINK = 0x4000000;
+        int32_t defRaw = sqlite3_column_int(stmt, 8);
+        if (entry.type & TYPE_LINK) {
+            entry.defense     = 0;
+            entry.link_marker = static_cast<uint32_t>(defRaw);
+        } else {
+            entry.defense     = defRaw;
+            entry.link_marker = 0;
+        }
 
         cards_[entry.code] = std::move(entry);
     }

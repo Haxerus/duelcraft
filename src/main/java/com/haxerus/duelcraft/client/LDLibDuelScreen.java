@@ -1064,7 +1064,22 @@ public class LDLibDuelScreen {
             for (int i = 0; i < 5; i++) {
                 var slot = spellSlots[player][i];
                 if (slot == null) continue;
-                refreshZoneSlot(slot, state.szone[player][i], state.szonePos[player][i], player, LOCATION_SZONE, i);
+
+                int code = state.szone[player][i];
+                int pos = state.szonePos[player][i];
+
+                // Pendulum zones (seq 6/7) share physical space with S/T 0 and 4
+                if (i == 0 && code == 0 && pos == 0) {
+                    code = state.szone[player][6];
+                    pos = state.szonePos[player][6];
+                    refreshZoneSlot(slot, code, pos, player, LOCATION_SZONE, code != 0 || pos != 0 ? 6 : 0);
+                } else if (i == 4 && code == 0 && pos == 0) {
+                    code = state.szone[player][7];
+                    pos = state.szonePos[player][7];
+                    refreshZoneSlot(slot, code, pos, player, LOCATION_SZONE, code != 0 || pos != 0 ? 7 : 4);
+                } else {
+                    refreshZoneSlot(slot, code, pos, player, LOCATION_SZONE, i);
+                }
             }
 
             if (fieldSpellSlots[player] != null) {
@@ -1479,8 +1494,31 @@ public class LDLibDuelScreen {
                                 e -> onCardClicked(player, LOCATION_MZONE, seq, e));
                     }
                     if (spellSlots[p][i] != null) {
-                        spellSlots[p][i].addEventListener(UIEvents.CLICK,
-                                e -> onCardClicked(player, LOCATION_SZONE, seq, e));
+                        // S/T 0 and 4 share physical space with pendulum zones (seq 6/7).
+                        // Send the pendulum seq only when a pendulum card is actually there;
+                        // otherwise use the base S/T seq (needed for SelectPlace).
+                        if (seq == 0) {
+                            spellSlots[p][i].addEventListener(UIEvents.CLICK, e -> {
+                                if (state.szone[player][0] != 0 || state.szonePos[player][0] != 0)
+                                    onCardClicked(player, LOCATION_SZONE, 0, e);
+                                else if (state.szone[player][6] != 0 || state.szonePos[player][6] != 0)
+                                    onCardClicked(player, LOCATION_SZONE, 6, e);
+                                else
+                                    onCardClicked(player, LOCATION_SZONE, 0, e);
+                            });
+                        } else if (seq == 4) {
+                            spellSlots[p][i].addEventListener(UIEvents.CLICK, e -> {
+                                if (state.szone[player][4] != 0 || state.szonePos[player][4] != 0)
+                                    onCardClicked(player, LOCATION_SZONE, 4, e);
+                                else if (state.szone[player][7] != 0 || state.szonePos[player][7] != 0)
+                                    onCardClicked(player, LOCATION_SZONE, 7, e);
+                                else
+                                    onCardClicked(player, LOCATION_SZONE, 4, e);
+                            });
+                        } else {
+                            spellSlots[p][i].addEventListener(UIEvents.CLICK,
+                                    e -> onCardClicked(player, LOCATION_SZONE, seq, e));
+                        }
                     }
                 }
 
@@ -1682,7 +1720,10 @@ public class LDLibDuelScreen {
                 }
                 case LOCATION_SZONE -> {
                     if (loc.sequence() < 5) yield spellSlots[p][loc.sequence()];
-                    else yield fieldSpellSlots[p];
+                    else if (loc.sequence() == 5) yield fieldSpellSlots[p];
+                    else if (loc.sequence() == 6) yield spellSlots[p][0]; // pendulum left shares S/T 0
+                    else if (loc.sequence() == 7) yield spellSlots[p][4]; // pendulum right shares S/T 4
+                    else yield null;
                 }
                 case LOCATION_EXTRA -> extraSlots[p];
                 case LOCATION_GRAVE -> graveSlots[p];

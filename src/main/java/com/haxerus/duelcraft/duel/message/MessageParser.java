@@ -99,6 +99,7 @@ public class MessageParser {
                 case MSG_SELECT_COUNTER   -> parseSelectCounter(reader);
                 case MSG_SELECT_SUM       -> parseSelectSum(reader, bodyLength);
                 case MSG_SELECT_UNSELECT_CARD -> parseSelectUnselectCard(reader);
+                case MSG_CARD_SELECTED -> parseCardSelected(reader);
                 case MSG_SORT_CARD        -> parseSortCard(reader);
                 case MSG_SORT_CHAIN       -> parseSortChain(reader);
                 case MSG_ANNOUNCE_RACE    -> parseAnnounceRace(reader);
@@ -437,6 +438,15 @@ public class MessageParser {
             cards.add(DuelMessage.CardInfo.read(r));
         }
         return new DuelMessage.SelectCard(player, cancelable, min, max, cards);
+    }
+
+    private static DuelMessage.CardSelected parseCardSelected(BufferReader r) {
+        int count = r.readInt32();
+        List<LocInfo> cards = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            cards.add(LocInfo.read(r));
+        }
+        return new DuelMessage.CardSelected(cards);
     }
 
     private static DuelMessage.SelectChain parseSelectChain(BufferReader r) {
