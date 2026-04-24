@@ -145,8 +145,7 @@ public class LDLibDuelScreen {
         private final UIElement cardInfoBanner;
         private final ZoneInspectorController zoneInspector;
         private final PromptController prompt;
-        // Context menu (cursor-anchored action icons)
-        private final UIElement contextMenu;
+        private final ClickDispatcher clicks;
 
         // Card image async retry — shared between field, prompts, and the info banner
         private final Map<UIElement, Integer> pendingCardImages = new LinkedHashMap<>();
@@ -238,7 +237,8 @@ public class LDLibDuelScreen {
                     return UIRefresher.this.cardDisplayName(code);
                 }
             });
-            contextMenu = byId("context-menu");
+            clicks = new ClickDispatcher(ui, state, field, prompt,
+                    response -> LDLibDuelScreen.sendResponse(state, response));
 
             // ── Bind reactive data ──
             bindReactiveData();
@@ -249,6 +249,7 @@ public class LDLibDuelScreen {
             wirePhaseButtons();
             field.wireFieldClicks();
             zoneInspector.wirePileClicks();
+            clicks.wireOutsideDismiss();
 
             // Refresh hand/field when card images finish downloading
             CardImageManager images = DuelcraftClient.getCardImageManager();
@@ -258,16 +259,6 @@ public class LDLibDuelScreen {
                     retryPendingCardImages();
                 });
             }
-
-            // Dismiss context menu when clicking outside it
-            ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
-                if (contextMenu != null && !contextMenu.hasClass("hidden")) {
-                    // Check if the click target is inside the context menu
-                    if (!contextMenu.isAncestorOf(e.target)) {
-                        hideContextMenu();
-                    }
-                }
-            });
 
             // Right-click to cancel/finish field selection
             ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
@@ -518,46 +509,14 @@ public class LDLibDuelScreen {
         // ── Called after a response is sent ──
 
         void onResponseSent() {
-            hideContextMenu();
+            clicks.hideContextMenu();
             prompt.onResponseSent();
             updatePhaseButtons();
         }
 
-        // ── Handlers ──
+        // Exposed so FieldRenderer/ZoneInspectorController callbacks can forward here.
         private void onCardClicked(int player, int location, int sequence, UIEvent event) {
-            var loc = new ClientDuelState.CardLocation(player, location, sequence);
-            var actions = state.cardActions.get(loc);
-
-            // Only show context menu during idle/battle command (not during sub-prompts like SelectPlace)
-            if (actions != null && !actions.isEmpty()
-                    && (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd
-                        || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) {
-                event.stopPropagation();
-                showContextMenu(actions, event.x, event.y);
-                return;
-            }
-
-            // No actions — dismiss context menu if open
-            hideContextMenu();
-
-            // SelectPlace is the only prompt PromptController doesn't handle
-            // (it's a pure field-bitmask check, moves along in Phase 4).
-            if (state.pendingPrompt instanceof DuelMessage.SelectPlace) {
-                handlePlaceSelection(player, location, sequence);
-                return;
-            }
-            prompt.handleFieldClick(player, location, sequence);
-        }
-
-        private void handlePlaceSelection(int player, int location, int sequence) {
-            if (!(state.pendingPrompt instanceof DuelMessage.SelectPlace sel)) return;
-            if (location != LOCATION_MZONE && location != LOCATION_SZONE) return;
-
-            int bit = field.getFieldBit(player, location, sequence);
-            if ((sel.field() & bit) != 0) return; // zone is blocked
-
-            LDLibDuelScreen.sendResponse(state,
-                    ResponseBuilder.selectPlace(player, location, sequence));
+            clicks.onCardClicked(player, location, sequence, event);
         }
 
         // ── Helpers ──
@@ -670,75 +629,5 @@ public class LDLibDuelScreen {
             return null;
         }
 
-        private record ActionIconInfo(String color, String tooltip) {}
-
-        private ActionIconInfo getActionIconInfo(int actionType, boolean isBattleCmd) {
-            if (isBattleCmd) {
-                return switch (actionType) {
-                    case 1 -> new ActionIconInfo("#FF4444", "Attack");
-                    case 2 -> new ActionIconInfo("#FF6644", "Activate");
-                    default -> new ActionIconInfo("#AAAAAA", "Action");
-                };
-            }
-            return switch (actionType) {
-                case 0 -> new ActionIconInfo("#FFCC00", "Summon");
-                case 1 -> new ActionIconInfo("#44CC44", "Special Summon");
-                case 2 -> new ActionIconInfo("#44AAFF", "Reposition");
-                case 3 -> new ActionIconInfo("#6688FF", "Set");
-                case 4 -> new ActionIconInfo("#8866FF", "Set S/T");
-                case 5 -> new ActionIconInfo("#FF6644", "Activate");
-                default -> new ActionIconInfo("#AAAAAA", "Action");
-            };
-        }
-
-        private void hideContextMenu() {
-            if (contextMenu != null) contextMenu.addClass("hidden");
-        }
-
-        private void showContextMenu(List<ClientDuelState.CardAction> actions, float mouseX, float mouseY) {
-            if (contextMenu == null) return;
-
-            contextMenu.clearAllChildren();
-
-            for (var action : actions) {
-                var icon = new UIElement();
-                icon.addClass("ctx-action");
-
-                var info = getActionIconInfo(action.actionType(), prompt.isBattleCmd());
-                icon.lss("background", "sdf(" + info.color() + ", 3, 2)");
-                icon.lss("tooltips", info.tooltip());
-
-                icon.addEventListener(UIEvents.CLICK, e -> {
-                    e.stopPropagation();
-                    LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(action.actionType(),
-                            action.listIndex()));
-                });
-
-                contextMenu.addChild(icon);
-            }
-
-            // Flip/nudge positioning
-            var root = ui.rootElement;
-            float rootW = root.getSizeWidth();
-            float rootH = root.getSizeHeight();
-            // Estimated menu size — must stay in sync with #context-menu and .ctx-action CSS:
-            //   width per icon = 14 (.ctx-action width) + 1 (gap-all) = 15
-            //   total padding = 1 (padding-all) * 2 sides = 2
-            //   height = 14 (.ctx-action height) + 2 (padding-all * 2) = 16
-            float menuW = actions.size() * 15f + 2f;
-            float menuH = 16f;
-
-            float x = mouseX;
-            float y = mouseY;
-            if (x + menuW > rootW) x = mouseX - menuW;
-            if (y + menuH > rootH) y = mouseY - menuH;
-            // Clamp to not go negative
-            if (x < 0) x = 0;
-            if (y < 0) y = 0;
-
-            contextMenu.lss("left", String.valueOf((int) x));
-            contextMenu.lss("top", String.valueOf((int) y));
-            contextMenu.removeClass("hidden");
-        }
     }
 }
