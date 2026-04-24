@@ -152,11 +152,7 @@ public class LDLibDuelScreen {
 
         // Overlays
         private final UIElement cardInfoBanner;
-        private final UIElement zoneInspector;
-        // Zone inspector target — refresh these when the underlying pile changes
-        private int inspectedPlayer = -1;
-        private int inspectedLocation = -1;
-        private String inspectedTitle;
+        private final ZoneInspectorController zoneInspector;
         private final UIElement promptOverlay;
         private final UIElement promptTitle;
         private final UIElement promptBody;
@@ -228,7 +224,20 @@ public class LDLibDuelScreen {
 
             // ── Overlays ──
             cardInfoBanner = byId("card-info-banner");
-            zoneInspector = byId("zone-inspector");
+            zoneInspector = new ZoneInspectorController(ui, state, new ZoneInspectorController.Callbacks() {
+                @Override public void setCardImageBackground(UIElement elem, int code) {
+                    UIRefresher.this.setCardImageBackground(elem, code);
+                }
+                @Override public void onCardClicked(int player, int location, int sequence, UIEvent event) {
+                    UIRefresher.this.onCardClicked(player, location, sequence, event);
+                }
+                @Override public void showCardInfo(int code) {
+                    UIRefresher.this.showCardInfo(code);
+                }
+                @Override public void hideCardInfo() {
+                    UIRefresher.this.hideCardInfo();
+                }
+            });
             promptOverlay = byId("prompt-overlay");
             promptTitle = byId("prompt-title");
             promptBody = byId("prompt-body");
@@ -243,7 +252,7 @@ public class LDLibDuelScreen {
 
             wirePhaseButtons();
             handleZoneClicks();
-            handlePileClicks();
+            zoneInspector.wirePileClicks();
 
             // Refresh hand/field when card images finish downloading
             CardImageManager images = DuelcraftClient.getCardImageManager();
@@ -378,7 +387,7 @@ public class LDLibDuelScreen {
 
             if (flags.contains(DirtyFlag.PILE_COUNTS)) {
                 refreshPiles();
-                refreshZoneInspector();
+                zoneInspector.refresh();
             }
 
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
@@ -395,7 +404,7 @@ public class LDLibDuelScreen {
             if (flags.contains(DirtyFlag.WINNER))
                 showWinOverlay();
             if (flags.contains(DirtyFlag.CONFIRM))
-                showConfirmCards();
+                zoneInspector.showConfirmCards();
         }
 
         // ── Rebuilders ──
@@ -1326,34 +1335,6 @@ public class LDLibDuelScreen {
             }
         }
 
-        private void showConfirmCards() {
-            if (state.confirmCards == null || state.confirmCards.isEmpty()) return;
-            if (zoneInspector == null) return;
-
-            zoneInspector.removeClass("hidden");
-            var titleLabel = byId("zone-inspector-title");
-            var zoneInspectorList = byId("zone-inspector-list", ScrollerView.class);
-            if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(state.confirmTitle));
-
-            if (zoneInspectorList != null) {
-                zoneInspectorList.clearAllScrollViewChildren();
-                for (var confirmCard : state.confirmCards) {
-                    int code = confirmCard.code();
-
-                    var card = new UIElement();
-                    card.addClass("card");
-                    setCardImageBackground(card, code);
-
-                    card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
-                    card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
-
-                    zoneInspectorList.addScrollViewChild(card);
-                }
-            }
-
-            state.confirmCards = null;
-        }
-
         private static String rpsName(int hand) {
             return switch (hand) {
                 case 1 -> "Rock";
@@ -1606,82 +1587,6 @@ public class LDLibDuelScreen {
                         }
                     });
                 }
-            }
-        }
-
-        private void handlePileClicks() {
-            handlePileClick("plr-graveyard", "Your Graveyard", state.localPlayer, LOCATION_GRAVE);
-            handlePileClick("opp-graveyard", "Opponent's Graveyard", state.opponent(), LOCATION_GRAVE);
-            handlePileClick("plr-banished", "Your Banished", state.localPlayer, LOCATION_REMOVED);
-            handlePileClick("opp-banished", "Opponent's Banished", state.opponent(), LOCATION_REMOVED);
-            handlePileClick("plr-extra-deck", "Your Extra Deck", state.localPlayer, LOCATION_EXTRA);
-
-            var closeBtn = byId("zone-inspector-close");
-            if (closeBtn instanceof Button btn) {
-                btn.setOnClick(e -> {
-                    zoneInspector.addClass("hidden");
-                    inspectedPlayer = -1;
-                    inspectedLocation = -1;
-                    inspectedTitle = null;
-                });
-            }
-        }
-
-        private List<Integer> getPileCards(int player, int location) {
-            return switch (location) {
-                case LOCATION_GRAVE -> state.grave[player];
-                case LOCATION_REMOVED -> state.banished[player];
-                case LOCATION_EXTRA -> state.extra[player];
-                default -> List.of();
-            };
-        }
-
-        private void handlePileClick(String elementId, String title, int player, int location) {
-            var elem = byId(elementId);
-            if (elem != null) {
-                elem.addEventListener(UIEvents.CLICK, e -> openZoneInspector(player, location, title));
-            }
-        }
-
-        private void openZoneInspector(int player, int location, String title) {
-            inspectedPlayer = player;
-            inspectedLocation = location;
-            inspectedTitle = title;
-            zoneInspector.removeClass("hidden");
-            refreshZoneInspector();
-        }
-
-        /** Rebuild the zone inspector list from current state. Safe to call repeatedly. */
-        private void refreshZoneInspector() {
-            if (zoneInspector == null || zoneInspector.hasClass("hidden")) return;
-            if (inspectedPlayer < 0 || inspectedLocation < 0) return;
-
-            var titleLabel = byId("zone-inspector-title");
-            var zoneInspectorList = byId("zone-inspector-list", ScrollerView.class);
-            if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(inspectedTitle));
-            if (zoneInspectorList == null) return;
-
-            int player = inspectedPlayer;
-            int location = inspectedLocation;
-            List<Integer> cards = getPileCards(player, location);
-
-            zoneInspectorList.clearAllScrollViewChildren();
-            for (int i = 0; i < cards.size(); i++) {
-                int code = cards.get(i);
-                int seq = i;
-
-                var card = new UIElement();
-                card.addClass("card");
-                setCardImageBackground(card, code);
-
-                card.addEventListener(UIEvents.CLICK, ev -> {
-                    ev.stopPropagation();
-                    onCardClicked(player, location, seq, ev);
-                });
-                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
-                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
-
-                zoneInspectorList.addScrollViewChild(card);
             }
         }
 
