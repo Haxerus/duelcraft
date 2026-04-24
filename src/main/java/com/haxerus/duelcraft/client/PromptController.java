@@ -51,6 +51,8 @@ public class PromptController {
         void sendResponse(byte[] response);
         /** Resolve a card code to its display name (from the client's card DB). */
         String cardDisplayName(int code);
+        /** Resolve a ygopro-core description code to human-readable text. */
+        String resolveDesc(long desc);
     }
 
     private final UI ui;
@@ -112,12 +114,13 @@ public class PromptController {
             }
 
             case DuelMessage.SelectYesNo sel ->
-                buildYesNoPrompt("Yes or No? (desc=" + sel.desc() + ")");
+                buildYesNoPrompt(callbacks.resolveDesc(sel.desc()));
             case DuelMessage.SelectEffectYn sel ->
-                buildYesNoPrompt("Activate effect of " + callbacks.cardDisplayName(sel.code()) + "?");
+                buildYesNoPrompt(callbacks.resolveDesc(sel.desc())
+                        + "\n(" + callbacks.cardDisplayName(sel.code()) + ")");
 
             case DuelMessage.SelectOption sel -> buildOptionPrompt("Choose Option",
-                    sel.options().stream().map(String::valueOf).toList(),
+                    sel.options().stream().map(callbacks::resolveDesc).toList(),
                     i -> callbacks.sendResponse(ResponseBuilder.selectOption(i)));
             case DuelMessage.RockPaperScissors ignored -> buildOptionPrompt("Rock Paper Scissors",
                     List.of("Rock", "Paper", "Scissors"),

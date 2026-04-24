@@ -28,6 +28,7 @@ import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardImageManager;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
+import com.haxerus.duelcraft.client.carddata.OptionTextResolver;
 import org.slf4j.Logger;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -220,6 +221,9 @@ public class LDLibDuelScreen {
                     UIRefresher.this.hideCardInfo();
                 }
             });
+            var descResolver = new OptionTextResolver(
+                    DuelcraftClient.getCardDatabase(),
+                    DuelcraftClient.getSystemStringTable());
             prompt = new PromptController(ui, state, field, statusLabel, new PromptController.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
@@ -235,6 +239,9 @@ public class LDLibDuelScreen {
                 }
                 @Override public String cardDisplayName(int code) {
                     return UIRefresher.this.cardDisplayName(code);
+                }
+                @Override public String resolveDesc(long desc) {
+                    return descResolver.resolve(desc);
                 }
             });
             clicks = new ClickDispatcher(ui, state, field, prompt,

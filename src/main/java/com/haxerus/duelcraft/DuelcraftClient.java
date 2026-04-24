@@ -3,6 +3,7 @@ package com.haxerus.duelcraft;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardDatabaseDownloader;
 import com.haxerus.duelcraft.client.carddata.CardImageManager;
+import com.haxerus.duelcraft.client.carddata.SystemStringTable;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -20,6 +21,7 @@ public class DuelcraftClient {
 
     private static @Nullable CardDatabase cardDatabase;
     private static @Nullable CardImageManager cardImageManager;
+    private static @Nullable SystemStringTable systemStringTable;
 
     public DuelcraftClient(IEventBus modBus, ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -48,6 +50,10 @@ public class DuelcraftClient {
             cardImageManager = new CardImageManager(imageBaseUrl, imageDir);
             Duelcraft.LOGGER.info("Card image manager initialized");
 
+            // Load system/counter/victory/setname strings
+            String stringsUrl = Config.STRINGS_CONF_URL.get();
+            systemStringTable = new SystemStringTable(stringsUrl, cacheDir);
+
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 if (cardImageManager != null) cardImageManager.close();
                 if (cardDatabase != null) {
@@ -66,5 +72,9 @@ public class DuelcraftClient {
 
     public static @Nullable CardImageManager getCardImageManager() {
         return cardImageManager;
+    }
+
+    public static @Nullable SystemStringTable getSystemStringTable() {
+        return systemStringTable;
     }
 }
