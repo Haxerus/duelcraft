@@ -153,6 +153,10 @@ public class LDLibDuelScreen {
         // Overlays
         private final UIElement cardInfoBanner;
         private final UIElement zoneInspector;
+        // Zone inspector target — refresh these when the underlying pile changes
+        private int inspectedPlayer = -1;
+        private int inspectedLocation = -1;
+        private String inspectedTitle;
         private final UIElement promptOverlay;
         private final UIElement promptTitle;
         private final UIElement promptBody;
@@ -372,13 +376,19 @@ public class LDLibDuelScreen {
                     || flags.contains(DirtyFlag.MZONE_0) || flags.contains(DirtyFlag.MZONE_1))
                 refreshFieldStats();
 
-            if (flags.contains(DirtyFlag.PILE_COUNTS))
+            if (flags.contains(DirtyFlag.PILE_COUNTS)) {
                 refreshPiles();
+                refreshZoneInspector();
+            }
 
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
                 rebuildPrompt();
                 updatePhaseButtons();
             }
+
+            // Turn/phase change also affects button visibility (hide on opponent's turn)
+            if (flags.contains(DirtyFlag.TURN_PHASE))
+                updatePhaseButtons();
 
             if (flags.contains(DirtyFlag.CHAIN))
                 updateStatusLabel();
@@ -963,14 +973,12 @@ public class LDLibDuelScreen {
                 }
             }
 
-            // Extra Monster Zones: bit 5 = local player's seq 5, bit 6 = local player's seq 6
-            // Physical mapping: local player's seq 5 → emzSlots[localPlayer],
-            //                   local player's seq 6 → emzSlots[1-localPlayer]
-            int lp = state.localPlayer;
-            if ((field & (1 << 5)) == 0 && emzSlots[lp] != null)
-                emzSlots[lp].addClass("target");
-            if ((field & (1 << 6)) == 0 && emzSlots[1 - lp] != null)
-                emzSlots[1 - lp].addClass("target");
+            // Extra Monster Zones: bit 5 = asking player's seq 5 (their left EMZ → physical emz-left);
+            //                      bit 6 = asking player's seq 6 (their right EMZ → physical emz-right)
+            if ((field & (1 << 5)) == 0 && emzSlots[0] != null)
+                emzSlots[0].addClass("target");
+            if ((field & (1 << 6)) == 0 && emzSlots[1] != null)
+                emzSlots[1].addClass("target");
         }
 
         private void enterFieldSelectionMode(DuelMessage.SelectCard sel) {
@@ -1035,10 +1043,13 @@ public class LDLibDuelScreen {
                 refreshZoneSlot(slot, state.mzone[player][i], state.mzonePos[player][i], player, LOCATION_MZONE, i);
             }
 
-            // EMZ: each physical slot is shared — player 0 seq 5 <-> player 1 seq 6 (left),
-            //       player 1 seq 5 <-> player 0 seq 6 (right)
-            refreshEmzSlot(0, 0, 5, 1, 6);
-            refreshEmzSlot(1, 1, 5, 0, 6);
+            // EMZ: physical slots are relative to local player's view.
+            //   emz-left (slot 0):  my seq 5 shares physical space with opp seq 6
+            //   emz-right (slot 1): my seq 6 shares physical space with opp seq 5
+            int lp = state.localPlayer;
+            int opp = state.opponent();
+            refreshEmzSlot(0, lp, 5, opp, 6);
+            refreshEmzSlot(1, lp, 6, opp, 5);
         }
 
         /** Refresh a physical EMZ slot. It can be occupied by (p1,s1) or (p2,s2). */
@@ -1054,9 +1065,9 @@ public class LDLibDuelScreen {
         private void updateEmzStats(int slotIdx, int p1, int s1, int p2, int s2) {
             if (emzSlots[slotIdx] == null) return;
             if (state.mzone[p1][s1] != 0 || state.mzonePos[p1][s1] != 0) {
-                updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p1][s1], state.mzone[p1][s1]);
+                updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p1][s1], state.mzone[p1][s1], p1);
             } else {
-                updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p2][s2], state.mzone[p2][s2]);
+                updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p2][s2], state.mzone[p2][s2], p2);
             }
         }
 
@@ -1090,15 +1101,17 @@ public class LDLibDuelScreen {
         private void refreshFieldStats() {
             for (int p = 0; p < 2; p++) {
                 for (int i = 0; i < 5; i++) {
-                    updateMonsterStats(monsterSlots[p][i], state.mzoneStats[p][i], state.mzone[p][i]);
+                    updateMonsterStats(monsterSlots[p][i], state.mzoneStats[p][i], state.mzone[p][i], p);
                 }
             }
-            // EMZ slots — check both cross-mapped sources
-            updateEmzStats(0, 0, 5, 1, 6);
-            updateEmzStats(1, 1, 5, 0, 6);
+            // EMZ slots — check both cross-mapped sources, relative to local player
+            int lp = state.localPlayer;
+            int opp = state.opponent();
+            updateEmzStats(0, lp, 5, opp, 6);
+            updateEmzStats(1, lp, 6, opp, 5);
         }
 
-        private void updateMonsterStats(UIElement slot, QueriedCard stats, int code) {
+        private void updateMonsterStats(UIElement slot, QueriedCard stats, int code, int player) {
             if (slot == null) return;
 
             // Remove old stat labels
@@ -1115,17 +1128,24 @@ public class LDLibDuelScreen {
             // Only show stats for monsters (check if QUERY_ATTACK was present in the flags)
             if ((stats.flags & QUERY_ATTACK) == 0) return;
 
-            // ATK/DEF label at bottom
+            boolean isOpp = player != state.localPlayer;
+
+            CardDatabase db = DuelcraftClient.getCardDatabase();
+            CardInfo cardInfo = db != null ? db.getCard(code) : null;
+            boolean isLink = cardInfo != null && cardInfo.isLink();
+
+            // ATK/DEF label — bottom for own cards, top for opponent's (card visual is flipped 180°)
+            // Link monsters have no DEF, so show ATK only.
             var atkDefLabel = new Label();
             atkDefLabel.addClass("stat-atk-def");
+            if (isOpp) atkDefLabel.addClass("opp");
             String atkText = stats.attack == -2 ? "?" : String.valueOf(stats.attack);
-            String defText;
-            if (stats.linkRating > 0) {
-                defText = "L" + stats.linkRating;
+            if (isLink) {
+                atkDefLabel.setText(Component.literal(atkText));
             } else {
-                defText = stats.defense == -2 ? "?" : String.valueOf(stats.defense);
+                String defText = stats.defense == -2 ? "?" : String.valueOf(stats.defense);
+                atkDefLabel.setText(Component.literal(atkText + "/" + defText));
             }
-            atkDefLabel.setText(Component.literal(atkText + "/" + defText));
 
             // Color based on buff/debuff (ATK takes priority)
             if (stats.baseAttack > 0 && stats.attack != stats.baseAttack) {
@@ -1134,15 +1154,14 @@ public class LDLibDuelScreen {
             }
             slot.addChild(atkDefLabel);
 
-            // Level/Rank label at top-right — only if modified from original
-            CardDatabase db = DuelcraftClient.getCardDatabase();
-            CardInfo cardInfo = db != null ? db.getCard(code) : null;
+            // Level/Rank label — top-right for own cards, bottom-right for opponent's
             if (cardInfo != null && cardInfo.isMonster() && !cardInfo.isLink()) {
                 int originalLevel = cardInfo.levelOrRank();
                 int currentLevel = stats.rank > 0 ? stats.rank : stats.level;
                 if (currentLevel != originalLevel && currentLevel > 0) {
                     var levelLabel = new Label();
                     levelLabel.addClass("stat-level");
+                    if (isOpp) levelLabel.addClass("opp");
                     boolean isXyz = cardInfo.isXyz();
                     levelLabel.setText(Component.literal((isXyz ? "R" : "★") + currentLevel));
                     if (currentLevel > originalLevel) levelLabel.addClass("stat-buffed");
@@ -1190,6 +1209,12 @@ public class LDLibDuelScreen {
                     cardVisual.addClass("defense");
                 }
 
+                // EMZ slots live outside #opponent-side, so opponent's cards need manual 180° flip
+                if (locationType == LOCATION_MZONE && (sequence == 5 || sequence == 6)
+                        && player != state.localPlayer) {
+                    cardVisual.addClass("emz-opp");
+                }
+
                 slot.addChild(cardVisual);
 
                 slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
@@ -1200,13 +1225,51 @@ public class LDLibDuelScreen {
 
         private void refreshPiles() {
             for (int p = 0; p < 2; p++) {
-                // Deck & Extra: card back when non-empty
+                // Deck: always face-down card back when non-empty
                 setPileBackground(deckSlots[p], state.deckCount[p] > 0 ? CARD_BACK_SPRITE : null);
-                setPileBackground(extraSlots[p], !state.extra[p].isEmpty() ? CARD_BACK_SPRITE : null);
+
+                // Extra deck: show top face-up card if any (pendulum cards returning face-up),
+                //             otherwise card back when non-empty
+                refreshExtraDeckPile(p);
 
                 // Graveyard & Banished: top card image when non-empty
                 setPileTopCard(graveSlots[p], state.grave[p]);
                 setPileTopCard(banishedSlots[p], state.banished[p]);
+            }
+        }
+
+        private void refreshExtraDeckPile(int player) {
+            var slot = extraSlots[player];
+            if (slot == null) return;
+
+            if (state.extra[player].isEmpty()) {
+                setPileBackground(slot, null);
+                return;
+            }
+
+            // Find the top-most face-up card (iterate from end)
+            int topFaceUpCode = 0;
+            var codes = state.extra[player];
+            var positions = state.extraPos[player];
+            for (int i = codes.size() - 1; i >= 0; i--) {
+                int pos = i < positions.size() ? positions.get(i) : 0;
+                if ((pos & (POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE)) != 0) {
+                    topFaceUpCode = codes.get(i);
+                    break;
+                }
+            }
+
+            if (topFaceUpCode != 0) {
+                // Face-up card — use setCardImageBackground for async retry support
+                setCardImageBackground(slot, topFaceUpCode);
+                slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+                slot.addClass("has-card");
+            } else {
+                // All face-down: static card back, clear any pending image retry
+                slot.lss("background", CARD_BACK_SPRITE);
+                slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+                slot.addClass("has-card");
+                pendingCardImages.remove(slot);
             }
         }
 
@@ -1215,27 +1278,26 @@ public class LDLibDuelScreen {
             if (background != null) {
                 slot.lss("background", background);
                 slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+                slot.addClass("has-card");
             } else {
                 slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
                 slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
+                slot.removeClass("has-card");
             }
         }
 
         private void setPileTopCard(UIElement slot, List<Integer> cards) {
             if (slot == null) return;
             if (!cards.isEmpty()) {
-                int topCode = cards.getLast();
-                CardImageManager images = DuelcraftClient.getCardImageManager();
-                ResourceLocation loc = images != null ? images.getCardTexture(topCode) : null;
-                if (loc != null) {
-                    slot.lss("background", "sprite(" + loc + ")");
-                } else {
-                    slot.lss("background", CARD_BACK_SPRITE);
-                }
+                // Use setCardImageBackground so the pile is registered for async image retry
+                setCardImageBackground(slot, cards.getLast());
                 slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+                slot.addClass("has-card");
             } else {
                 slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
                 slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
+                slot.removeClass("has-card");
+                pendingCardImages.remove(slot);
             }
         }
 
@@ -1321,18 +1383,19 @@ public class LDLibDuelScreen {
         }
 
         private void updatePhaseButtons() {
-            if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle) {
+            boolean myTurn = state.isLocalTurn();
+            if (myTurn && state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle) {
                 setButtonActive(phaseBtnLeft, idle.canBattle(), "BP");
                 setButtonActive(phaseBtnCenter, false, "");
                 setButtonActive(phaseBtnRight, idle.canEnd(), "EP");
-            } else if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle) {
+            } else if (myTurn && state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle) {
                 setButtonActive(phaseBtnLeft, false, "");
                 setButtonActive(phaseBtnCenter, battle.canMain2(), "M2");
                 setButtonActive(phaseBtnRight, battle.canEnd(), "EP");
             } else {
-                setButtonActive(phaseBtnLeft, false, "SP");
-                setButtonActive(phaseBtnCenter, false, "BP");
-                setButtonActive(phaseBtnRight, false, "EP");
+                setButtonActive(phaseBtnLeft, false, "");
+                setButtonActive(phaseBtnCenter, false, "");
+                setButtonActive(phaseBtnRight, false, "");
             }
         }
 
@@ -1522,22 +1585,24 @@ public class LDLibDuelScreen {
                     }
                 }
 
-                // Extra Monster Zone — dynamically resolve occupant at click time
+                // Extra Monster Zone — dynamically resolve occupant at click time.
+                // Physical mapping is relative to the local player:
+                //   emz-left (slot 0):  local seq 5 shares physical space with opp seq 6
+                //   emz-right (slot 1): local seq 6 shares physical space with opp seq 5
                 int slotIdx = p;
                 if (emzSlots[p] != null) {
-                    // Physical left (idx 0): player 0 seq 5 or player 1 seq 6
-                    // Physical right (idx 1): player 1 seq 5 or player 0 seq 6
-                    int pri = slotIdx;       // primary player
-                    int alt = 1 - slotIdx;   // alternate player
                     emzSlots[p].addEventListener(UIEvents.CLICK, e -> {
-                        if (state.mzone[pri][5] != 0 || state.mzonePos[pri][5] != 0) {
-                            onCardClicked(pri, LOCATION_MZONE, 5, e);
-                        } else if (state.mzone[alt][6] != 0 || state.mzonePos[alt][6] != 0) {
-                            onCardClicked(alt, LOCATION_MZONE, 6, e);
+                        int lp = state.localPlayer;
+                        int opp = state.opponent();
+                        int mySeq = slotIdx == 0 ? 5 : 6;
+                        int oppSeq = slotIdx == 0 ? 6 : 5;
+                        if (state.mzone[lp][mySeq] != 0 || state.mzonePos[lp][mySeq] != 0) {
+                            onCardClicked(lp, LOCATION_MZONE, mySeq, e);
+                        } else if (state.mzone[opp][oppSeq] != 0 || state.mzonePos[opp][oppSeq] != 0) {
+                            onCardClicked(opp, LOCATION_MZONE, oppSeq, e);
                         } else {
                             // Empty — send local player's mapping for placement
-                            int lp = state.localPlayer;
-                            onCardClicked(lp, LOCATION_MZONE, lp == pri ? 5 : 6, e);
+                            onCardClicked(lp, LOCATION_MZONE, mySeq, e);
                         }
                     });
                 }
@@ -1553,7 +1618,12 @@ public class LDLibDuelScreen {
 
             var closeBtn = byId("zone-inspector-close");
             if (closeBtn instanceof Button btn) {
-                btn.setOnClick(e -> zoneInspector.addClass("hidden"));
+                btn.setOnClick(e -> {
+                    zoneInspector.addClass("hidden");
+                    inspectedPlayer = -1;
+                    inspectedLocation = -1;
+                    inspectedTitle = null;
+                });
             }
         }
 
@@ -1569,35 +1639,49 @@ public class LDLibDuelScreen {
         private void handlePileClick(String elementId, String title, int player, int location) {
             var elem = byId(elementId);
             if (elem != null) {
-                elem.addEventListener(UIEvents.CLICK, e -> {
-                   zoneInspector.removeClass("hidden");
-                   var titleLabel = byId("zone-inspector-title");
-                   var zoneInspectorList = byId("zone-inspector-list", ScrollerView.class);
-                   if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(title));
+                elem.addEventListener(UIEvents.CLICK, e -> openZoneInspector(player, location, title));
+            }
+        }
 
-                   if (zoneInspectorList != null) {
-                       List<Integer> cards = getPileCards(player, location);
+        private void openZoneInspector(int player, int location, String title) {
+            inspectedPlayer = player;
+            inspectedLocation = location;
+            inspectedTitle = title;
+            zoneInspector.removeClass("hidden");
+            refreshZoneInspector();
+        }
 
-                       zoneInspectorList.clearAllScrollViewChildren();
-                       for (int i = 0; i < cards.size(); i++) {
-                           int code = cards.get(i);
-                           int seq = i;
+        /** Rebuild the zone inspector list from current state. Safe to call repeatedly. */
+        private void refreshZoneInspector() {
+            if (zoneInspector == null || zoneInspector.hasClass("hidden")) return;
+            if (inspectedPlayer < 0 || inspectedLocation < 0) return;
 
-                           var card = new UIElement();
-                           card.addClass("card");
-                           setCardImageBackground(card, code);
+            var titleLabel = byId("zone-inspector-title");
+            var zoneInspectorList = byId("zone-inspector-list", ScrollerView.class);
+            if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(inspectedTitle));
+            if (zoneInspectorList == null) return;
 
-                           card.addEventListener(UIEvents.CLICK, ev -> {
-                               ev.stopPropagation();
-                               onCardClicked(player, location, seq, ev);
-                           });
-                           card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
-                           card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+            int player = inspectedPlayer;
+            int location = inspectedLocation;
+            List<Integer> cards = getPileCards(player, location);
 
-                           zoneInspectorList.addScrollViewChild(card);
-                       }
-                   }
+            zoneInspectorList.clearAllScrollViewChildren();
+            for (int i = 0; i < cards.size(); i++) {
+                int code = cards.get(i);
+                int seq = i;
+
+                var card = new UIElement();
+                card.addClass("card");
+                setCardImageBackground(card, code);
+
+                card.addEventListener(UIEvents.CLICK, ev -> {
+                    ev.stopPropagation();
+                    onCardClicked(player, location, seq, ev);
                 });
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> hideCardInfo());
+
+                zoneInspectorList.addScrollViewChild(card);
             }
         }
 
@@ -1714,8 +1798,12 @@ public class LDLibDuelScreen {
             return switch (loc.location()) {
                 case LOCATION_MZONE -> {
                     if (loc.sequence() < 5) yield monsterSlots[p][loc.sequence()];
-                    else if (loc.sequence() == 5) yield emzSlots[p];
-                    else if (loc.sequence() == 6) yield emzSlots[1 - p];
+                    // EMZ: slot 0 = local player's seq 5 (or opp's seq 6);
+                    //      slot 1 = local player's seq 6 (or opp's seq 5)
+                    else if (loc.sequence() == 5)
+                        yield p == state.localPlayer ? emzSlots[0] : emzSlots[1];
+                    else if (loc.sequence() == 6)
+                        yield p == state.localPlayer ? emzSlots[1] : emzSlots[0];
                     else yield null;
                 }
                 case LOCATION_SZONE -> {

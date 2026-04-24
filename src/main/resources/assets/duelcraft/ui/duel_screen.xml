@@ -236,6 +236,17 @@
         padding-horizontal: 1;
         }
 
+        /* Opponent's stat labels — positions mirror the flipped card (text stays upright) */
+        .stat-atk-def.opp {
+        bottom: auto;
+        top: 0;
+        }
+
+        .stat-level.opp {
+        top: auto;
+        bottom: 0;
+        }
+
         .stat-buffed {
         text-color: #55FF55;
         }
@@ -251,6 +262,42 @@
 
         #opponent-side .defense {
         transform: rotate(270);
+        }
+
+        /* Opponent-owned EMZ cards (EMZ slots live outside #opponent-side) */
+        .emz-opp {
+        transform: rotate(180);
+        }
+
+        .emz-opp.defense {
+        transform: rotate(270);
+        }
+
+        /* Opponent's pile slots — rotate the card image when showing one */
+        #opp-graveyard.has-card,
+        #opp-banished.has-card,
+        #opp-extra-deck.has-card {
+        transform: rotate(180);
+        }
+
+        /* Opponent pile count labels — always at visual top for consistency,
+           regardless of whether the pile is rotated */
+        #opp-deck .card-count,
+        #opp-graveyard .card-count,
+        #opp-banished .card-count,
+        #opp-extra-deck .card-count {
+        top: 1;
+        bottom: auto;
+        }
+
+        /* When the pile is rotated 180°, CSS-top visually becomes bottom.
+           Flip the label to CSS-bottom and counter-rotate so text reads upright at visual top. */
+        #opp-graveyard.has-card .card-count,
+        #opp-banished.has-card .card-count,
+        #opp-extra-deck.has-card .card-count {
+        top: auto;
+        bottom: 1;
+        transform: rotate(180);
         }
 
         /* ── Hand Row ── */

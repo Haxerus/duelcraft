@@ -99,6 +99,10 @@ public class ClientDuelState {
     // Extra deck, graveyard, banished — full card lists (browsable in UI)
     @SuppressWarnings("unchecked")
     public final List<Integer>[] extra = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    // Parallel to extra[]: position bits per card. Face-up pendulums returning from field
+    // get POS_FACEUP_*; regular extra deck entries are face-down.
+    @SuppressWarnings("unchecked")
+    public final List<Integer>[] extraPos = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
     public final List<Integer>[] grave = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
@@ -193,8 +197,8 @@ public class ClientDuelState {
                 // Reset extra deck lists to new size (codes unknown, placeholder 0)
                 extra[0].clear();
                 extra[1].clear();
-                for (int i = 0; i < start.extraCount0(); i++) extra[0].add(0);
-                for (int i = 0; i < start.extraCount1(); i++) extra[1].add(0);
+                for (int i = 0; i < start.extraCount0(); i++) { extra[0].add(0); extraPos[0].add(POS_FACEDOWN_DEFENSE); }
+                for (int i = 0; i < start.extraCount1(); i++) { extra[1].add(0); extraPos[1].add(POS_FACEDOWN_DEFENSE); }
                 dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
                         lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
@@ -318,10 +322,12 @@ public class ClientDuelState {
                         szoneStats[upd.player()][i] = cards.get(i);
                     }
                 } else if (upd.location() == LOCATION_EXTRA) {
-                    // Update extra deck card codes from query results
+                    // Update extra deck card codes and positions from query results
                     extra[upd.player()].clear();
+                    extraPos[upd.player()].clear();
                     for (var card : cards) {
                         extra[upd.player()].add(card != null ? card.code : 0);
+                        extraPos[upd.player()].add(card != null ? card.position : POS_FACEDOWN_DEFENSE);
                     }
                     dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 }
@@ -502,10 +508,13 @@ public class ClientDuelState {
             case LOCATION_DECK -> deckCount[loc.controller()]--;
             case LOCATION_EXTRA -> {
                 int seq = loc.sequence();
-                if (seq < extra[loc.controller()].size()) {
-                    extra[loc.controller()].remove(seq);
-                } else if (!extra[loc.controller()].isEmpty()) {
-                    extra[loc.controller()].removeLast();
+                int p = loc.controller();
+                if (seq < extra[p].size()) {
+                    extra[p].remove(seq);
+                    if (seq < extraPos[p].size()) extraPos[p].remove(seq);
+                } else if (!extra[p].isEmpty()) {
+                    extra[p].removeLast();
+                    if (!extraPos[p].isEmpty()) extraPos[p].removeLast();
                 }
             }
             case LOCATION_GRAVE -> {
@@ -549,7 +558,10 @@ public class ClientDuelState {
                 szonePos[loc.controller()][loc.sequence()] = loc.position();
             }
             case LOCATION_DECK -> deckCount[loc.controller()]++;
-            case LOCATION_EXTRA -> extra[loc.controller()].add(code);
+            case LOCATION_EXTRA -> {
+                extra[loc.controller()].add(code);
+                extraPos[loc.controller()].add(loc.position());
+            }
             case LOCATION_GRAVE -> grave[loc.controller()].add(code);
             case LOCATION_REMOVED -> banished[loc.controller()].add(code);
             case LOCATION_OVERLAY -> {
