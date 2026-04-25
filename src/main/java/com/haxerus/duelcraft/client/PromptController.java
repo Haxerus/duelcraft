@@ -307,54 +307,42 @@ public class PromptController {
     }
 
     private void buildTributePrompt(DuelMessage.SelectTribute sel) {
+        // Tributes are definitionally field-only (you can't tribute from a pile),
+        // so this always renders as field highlights — no scroller dialog.
         selectedIndices.clear();
-        promptOverlay.removeClass("hidden");
-        if (promptTitle instanceof Label t)
-            t.setText(Component.literal("Tribute " + sel.min() + "-" + sel.max() + " card(s)"));
-        clearPromptContent();
+        promptOverlay.addClass("hidden");
 
-        var scroller = createPromptCardScroller();
-        for (int i = 0; i < sel.cards().size(); i++) {
-            int idx = i;
-            var tributeCard = sel.cards().get(i);
-            int code = tributeCard.code();
-
-            var card = new UIElement();
-            card.addClass("card");
-            callbacks.setCardImageBackground(card, code);
-            card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
-            card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
-            card.addEventListener(UIEvents.CLICK, ev -> {
-                ev.stopPropagation();
-                if (selectedIndices.contains(idx)) {
-                    selectedIndices.remove(Integer.valueOf(idx));
-                    card.removeClass("target");
-                } else if (selectedIndices.size() < sel.max()) {
-                    selectedIndices.add(idx);
-                    card.addClass("target");
-                }
-            });
-            scroller.addScrollViewChild(card);
+        for (var tributeCard : sel.cards()) {
+            var loc = new ClientDuelState.CardLocation(
+                    tributeCard.controller(), tributeCard.location(), tributeCard.sequence());
+            UIElement slot = field.findSlotForLocation(loc);
+            if (slot != null) slot.addClass("selectable");
         }
 
-        var confirmBtn = new Button();
-        confirmBtn.setText(Component.literal("Confirm"));
-        confirmBtn.addClasses("prompt-btn");
-        confirmBtn.setOnClick(e -> {
-            if (selectedIndices.size() >= sel.min()) {
-                callbacks.sendResponse(ResponseBuilder.selectCards(
-                        selectedIndices.stream().mapToInt(Integer::intValue).toArray()));
-            }
-        });
-        promptButtons.addChild(confirmBtn);
+        updateTributeStatus(sel);
+    }
 
-        if (sel.cancelable()) {
-            var cancelBtn = new Button();
-            cancelBtn.setText(Component.literal("Cancel"));
-            cancelBtn.addClasses("prompt-btn");
-            cancelBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectCardsCancel()));
-            promptButtons.addChild(cancelBtn);
+    private void updateTributeStatus(DuelMessage.SelectTribute sel) {
+        if (!(statusLabel instanceof Label lbl)) return;
+        int sum = currentTributeSum(sel);
+        String text;
+        if (sel.min() == sel.max()) {
+            String plural = sel.max() == 1 ? "tribute" : "tributes";
+            text = "Tribute " + sel.max() + " " + plural + " (" + sum + "/" + sel.max() + ")";
+        } else {
+            text = "Tribute " + sel.min() + "-" + sel.max() + " tributes (" + sum + ")";
         }
+        if (sel.cancelable()) text += "  (Right-click to cancel)";
+        lbl.setText(Component.literal(text));
+        statusLabel.removeClass("hidden");
+    }
+
+    private int currentTributeSum(DuelMessage.SelectTribute sel) {
+        int sum = 0;
+        for (int idx : selectedIndices) {
+            if (idx < sel.cards().size()) sum += sel.cards().get(idx).tributeCount();
+        }
+        return sum;
     }
 
     private void buildFieldUnselectCardPrompt(DuelMessage.SelectUnselectCard sel) {
@@ -618,6 +606,10 @@ public class PromptController {
             handleSelectSumClick(player, location, sequence, sel);
             return true;
         }
+        if (state.pendingPrompt instanceof DuelMessage.SelectTribute sel) {
+            handleSelectTributeClick(player, location, sequence, sel);
+            return true;
+        }
         return false;
     }
 
@@ -701,6 +693,38 @@ public class PromptController {
         }
     }
 
+    private void handleSelectTributeClick(int player, int location, int sequence,
+                                          DuelMessage.SelectTribute sel) {
+        for (int i = 0; i < sel.cards().size(); i++) {
+            var c = sel.cards().get(i);
+            if (c.controller() != player || c.location() != location || c.sequence() != sequence) continue;
+
+            var loc = new ClientDuelState.CardLocation(player, location, sequence);
+            UIElement slot = field.findSlotForLocation(loc);
+
+            if (selectedIndices.contains(i)) {
+                selectedIndices.remove(Integer.valueOf(i));
+                if (slot != null) slot.removeClass("selected");
+            } else {
+                // No overshoot guard: ygopro-core allows over-tribute (e.g., a regular monster
+                // plus a double-cost monster for a 2-tribute summon — total 3, accepted).
+                selectedIndices.add(i);
+                if (slot != null) slot.addClass("selected");
+            }
+
+            updateTributeStatus(sel);
+
+            // Auto-submit once we've reached the minimum required tribute count.
+            // If the selection went OVER max via over-tribute, the engine accepts it.
+            int sum = currentTributeSum(sel);
+            if (sum >= sel.min()) {
+                callbacks.sendResponse(ResponseBuilder.selectCards(
+                        selectedIndices.stream().mapToInt(Integer::intValue).toArray()));
+            }
+            return;
+        }
+    }
+
     // ── Right-click cancel/finish ──────────────────────────────────────────
 
     /**
@@ -722,6 +746,11 @@ public class PromptController {
                 && !sel.unselectableCards().isEmpty()) {
             e.stopPropagation();
             callbacks.sendResponse(ResponseBuilder.selectUnselectCardFinish());
+            return true;
+        }
+        if (state.pendingPrompt instanceof DuelMessage.SelectTribute sel && sel.cancelable()) {
+            e.stopPropagation();
+            callbacks.sendResponse(ResponseBuilder.selectCardsCancel());
             return true;
         }
         return false;
