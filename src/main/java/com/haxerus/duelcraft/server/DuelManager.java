@@ -2,17 +2,21 @@ package com.haxerus.duelcraft.server;
 
 import com.haxerus.duelcraft.Config;
 import com.haxerus.duelcraft.core.Deck;
+import com.haxerus.duelcraft.core.DeckLoader;
+import com.haxerus.duelcraft.core.DeckRegistry;
 import com.haxerus.duelcraft.core.DuelEngine;
 import com.haxerus.duelcraft.core.DuelOptions;
 import com.haxerus.duelcraft.core.OcgCore;
 import com.haxerus.duelcraft.duel.DuelSession;
 import com.mojang.logging.LogUtils;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
 
+import java.io.IOException;
 import java.util.*;
 
 public class DuelManager {
@@ -24,6 +28,8 @@ public class DuelManager {
     private Map<UUID, DuelSession> activeDuels;
     private Map<UUID, UUID> playerToDuel;
     private Map<UUID, SoloDuelHandler> soloHandlers;
+    private DeckRegistry deckRegistry;
+    private final Map<UUID, String> playerCurrentDeck = new HashMap<>();
 
     // FIXME: Temporary for testing
     public Map<UUID, UUID> duelInvites; // target -> challenger
@@ -32,7 +38,7 @@ public class DuelManager {
 
     public static void onServerStarting(ServerStartingEvent event) {
         instance = new DuelManager();
-        instance.init();
+        instance.init(event.getServer());
     }
 
     public static void onServerStopped(ServerStoppedEvent event) {
@@ -42,7 +48,7 @@ public class DuelManager {
         }
     }
 
-    public void init() {
+    public void init(MinecraftServer server) {
         List<String> dbPaths = new ArrayList<>(Config.CARD_DATABASE_PATHS.get());
         List<String> scriptPaths = new ArrayList<>(Config.SCRIPT_SEARCH_PATHS.get());
 
@@ -53,8 +59,12 @@ public class DuelManager {
         soloHandlers = new HashMap<>();
         duelInvites = new HashMap<>();
 
+        java.nio.file.Path decksDir = server.getServerDirectory().resolve("duelcraft").resolve("decks");
+        deckRegistry = new DeckRegistry(decksDir);
+
         int[] version = OcgCore.nGetVersion();
-        LOGGER.info("DuelManager initialized — OCG core v{}.{}", version[0], version[1]);
+        LOGGER.info("DuelManager initialized — OCG core v{}.{}, decks dir: {}",
+                version[0], version[1], decksDir);
     }
 
     public void shutdown() {
@@ -187,5 +197,32 @@ public class DuelManager {
 
     public UUID getPlayerActiveDuel(ServerPlayer player) {
         return playerToDuel.get(player.getUUID());
+    }
+
+    public DeckRegistry getDeckRegistry() { return deckRegistry; }
+
+    public void setPlayerCurrentDeck(UUID player, String deckName) {
+        playerCurrentDeck.put(player, deckName);
+    }
+
+    public Optional<String> getPlayerCurrentDeck(UUID player) {
+        return Optional.ofNullable(playerCurrentDeck.get(player));
+    }
+
+    public void clearPlayerCurrentDeck(UUID player) {
+        playerCurrentDeck.remove(player);
+    }
+
+    /**
+     * Resolves the deck a player should use right now.
+     * Returns {@link Deck#standard()} when no current deck is set (silent fallback).
+     * Throws when a current deck is set but its file is missing or malformed.
+     */
+    public Deck resolveDeck(ServerPlayer player) throws IOException, DeckLoader.DeckParseException {
+        String name = playerCurrentDeck.get(player.getUUID());
+        if (name == null) {
+            return Deck.standard();
+        }
+        return deckRegistry.load(name);
     }
 }
