@@ -10,8 +10,8 @@ import com.haxerus.duelcraft.core.OcgCore;
 import com.haxerus.duelcraft.duel.DuelSession;
 import com.mojang.logging.LogUtils;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
@@ -38,7 +38,7 @@ public class DuelManager {
 
     public static void onServerStarting(ServerStartingEvent event) {
         instance = new DuelManager();
-        instance.init(event.getServer());
+        instance.init();
     }
 
     public static void onServerStopped(ServerStoppedEvent event) {
@@ -48,7 +48,7 @@ public class DuelManager {
         }
     }
 
-    public void init(MinecraftServer server) {
+    public void init() {
         List<String> dbPaths = new ArrayList<>(Config.CARD_DATABASE_PATHS.get());
         List<String> scriptPaths = new ArrayList<>(Config.SCRIPT_SEARCH_PATHS.get());
 
@@ -59,7 +59,7 @@ public class DuelManager {
         soloHandlers = new HashMap<>();
         duelInvites = new HashMap<>();
 
-        java.nio.file.Path decksDir = server.getServerDirectory().resolve("duelcraft").resolve("decks");
+        java.nio.file.Path decksDir = FMLPaths.GAMEDIR.get().resolve("duelcraft").resolve("decks");
         deckRegistry = new DeckRegistry(decksDir);
 
         int[] version = OcgCore.nGetVersion();
