@@ -26,6 +26,11 @@ public final class DeckLoader {
         List<Integer> extra = new ArrayList<>();
         List<Integer> sideSink = new ArrayList<>();
 
+        // Strip leading UTF-8 BOM if present
+        if (!content.isEmpty() && content.charAt(0) == '﻿') {
+            content = content.substring(1);
+        }
+
         Section section = Section.NONE;
         boolean sawMain = false;
         int lineNum = 0;

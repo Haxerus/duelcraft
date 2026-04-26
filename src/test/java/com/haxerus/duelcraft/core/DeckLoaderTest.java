@@ -100,4 +100,11 @@ class DeckLoaderTest {
         Deck deck = DeckLoader.parseYdk(ydk);
         assertEquals(List.of(111), deck.main());
     }
+
+    @Test
+    void stripsLeadingByteOrderMark() {
+        String ydk = "﻿#main\n89631139\n";
+        Deck deck = DeckLoader.parseYdk(ydk);
+        assertEquals(List.of(89631139), deck.main());
+    }
 }
