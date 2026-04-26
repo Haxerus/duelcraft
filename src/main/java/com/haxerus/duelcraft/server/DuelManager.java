@@ -84,15 +84,26 @@ public class DuelManager {
         }
     }
 
+    /** Convenience: random seed. */
+    public void startSoloDuel(ServerPlayer player, Deck playerDeck, Deck aiDeck) {
+        startSoloDuel(player, java.util.concurrent.ThreadLocalRandom.current().nextLong(),
+                playerDeck, aiDeck, null, null);
+    }
+
     /**
      * Start a solo test duel where player 1 is AI-controlled.
+     * Both decks are deterministically shuffled with {@code seed} before being handed to the engine.
+     * {@code playerDeckName} and {@code aiDeckName} are used only for logging.
      */
-    public void startSoloDuel(ServerPlayer player, DuelOptions options, Deck playerDeck, Deck aiDeck) {
+    public void startSoloDuel(ServerPlayer player, long seed,
+                              Deck playerDeck, Deck aiDeck,
+                              String playerDeckName, String aiDeckName) {
         if (playerToDuel.containsKey(player.getUUID())) {
             LOGGER.warn("Cannot start solo duel - player is already in a duel!");
             return;
         }
 
+        DuelOptions options = DuelOptions.standard(seed);
         UUID duelId = UUID.randomUUID();
         var handler = new SoloDuelHandler(player, duelId);
         var session = new DuelSession(engine, options, handler);
@@ -101,15 +112,22 @@ public class DuelManager {
         playerToDuel.put(player.getUUID(), duelId);
         soloHandlers.put(duelId, handler);
 
+        LOGGER.info("Solo duel {}: seed={}, player={}, aiDeck={}",
+                duelId, seed,
+                playerDeckName != null ? playerDeckName : "<standard>",
+                aiDeckName != null ? aiDeckName : "<standard>");
+
+        Deck shuffledPlayer = playerDeck.shuffled(seed);
+        Deck shuffledAi = aiDeck.shuffled(seed);
+
         int lp0 = options.team1().lp();
         int lp1 = options.team2().lp();
         PacketDistributor.sendToPlayer(player, new DuelStartPayload(0, "AI Opponent",
-                lp0, lp1, playerDeck.main().size(), playerDeck.extra().size()));
+                lp0, lp1, shuffledPlayer.main().size(), shuffledPlayer.extra().size()));
 
-        session.setupDuel(playerDeck, aiDeck);
+        session.setupDuel(shuffledPlayer, shuffledAi);
         session.process();
 
-        // Check if the AI needs to respond first (e.g., if AI goes first)
         processSoloAutoResponse(duelId, handler);
     }
 
@@ -149,12 +167,21 @@ public class DuelManager {
         }
     }
 
-    public void startDuel(ServerPlayer p1, ServerPlayer p2, DuelOptions options, Deck team1deck, Deck team2Deck) {
+    /** Convenience: random seed, decks resolved later by caller. */
+    public void startDuel(ServerPlayer p1, ServerPlayer p2, Deck team1Deck, Deck team2Deck) {
+        startDuel(p1, p2, java.util.concurrent.ThreadLocalRandom.current().nextLong(),
+                team1Deck, team2Deck, null, null);
+    }
+
+    public void startDuel(ServerPlayer p1, ServerPlayer p2, long seed,
+                          Deck team1Deck, Deck team2Deck,
+                          String team1Name, String team2Name) {
         if (playerToDuel.containsKey(p1.getUUID()) || playerToDuel.containsKey(p2.getUUID())) {
             LOGGER.warn("Cannot start duel - a player is already in a duel!");
             return;
         }
 
+        DuelOptions options = DuelOptions.standard(seed);
         UUID duelId = UUID.randomUUID();
         var handler = new ServerDuelHandler(p1, p2, duelId);
         var session = new DuelSession(engine, options, handler);
@@ -163,17 +190,24 @@ public class DuelManager {
         playerToDuel.put(p1.getUUID(), duelId);
         playerToDuel.put(p2.getUUID(), duelId);
 
-        // Tell each client which player they are, the opponent's name, and initial game state
+        LOGGER.info("Duel {}: seed={}, decks=[{}, {}]",
+                duelId, seed,
+                team1Name != null ? team1Name : "<standard>",
+                team2Name != null ? team2Name : "<standard>");
+
+        Deck shuffled1 = team1Deck.shuffled(seed);
+        Deck shuffled2 = team2Deck.shuffled(seed);
+
         int lp0 = options.team1().lp();
         int lp1 = options.team2().lp();
-        int deckSize = team1deck.main().size();
-        int extraSize = team1deck.extra().size();
+        int deckSize = shuffled1.main().size();
+        int extraSize = shuffled1.extra().size();
         PacketDistributor.sendToPlayer(p1, new DuelStartPayload(0, p2.getName().getString(),
                 lp0, lp1, deckSize, extraSize));
         PacketDistributor.sendToPlayer(p2, new DuelStartPayload(1, p1.getName().getString(),
                 lp0, lp1, deckSize, extraSize));
 
-        session.setupDuel(team1deck, team2Deck);
+        session.setupDuel(shuffled1, shuffled2);
         session.process();
     }
 
