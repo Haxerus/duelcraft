@@ -8,9 +8,17 @@ public record DuelOptions(
     PlayerOptions team1,
     PlayerOptions team2
 ) {
+    /** Builds standard options with a fully expanded seed. */
+    public static DuelOptions standard(long seed) {
+        return new DuelOptions(
+                SeedExpander.toFourLongs(seed),
+                OcgConstants.DUEL_MODE_MR5,
+                PlayerOptions.standard(),
+                PlayerOptions.standard());
+    }
+
+    /** Builds standard options with a freshly randomized seed. */
     public static DuelOptions standard() {
-        long[] seed = ThreadLocalRandom.current().longs(4).toArray();
-        return new DuelOptions(seed, OcgConstants.DUEL_MODE_MR5,
-                PlayerOptions.standard(), PlayerOptions.standard());
+        return standard(ThreadLocalRandom.current().nextLong());
     }
 }
