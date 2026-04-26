@@ -184,7 +184,7 @@ class ResponseBuilderTest {
 
     @Test
     void selectUnselectCardFinish() {
-        byte[] resp = ResponseBuilder.selectUnselectCard(-1);
+        byte[] resp = ResponseBuilder.selectUnselectCardFinish();
         assertEquals(-1, readInt32(resp, 0));
     }
 

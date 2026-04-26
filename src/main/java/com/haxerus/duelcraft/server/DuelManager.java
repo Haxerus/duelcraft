@@ -32,7 +32,7 @@ public class DuelManager {
     private final Map<UUID, String> playerCurrentDeck = new HashMap<>();
 
     // FIXME: Temporary for testing
-    public Map<UUID, UUID> duelInvites; // target -> challenger
+    public Map<UUID, DuelCommand.PendingChallenge> duelInvites; // target -> pending
 
     public static DuelManager get() { return instance; }
 
