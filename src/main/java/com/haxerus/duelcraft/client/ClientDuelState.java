@@ -67,6 +67,8 @@ public class ClientDuelState {
     // Which player index we are (0 or 1)
     public final int localPlayer;
     public final String opponentName;
+    // Engine flags this duel was created with; the field layout is derived from them.
+    public final long duelFlags;
 
     // Life points per player
     public final int[] lp = new int[2];
@@ -150,6 +152,7 @@ public class ClientDuelState {
     public ClientDuelState(DuelStartPayload startInfo) {
         this.localPlayer = startInfo.localPlayer();
         this.opponentName = startInfo.opponentName();
+        this.duelFlags = startInfo.duelFlags();
         this.lp[0] = startInfo.lp0();
         this.lp[1] = startInfo.lp1();
         this.deckCount[0] = startInfo.deckSize();

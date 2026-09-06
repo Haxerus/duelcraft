@@ -4,7 +4,6 @@ import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
-import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.DataBindingBuilder;
 import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.SupplierDataSource;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
@@ -17,6 +16,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.lowdragmc.lowdraglib2.math.Size;
 import com.lowdragmc.lowdraglib2.utils.XmlUtils;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -60,13 +60,18 @@ public class LDLibDuelScreen {
      * Load the XML UI and open the duel screen.
      */
     public static void open(DuelStartPayload startInfo) {
+        Minecraft.getInstance().setScreen(create(startInfo));
+        LOGGER.info("Duel screen opened (XML-based) vs. {}", startInfo.opponentName());
+    }
+
+    /** Builds the screen without showing it. The UI test harness opens the result itself. */
+    public static DuelScreen create(DuelStartPayload startInfo) {
         activeState = new ClientDuelState(startInfo);
         activeUI = loadFromXml();
         refresher = new UIRefresher(activeUI, activeState);
-        var screen = new ModularUIScreen(activeUI,
-                Component.literal("Duel vs. " + startInfo.opponentName()));
-        Minecraft.getInstance().setScreen(screen);
-        LOGGER.info("Duel screen opened (XML-based) vs. {}", startInfo.opponentName());
+        UIElement canvas = activeUI.ui.selectId("duel-canvas").findFirst()
+                .orElseThrow(() -> new IllegalStateException(DUEL_UI + " has no #duel-canvas"));
+        return new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + startInfo.opponentName()));
     }
 
     /**
@@ -94,9 +99,9 @@ public class LDLibDuelScreen {
         }
         // Parse XML to get the root element and stylesheets
         var parsed = UI.of(doc);
-        // Rebuild with a DynamicSizeProvider that uses the full screen size,
-        // so the root element can use width/height: 100% reliably
-        var ui = UI.of(parsed.rootElement, parsed.stylesheets, screenSize -> screenSize);
+        // Fixed design size: LDLib2 centers the root, DuelScreen scales #duel-canvas to fit.
+        var ui = UI.of(parsed.rootElement, parsed.stylesheets,
+                screenSize -> Size.of(DuelScreen.DESIGN_WIDTH, DuelScreen.DESIGN_HEIGHT));
         return ModularUI.of(ui);
     }
 
@@ -168,7 +173,7 @@ public class LDLibDuelScreen {
             statusLabel = byId("status-label");
 
             // ── Field slots (owned by FieldRenderer) ──
-            field = new FieldRenderer(ui, state, new FieldRenderer.Callbacks() {
+            field = new FieldRenderer(ui, state, FieldLayout.fromFlags(state.duelFlags), new FieldRenderer.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
                 }
@@ -244,7 +249,8 @@ public class LDLibDuelScreen {
                     return descResolver.resolve(desc);
                 }
             });
-            clicks = new ClickDispatcher(ui, state, field, prompt,
+            UIElement canvas = byId("duel-canvas");
+            clicks = new ClickDispatcher(ui, state, field, prompt, canvas,
                     response -> LDLibDuelScreen.sendResponse(state, response));
 
             // ── Bind reactive data ──

@@ -1,6 +1,9 @@
 package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.DuelcraftClient;
+import com.haxerus.duelcraft.client.FieldLayout.PendulumMode;
+import com.haxerus.duelcraft.client.FieldLayout.Side;
+import com.haxerus.duelcraft.client.FieldLayout.Zone;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
@@ -9,23 +12,32 @@ import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
+import org.slf4j.Logger;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /**
- * Owns the field UI: monster zones, spell/trap zones, EMZ, field spell, piles,
- * and the stat overlays drawn on top of monster cards. Reacts to dirty flags
- * from ClientDuelState via explicit refresh methods called from the tick loop.
+ * Owns the field UI: monster zones, spell/trap zones, EMZ, pendulum zones, field spell,
+ * piles, and the stat overlays drawn on monster cards. Reacts to dirty flags from
+ * ClientDuelState via explicit refresh methods called from the tick loop.
  *
- * Decoupled from click routing via the {@link Callbacks} interface — slot
- * click handlers are wired here but forward the click decision back to the
- * host. Similarly delegates card image async retry (setCardImageBackground)
- * and the card info hover banner to the host.
+ * Every zone lookup goes through {@link FieldLayout}, which knows the rule set's geometry
+ * and the slot each engine zone lives in. This class is the only place that converts
+ * between absolute player indices (state, engine) and viewer-relative {@link Side}s (layout, XML).
+ *
+ * Decoupled from click routing via the {@link Callbacks} interface: slot click handlers are
+ * wired here but forward the click decision back to the host, which also owns card image
+ * async retry and the card info hover banner.
  */
 public class FieldRenderer {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /** Hooks back into host UI for things not owned by FieldRenderer. */
     public interface Callbacks {
@@ -39,166 +51,115 @@ public class FieldRenderer {
 
     public static final String CARD_BACK_SPRITE = "sprite(duelcraft:textures/card_back.png)";
 
-    // Slot arrays — owned by FieldRenderer, bound in constructor.
-    public final UIElement[][] monsterSlots = new UIElement[2][5];
-    public final UIElement[][] spellSlots = new UIElement[2][5];
-    public final UIElement[] emzSlots = new UIElement[2];
-    public final UIElement[] fieldSpellSlots = new UIElement[2];
-    public final UIElement[] deckSlots = new UIElement[2];
-    public final UIElement[] graveSlots = new UIElement[2];
-    public final UIElement[] extraSlots = new UIElement[2];
-    public final UIElement[] banishedSlots = new UIElement[2];
-
     private final UI ui;
     private final ClientDuelState state;
+    private final FieldLayout layout;
     private final Callbacks callbacks;
+    /** Superset slot id → element. Ids the XML lacks are absent. */
+    private final Map<String, UIElement> slots = new HashMap<>();
 
-    public FieldRenderer(UI ui, ClientDuelState state, Callbacks callbacks) {
+    public FieldRenderer(UI ui, ClientDuelState state, FieldLayout layout, Callbacks callbacks) {
         this.ui = ui;
         this.state = state;
+        this.layout = layout;
         this.callbacks = callbacks;
-        bindSlotElements();
+        bindSlots();
     }
 
-    private void bindSlotElements() {
-        int plr = state.localPlayer;
-        int opp = state.opponent();
-        for (int i = 0; i < 5; i++) {
-            monsterSlots[opp][i] = byId("opp-mon-" + i);
-            monsterSlots[plr][i] = byId("plr-mon-" + i);
-            spellSlots[opp][i]   = byId("opp-st-" + i);
-            spellSlots[plr][i]   = byId("plr-st-" + i);
+    private void bindSlots() {
+        for (String id : FieldLayout.allSlotIds()) {
+            UIElement el = ui.selectId(id).findFirst().orElse(null);
+            if (el == null) {
+                LOGGER.warn("duel_screen.xml has no slot #{}; treating it as hidden", id);
+                continue;
+            }
+            slots.put(id, el);
         }
-        emzSlots[0] = byId("emz-left");
-        emzSlots[1] = byId("emz-right");
-        fieldSpellSlots[opp] = byId("opp-field-spell");
-        fieldSpellSlots[plr] = byId("plr-field-spell");
-        deckSlots[opp]       = byId("opp-deck");
-        deckSlots[plr]       = byId("plr-deck");
-        graveSlots[opp]      = byId("opp-graveyard");
-        graveSlots[plr]      = byId("plr-graveyard");
-        extraSlots[opp]      = byId("opp-extra-deck");
-        extraSlots[plr]      = byId("plr-extra-deck");
-        banishedSlots[opp]   = byId("opp-banished");
-        banishedSlots[plr]   = byId("plr-banished");
+        for (String id : layout.hiddenSlotIds()) {
+            UIElement el = slots.get(id);
+            if (el != null) el.addClass("rule-hidden");
+        }
+        if (layout.pendulum() == PendulumMode.SHARED) {
+            for (int seq : layout.pendulumSequences()) {
+                for (Side side : Side.values()) {
+                    slot(new Zone(side, LOCATION_SZONE, seq)).ifPresent(el -> el.addClass("pendulum"));
+                }
+            }
+        }
+    }
+
+    // ── Player ↔ side conversion (the only place it happens) ────────────────
+
+    private Side side(int player) {
+        return player == state.localPlayer ? Side.PLR : Side.OPP;
+    }
+
+    private int player(Side side) {
+        return side == Side.PLR ? state.localPlayer : state.opponent();
+    }
+
+    private Optional<UIElement> slot(Zone zone) {
+        return layout.slotId(zone).map(slots::get);
+    }
+
+    private boolean occupied(Zone z) {
+        int p = player(z.side());
+        if (z.location() == LOCATION_MZONE) {
+            return state.mzone[p][z.sequence()] != 0 || state.mzonePos[p][z.sequence()] != 0;
+        }
+        return state.szone[p][z.sequence()] != 0 || state.szonePos[p][z.sequence()] != 0;
+    }
+
+    /** The zone a slot shows: the occupied candidate, else the viewer's own zone (for placement). */
+    private Zone shownZone(List<Zone> candidates) {
+        return candidates.stream().filter(this::occupied).findFirst().orElse(candidates.get(0));
     }
 
     // ── Click wiring ────────────────────────────────────────────────────────
 
-    /** Bind click handlers on all field slots. Call once after construction. */
+    /** Bind click handlers on every visible monster and spell slot. Call once after construction. */
     public void wireFieldClicks() {
-        for (int p = 0; p < 2; p++) {
-            for (int i = 0; i < 5; i++) {
-                int player = p;
-                int seq = i;
-                if (monsterSlots[p][i] != null) {
-                    monsterSlots[p][i].addEventListener(UIEvents.CLICK,
-                            e -> callbacks.onCardClicked(player, LOCATION_MZONE, seq, e));
-                }
-                if (spellSlots[p][i] != null) {
-                    // S/T 0 and 4 share physical space with pendulum zones (seq 6/7).
-                    // Send the pendulum seq only when a pendulum card is actually there;
-                    // otherwise use the base S/T seq (needed for SelectPlace).
-                    if (seq == 0) {
-                        spellSlots[p][i].addEventListener(UIEvents.CLICK, e -> {
-                            if (state.szone[player][0] != 0 || state.szonePos[player][0] != 0)
-                                callbacks.onCardClicked(player, LOCATION_SZONE, 0, e);
-                            else if (state.szone[player][6] != 0 || state.szonePos[player][6] != 0)
-                                callbacks.onCardClicked(player, LOCATION_SZONE, 6, e);
-                            else
-                                callbacks.onCardClicked(player, LOCATION_SZONE, 0, e);
-                        });
-                    } else if (seq == 4) {
-                        spellSlots[p][i].addEventListener(UIEvents.CLICK, e -> {
-                            if (state.szone[player][4] != 0 || state.szonePos[player][4] != 0)
-                                callbacks.onCardClicked(player, LOCATION_SZONE, 4, e);
-                            else if (state.szone[player][7] != 0 || state.szonePos[player][7] != 0)
-                                callbacks.onCardClicked(player, LOCATION_SZONE, 7, e);
-                            else
-                                callbacks.onCardClicked(player, LOCATION_SZONE, 4, e);
-                        });
-                    } else {
-                        spellSlots[p][i].addEventListener(UIEvents.CLICK,
-                                e -> callbacks.onCardClicked(player, LOCATION_SZONE, seq, e));
-                    }
-                }
-            }
-
-            // Extra Monster Zone — dynamically resolve occupant at click time.
-            // Physical mapping is relative to the local player:
-            //   emz-left (slot 0):  local seq 5 shares physical space with opp seq 6
-            //   emz-right (slot 1): local seq 6 shares physical space with opp seq 5
-            int slotIdx = p;
-            if (emzSlots[p] != null) {
-                emzSlots[p].addEventListener(UIEvents.CLICK, e -> {
-                    int lp = state.localPlayer;
-                    int opp = state.opponent();
-                    int mySeq = slotIdx == 0 ? 5 : 6;
-                    int oppSeq = slotIdx == 0 ? 6 : 5;
-                    if (state.mzone[lp][mySeq] != 0 || state.mzonePos[lp][mySeq] != 0) {
-                        callbacks.onCardClicked(lp, LOCATION_MZONE, mySeq, e);
-                    } else if (state.mzone[opp][oppSeq] != 0 || state.mzonePos[opp][oppSeq] != 0) {
-                        callbacks.onCardClicked(opp, LOCATION_MZONE, oppSeq, e);
-                    } else {
-                        // Empty — send local player's mapping for placement
-                        callbacks.onCardClicked(lp, LOCATION_MZONE, mySeq, e);
-                    }
-                });
-            }
+        for (String id : FieldLayout.allSlotIds()) {
+            UIElement el = slots.get(id);
+            List<Zone> zones = layout.zonesOf(id);
+            if (el == null || zones.isEmpty()) continue;
+            int location = zones.get(0).location();
+            if (location != LOCATION_MZONE && location != LOCATION_SZONE) continue; // piles: ZoneInspectorController
+            el.addEventListener(UIEvents.CLICK, e -> {
+                Zone target = shownZone(zones);
+                callbacks.onCardClicked(player(target.side()), target.location(), target.sequence(), e);
+            });
         }
     }
 
     // ── Zone refresh ────────────────────────────────────────────────────────
 
     public void refreshMonsterZones(int player) {
-        for (int i = 0; i < 5; i++) {
-            var slot = monsterSlots[player][i];
-            if (slot == null) continue;
-            refreshZoneSlot(slot, state.mzone[player][i], state.mzonePos[player][i], player, LOCATION_MZONE, i);
-        }
-
-        // EMZ: physical slots are relative to local player's view.
-        int lp = state.localPlayer;
-        int opp = state.opponent();
-        refreshEmzSlot(0, lp, 5, opp, 6);
-        refreshEmzSlot(1, lp, 6, opp, 5);
-    }
-
-    /** Refresh a physical EMZ slot. It can be occupied by (p1,s1) or (p2,s2). */
-    private void refreshEmzSlot(int slotIdx, int p1, int s1, int p2, int s2) {
-        if (emzSlots[slotIdx] == null) return;
-        if (state.mzone[p1][s1] != 0 || state.mzonePos[p1][s1] != 0) {
-            refreshZoneSlot(emzSlots[slotIdx], state.mzone[p1][s1], state.mzonePos[p1][s1], p1, LOCATION_MZONE, s1);
-        } else {
-            refreshZoneSlot(emzSlots[slotIdx], state.mzone[p2][s2], state.mzonePos[p2][s2], p2, LOCATION_MZONE, s2);
+        Side side = side(player);
+        for (int seq = 0; seq <= 6; seq++) {
+            refreshZone(new Zone(side, LOCATION_MZONE, seq));
         }
     }
 
     public void refreshSpellZones(int player) {
-        for (int i = 0; i < 5; i++) {
-            var slot = spellSlots[player][i];
-            if (slot == null) continue;
-
-            int code = state.szone[player][i];
-            int pos = state.szonePos[player][i];
-
-            // Pendulum zones (seq 6/7) share physical space with S/T 0 and 4
-            if (i == 0 && code == 0 && pos == 0) {
-                code = state.szone[player][6];
-                pos = state.szonePos[player][6];
-                refreshZoneSlot(slot, code, pos, player, LOCATION_SZONE, code != 0 || pos != 0 ? 6 : 0);
-            } else if (i == 4 && code == 0 && pos == 0) {
-                code = state.szone[player][7];
-                pos = state.szonePos[player][7];
-                refreshZoneSlot(slot, code, pos, player, LOCATION_SZONE, code != 0 || pos != 0 ? 7 : 4);
-            } else {
-                refreshZoneSlot(slot, code, pos, player, LOCATION_SZONE, i);
-            }
+        Side side = side(player);
+        for (int seq = 0; seq <= 7; seq++) {
+            refreshZone(new Zone(side, LOCATION_SZONE, seq));
         }
+    }
 
-        if (fieldSpellSlots[player] != null) {
-            refreshZoneSlot(fieldSpellSlots[player], state.szone[player][5], state.szonePos[player][5], player, LOCATION_SZONE, 5);
-        }
+    /** Re-render the slot holding {@code zone}. Shared EMZ slots re-evaluate both owners. */
+    private void refreshZone(Zone zone) {
+        layout.slotId(zone).ifPresent(id -> {
+            UIElement el = slots.get(id);
+            if (el == null) return;
+            Zone shown = shownZone(layout.zonesOf(id));
+            int p = player(shown.side());
+            boolean monster = shown.location() == LOCATION_MZONE;
+            int code = monster ? state.mzone[p][shown.sequence()] : state.szone[p][shown.sequence()];
+            int pos = monster ? state.mzonePos[p][shown.sequence()] : state.szonePos[p][shown.sequence()];
+            refreshZoneSlot(el, code, pos, p, shown.location(), shown.sequence());
+        });
     }
 
     private void refreshZoneSlot(UIElement slot, int code, int position, int player, int locationType, int sequence) {
@@ -255,24 +216,16 @@ public class FieldRenderer {
     // ── Stat overlays ──────────────────────────────────────────────────────
 
     public void refreshFieldStats() {
-        for (int p = 0; p < 2; p++) {
-            for (int i = 0; i < 5; i++) {
-                updateMonsterStats(monsterSlots[p][i], state.mzoneStats[p][i], state.mzone[p][i], p);
+        for (Side side : Side.values()) {
+            for (int seq = 0; seq <= 6; seq++) {
+                layout.slotId(new Zone(side, LOCATION_MZONE, seq)).ifPresent(id -> {
+                    UIElement el = slots.get(id);
+                    if (el == null) return;
+                    Zone shown = shownZone(layout.zonesOf(id));
+                    int p = player(shown.side());
+                    updateMonsterStats(el, state.mzoneStats[p][shown.sequence()], state.mzone[p][shown.sequence()], p);
+                });
             }
-        }
-        // EMZ slots — check both cross-mapped sources, relative to local player
-        int lp = state.localPlayer;
-        int opp = state.opponent();
-        updateEmzStats(0, lp, 5, opp, 6);
-        updateEmzStats(1, lp, 6, opp, 5);
-    }
-
-    private void updateEmzStats(int slotIdx, int p1, int s1, int p2, int s2) {
-        if (emzSlots[slotIdx] == null) return;
-        if (state.mzone[p1][s1] != 0 || state.mzonePos[p1][s1] != 0) {
-            updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p1][s1], state.mzone[p1][s1], p1);
-        } else {
-            updateMonsterStats(emzSlots[slotIdx], state.mzoneStats[p2][s2], state.mzone[p2][s2], p2);
         }
     }
 
@@ -340,23 +293,20 @@ public class FieldRenderer {
 
     public void refreshPiles() {
         for (int p = 0; p < 2; p++) {
+            final int player = p;
+            Side side = side(player);
             // Deck: always face-down card back when non-empty
-            setPileBackground(deckSlots[p], state.deckCount[p] > 0 ? CARD_BACK_SPRITE : null);
-
-            // Extra deck: show top face-up card if any (pendulum cards returning face-up),
-            //             otherwise card back when non-empty
-            refreshExtraDeckPile(p);
-
+            slot(new Zone(side, LOCATION_DECK, 0)).ifPresent(el ->
+                    setPileBackground(el, state.deckCount[player] > 0 ? CARD_BACK_SPRITE : null));
+            // Extra deck: top face-up card if any, otherwise card back when non-empty
+            slot(new Zone(side, LOCATION_EXTRA, 0)).ifPresent(el -> refreshExtraDeckPile(el, player));
             // Graveyard & Banished: top card image when non-empty
-            setPileTopCard(graveSlots[p], state.grave[p]);
-            setPileTopCard(banishedSlots[p], state.banished[p]);
+            slot(new Zone(side, LOCATION_GRAVE, 0)).ifPresent(el -> setPileTopCard(el, state.grave[player]));
+            slot(new Zone(side, LOCATION_REMOVED, 0)).ifPresent(el -> setPileTopCard(el, state.banished[player]));
         }
     }
 
-    private void refreshExtraDeckPile(int player) {
-        var slot = extraSlots[player];
-        if (slot == null) return;
-
+    private void refreshExtraDeckPile(UIElement slot, int player) {
         if (state.extra[player].isEmpty()) {
             setPileBackground(slot, null);
             return;
@@ -420,30 +370,26 @@ public class FieldRenderer {
 
     /**
      * Highlight valid placement zones for a SelectPlace prompt.
-     * Bitmask is relative to the asking player (set bit = blocked zone).
+     * Bitmask is relative to the asking player (set bit = blocked zone); the asking player is the viewer.
+     * Monster bits 0-6 and spell bits 8-15 of the viewer's block; the opponent's block starts at bit 16.
+     * EMZ bits (5, 6) are read from the viewer's block only, because the two shared slots are covered there.
      */
     public void highlightValidPlaces(int field) {
         ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
-        // Bitmask is relative: p=0 = asking player (self), p=1 = opponent
-        for (int p = 0; p < 2; p++) {
-            int absPlayer = (p == 0) ? state.localPlayer : state.opponent();
-            for (int i = 0; i < 5; i++) {
-                int mBit = 1 << (p * 16 + i);
-                if ((field & mBit) == 0 && monsterSlots[absPlayer][i] != null)
-                    monsterSlots[absPlayer][i].addClass("target");
-
-                int sBit = 1 << (p * 16 + 8 + i);
-                if ((field & sBit) == 0 && spellSlots[absPlayer][i] != null)
-                    spellSlots[absPlayer][i].addClass("target");
+        for (Side side : Side.values()) {
+            int base = side == Side.PLR ? 0 : 16;
+            int lastMonster = side == Side.PLR ? 6 : 4;
+            for (int seq = 0; seq <= lastMonster; seq++) {
+                if ((field & (1 << (base + seq))) == 0) {
+                    slot(new Zone(side, LOCATION_MZONE, seq)).ifPresent(el -> el.addClass("target"));
+                }
+            }
+            for (int seq = 0; seq <= 7; seq++) {
+                if ((field & (1 << (base + 8 + seq))) == 0) {
+                    slot(new Zone(side, LOCATION_SZONE, seq)).ifPresent(el -> el.addClass("target"));
+                }
             }
         }
-
-        // Extra Monster Zones: bit 5 = asking player's seq 5 (their left EMZ → physical emz-left);
-        //                      bit 6 = asking player's seq 6 (their right EMZ → physical emz-right)
-        if ((field & (1 << 5)) == 0 && emzSlots[0] != null)
-            emzSlots[0].addClass("target");
-        if ((field & (1 << 6)) == 0 && emzSlots[1] != null)
-            emzSlots[1].addClass("target");
     }
 
     /** Refresh the .target highlight on field slots based on state.cardActions. */
@@ -457,33 +403,9 @@ public class FieldRenderer {
         }
     }
 
-    /** Map an absolute (player, location, sequence) to the corresponding UI slot. */
+    /** Map an absolute (player, location, sequence) to the corresponding UI slot, or null. */
     public UIElement findSlotForLocation(ClientDuelState.CardLocation loc) {
-        int p = loc.controller();
-        return switch (loc.location()) {
-            case LOCATION_MZONE -> {
-                if (loc.sequence() < 5) yield monsterSlots[p][loc.sequence()];
-                // EMZ: slot 0 = local player's seq 5 (or opp's seq 6);
-                //      slot 1 = local player's seq 6 (or opp's seq 5)
-                else if (loc.sequence() == 5)
-                    yield p == state.localPlayer ? emzSlots[0] : emzSlots[1];
-                else if (loc.sequence() == 6)
-                    yield p == state.localPlayer ? emzSlots[1] : emzSlots[0];
-                else yield null;
-            }
-            case LOCATION_SZONE -> {
-                if (loc.sequence() < 5) yield spellSlots[p][loc.sequence()];
-                else if (loc.sequence() == 5) yield fieldSpellSlots[p];
-                else if (loc.sequence() == 6) yield spellSlots[p][0]; // pendulum left shares S/T 0
-                else if (loc.sequence() == 7) yield spellSlots[p][4]; // pendulum right shares S/T 4
-                else yield null;
-            }
-            case LOCATION_EXTRA -> extraSlots[p];
-            case LOCATION_GRAVE -> graveSlots[p];
-            case LOCATION_REMOVED -> banishedSlots[p];
-            case LOCATION_DECK -> deckSlots[p];
-            default -> null;
-        };
+        return slot(new Zone(side(loc.controller()), loc.location(), loc.sequence())).orElse(null);
     }
 
     /** Compute the bit position in the SelectPlace bitmask for a given zone. */
@@ -493,9 +415,5 @@ public class FieldRenderer {
         int offset = bitmaskPlayer * 16;
         if (location == LOCATION_SZONE) offset += 8;
         return 1 << (offset + sequence);
-    }
-
-    private UIElement byId(String id) {
-        return ui.selectId(id).findFirst().orElse(null);
     }
 }

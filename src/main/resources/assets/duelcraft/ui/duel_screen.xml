@@ -3,10 +3,14 @@
            xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/Low-Drag-MC/LDLib2/refs/heads/1.21/ldlib2-ui.xsd">
     <stylesheet location="ldlib2:lss/gdp.lss" />
     <style>
-        /* ── Root ── */
+        /* ── Root: fixed design canvas. DuelScreen scales #duel-canvas to the window. ── */
         #duel-root {
+        width: 960;
+        height: 540;
+        }
+
+        #duel-canvas {
         flex-direction: column;
-        flex: 1;
         width: 100%;
         height: 100%;
         }
@@ -19,7 +23,7 @@
         align-self: center;
         gap-all: 2;
         padding-all: 8;
-        margin-vertical: 16;
+        margin-vertical: 8;
         background: built-in(ui-gdp:BORDER_THICK_RT1)
         }
 
@@ -76,12 +80,8 @@
         padding-horizontal: 4;
         }
 
-        #opp-banished {
-        margin-right: 8;
-        }
-
-        #plr-banished {
-        margin-left: 8;
+        .pz-slot {
+        background: built-in(ui-gdp:RECT_RD_DARK);
         }
 
         /* ── Zone Grid (rectangle background behind zones) ── */
@@ -161,7 +161,13 @@
         #center-row {
         flex-direction: row;
         align-items: center;
-        justify-content: center;
+        justify-content: space_between;
+        align-self: stretch;
+        }
+
+        #center-controls {
+        flex-direction: row;
+        align-items: center;
         gap-all: 14;
         }
 
@@ -309,7 +315,6 @@
         align-self: stretch;
         scroller-view-mode: HORIZONTAL;
         scroller-horizontal-display: ALWAYS;
-        max-width: 340;
         }
 
         #opponent-hand .__scroller_view_view-container__ {
@@ -578,9 +583,27 @@
         align-items: center;
         justify-content: center;
         }
+
+        /* ── Rule-driven visibility (FieldRenderer assigns these classes) ── */
+        .rule-hidden {
+        display: none;
+        }
+
+        .pendulum-marker {
+        display: none;
+        }
+
+        .pendulum > .pendulum-marker {
+        display: flex;
+        }
+
+        .zone-icon.pendulum-marker.hidden {
+        display: none;
+        }
     </style>
 
     <root id="duel-root">
+        <element id="duel-canvas">
 
         <!-- HUD Bar (top overlay: LP bars + duel title) -->
         <element id="hud-bar">
@@ -603,12 +626,16 @@
 
             <!-- ── Opponent Side ── -->
             <element id="opponent-side" class="player-side">
-                <!-- Opponent Left Piles: Extra Deck, Field Spell -->
+                <!-- Opponent Left Piles: Extra Deck, Pendulum (left, MR3 only), Field Spell -->
                 <element id="opp-piles-left" class="pile-column">
                     <element id="opp-extra-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/block/spawner.png);" />
                         <label class="card-count">0</label>
+                    </element>
+                    <element id="opp-pz-left" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                     </element>
                     <element id="opp-field-spell" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -621,14 +648,20 @@
                     <!-- Opponent S/T Row (far side) -->
                     <element id="opp-st-row" class="zone-row">
                         <element id="opp-st-0" class="square-slot zone-slot">
-                            <element class="zone-icon"
+                            <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                         </element>
-                        <element id="opp-st-1" class="square-slot zone-slot" />
+                        <element id="opp-st-1" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
                         <element id="opp-st-2" class="square-slot zone-slot" />
-                        <element id="opp-st-3" class="square-slot zone-slot" />
+                        <element id="opp-st-3" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
                         <element id="opp-st-4" class="square-slot zone-slot">
-                            <element class="zone-icon"
+                            <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/redstone.png)" />
                         </element>
                     </element>
@@ -642,12 +675,16 @@
                     </element>
                 </element>
 
-                <!-- Opponent Right Piles: Deck, GY, Banished -->
+                <!-- Opponent Right Piles: Deck, Pendulum (right, MR3 only), Graveyard -->
                 <element id="opp-piles-right" class="pile-column">
                     <element id="opp-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/book.png);" />
                         <label class="card-count">40</label>
+                    </element>
+                    <element id="opp-pz-right" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/redstone.png)" />
                     </element>
                     <element id="opp-graveyard" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -659,26 +696,36 @@
 
             <!-- ── Center Row: Extra Monster Zones + Controls ── -->
             <element id="center-row">
-                <element id="opp-banished" class="card-slot pile-slot">
-                    <label class="card-count">0</label>
+                <element id="opp-piles-banished" class="pile-column">
+                    <element id="opp-banished" class="card-slot pile-slot">
+                        <label class="card-count">0</label>
+                    </element>
                 </element>
-                <button id="phase-btn-left" class="phase-btn" text="SP" />
-                <element id="emz-left" class="square-slot emz-slot" />
-                <button id="phase-btn-center" class="phase-btn" text="BP" />
-                <element id="emz-right" class="square-slot emz-slot" />
-                <button id="phase-btn-right" class="phase-btn" text="EP" />
-                <element id="plr-banished" class="card-slot pile-slot">
-                    <label class="card-count">0</label>
+                <element id="center-controls">
+                    <button id="phase-btn-left" class="phase-btn" text="SP" />
+                    <element id="emz-left" class="square-slot emz-slot" />
+                    <button id="phase-btn-center" class="phase-btn" text="BP" />
+                    <element id="emz-right" class="square-slot emz-slot" />
+                    <button id="phase-btn-right" class="phase-btn" text="EP" />
+                </element>
+                <element id="plr-piles-banished" class="pile-column">
+                    <element id="plr-banished" class="card-slot pile-slot">
+                        <label class="card-count">0</label>
+                    </element>
                 </element>
             </element>
 
             <!-- ── Player Side ── -->
             <element id="player-side" class="player-side">
-                <!-- Player Left Piles: Extra Deck, Field Spell -->
+                <!-- Player Left Piles: Field Spell, Pendulum (left, MR3 only), Extra Deck -->
                 <element id="plr-piles-left" class="pile-column">
                     <element id="plr-field-spell" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/seagrass.png)" />
+                    </element>
+                    <element id="plr-pz-left" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                     </element>
                     <element id="plr-extra-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -700,25 +747,35 @@
                     <!-- Player S/T Row -->
                     <element id="plr-st-row" class="zone-row">
                         <element id="plr-st-0" class="square-slot zone-slot">
-                            <element class="zone-icon"
+                            <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                         </element>
-                        <element id="plr-st-1" class="square-slot zone-slot" />
+                        <element id="plr-st-1" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
                         <element id="plr-st-2" class="square-slot zone-slot" />
-                        <element id="plr-st-3" class="square-slot zone-slot" />
+                        <element id="plr-st-3" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
                         <element id="plr-st-4" class="square-slot zone-slot">
-                            <element class="zone-icon"
+                            <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/redstone.png)" />
                         </element>
                     </element>
                 </element>
 
-                <!-- Player Right Piles: Deck, GY, Banished -->
+                <!-- Player Right Piles: Graveyard, Pendulum (right, MR3 only), Deck -->
                 <element id="plr-piles-right" class="pile-column">
                     <element id="plr-graveyard" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/bone.png);" />
                         <label class="card-count">0</label>
+                    </element>
+                    <element id="plr-pz-right" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/redstone.png)" />
                     </element>
                     <element id="plr-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -788,5 +845,6 @@
         <!-- Card Action Context Menu (positioned at cursor on card click) -->
         <element id="context-menu" class="hidden" />
 
+        </element>
     </root>
 </ldlib2-ui>
