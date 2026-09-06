@@ -44,9 +44,10 @@ public abstract class DuelScreenScenario implements UIScenario {
          .checkBounds("#opponent-hand", DuelScreenScenario::insideViewport)
          .checkBounds("#player-hand", DuelScreenScenario::insideViewport)
          .check("hand rows span the field", DuelScreenScenario::handsSpanField)
-         .checkNotExists("#center-row .pile-slot")
+         .check("banished piles continue their graveyard columns", DuelScreenScenario::banishedContinuesGraveyard)
          .check("banished piles sit outside the zone grids", DuelScreenScenario::banishedOutsideGrids)
-         .check("zone grids are vertically aligned", DuelScreenScenario::gridsAligned);
+         .check("zone grids are vertically aligned", DuelScreenScenario::gridsAligned)
+         .check("field area fits inside the canvas", DuelScreenScenario::fieldAreaFitsCanvas);
         ruleChecks(s);
         s.screenshot(rule.id() + "-scale" + guiScale)
          .teardown("close", ctx -> {
@@ -72,6 +73,18 @@ public abstract class DuelScreenScenario implements UIScenario {
         return Math.abs(handBounds.width() - sideBounds.width()) <= 2f;
     }
 
+    /** Banished piles now live in the center row, but should still line up with their graveyard's column. */
+    private static boolean banishedContinuesGraveyard(TestContext ctx) {
+        var plrBanished = ctx.el("#plr-banished").bounds();
+        var plrGraveyard = ctx.el("#plr-graveyard").bounds();
+        var oppBanished = ctx.el("#opp-banished").bounds();
+        var oppGraveyard = ctx.el("#opp-graveyard").bounds();
+        ctx.attach("banished vs graveyard x", "plr banished=%.1f graveyard=%.1f, opp banished=%.1f graveyard=%.1f"
+                .formatted(plrBanished.x(), plrGraveyard.x(), oppBanished.x(), oppGraveyard.x()));
+        return Math.abs(plrBanished.x() - plrGraveyard.x()) <= 1f
+                && Math.abs(oppBanished.x() - oppGraveyard.x()) <= 1f;
+    }
+
     /** Each banished pile sits in its own column past the outer edge of its zone grid. */
     private static boolean banishedOutsideGrids(TestContext ctx) {
         var plrBanished = ctx.el("#plr-banished").bounds();
@@ -85,12 +98,22 @@ public abstract class DuelScreenScenario implements UIScenario {
                 && oppBanished.x() + oppBanished.width() <= oppZones.x() + 1f;
     }
 
-    /** The spacer column opposite the banished column keeps both grids at the same left edge. */
+    /** Both side rows carry the same columns at both ends, so the two zone grids share one left edge. */
     private static boolean gridsAligned(TestContext ctx) {
         var plrZones = ctx.el("#plr-zones").bounds();
         var oppZones = ctx.el("#opp-zones").bounds();
         ctx.attach("zone grid x", "plr=%.1f opp=%.1f".formatted(plrZones.x(), oppZones.x()));
         return Math.abs(plrZones.x() - oppZones.x()) <= 1f;
+    }
+
+    /** The field panel (with its padding and margin) must not clip outside the design canvas. */
+    private static boolean fieldAreaFitsCanvas(TestContext ctx) {
+        var f = ctx.el("#field-area").bounds();
+        var c = ctx.el("#duel-canvas").bounds();
+        ctx.attach("field area vs canvas", "field=%.1f,%.1f %.1fx%.1f canvas=%.1f,%.1f %.1fx%.1f"
+                .formatted(f.x(), f.y(), f.width(), f.height(), c.x(), c.y(), c.width(), c.height()));
+        return f.y() >= c.y() - 1f && f.y() + f.height() <= c.y() + c.height() + 1f
+                && f.x() >= c.x() - 1f && f.x() + f.width() <= c.x() + c.width() + 1f;
     }
 
     /** Bounds are in GUI space, the same space as the window's scaled size. One pixel of slack for rounding. */
