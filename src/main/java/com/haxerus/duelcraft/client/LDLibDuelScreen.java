@@ -173,7 +173,7 @@ public class LDLibDuelScreen {
             statusLabel = byId("status-label");
 
             // ── Field slots (owned by FieldRenderer) ──
-            field = new FieldRenderer(ui, state, new FieldRenderer.Callbacks() {
+            field = new FieldRenderer(ui, state, FieldLayout.fromFlags(state.duelFlags), new FieldRenderer.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
                 }

@@ -582,6 +582,23 @@
         align-items: center;
         justify-content: center;
         }
+
+        /* ── Rule-driven visibility (FieldRenderer assigns these classes) ── */
+        .rule-hidden {
+        display: none;
+        }
+
+        .pendulum-marker {
+        display: none;
+        }
+
+        .pendulum > .pendulum-marker {
+        display: flex;
+        }
+
+        .zone-icon.pendulum-marker.hidden {
+        display: none;
+        }
     </style>
 
     <root id="duel-root">
@@ -625,14 +642,28 @@
                 <element id="opp-zones" class="zone-grid">
                     <!-- Opponent S/T Row (far side) -->
                     <element id="opp-st-row" class="zone-row">
-                        <element id="opp-st-0" class="square-slot zone-slot">
+                        <element id="opp-pz-left" class="square-slot zone-slot">
                             <element class="zone-icon"
                                      style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                         </element>
-                        <element id="opp-st-1" class="square-slot zone-slot" />
+                        <element id="opp-st-0" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
+                        <element id="opp-st-1" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
                         <element id="opp-st-2" class="square-slot zone-slot" />
-                        <element id="opp-st-3" class="square-slot zone-slot" />
+                        <element id="opp-st-3" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
                         <element id="opp-st-4" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
+                        <element id="opp-pz-right" class="square-slot zone-slot">
                             <element class="zone-icon"
                                      style="background: sprite(minecraft:textures/item/redstone.png)" />
                         </element>
@@ -704,14 +735,28 @@
                     </element>
                     <!-- Player S/T Row -->
                     <element id="plr-st-row" class="zone-row">
-                        <element id="plr-st-0" class="square-slot zone-slot">
+                        <element id="plr-pz-left" class="square-slot zone-slot">
                             <element class="zone-icon"
                                      style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                         </element>
-                        <element id="plr-st-1" class="square-slot zone-slot" />
+                        <element id="plr-st-0" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
+                        <element id="plr-st-1" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
+                        </element>
                         <element id="plr-st-2" class="square-slot zone-slot" />
-                        <element id="plr-st-3" class="square-slot zone-slot" />
+                        <element id="plr-st-3" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
                         <element id="plr-st-4" class="square-slot zone-slot">
+                            <element class="zone-icon pendulum-marker"
+                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
+                        </element>
+                        <element id="plr-pz-right" class="square-slot zone-slot">
                             <element class="zone-icon"
                                      style="background: sprite(minecraft:textures/item/redstone.png)" />
                         </element>
