@@ -76,9 +76,12 @@ public class ClickDispatcher {
                 && (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd
                     || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) {
             event.stopPropagation();
-            // UIEvent carries screen coordinates; the menu is positioned inside the scaled canvas.
+            // UIEvent carries screen coordinates. The inverse pose undoes the canvas scale but
+            // lands in root-layout space, which still carries the root's centering offset, so the
+            // canvas position comes off: "left" and "top" of an absolute child are measured from
+            // the canvas's own origin.
             var local = canvas.getWorldToLocalPose().transformPosition(new Vector3f(event.x, event.y, 0f));
-            showContextMenu(actions, local.x, local.y);
+            showContextMenu(actions, local.x - canvas.getPositionX(), local.y - canvas.getPositionY());
             return;
         }
 

@@ -175,13 +175,13 @@ public final class DuelScreen extends ModularUIScreen {
 
 `LDLibDuelScreen.create` looks up `#duel-canvas` with `ui.selectId` and passes it to the `DuelScreen` constructor along with the `ModularUI` and title. `Transform2D.scale` assigns rather than multiplies, so repeated resizes are idempotent. The root element's own transform is ignored by LDLib2 (`computeLocalToWorldPose` returns the ModularUI pose for a parentless element), which is why the scale lives on the wrapper. `LDLibDuelScreen.loadFromXml` passes `screen -> Size.of(960, 540)` as the size provider.
 
-`ClickDispatcher` receives the canvas element. `showContextMenu` maps `event.x` and `event.y`, which LDLib2 fills with screen coordinates (`ModularUI.java:848`), through `canvas.getWorldToLocalPose()` before the existing flip-and-nudge logic, which already measures against the root's 960x540.
+`ClickDispatcher` receives the canvas element. `event.x` and `event.y`, which LDLib2 fills with screen coordinates (`ModularUI.java:848`), go through `canvas.getWorldToLocalPose()`. That undoes the scale but yields root-layout coordinates, which still carry the root's centering offset, so `showContextMenu` receives them minus `canvas.getPositionX()` and `canvas.getPositionY()`. That makes them canvas-relative, which is what `left` and `top` on an absolute child are measured from. The existing flip-and-nudge logic then applies unchanged, already measuring against the canvas's 960x540.
 
 ### XML restructuring
 
 - `#duel-root`: `width: 960; height: 540;` replacing the percent sizes. Its only child is `#duel-canvas`.
 - `#duel-canvas`: `width: 100%; height: 100%; flex-direction: column;`. Every current child of the root moves under it unchanged, including the absolute-positioned overlays, which then position against the canvas.
-- Separate pendulum slots: `plr-pz-left` and `plr-pz-right` become the first and last children of `#plr-st-row`; `opp-pz-left` and `opp-pz-right` the same in `#opp-st-row`. Class `square-slot zone-slot pz-slot`, each holding a pendulum `zone-icon`. The existing `row_reverse` on the opponent rows mirrors them.
+- Separate pendulum slots: `plr-pz-left` and `plr-pz-right` become the first and last children of `#plr-st-row`; `opp-pz-left` and `opp-pz-right` the same in `#opp-st-row`. Class `square-slot zone-slot`, each holding a pendulum `zone-icon`. The existing `row_reverse` on the opponent rows mirrors them.
 - Pendulum markers: the lapis and redstone icons on S/T 0 and 4 become `zone-icon pendulum-marker` children, and S/T 1 and 3 gain the same children. Rules: `.pendulum-marker { display: none; }` and `.pendulum > .pendulum-marker { display: flex; }`. `FieldRenderer` owns the `pendulum` class.
 - `.rule-hidden { display: none; }`. Hidden slots leave the flex row, so a 3-column field renders three zones wide.
 - `#center-row` keeps the EMZ slots; hidden ones collapse and the phase buttons and banished piles stay.
