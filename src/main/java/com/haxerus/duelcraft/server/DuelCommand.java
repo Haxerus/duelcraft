@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.server;
 import com.haxerus.duelcraft.core.Deck;
 import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.core.DeckRegistry;
+import com.haxerus.duelcraft.core.DuelRule;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -117,7 +118,7 @@ public class DuelCommand {
         String challengerName = DuelManager.get().getPlayerCurrentDeck(challenger.getUUID()).orElse(null);
         String accepterName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
 
-        DuelManager.get().startDuel(challenger, player, pending.seed(),
+        DuelManager.get().startDuel(challenger, player, pending.seed(), DuelRule.MR5,
                 challengerDeck, accepterDeck, challengerName, accepterName);
         DuelManager.get().duelInvites.remove(player.getUUID());
         return 1;
@@ -157,7 +158,7 @@ public class DuelCommand {
         String playerDeckName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
 
         player.sendSystemMessage(Component.literal("Starting solo test duel vs AI (seed=" + seed + ")..."));
-        DuelManager.get().startSoloDuel(player, seed, playerDeck, aiDeck, playerDeckName, aiDeckName);
+        DuelManager.get().startSoloDuel(player, seed, DuelRule.MR5, playerDeck, aiDeck, playerDeckName, aiDeckName);
         return 1;
     }
 
