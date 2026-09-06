@@ -181,10 +181,12 @@ public final class DuelScreen extends ModularUIScreen {
 
 - `#duel-root`: `width: 960; height: 540;` replacing the percent sizes. Its only child is `#duel-canvas`.
 - `#duel-canvas`: `width: 100%; height: 100%; flex-direction: column;`. Every current child of the root moves under it unchanged, including the absolute-positioned overlays, which then position against the canvas.
-- Separate pendulum slots: `plr-pz-left` and `plr-pz-right` become the first and last children of `#plr-st-row`; `opp-pz-left` and `opp-pz-right` the same in `#opp-st-row`. Class `square-slot zone-slot`, each holding a pendulum `zone-icon`. The existing `row_reverse` on the opponent rows mirrors them.
+- Separate pendulum slots: each is the middle child of an inner pile column, in EDOPro's order — field spell / pendulum (left) / extra deck, and graveyard / pendulum (right) / deck. Class `card-slot zone-slot pz-slot`, card-proportioned like the piles they sit between, each holding a pendulum `zone-icon`. The opponent's columns keep their vertical mirroring.
 - Pendulum markers: the lapis and redstone icons on S/T 0 and 4 become `zone-icon pendulum-marker` children, and S/T 1 and 3 gain the same children. Rules: `.pendulum-marker { display: none; }` and `.pendulum > .pendulum-marker { display: flex; }`. `FieldRenderer` owns the `pendulum` class.
 - `.rule-hidden { display: none; }`. Hidden slots leave the flex row, so a 3-column field renders three zones wide.
-- `#center-row` keeps the EMZ slots; hidden ones collapse and the phase buttons and banished piles stay.
+- `#center-row` holds only the phase buttons and the EMZ slots; hidden EMZ slots collapse and the buttons stay.
+- Each banished pile lives in its own outer `pile-column`, level with that side's graveyard, with an invisible spacer column of the same width at the opposite end of the row so both zone grids stay aligned.
+- `.hand-row` has no max width: both hands stretch to the field's content width.
 - Nothing else in the stylesheet changes. `#field-area` keeps its centering within the canvas.
 
 ### DuelRule, DuelOptions, payload, commands

@@ -78,14 +78,29 @@
         align-items: center;
         gap-all: 2;
         padding-horizontal: 4;
+        padding-vertical: 4;
         }
 
-        #opp-banished {
-        margin-right: 8;
+        /* Banished sits in its own column, level with the graveyard at the column's near end. */
+        .outer-column {
+        align-self: stretch;
         }
 
-        #plr-banished {
-        margin-left: 8;
+        #plr-piles-outer {
+        justify-content: flex_start;
+        }
+
+        #opp-piles-outer {
+        justify-content: flex_end;
+        }
+
+        /* Invisible column opposite the banished one, keeping both zone grids aligned. */
+        .spacer {
+        opacity: 0;
+        }
+
+        .pz-slot {
+        background: built-in(ui-gdp:RECT_RD_DARK);
         }
 
         /* ── Zone Grid (rectangle background behind zones) ── */
@@ -313,7 +328,6 @@
         align-self: stretch;
         scroller-view-mode: HORIZONTAL;
         scroller-horizontal-display: ALWAYS;
-        max-width: 340;
         }
 
         #opponent-hand .__scroller_view_view-container__ {
@@ -625,12 +639,20 @@
 
             <!-- ── Opponent Side ── -->
             <element id="opponent-side" class="player-side">
-                <!-- Opponent Left Piles: Extra Deck, Field Spell -->
+                <element id="opp-piles-spacer" class="pile-column">
+                    <element class="card-slot spacer" />
+                </element>
+
+                <!-- Opponent Left Piles: Extra Deck, Pendulum (left, MR3 only), Field Spell -->
                 <element id="opp-piles-left" class="pile-column">
                     <element id="opp-extra-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/block/spawner.png);" />
                         <label class="card-count">0</label>
+                    </element>
+                    <element id="opp-pz-left" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                     </element>
                     <element id="opp-field-spell" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -642,10 +664,6 @@
                 <element id="opp-zones" class="zone-grid">
                     <!-- Opponent S/T Row (far side) -->
                     <element id="opp-st-row" class="zone-row">
-                        <element id="opp-pz-left" class="square-slot zone-slot">
-                            <element class="zone-icon"
-                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
-                        </element>
                         <element id="opp-st-0" class="square-slot zone-slot">
                             <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
@@ -663,10 +681,6 @@
                             <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/redstone.png)" />
                         </element>
-                        <element id="opp-pz-right" class="square-slot zone-slot">
-                            <element class="zone-icon"
-                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
-                        </element>
                     </element>
                     <!-- Opponent Monster Row -->
                     <element id="opp-mon-row" class="zone-row">
@@ -678,12 +692,16 @@
                     </element>
                 </element>
 
-                <!-- Opponent Right Piles: Deck, GY, Banished -->
+                <!-- Opponent Right Piles: Deck, Pendulum (right, MR3 only), Graveyard -->
                 <element id="opp-piles-right" class="pile-column">
                     <element id="opp-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/book.png);" />
                         <label class="card-count">40</label>
+                    </element>
+                    <element id="opp-pz-right" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/redstone.png)" />
                     </element>
                     <element id="opp-graveyard" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -691,30 +709,39 @@
                         <label class="card-count">0</label>
                     </element>
                 </element>
+
+                <!-- Opponent Banished: own column, level with the graveyard -->
+                <element id="opp-piles-outer" class="pile-column outer-column">
+                    <element id="opp-banished" class="card-slot pile-slot">
+                        <label class="card-count">0</label>
+                    </element>
+                </element>
             </element>
 
             <!-- ── Center Row: Extra Monster Zones + Controls ── -->
             <element id="center-row">
-                <element id="opp-banished" class="card-slot pile-slot">
-                    <label class="card-count">0</label>
-                </element>
                 <button id="phase-btn-left" class="phase-btn" text="SP" />
                 <element id="emz-left" class="square-slot emz-slot" />
                 <button id="phase-btn-center" class="phase-btn" text="BP" />
                 <element id="emz-right" class="square-slot emz-slot" />
                 <button id="phase-btn-right" class="phase-btn" text="EP" />
-                <element id="plr-banished" class="card-slot pile-slot">
-                    <label class="card-count">0</label>
-                </element>
             </element>
 
             <!-- ── Player Side ── -->
             <element id="player-side" class="player-side">
-                <!-- Player Left Piles: Extra Deck, Field Spell -->
+                <element id="plr-piles-spacer" class="pile-column">
+                    <element class="card-slot spacer" />
+                </element>
+
+                <!-- Player Left Piles: Field Spell, Pendulum (left, MR3 only), Extra Deck -->
                 <element id="plr-piles-left" class="pile-column">
                     <element id="plr-field-spell" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/seagrass.png)" />
+                    </element>
+                    <element id="plr-pz-left" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
                     </element>
                     <element id="plr-extra-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
@@ -735,10 +762,6 @@
                     </element>
                     <!-- Player S/T Row -->
                     <element id="plr-st-row" class="zone-row">
-                        <element id="plr-pz-left" class="square-slot zone-slot">
-                            <element class="zone-icon"
-                                     style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
-                        </element>
                         <element id="plr-st-0" class="square-slot zone-slot">
                             <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/lapis_lazuli.png)" />
@@ -756,24 +779,31 @@
                             <element class="zone-icon pendulum-marker"
                                      style="background: sprite(minecraft:textures/item/redstone.png)" />
                         </element>
-                        <element id="plr-pz-right" class="square-slot zone-slot">
-                            <element class="zone-icon"
-                                     style="background: sprite(minecraft:textures/item/redstone.png)" />
-                        </element>
                     </element>
                 </element>
 
-                <!-- Player Right Piles: Deck, GY, Banished -->
+                <!-- Player Right Piles: Graveyard, Pendulum (right, MR3 only), Deck -->
                 <element id="plr-piles-right" class="pile-column">
                     <element id="plr-graveyard" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/bone.png);" />
                         <label class="card-count">0</label>
                     </element>
+                    <element id="plr-pz-right" class="card-slot zone-slot pz-slot">
+                        <element class="zone-icon"
+                                 style="background: sprite(minecraft:textures/item/redstone.png)" />
+                    </element>
                     <element id="plr-deck" class="card-slot pile-slot">
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/book.png);" />
                         <label class="card-count">40</label>
+                    </element>
+                </element>
+
+                <!-- Player Banished: own column, level with the graveyard -->
+                <element id="plr-piles-outer" class="pile-column outer-column">
+                    <element id="plr-banished" class="card-slot pile-slot">
+                        <label class="card-count">0</label>
                     </element>
                 </element>
             </element>
