@@ -24,9 +24,15 @@ public final class DuelMr3Scale3Scenario extends DuelScreenScenario {
          .checkVisible("#opp-pz-left")
          .checkVisible("#opp-pz-right")
          .checkExists("#plr-pz-left .card")
+         // checkHidden also passes when the selector matches nothing, so pair each one that is
+         // never checked visible here with a checkExists that would catch a renamed id or class.
+         .checkExists("#emz-left")
          .checkHidden("#emz-left")
+         .checkExists("#emz-right")
          .checkHidden("#emz-right")
+         .checkExists("#plr-st-0 .pendulum-marker")
          .checkHidden("#plr-st-0 .pendulum-marker")
+         .checkExists("#plr-st-4 .pendulum-marker")
          .checkHidden("#plr-st-4 .pendulum-marker");
     }
 }

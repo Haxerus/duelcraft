@@ -22,7 +22,11 @@ public final class DuelMr5Scale3Scenario extends DuelScreenScenario {
     protected void ruleChecks(ScenarioBuilder s) {
         s.checkVisible("#emz-left")
          .checkVisible("#emz-right")
+         // checkHidden also passes when the selector matches nothing, so pair each one that is
+         // never checked visible here with a checkExists that would catch a renamed id.
+         .checkExists("#plr-pz-left")
          .checkHidden("#plr-pz-left")
+         .checkExists("#opp-pz-right")
          .checkHidden("#opp-pz-right")
          .checkHidden("#card-info-banner")
          .hover("#plr-mon-2 .card")

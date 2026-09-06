@@ -61,6 +61,20 @@ public final class DuelScreenFixture {
         moveFromHand(0, codes.get(44), LOCATION_GRAVE, 0, POS_FACEUP_ATTACK);
     }
 
+    /**
+     * Sends an idle command whose only entry makes the monster at {@code (player, MZONE, sequence)}
+     * repositionable, so clicking that zone opens the context menu. Card codes follow
+     * {@link #populate}'s five-column mapping, where monster zone N holds {@code main().get(N)}.
+     */
+    public static void promptRepositionOf(int player, int sequence) {
+        int code = Deck.standard().main().get(sequence);
+        LDLibDuelScreen.applyMessage(new DuelMessage.SelectIdleCmd(player,
+                List.of(), List.of(),
+                List.of(new DuelMessage.ReposCard(code, player, LOCATION_MZONE, sequence)),
+                List.of(), List.of(), List.of(),
+                true, true, false));
+    }
+
     /** Moves the first card of the player's hand to the given zone. */
     private static void moveFromHand(int player, int code, int location, int sequence, int position) {
         LDLibDuelScreen.applyMessage(new DuelMessage.Move(code,
