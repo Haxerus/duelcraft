@@ -6,6 +6,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import org.joml.Vector3f;
 
 import java.util.List;
 
@@ -40,13 +41,15 @@ public class ClickDispatcher {
     private final Callbacks callbacks;
 
     private final UIElement contextMenu;
+    private final UIElement canvas;
 
     public ClickDispatcher(UI ui, ClientDuelState state, FieldRenderer field,
-                           PromptController prompt, Callbacks callbacks) {
+                           PromptController prompt, UIElement canvas, Callbacks callbacks) {
         this.ui = ui;
         this.state = state;
         this.field = field;
         this.prompt = prompt;
+        this.canvas = canvas;
         this.callbacks = callbacks;
         this.contextMenu = byId("context-menu");
     }
@@ -73,7 +76,9 @@ public class ClickDispatcher {
                 && (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd
                     || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) {
             event.stopPropagation();
-            showContextMenu(actions, event.x, event.y);
+            // UIEvent carries screen coordinates; the menu is positioned inside the scaled canvas.
+            var local = canvas.getWorldToLocalPose().transformPosition(new Vector3f(event.x, event.y, 0f));
+            showContextMenu(actions, local.x, local.y);
             return;
         }
 
@@ -127,10 +132,9 @@ public class ClickDispatcher {
             contextMenu.addChild(icon);
         }
 
-        // Flip/nudge positioning so the menu never runs off the edge
-        var root = ui.rootElement;
-        float rootW = root.getSizeWidth();
-        float rootH = root.getSizeHeight();
+        // Flip/nudge positioning so the menu never runs off the canvas
+        float rootW = canvas.getSizeWidth();
+        float rootH = canvas.getSizeHeight();
         // Estimated menu size — must stay in sync with #context-menu and .ctx-action CSS:
         //   width per icon = 14 (.ctx-action width) + 1 (gap-all) = 15
         //   total padding = 1 (padding-all) * 2 sides = 2
