@@ -8,6 +8,7 @@ import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -30,29 +31,53 @@ public class DuelCommand {
                 return SharedSuggestionProvider.suggest(reg.listDeckNames(), builder);
             };
 
+    private static final SuggestionProvider<CommandSourceStack> RULE_IDS =
+            (ctx, builder) -> SharedSuggestionProvider.suggest(DuelRule.ids(), builder);
+
+    private static final DynamicCommandExceptionType UNKNOWN_RULE = new DynamicCommandExceptionType(
+            id -> Component.literal("Unknown rule '" + id + "'. Valid rules: " + String.join(", ", DuelRule.ids())));
+
+    private static DuelRule parseRule(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        String id = StringArgumentType.getString(ctx, "rule");
+        return DuelRule.parse(id).orElseThrow(() -> UNKNOWN_RULE.create(id));
+    }
+
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("duel")
                         .then(Commands.literal("challenge")
                                 .then(Commands.argument("player", EntityArgument.player())
-                                        .executes(ctx -> challenge(ctx, ThreadLocalRandom.current().nextLong()))
+                                        .executes(ctx -> challenge(ctx, ThreadLocalRandom.current().nextLong(), DuelRule.MR5))
                                         .then(Commands.argument("seed", LongArgumentType.longArg())
-                                                .executes(ctx -> challenge(ctx, LongArgumentType.getLong(ctx, "seed"))))))
+                                                .executes(ctx -> challenge(ctx, LongArgumentType.getLong(ctx, "seed"), DuelRule.MR5))
+                                                .then(Commands.argument("rule", StringArgumentType.word())
+                                                        .suggests(RULE_IDS)
+                                                        .executes(ctx -> challenge(ctx,
+                                                                LongArgumentType.getLong(ctx, "seed"),
+                                                                parseRule(ctx)))))))
                         .then(Commands.literal("accept")
                                 .executes(DuelCommand::accept))
                         .then(Commands.literal("forfeit")
                                 .executes(DuelCommand::forfeit))
                         .then(Commands.literal("test")
-                                .executes(ctx -> test(ctx, null, ThreadLocalRandom.current().nextLong()))
+                                .executes(ctx -> test(ctx, null, ThreadLocalRandom.current().nextLong(), DuelRule.MR5))
                                 .then(Commands.argument("aiDeck", StringArgumentType.string())
                                         .suggests(DECK_NAMES)
                                         .executes(ctx -> test(ctx,
                                                 StringArgumentType.getString(ctx, "aiDeck"),
-                                                ThreadLocalRandom.current().nextLong()))
+                                                ThreadLocalRandom.current().nextLong(),
+                                                DuelRule.MR5))
                                         .then(Commands.argument("seed", LongArgumentType.longArg())
                                                 .executes(ctx -> test(ctx,
                                                         StringArgumentType.getString(ctx, "aiDeck"),
-                                                        LongArgumentType.getLong(ctx, "seed"))))))
+                                                        LongArgumentType.getLong(ctx, "seed"),
+                                                        DuelRule.MR5))
+                                                .then(Commands.argument("rule", StringArgumentType.word())
+                                                        .suggests(RULE_IDS)
+                                                        .executes(ctx -> test(ctx,
+                                                                StringArgumentType.getString(ctx, "aiDeck"),
+                                                                LongArgumentType.getLong(ctx, "seed"),
+                                                                parseRule(ctx)))))))
                         .then(Commands.literal("deck")
                                 .then(Commands.literal("list")
                                         .executes(DuelCommand::deckList))
@@ -69,7 +94,7 @@ public class DuelCommand {
 
     // --- challenge / accept / forfeit ---
 
-    private static int challenge(CommandContext<CommandSourceStack> ctx, long seed)
+    private static int challenge(CommandContext<CommandSourceStack> ctx, long seed, DuelRule rule)
             throws CommandSyntaxException {
         ServerPlayer sender = ctx.getSource().getPlayerOrException();
         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
@@ -84,8 +109,8 @@ public class DuelCommand {
             return 0;
         }
 
-        DuelManager.get().duelInvites.put(target.getUUID(), new PendingChallenge(sender.getUUID(), seed));
-        sender.sendSystemMessage(Component.literal("Sent duel challenge (seed=" + seed + ")."));
+        DuelManager.get().duelInvites.put(target.getUUID(), new PendingChallenge(sender.getUUID(), seed, rule));
+        sender.sendSystemMessage(Component.literal("Sent duel challenge (seed=" + seed + ", rule=" + rule.id() + ")."));
         target.sendSystemMessage(Component.literal("You have been challenged to a duel."));
         return 1;
     }
@@ -118,7 +143,7 @@ public class DuelCommand {
         String challengerName = DuelManager.get().getPlayerCurrentDeck(challenger.getUUID()).orElse(null);
         String accepterName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
 
-        DuelManager.get().startDuel(challenger, player, pending.seed(), DuelRule.MR5,
+        DuelManager.get().startDuel(challenger, player, pending.seed(), pending.rule(),
                 challengerDeck, accepterDeck, challengerName, accepterName);
         DuelManager.get().duelInvites.remove(player.getUUID());
         return 1;
@@ -137,7 +162,7 @@ public class DuelCommand {
 
     // --- test ---
 
-    private static int test(CommandContext<CommandSourceStack> ctx, String aiDeckName, long seed)
+    private static int test(CommandContext<CommandSourceStack> ctx, String aiDeckName, long seed, DuelRule rule)
             throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
 
@@ -157,8 +182,8 @@ public class DuelCommand {
         }
         String playerDeckName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
 
-        player.sendSystemMessage(Component.literal("Starting solo test duel vs AI (seed=" + seed + ")..."));
-        DuelManager.get().startSoloDuel(player, seed, DuelRule.MR5, playerDeck, aiDeck, playerDeckName, aiDeckName);
+        player.sendSystemMessage(Component.literal("Starting solo test duel vs AI (seed=" + seed + ", rule=" + rule.id() + ")..."));
+        DuelManager.get().startSoloDuel(player, seed, rule, playerDeck, aiDeck, playerDeckName, aiDeckName);
         return 1;
     }
 
@@ -205,6 +230,6 @@ public class DuelCommand {
         return 1;
     }
 
-    /** Pending challenge: who challenged + the agreed seed. */
-    public record PendingChallenge(UUID challengerUUID, long seed) {}
+    /** Pending challenge: who challenged, the agreed seed, and the rule set. */
+    public record PendingChallenge(UUID challengerUUID, long seed, DuelRule rule) {}
 }
