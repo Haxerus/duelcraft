@@ -48,7 +48,7 @@ public final class DuelScreenFixture {
         int last = layout.columns() == 3 ? 3 : 4;
         for (int p = 0; p < 2; p++) {
             for (int seq = first; seq <= last; seq++) {
-                moveFromHand(p, codes.get(seq), LOCATION_MZONE, seq, POS_FACEUP_ATTACK);
+                moveFromHand(p, codes.get(seq - first), LOCATION_MZONE, seq, POS_FACEUP_ATTACK);
             }
         }
         if (layout.emz()) {
