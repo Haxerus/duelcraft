@@ -248,6 +248,9 @@ neoForge {
     }
 }
 
+// LDLib2 in-client UI test harness. Inert unless -PldTest is given.
+apply from: rootProject.file('gradle/ldlib2-uitest.gradle')
+
 // Sets up a dependency configuration called 'localRuntime'.
 // This configuration should be used instead of 'runtimeOnly' to declare
 // a dependency that will be present for runtime testing but that is
