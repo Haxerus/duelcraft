@@ -23,7 +23,7 @@
         align-self: center;
         gap-all: 2;
         padding-all: 8;
-        margin-vertical: 16;
+        margin-vertical: 8;
         background: built-in(ui-gdp:BORDER_THICK_RT1)
         }
 
@@ -78,25 +78,6 @@
         align-items: center;
         gap-all: 2;
         padding-horizontal: 4;
-        padding-vertical: 4;
-        }
-
-        /* Banished sits in its own column, level with the graveyard at the column's near end. */
-        .outer-column {
-        align-self: stretch;
-        }
-
-        #plr-piles-outer {
-        justify-content: flex_start;
-        }
-
-        #opp-piles-outer {
-        justify-content: flex_end;
-        }
-
-        /* Invisible column opposite the banished one, keeping both zone grids aligned. */
-        .spacer {
-        opacity: 0;
         }
 
         .pz-slot {
@@ -180,7 +161,13 @@
         #center-row {
         flex-direction: row;
         align-items: center;
-        justify-content: center;
+        justify-content: space_between;
+        align-self: stretch;
+        }
+
+        #center-controls {
+        flex-direction: row;
+        align-items: center;
         gap-all: 14;
         }
 
@@ -639,10 +626,6 @@
 
             <!-- ── Opponent Side ── -->
             <element id="opponent-side" class="player-side">
-                <element id="opp-piles-spacer" class="pile-column">
-                    <element class="card-slot spacer" />
-                </element>
-
                 <!-- Opponent Left Piles: Extra Deck, Pendulum (left, MR3 only), Field Spell -->
                 <element id="opp-piles-left" class="pile-column">
                     <element id="opp-extra-deck" class="card-slot pile-slot">
@@ -709,30 +692,31 @@
                         <label class="card-count">0</label>
                     </element>
                 </element>
+            </element>
 
-                <!-- Opponent Banished: own column, level with the graveyard -->
-                <element id="opp-piles-outer" class="pile-column outer-column">
+            <!-- ── Center Row: Extra Monster Zones + Controls ── -->
+            <element id="center-row">
+                <element id="opp-piles-banished" class="pile-column">
                     <element id="opp-banished" class="card-slot pile-slot">
+                        <label class="card-count">0</label>
+                    </element>
+                </element>
+                <element id="center-controls">
+                    <button id="phase-btn-left" class="phase-btn" text="SP" />
+                    <element id="emz-left" class="square-slot emz-slot" />
+                    <button id="phase-btn-center" class="phase-btn" text="BP" />
+                    <element id="emz-right" class="square-slot emz-slot" />
+                    <button id="phase-btn-right" class="phase-btn" text="EP" />
+                </element>
+                <element id="plr-piles-banished" class="pile-column">
+                    <element id="plr-banished" class="card-slot pile-slot">
                         <label class="card-count">0</label>
                     </element>
                 </element>
             </element>
 
-            <!-- ── Center Row: Extra Monster Zones + Controls ── -->
-            <element id="center-row">
-                <button id="phase-btn-left" class="phase-btn" text="SP" />
-                <element id="emz-left" class="square-slot emz-slot" />
-                <button id="phase-btn-center" class="phase-btn" text="BP" />
-                <element id="emz-right" class="square-slot emz-slot" />
-                <button id="phase-btn-right" class="phase-btn" text="EP" />
-            </element>
-
             <!-- ── Player Side ── -->
             <element id="player-side" class="player-side">
-                <element id="plr-piles-spacer" class="pile-column">
-                    <element class="card-slot spacer" />
-                </element>
-
                 <!-- Player Left Piles: Field Spell, Pendulum (left, MR3 only), Extra Deck -->
                 <element id="plr-piles-left" class="pile-column">
                     <element id="plr-field-spell" class="card-slot pile-slot">
@@ -797,13 +781,6 @@
                         <element class="zone-icon"
                                  style="background: sprite(minecraft:textures/item/book.png);" />
                         <label class="card-count">40</label>
-                    </element>
-                </element>
-
-                <!-- Player Banished: own column, level with the graveyard -->
-                <element id="plr-piles-outer" class="pile-column outer-column">
-                    <element id="plr-banished" class="card-slot pile-slot">
-                        <label class="card-count">0</label>
                     </element>
                 </element>
             </element>

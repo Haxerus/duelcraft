@@ -184,8 +184,8 @@ public final class DuelScreen extends ModularUIScreen {
 - Separate pendulum slots: each is the middle child of an inner pile column, in EDOPro's order — field spell / pendulum (left) / extra deck, and graveyard / pendulum (right) / deck. Class `card-slot zone-slot pz-slot`, card-proportioned like the piles they sit between, each holding a pendulum `zone-icon`. The opponent's columns keep their vertical mirroring.
 - Pendulum markers: the lapis and redstone icons on S/T 0 and 4 become `zone-icon pendulum-marker` children, and S/T 1 and 3 gain the same children. Rules: `.pendulum-marker { display: none; }` and `.pendulum > .pendulum-marker { display: flex; }`. `FieldRenderer` owns the `pendulum` class.
 - `.rule-hidden { display: none; }`. Hidden slots leave the flex row, so a 3-column field renders three zones wide.
-- `#center-row` holds only the phase buttons and the EMZ slots; hidden EMZ slots collapse and the buttons stay.
-- Each banished pile lives in its own outer `pile-column`, level with that side's graveyard, with an invisible spacer column of the same width at the opposite end of the row so both zone grids stay aligned.
+- `#center-row` stretches to the field width and, with `justify-content: space_between`, holds a banished pile at each end and a centered group of the phase buttons and EMZ slots. Each banished pile sits directly below (opponent) or above (player) the graveyard column on the same side, so every pile column reads as one continuous stack. Hidden EMZ slots collapse and the buttons stay.
+- `.pile-column` has no vertical padding, so a three-slot column under MR3 is 148 px tall and the whole field fits the 540 px canvas; `#field-area` uses an 8 px vertical margin. The zone grid keeps its natural height and centers against taller columns.
 - `.hand-row` has no max width: both hands stretch to the field's content width.
 - Nothing else in the stylesheet changes. `#field-area` keeps its centering within the canvas.
 
