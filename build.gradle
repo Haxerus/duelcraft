@@ -257,7 +257,7 @@ configurations {
 }
 
 dependencies {
-    implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-1.21.1:2.2.5:all")
+    implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-1.21.1:2.2.39.a:all")
 
     implementation("org.xerial:sqlite-jdbc:3.49.1.0")
     additionalRuntimeClasspath("org.xerial:sqlite-jdbc:3.49.1.0")
