@@ -70,11 +70,12 @@ class DeckRegistryTest {
     }
 
     @Test
-    void constructorCreatesDirectoryIfMissing(@TempDir Path parent) {
+    void openCreatesDirectoryIfMissing(@TempDir Path parent) {
         Path target = parent.resolve("decks_subdir");
         assertFalse(Files.exists(target));
-        new DeckRegistry(target);
+        DeckRegistry registry = DeckRegistry.open(target);
         assertTrue(Files.isDirectory(target));
+        assertEquals(target, registry.dir());
     }
 
     @Test

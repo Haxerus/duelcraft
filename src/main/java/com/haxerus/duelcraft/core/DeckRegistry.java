@@ -10,19 +10,18 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /** Lists and loads {@link Deck}s from a directory of {@code .ydk} files. No caching. */
-public final class DeckRegistry {
+public record DeckRegistry(Path dir) {
 
     private static final String EXT = ".ydk";
 
-    private final Path dir;
-
-    public DeckRegistry(Path dir) {
-        this.dir = dir;
+    /** Opens the registry at {@code dir}, creating the directory if it is missing. */
+    public static DeckRegistry open(Path dir) {
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to create decks directory: " + dir, e);
         }
+        return new DeckRegistry(dir);
     }
 
     /** Returns alphabetized names (no extension) of every {@code .ydk} file in the directory. */
@@ -50,6 +49,4 @@ public final class DeckRegistry {
         }
         return DeckLoader.loadFromFile(file);
     }
-
-    public Path getDir() { return dir; }
 }

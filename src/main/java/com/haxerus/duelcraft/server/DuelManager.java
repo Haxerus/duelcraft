@@ -60,7 +60,7 @@ public class DuelManager {
         duelInvites = new HashMap<>();
 
         java.nio.file.Path decksDir = FMLPaths.GAMEDIR.get().resolve("duelcraft").resolve("decks");
-        deckRegistry = new DeckRegistry(decksDir);
+        deckRegistry = DeckRegistry.open(decksDir);
 
         int[] version = OcgCore.nGetVersion();
         LOGGER.info("DuelManager initialized — OCG core v{}.{}, decks dir: {}",
