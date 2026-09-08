@@ -3,7 +3,6 @@ package com.haxerus.duelcraft.client.uitest;
 import com.haxerus.duelcraft.client.FieldLayout;
 import com.haxerus.duelcraft.client.FieldLayout.PendulumMode;
 import com.haxerus.duelcraft.client.LDLibDuelScreen;
-import com.haxerus.duelcraft.core.Deck;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
@@ -17,11 +16,20 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /**
  * Synthetic duel state for UI scenarios: no server and no engine, only the messages a client
- * would receive. Card codes come from the standard deck; nothing here depends on the card
+ * would receive. Card codes are a fixed list of passcodes; nothing here depends on the card
  * database or images being present.
  */
 @OnlyIn(Dist.CLIENT)
 public final class DuelScreenFixture {
+
+    private static final List<Integer> CODES = List.of(
+            89631139, 33750025, 28406301, 55415564,
+            49238328, 39153655, 39153655, 70095154,
+            11747708, 55144522, 24094653, 55144522,
+            25259669, 25259669, 13039848, 55144522,
+            31786629, 31786629, 43096270, 11091375,
+            11091375, 11091375, 11091375, 69247929,
+            69247929, 69247929, 69247929, 28406301);
 
     private DuelScreenFixture() {}
 
@@ -38,36 +46,35 @@ public final class DuelScreenFixture {
      */
     public static void populate(DuelRule rule) {
         FieldLayout layout = FieldLayout.fromFlags(rule.flags());
-        List<Integer> codes = Deck.standard().main();
 
         for (int p = 0; p < 2; p++) {
-            LDLibDuelScreen.applyMessage(new DuelMessage.Draw(p, codes.subList(0, 10)));
+            LDLibDuelScreen.applyMessage(new DuelMessage.Draw(p, CODES.subList(0, 10)));
         }
 
         int first = layout.columns() == 3 ? 1 : 0;
         int last = layout.columns() == 3 ? 3 : 4;
         for (int p = 0; p < 2; p++) {
             for (int seq = first; seq <= last; seq++) {
-                moveFromHand(p, codes.get(seq - first), LOCATION_MZONE, seq, POS_FACEUP_ATTACK);
+                moveFromHand(p, CODES.get(seq - first), LOCATION_MZONE, seq, POS_FACEUP_ATTACK);
             }
         }
         if (layout.emz()) {
-            moveFromHand(0, codes.get(5), LOCATION_MZONE, 5, POS_FACEUP_ATTACK);
+            moveFromHand(0, CODES.get(5), LOCATION_MZONE, 5, POS_FACEUP_ATTACK);
         }
-        moveFromHand(0, codes.get(30), LOCATION_SZONE, 1, POS_FACEUP_ATTACK);
+        moveFromHand(0, CODES.get(20), LOCATION_SZONE, 1, POS_FACEUP_ATTACK);
         if (layout.pendulum() == PendulumMode.SEPARATE) {
-            moveFromHand(0, codes.get(31), LOCATION_SZONE, 6, POS_FACEUP_ATTACK);
+            moveFromHand(0, CODES.get(21), LOCATION_SZONE, 6, POS_FACEUP_ATTACK);
         }
-        moveFromHand(0, codes.get(44), LOCATION_GRAVE, 0, POS_FACEUP_ATTACK);
+        moveFromHand(0, CODES.get(27), LOCATION_GRAVE, 0, POS_FACEUP_ATTACK);
     }
 
     /**
      * Sends an idle command whose only entry makes the monster at {@code (player, MZONE, sequence)}
      * repositionable, so clicking that zone opens the context menu. Card codes follow
-     * {@link #populate}'s five-column mapping, where monster zone N holds {@code main().get(N)}.
+     * {@link #populate}'s five-column mapping, where monster zone N holds {@code CODES.get(N)}.
      */
     public static void promptRepositionOf(int player, int sequence) {
-        int code = Deck.standard().main().get(sequence);
+        int code = CODES.get(sequence);
         LDLibDuelScreen.applyMessage(new DuelMessage.SelectIdleCmd(player,
                 List.of(), List.of(),
                 List.of(new DuelMessage.ReposCard(code, player, LOCATION_MZONE, sequence)),
