@@ -493,6 +493,31 @@ class MessageParserTest {
     }
 
     @Test
+    void parseSelectChain_entriesCarryLocInfoWithPosition() {
+        // playerop.cpp: [u8 player][u8 specount][u8 forced][u32 hint0][u32 hint1][u32 count]
+        // then per entry [u32 code][u8 con][u8 loc][u32 seq][u32 pos][u64 desc][u8 mode] = 23 bytes
+        ByteBuffer b = body(3 + 4 + 4 + 4 + 2 * 23);
+        b.put((byte) 1); b.put((byte) 0); b.put((byte) 0);
+        b.putInt(0); b.putInt(0);
+        b.putInt(2);
+        b.putInt(89631139); putLocInfo(b, 1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK); b.putLong((89631139L << 20) | 1); b.put((byte) 0);
+        b.putInt(46986414); putLocInfo(b, 1, LOCATION_SZONE, 4, POS_FACEDOWN_ATTACK); b.putLong((46986414L << 20) | 2); b.put((byte) 1);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_CHAIN, b.array()));
+        assertEquals(1, msgs.size());
+        var sc = (DuelMessage.SelectChain) msgs.getFirst();
+        assertEquals(1, sc.player());
+        assertFalse(sc.forced());
+        assertEquals(2, sc.count());
+        var second = sc.chains().get(1);
+        assertEquals(46986414, second.code());
+        assertEquals(LOCATION_SZONE, second.location());
+        assertEquals(4, second.sequence());
+        assertEquals((46986414L << 20) | 2, second.desc());
+        assertEquals(1, second.flag());
+    }
+
+    @Test
     void parseSelectUnselectCard() {
         ByteBuffer b = body(1 + 1 + 1 + 4 + 4 + 4 + 14 + 4 + 14);
         b.put((byte) 0);    // player

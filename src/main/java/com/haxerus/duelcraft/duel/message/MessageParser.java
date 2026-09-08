@@ -437,7 +437,13 @@ public class MessageParser {
         int count = r.readInt32();
         List<DuelMessage.ActivatableCard> chains = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            chains.add(DuelMessage.ActivatableCard.read(r));
+            // playerop.cpp select_chain: [u32 code][loc_info with position][u64 desc][u8 mode]; the idle and
+            // battle commands write their activatable entries without the position (ActivatableCard.read).
+            int code = r.readInt32();
+            LocInfo loc = LocInfo.read(r);
+            long desc = r.readInt64();
+            int flag = r.readUint8();
+            chains.add(new DuelMessage.ActivatableCard(code, loc.controller(), loc.location(), loc.sequence(), desc, flag));
         }
         return new DuelMessage.SelectChain(player, speCount, forced, hint0, hint1, chains);
     }
