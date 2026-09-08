@@ -75,11 +75,12 @@ public class MessageParser {
                 // Deck/Hand
                 case MSG_SHUFFLE_DECK  -> new DuelMessage.ShuffleDeck(reader.readUint8());
                 case MSG_SHUFFLE_HAND  -> parseShuffleHand(reader);
-                case MSG_SHUFFLE_EXTRA -> new DuelMessage.ShuffleExtra(reader.readUint8());
+                case MSG_SHUFFLE_EXTRA -> parseShuffleExtra(reader);
 
                 // UI/Info
                 case MSG_HINT          -> parseHint(reader);
-                case MSG_PLAYER_HINT   -> parseHint(reader);
+                // MSG_PLAYER_HINT ([u8 player][u8 type][u64 desc], field.cpp) stays Raw: its layout is not
+                // MSG_HINT's and no UI consumes it yet.
                 case MSG_CARD_HINT     -> parseCardHint(reader);
                 case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(reader.readInt32());
                 case MSG_BECOME_TARGET -> parseBecomeTarget(reader);
@@ -299,6 +300,13 @@ public class MessageParser {
             codes.add(r.readInt32());
         }
         return new DuelMessage.ShuffleHand(player, codes);
+    }
+
+    /** [u8 player][u32 count][u32 code]*count (field.cpp). The codes are skipped: the client treats the extra deck as an unordered pile. */
+    private static DuelMessage.ShuffleExtra parseShuffleExtra(BufferReader r) {
+        int player = r.readUint8();
+        r.skip(4 * r.readInt32());
+        return new DuelMessage.ShuffleExtra(player);
     }
 
     // ---- UI/Info ----

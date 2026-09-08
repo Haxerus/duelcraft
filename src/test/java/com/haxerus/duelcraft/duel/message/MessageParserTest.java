@@ -339,6 +339,20 @@ class MessageParserTest {
         assertEquals(560L, hint.data());
     }
 
+    @Test
+    void playerHintStaysRaw() {
+        // field.cpp: [u8 player][u8 type][u64 desc]; not MSG_HINT's [u8 type][u8 player][u64 desc]
+        ByteBuffer b = body(10);
+        b.put((byte) 0);
+        b.put((byte) PHINT_DESC_ADD);
+        b.putLong(1160L);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_PLAYER_HINT, b.array()));
+        var raw = (DuelMessage.Raw) msgs.getFirst();
+        assertEquals(MSG_PLAYER_HINT, raw.type());
+        assertEquals(10, raw.body().length);
+    }
+
     // ---- Deck/Hand ----
 
     @Test
@@ -360,6 +374,20 @@ class MessageParserTest {
         var sh = (DuelMessage.ShuffleHand) msgs.getFirst();
         assertEquals(0, sh.player());
         assertEquals(List.of(89631139, 46986414), sh.codes());
+    }
+
+    @Test
+    void parseShuffleExtra_consumesCountAndCodes() {
+        // field.cpp: [u8 player][u32 count][u32 code]*count, same shape as MSG_SHUFFLE_HAND
+        ByteBuffer b = body(1 + 4 + 4 * 2);
+        b.put((byte) 1);
+        b.putInt(2);
+        b.putInt(7391448);
+        b.putInt(29981921);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SHUFFLE_EXTRA, b.array()));
+        assertEquals(1, msgs.size());
+        assertEquals(1, ((DuelMessage.ShuffleExtra) msgs.getFirst()).player());
     }
 
     // ---- Selection Messages ----
