@@ -76,25 +76,15 @@ public class DuelManager {
         activeDuels.clear();
         playerToDuel.clear();
         if (engine != null) {
-            try {
-                engine.close();
-                engine = null;
-            } catch (Exception e) {
-                LOGGER.error("{}{}", "Failed to shutdown DuelManager ", e);
-            }
+            engine.close();
+            engine = null;
         }
-    }
-
-    /** Convenience: random seed, Master Rule 5. */
-    public void startSoloDuel(ServerPlayer player, Deck playerDeck, Deck aiDeck) {
-        startSoloDuel(player, java.util.concurrent.ThreadLocalRandom.current().nextLong(), DuelRule.MR5,
-                playerDeck, aiDeck, null, null);
     }
 
     /**
      * Start a solo test duel where player 1 is AI-controlled.
-     * Both decks are deterministically shuffled with {@code seed} before being handed to the engine.
-     * {@code playerDeckName} and {@code aiDeckName} are used only for logging.
+     * The player's deck is shuffled with {@code seed} and the AI's with {@code seed + 1}, so two
+     * identical lists still produce different draws. Deck names are used only for logging.
      */
     public void startSoloDuel(ServerPlayer player, long seed, DuelRule rule,
                               Deck playerDeck, Deck aiDeck,
@@ -114,12 +104,10 @@ public class DuelManager {
         soloHandlers.put(duelId, handler);
 
         LOGGER.info("Solo duel {}: seed={}, rule={}, player={}, aiDeck={}",
-                duelId, seed, rule.id(),
-                playerDeckName != null ? playerDeckName : "<standard>",
-                aiDeckName != null ? aiDeckName : "<standard>");
+                duelId, seed, rule.id(), playerDeckName, aiDeckName);
 
         Deck shuffledPlayer = playerDeck.shuffled(seed);
-        Deck shuffledAi = aiDeck.shuffled(seed);
+        Deck shuffledAi = aiDeck.shuffled(seed + 1);
 
         int lp0 = options.team1().lp();
         int lp1 = options.team2().lp();
@@ -168,12 +156,7 @@ public class DuelManager {
         }
     }
 
-    /** Convenience: random seed, Master Rule 5, decks resolved earlier by the caller. */
-    public void startDuel(ServerPlayer p1, ServerPlayer p2, Deck team1Deck, Deck team2Deck) {
-        startDuel(p1, p2, java.util.concurrent.ThreadLocalRandom.current().nextLong(), DuelRule.MR5,
-                team1Deck, team2Deck, null, null);
-    }
-
+    /** Team 1 shuffles with {@code seed}, team 2 with {@code seed + 1}; see {@link #startSoloDuel}. */
     public void startDuel(ServerPlayer p1, ServerPlayer p2, long seed, DuelRule rule,
                           Deck team1Deck, Deck team2Deck,
                           String team1Name, String team2Name) {
@@ -192,12 +175,10 @@ public class DuelManager {
         playerToDuel.put(p2.getUUID(), duelId);
 
         LOGGER.info("Duel {}: seed={}, rule={}, decks=[{}, {}]",
-                duelId, seed, rule.id(),
-                team1Name != null ? team1Name : "<standard>",
-                team2Name != null ? team2Name : "<standard>");
+                duelId, seed, rule.id(), team1Name, team2Name);
 
         Deck shuffled1 = team1Deck.shuffled(seed);
-        Deck shuffled2 = team2Deck.shuffled(seed);
+        Deck shuffled2 = team2Deck.shuffled(seed + 1);
 
         int lp0 = options.team1().lp();
         int lp1 = options.team2().lp();
@@ -250,13 +231,13 @@ public class DuelManager {
 
     /**
      * Resolves the deck a player should use right now.
-     * Returns {@link Deck#standard()} when no current deck is set (silent fallback).
+     * Throws IOException when no current deck is set.
      * Throws when a current deck is set but its file is missing or malformed.
      */
     public Deck resolveDeck(ServerPlayer player) throws IOException, DeckLoader.DeckParseException {
         String name = playerCurrentDeck.get(player.getUUID());
         if (name == null) {
-            return Deck.standard();
+            throw new IOException("No deck set; run /duel deck set <name>");
         }
         return deckRegistry.load(name);
     }

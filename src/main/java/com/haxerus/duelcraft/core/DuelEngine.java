@@ -18,7 +18,7 @@ public class DuelEngine implements AutoCloseable {
     public long getHandle() { return handle; }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         OcgCore.nDestroyEngine(handle);
     }
 }

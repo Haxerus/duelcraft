@@ -75,11 +75,12 @@ public class MessageParser {
                 // Deck/Hand
                 case MSG_SHUFFLE_DECK  -> new DuelMessage.ShuffleDeck(reader.readUint8());
                 case MSG_SHUFFLE_HAND  -> parseShuffleHand(reader);
-                case MSG_SHUFFLE_EXTRA -> new DuelMessage.ShuffleExtra(reader.readUint8());
+                case MSG_SHUFFLE_EXTRA -> parseShuffleExtra(reader);
 
                 // UI/Info
                 case MSG_HINT          -> parseHint(reader);
-                case MSG_PLAYER_HINT   -> parseHint(reader);
+                // MSG_PLAYER_HINT ([u8 player][u8 type][u64 desc], field.cpp) stays Raw: its layout is not
+                // MSG_HINT's and no UI consumes it yet.
                 case MSG_CARD_HINT     -> parseCardHint(reader);
                 case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(reader.readInt32());
                 case MSG_BECOME_TARGET -> parseBecomeTarget(reader);
@@ -121,27 +122,6 @@ public class MessageParser {
                 case MSG_TOSS_COIN     -> parseTossCoin(reader);
                 case MSG_TOSS_DICE     -> parseTossDice(reader);
 
-                // State updates
-                case MSG_UPDATE_DATA -> {
-                    int player = reader.readUint8();
-                    int location = reader.readUint8();
-                    int queryLen = bodyLength - 2;
-                    byte[] queryData = new byte[queryLen];
-                    for (int i = 0; i < queryLen; i++) queryData[i] = (byte) reader.readUint8();
-                    yield new DuelMessage.UpdateData(player, location, QueryParser.parseLocation(queryData));
-                }
-                case MSG_UPDATE_CARD -> {
-                    int player = reader.readUint8();
-                    int location = reader.readUint8();
-                    int sequence = reader.readUint8();
-                    int queryLen = bodyLength - 3;
-                    byte[] queryData = new byte[queryLen];
-                    for (int i = 0; i < queryLen; i++) queryData[i] = (byte) reader.readUint8();
-                    var card = QueryParser.parseSingle(queryData);
-                    yield new DuelMessage.UpdateCard(player, location, sequence,
-                            card != null ? card : new QueriedCard());
-                }
-
                 // Fallback
                 default -> {
                     byte[] body = new byte[bodyLength];
@@ -161,7 +141,7 @@ public class MessageParser {
             // Ensure we're at the expected position regardless of how much the parser read.
             int drift = messageEnd - reader.position();
             if (drift != 0) {
-                LOGGER.debug("[Parse] msg type {} drifted {} bytes (body={}, consumed={})",
+                LOGGER.warn("[Parse] msg type {} drifted {} bytes (body={}, consumed={})",
                         type, drift, bodyLength, bodyLength - drift);
                 reader.skip(drift);
             }
@@ -322,6 +302,13 @@ public class MessageParser {
         return new DuelMessage.ShuffleHand(player, codes);
     }
 
+    /** [u8 player][u32 count][u32 code]*count (field.cpp). The codes are skipped: the client treats the extra deck as an unordered pile. */
+    private static DuelMessage.ShuffleExtra parseShuffleExtra(BufferReader r) {
+        int player = r.readUint8();
+        r.skip(4 * r.readInt32());
+        return new DuelMessage.ShuffleExtra(player);
+    }
+
     // ---- UI/Info ----
 
     private static DuelMessage.Hint parseHint(BufferReader r) {
@@ -458,7 +445,13 @@ public class MessageParser {
         int count = r.readInt32();
         List<DuelMessage.ActivatableCard> chains = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            chains.add(DuelMessage.ActivatableCard.read(r));
+            // playerop.cpp select_chain: [u32 code][loc_info with position][u64 desc][u8 mode]; the idle and
+            // battle commands write their activatable entries without the position (ActivatableCard.read).
+            int code = r.readInt32();
+            LocInfo loc = LocInfo.read(r);
+            long desc = r.readInt64();
+            int flag = r.readUint8();
+            chains.add(new DuelMessage.ActivatableCard(code, loc.controller(), loc.location(), loc.sequence(), desc, flag));
         }
         return new DuelMessage.SelectChain(player, speCount, forced, hint0, hint1, chains);
     }
