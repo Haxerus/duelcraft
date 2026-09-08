@@ -191,7 +191,8 @@ public class DuelCommand {
         String playerDeckName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
 
         player.sendSystemMessage(Component.literal("Starting solo test duel vs AI (seed=" + seed + ", rule=" + rule.id() + ")..."));
-        DuelManager.get().startSoloDuel(player, seed, rule, playerDeck, aiDeck, playerDeckName, aiDeckName);
+        DuelManager.get().startSoloDuel(player, seed, rule, playerDeck, aiDeck, playerDeckName,
+                aiDeckName != null ? aiDeckName : playerDeckName);
         return 1;
     }
 

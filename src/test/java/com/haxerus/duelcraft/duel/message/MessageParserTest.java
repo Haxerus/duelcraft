@@ -377,7 +377,7 @@ class MessageParserTest {
     }
 
     @Test
-    void parseShuffleExtra_consumesCountAndCodes() {
+    void parseShuffleExtra_pinsPlayerCountCodesLayout() {
         // field.cpp: [u8 player][u32 count][u32 code]*count, same shape as MSG_SHUFFLE_HAND
         ByteBuffer b = body(1 + 4 + 4 * 2);
         b.put((byte) 1);
