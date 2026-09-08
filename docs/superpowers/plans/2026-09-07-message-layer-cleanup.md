@@ -18,6 +18,7 @@
 - Commit messages: one imperative sentence, no `feat:` style prefixes, matching the repo history (`Add click scenario for the context menu; ...`).
 - Tests: `./gradlew test --console=plain` must end `BUILD SUCCESSFUL`. The suite needs EDOPro data at `C:/ProjectIgnis` (present on this machine). Run Gradle from the repo root with Bash timeout 600000 ms.
 - UI harness: `./gradlew runClient -PldTest=group:duelcraft --console=plain` opens a game window and must print `6/6 scenarios passed`; details in `build/ldlib2-uitest/report.txt`.
+- `CLAUDE.md` is gitignored (`.gitignore:48`). When a task edits it, change the local file and never stage it.
 - Record shapes stay as they are: `ActivatableCard(int code, int controller, int location, int sequence, long desc, int flag)`, `ShuffleExtra(int player)`, `Hint(int hintType, int player, long data)`, `SelectChain(int player, int speCount, boolean forced, int hint0, int hint1, List<ActivatableCard> chains)`.
 
 ---
@@ -624,7 +625,7 @@ With the `Deck.standard()` fallback gone, `/duel accept` fails when either playe
 
 **Files:**
 - Modify: `src/main/java/com/haxerus/duelcraft/server/DuelCommand.java:135-142, 222`
-- Modify: `CLAUDE.md:106, 148, 168`
+- Modify: `CLAUDE.md:106, 148, 168` (gitignored; edit the local file, do not stage it)
 - Modify: `docs/engine-implementation-checklist.md:58, 133`
 
 **Interfaces:**
@@ -710,6 +711,8 @@ Run: `grep -n "standard" src/main/java/com/haxerus/duelcraft/server/DuelCommand.
 Expected: no output.
 
 ```bash
-git add src/main/java/com/haxerus/duelcraft/server/DuelCommand.java CLAUDE.md docs/engine-implementation-checklist.md
+git add src/main/java/com/haxerus/duelcraft/server/DuelCommand.java docs/engine-implementation-checklist.md
 git commit -m "Deck errors name the player; docs follow the QueryParser removal and the seed + 1 shuffle"
 ```
+
+`CLAUDE.md` is gitignored; its edit lives in the local file only and is never staged.
