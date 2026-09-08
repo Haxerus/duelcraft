@@ -80,7 +80,7 @@ SelectIdleCmd, SelectBattleCmd, SelectEffectYn, SelectYesNo, SelectOption, Selec
 - [x] **Card images** — No card artwork. Cards are colored rectangles with code numbers. Needs image loading system (local files by card code, potentially download from configurable URLs).
 - [x] **Card tooltip with real data** — The card info banner UI shell exists (card-info-banner in XML) but `showCardInfo()` only shows `"Card #" + code`. Depends on card data system above.
 - [x] **On-field ATK/DEF display** — Players can't see monster stats for combat decisions. edopro shows current ATK/DEF color-coded (green=buffed, red=debuffed). Depends on MSG_UPDATE_DATA parsing + card query pipeline.
-- [x] **Card query pipeline to client** — JNI query infrastructure exists and works (DuelSession.query/queryLocation/queryField, QueryParser, 123 tests pass). But queries are never sent to the client. Server needs to forward query results after effects resolve.
+- [x] **Card query pipeline to client** — JNI query infrastructure exists and works (per-slot nDuelQuery in DuelSession.sendFieldStats, blocks parsed by FieldQuery). But queries are never sent to the client. Server needs to forward query results after effects resolve.
 
 ### Important — Expected by players
 

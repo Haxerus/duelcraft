@@ -444,7 +444,7 @@ Run: `./gradlew test --tests "com.haxerus.duelcraft.duel.message.FieldQueryTest"
 Expected: 5 tests pass.
 
 Run: `./gradlew test --console=plain`
-Expected: `BUILD SUCCESSFUL` (`OcgCoreTest` exercises live `nDuelQuery` buffers through the new parser).
+Expected: `BUILD SUCCESSFUL`. No test parses live engine query buffers yet; `OcgCoreTest.testQueryField` only checks that the raw buffer is non-empty.
 
 - [ ] **Step 6: Commit**
 
@@ -543,7 +543,7 @@ Add after the existing `parseShuffleHand` test:
 
 ```java
     @Test
-    void parseShuffleExtra_consumesCountAndCodes() {
+    void parseShuffleExtra_pinsPlayerCountCodesLayout() {
         // field.cpp: [u8 player][u32 count][u32 code]*count, same shape as MSG_SHUFFLE_HAND
         ByteBuffer b = body(1 + 4 + 4 * 2);
         b.put((byte) 1);
@@ -578,7 +578,7 @@ Add after the existing `parseHint` test:
 - [ ] **Step 6: Run them**
 
 Run: `./gradlew test --tests "com.haxerus.duelcraft.duel.message.MessageParserTest" --console=plain`
-Expected: `playerHintStaysRaw` fails with a `ClassCastException` (`Hint` is not `Raw`). `parseShuffleExtra_consumesCountAndCodes` already passes: drift correction realigns the frame today, so this test pins the layout rather than catching a wrong result; the observable change is that the `[Parse] msg type 39 drifted` warning disappears.
+Expected: `playerHintStaysRaw` fails with a `ClassCastException` (`Hint` is not `Raw`). `parseShuffleExtra_pinsPlayerCountCodesLayout` already passes: drift correction realigns the frame today, so this test pins the layout rather than catching a wrong result; the observable change is that the `[Parse] msg type 39 drifted` warning disappears.
 
 - [ ] **Step 7: Fix the two cases**
 
