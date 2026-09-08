@@ -55,7 +55,7 @@ Generated 2026-04-11.
 - [ ] MSG_MISSED_EFFECT (120) — "Missed timing" indicator
 - [ ] MSG_BE_CHAIN_TARGET (121) — Chain target notification
 - [ ] MSG_SHOW_HINT (164) — Script-defined hint text
-- [ ] MSG_PLAYER_HINT (165) — Player-specific hint
+- [ ] MSG_PLAYER_HINT (165) — Player-specific hint; parsed as Raw (layout [u8 player][u8 type][u64 desc], not MSG_HINT's)
 - [ ] MSG_TAG_SWAP (161) — Tag duel swap (not relevant for 1v1)
 - [ ] MSG_AI_NAME (163) — AI player name
 - [ ] MSG_MATCH_KILL (170) — Match-ending effect
@@ -130,7 +130,7 @@ All verified correct after the audit session on 2026-04-11:
 
 ## 4. Open Bugs and UX Gaps (found in the 2026-09-06 manual pass; deliberately not fixed in the duel-ui-layout PR)
 
-- [ ] **Identical decks produce identical opening hands.** `DuelManager.startDuel` and `startSoloDuel` shuffle both decks with the same seed (`team1Deck.shuffled(seed)` and `team2Deck.shuffled(seed)`), so equal card lists yield equal permutations. Fix: derive a distinct shuffle seed per player from the duel seed, for example the second and third longs of `SeedExpander.toFourLongs(seed)`, so a duel stays reproducible from one seed while the two decks diverge. Add a `DeckShuffleTest` case with two identical decks.
+- [x] **Identical decks produce identical opening hands.** Fixed 2026-09-07: `DuelManager` shuffles team 2 (and the solo AI deck) with `seed + 1`, so a duel stays reproducible from one seed while equal card lists diverge. `DeckShuffleTest.differentSeedsProduceDifferentMainOrder` covers the divergence.
 - [ ] **ESC closes the duel screen with no way back.** `DuelScreen` inherits vanilla `Screen.shouldCloseOnEsc()`, and `LDLibDuelScreen.open` is only called from `DuelStartPayload`, so a closed screen cannot be reopened while the duel continues on the server. Fix: override `shouldCloseOnEsc()` to return false in `DuelScreen` (or route ESC to an in-duel menu), and add a `/duel show` command or key binding that rebuilds the screen from the still-live `ClientDuelState`.
 - [ ] **Forfeit leaves the other client frozen.** `DuelManager.endDuel` removes and closes the session but sends no `DuelEndPayload`; only the engine MSG_WIN path in `ServerDuelHandler` notifies both clients. After `/duel forfeit` the opponent keeps an open screen on a dead session. Fix: every server-side termination, `endDuel` included, must send `DuelEndPayload` to both players naming the forfeiting player as the loser.
 - [ ] **No win/lose screen and no concede button.** `ClientPayloadHandler.handleEnd` closes the screen at once and the win overlay never shows. Wanted: a result overlay with winner and reason that must be dismissed, plus a concede/forfeit button in the duel UI, so nobody has to press ESC and type `/duel forfeit`.

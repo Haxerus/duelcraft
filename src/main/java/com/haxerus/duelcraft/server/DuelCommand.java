@@ -132,12 +132,20 @@ public class DuelCommand {
         }
 
         Deck challengerDeck;
-        Deck accepterDeck;
         try {
             challengerDeck = DuelManager.get().resolveDeck(challenger);
+        } catch (IOException | DeckLoader.DeckParseException e) {
+            String who = challenger.getName().getString();
+            player.sendSystemMessage(Component.literal(who + "'s deck could not be loaded: " + e.getMessage()));
+            challenger.sendSystemMessage(Component.literal("Your deck could not be loaded, so "
+                    + player.getName().getString() + " could not accept: " + e.getMessage()));
+            return 0;
+        }
+        Deck accepterDeck;
+        try {
             accepterDeck = DuelManager.get().resolveDeck(player);
         } catch (IOException | DeckLoader.DeckParseException e) {
-            player.sendSystemMessage(Component.literal("Failed to load a deck: " + e.getMessage()));
+            player.sendSystemMessage(Component.literal("Your deck could not be loaded: " + e.getMessage()));
             return 0;
         }
         String challengerName = DuelManager.get().getPlayerCurrentDeck(challenger.getUUID()).orElse(null);
@@ -219,7 +227,7 @@ public class DuelCommand {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         var name = DuelManager.get().getPlayerCurrentDeck(player.getUUID());
         player.sendSystemMessage(Component.literal(
-                name.map(n -> "Current deck: " + n).orElse("No current deck (using standard).")));
+                name.map(n -> "Current deck: " + n).orElse("No deck set; run /duel deck set <name>.")));
         return 1;
     }
 
