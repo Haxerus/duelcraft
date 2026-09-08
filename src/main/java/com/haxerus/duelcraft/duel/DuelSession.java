@@ -10,8 +10,6 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -147,7 +145,7 @@ public class DuelSession implements AutoCloseable {
                 cards.add(null);
             } else {
                 try {
-                    cards.add(parseSingleNativeQuery(data));
+                    cards.add(FieldQuery.parse(data));
                 } catch (Exception e) {
                     LOGGER.warn("[Query] Failed to parse slot p={} loc=0x{} seq={}: {}",
                             player, Integer.toHexString(location), seq, e.getMessage());
@@ -158,23 +156,6 @@ public class DuelSession implements AutoCloseable {
 
         listener.onMessage(new DuelMessage.UpdateData(player, location, cards));
     }
-
-    /**
-     * Parse a single-card native query result: sequential field blocks
-     * [u16 fieldSize][u32 flag][data] with no per-card header.
-     */
-    private static QueriedCard parseSingleNativeQuery(byte[] data) {
-        var buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        var card = new QueriedCard();
-        while (buf.remaining() >= 6) { // at least u16 + u32
-            int fieldSize = Short.toUnsignedInt(buf.getShort());
-            if (fieldSize == 0) break;
-            FieldQuery.readFieldBlock(buf, card, fieldSize);
-        }
-        return card;
-    }
-
-
 
     /**
      * Submit a player response and resume processing.
