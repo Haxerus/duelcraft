@@ -18,6 +18,7 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 
 public class DuelManager {
@@ -60,7 +61,7 @@ public class DuelManager {
         soloHandlers = new HashMap<>();
         duelInvites = new HashMap<>();
 
-        java.nio.file.Path decksDir = FMLPaths.GAMEDIR.get().resolve("duelcraft").resolve("decks");
+        Path decksDir = FMLPaths.GAMEDIR.get().resolve("duelcraft").resolve("decks");
         deckRegistry = DeckRegistry.open(decksDir);
 
         int[] version = OcgCore.nGetVersion();
@@ -182,12 +183,14 @@ public class DuelManager {
 
         int lp0 = options.team1().lp();
         int lp1 = options.team2().lp();
-        int deckSize = shuffled1.main().size();
-        int extraSize = shuffled1.extra().size();
+        int deck1Size = shuffled1.main().size();
+        int extra1Size = shuffled1.extra().size();
+        int deck2Size = shuffled2.main().size();
+        int extra2Size = shuffled2.extra().size();
         PacketDistributor.sendToPlayer(p1, new DuelStartPayload(0, p2.getName().getString(),
-                lp0, lp1, deckSize, extraSize, options.flags()));
+                lp0, lp1, deck1Size, extra1Size, options.flags()));
         PacketDistributor.sendToPlayer(p2, new DuelStartPayload(1, p1.getName().getString(),
-                lp0, lp1, deckSize, extraSize, options.flags()));
+                lp0, lp1, deck2Size, extra2Size, options.flags()));
 
         session.setupDuel(shuffled1, shuffled2);
         session.process();
