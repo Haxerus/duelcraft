@@ -375,12 +375,12 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 
 - [x] Both decks shuffled Java-side (team 1 with `seed`, team 2 and the solo AI with `seed + 1`); engine never shuffles the starting deck.
 - [x] Player indices stay absolute on the wire; the client mirrors from `DuelStartPayload.localPlayer`.
-- [ ] **No response ownership check.** `DuelManager.handleResponse` applies any player's bytes to whatever prompt is pending; a player can answer the opponent's prompt. `ResponseValidator` has zero production callers.
-- [ ] **Forfeit sends no `DuelEndPayload`.** `DuelManager.endDuel` closes the session silently; both screens stay open on a dead duel and later responses are dropped. Same for an engine `DUEL_STATUS_END` without `MSG_WIN`.
-- [ ] **No disconnect handling.** No logout listener; a quitting duellist leaves the session alive and the opponent stuck. `duelInvites` never expires (`FIXME` in `DuelManager`).
+- [x] **No response ownership check.** `DuelManager.handleResponse` applies any player's bytes to whatever prompt is pending; a player can answer the opponent's prompt. `ResponseValidator` has zero production callers.
+- [x] **Forfeit sends no `DuelEndPayload`.** `DuelManager.endDuel` closes the session silently; both screens stay open on a dead duel and later responses are dropped. Same for an engine `DUEL_STATUS_END` without `MSG_WIN`.
+- [x] **No disconnect handling.** No logout listener; a quitting duellist leaves the session alive and the opponent stuck. `duelInvites` never expires (`FIXME` in `DuelManager`).
 - [ ] `ServerPlayer` references captured at construction go stale on respawn or dimension change.
 - [x] `MSG_RETRY` is broadcast to both players.
-- [ ] `/duel challenge` does not check that either side has a deck; failure surfaces at `accept`.
+- [x] `/duel challenge` does not check that either side has a deck; failure surfaces at `accept`.
 - [ ] Solo AI: `handleSoloAutoResponse` → `process()` → `routePrompt` → … is directly recursive; a long AI chain grows the stack. The `activeDuels` loop and "need a way to get the handler" comments are scaffolding.
 - [ ] A prompt with no `routePrompt`/`onMessage` case returns 0, so `process()` exits with `AWAITING` and waits forever (same class as §3.7).
 - [ ] No threading guards anywhere in `duel/`, `server/`, `core/`; `ServerPayloadHandler` does not `enqueueWork`. Everything assumes the server thread.
@@ -394,8 +394,8 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structural gaps beyond the per-message rows:
 
 - [ ] **Card object model.** edopro moves one card object between containers, so counters, equip links, targets and materials travel with it (§12.4). Duelcraft's parallel code/position arrays are the root cause of the `Swap`, overlay and counter gaps below.
-- [ ] **Win/lose.** `DuelEndPayload` closes the screen at once; the win overlay code path is unreachable. Wanted: a result overlay with winner and reason, a concede button, and `LDLibDuelScreen.close()` on every exit so statics do not linger.
-- [ ] **ESC** closes the screen with no way back (`shouldCloseOnEsc` inherited); incoming messages accumulate into an unrendered state. Needs `shouldCloseOnEsc = false` or `/duel show` rebuilding from `ClientDuelState` (or a `QueryField` resync).
+- [x] **Win/lose.** `DuelEndPayload` closes the screen at once; the win overlay code path is unreachable. Wanted: a result overlay with winner and reason, a concede button, and `LDLibDuelScreen.close()` on every exit so statics do not linger.
+- [x] **ESC** closes the screen with no way back (`shouldCloseOnEsc` inherited); incoming messages accumulate into an unrendered state. Needs `shouldCloseOnEsc = false` or `/duel show` rebuilding from `ClientDuelState` (or a `QueryField` resync).
 - [ ] **No duel log.** Attacks, coin flips, negations, targets, equips, LP reasons and every hint vanish once processed.
 - [ ] **Overlay materials** tracked (badly, §3.4) and never drawn.
 - [ ] **Counters** have no client state.
@@ -427,7 +427,7 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [ ] `ResponseValidator` (42 tests, zero production callers; several rules contradict the engine, §3.9). Decide: wire into `PromptController` or delete; the `MSG_RETRY` fix does not depend on it.
 - [ ] `DuelSession.queryLocation/queryField` wrappers (test-only).
 - [ ] `ClientDuelState`: `DirtyFlag.LP`, `startingLP`, `winReason`, `lastAction`, `CardAction.label`, `szoneStats`, `lastHintType/Data` (written, never rendered).
-- [ ] `PromptController.showWinOverlay` (unreachable until `Win` or `DuelEndPayload` triggers it).
+- [x] `PromptController.showWinOverlay` (unreachable until `Win` or `DuelEndPayload` triggers it).
 - [ ] `CardInfo.linkArrows/leftScale/rightScale` (no callers).
 - [ ] `FieldQuery` cases for `ALIAS`, `REASON`, `LSCALE`, `RSCALE`, `COVER` are exercised only by tests until requested.
 - [ ] `DuelMessageCodec.encode`'s `Raw` throw arm and `decode`'s `default` are unreachable.
@@ -613,11 +613,11 @@ Items already tracked in §3 are referenced, not repeated.
 - [ ] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
 - [x] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
 - [ ] Take the full-information copy before sanitising and keep it for a future replay.
-- [ ] Response gate: per-player pending-response state plus the responder-equals-prompted check edopro lacks (`:1284-1297`).
+- [x] Response gate: per-player pending-response state plus the responder-equals-prompted check edopro lacks (`:1284-1297`).
 - [ ] Rock-paper-scissors before the duel and let the winner choose who goes first; make the first player engine player 0 (`:444-565`).
 - [ ] Synthesised start packet with both players' deck and extra counts from `OCG_DuelQueryCount` (`:696-721`).
 - [ ] Deck legality at ready time per `CheckDeckSize`/`CheckDeckContent` (sizes, copies, banlist, extra-deck types).
-- [ ] Surrender and disconnect end with a synthesised `MSG_WIN` (reasons 0 and 4) so both clients learn the result (`:777-793`, `:284-309`).
+- [x] Surrender and disconnect end with a synthesised `MSG_WIN` (reasons 0 and 4) so both clients learn the result (`:777-793`, `:284-309`).
 - [ ] Optional: per-turn time limit ending in `MSG_WIN` reason 3 (`:1439-1460`).
 - [ ] Treat `MSG_RETRY` as a bug signal (edopro ends the duel) and prevent it by validating before sending; §3.3.
 
@@ -651,4 +651,4 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] `ANNOUNCE_NUMBER` via the option dialog, answering with the index.
 - [ ] Effect disambiguation through the option dialog with `desc` text, skipped when one effect survives; separate Activate / Resolve / Reset entries by client mode.
 - [ ] `SELECT_POSITION` with card-image buttons.
-- [ ] Concede: edopro offers only a retitled leave button and no result screen beyond the win banner, so the result overlay and concede button need an original design.
+- [x] Concede: edopro offers only a retitled leave button and no result screen beyond the win banner, so the result overlay and concede button need an original design.
