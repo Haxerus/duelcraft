@@ -473,6 +473,22 @@ class MessageParserTest {
     }
 
     @Test
+    void parseSelectDisfield() {
+        // Same wire shape as MSG_SELECT_PLACE, but must decode as SelectDisfield (id 24), not SelectPlace.
+        ByteBuffer b = body(6);
+        b.put((byte) 0);      // player
+        b.put((byte) 2);      // count
+        b.putInt(0x0000001F);  // field bitmask
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_DISFIELD, b.array()));
+        var sd = (DuelMessage.SelectDisfield) msgs.getFirst();
+        assertEquals(MSG_SELECT_DISFIELD, sd.type());
+        assertEquals(0, sd.player());
+        assertEquals(2, sd.count());
+        assertEquals(0x1F, sd.field());
+    }
+
+    @Test
     void parseSelectPosition() {
         ByteBuffer b = body(6);
         b.put((byte) 0);           // player

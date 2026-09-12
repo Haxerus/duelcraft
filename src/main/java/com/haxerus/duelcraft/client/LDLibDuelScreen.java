@@ -254,7 +254,7 @@ public class LDLibDuelScreen {
                 }
             });
             UIElement canvas = byId("duel-canvas");
-            clicks = new ClickDispatcher(ui, state, field, prompt, canvas,
+            clicks = new ClickDispatcher(ui, state, prompt, canvas,
                     response -> LDLibDuelScreen.sendResponse(state, response));
 
             // ── Bind reactive data ──

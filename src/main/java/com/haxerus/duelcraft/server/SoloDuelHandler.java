@@ -58,6 +58,7 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.SelectYesNo sel -> routePrompt(sel.player(), msg);
             case DuelMessage.SelectOption sel -> routePrompt(sel.player(), msg);
             case DuelMessage.SelectPlace sel -> routePrompt(sel.player(), msg);
+            case DuelMessage.SelectDisfield sel -> routePrompt(sel.player(), msg);
             case DuelMessage.SelectPosition sel -> routePrompt(sel.player(), msg);
             case DuelMessage.SelectTribute sel -> routePrompt(sel.player(), msg);
             case DuelMessage.SelectCounter sel -> routePrompt(sel.player(), msg);
@@ -235,6 +236,28 @@ public class SoloDuelHandler implements DuelEventListener {
                         yield ResponseBuilder.selectPlace(sel.player(), 0x08, seq);
                 }
                 yield ResponseBuilder.selectPlace(sel.player(), 0x04, 0); // fallback
+            }
+
+            case DuelMessage.SelectDisfield sel -> {
+                // Disable the first `count` zones whose bits are clear: own MZONE (0-6), own SZONE
+                // (8-15), then the opponent's MZONE (16-22) and SZONE (24-31).
+                int fieldMask = sel.field();
+                int self = sel.player();
+                int other = 1 - self;
+                List<int[]> zones = new ArrayList<>();
+                for (int seq = 0; seq < 7 && zones.size() < sel.count(); seq++) {
+                    if ((fieldMask & (1 << seq)) == 0) zones.add(new int[]{self, 0x04, seq});
+                }
+                for (int seq = 0; seq < 8 && zones.size() < sel.count(); seq++) {
+                    if ((fieldMask & (1 << (8 + seq))) == 0) zones.add(new int[]{self, 0x08, seq});
+                }
+                for (int seq = 0; seq < 7 && zones.size() < sel.count(); seq++) {
+                    if ((fieldMask & (1 << (16 + seq))) == 0) zones.add(new int[]{other, 0x04, seq});
+                }
+                for (int seq = 0; seq < 8 && zones.size() < sel.count(); seq++) {
+                    if ((fieldMask & (1 << (24 + seq))) == 0) zones.add(new int[]{other, 0x08, seq});
+                }
+                yield ResponseBuilder.selectPlaces(zones);
             }
 
             case DuelMessage.SelectPosition sel -> {

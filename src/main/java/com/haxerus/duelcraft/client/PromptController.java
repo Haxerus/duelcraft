@@ -78,6 +78,9 @@ public class PromptController {
     private boolean inFieldSelectionMode;
     private boolean isBattleCmd;
 
+    // SelectPlace/SelectDisfield: {player, location, sequence} triples chosen so far, in click order.
+    private final List<int[]> chosenPlaces = new ArrayList<>();
+
     public PromptController(UI ui, ClientDuelState state, FieldRenderer field,
                             UIElement statusLabel, Callbacks callbacks) {
         this.ui = ui;
@@ -148,10 +151,8 @@ public class PromptController {
 
             case DuelMessage.SelectPosition sel -> buildPositionPrompt(sel);
 
-            case DuelMessage.SelectPlace sel -> {
-                promptOverlay.addClass("hidden");
-                field.highlightValidPlaces(sel.field());
-            }
+            case DuelMessage.SelectPlace sel -> buildPlacePrompt(sel.count(), sel.field(), false);
+            case DuelMessage.SelectDisfield sel -> buildPlacePrompt(sel.count(), sel.field(), true);
 
             default -> {
                 promptOverlay.removeClass("hidden");
@@ -314,6 +315,52 @@ public class PromptController {
         btn.addClasses("prompt-btn");
         btn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectPosition(position)));
         promptButtons.addChild(btn);
+    }
+
+    // ── SelectPlace / SelectDisfield (field-only, count zones, no cancel) ──
+
+    private void buildPlacePrompt(int count, int placeField, boolean disfield) {
+        chosenPlaces.clear();
+        promptOverlay.addClass("hidden");
+        field.highlightValidPlaces(placeField);
+        updatePlaceStatus(count, disfield);
+    }
+
+    private void updatePlaceStatus(int count, boolean disfield) {
+        if (!(statusLabel instanceof Label lbl)) return;
+        int remaining = count - chosenPlaces.size();
+        String text = disfield
+                ? "Select " + remaining + " zone(s) to become unusable"
+                : (remaining <= 1 ? "Select a zone" : "Select " + remaining + " more zone(s)");
+        lbl.setText(Component.literal(text));
+        statusLabel.removeClass("hidden");
+    }
+
+    /** Toggle a clicked field zone for the active SelectPlace/SelectDisfield prompt; submit at count. */
+    private void handlePlaceClick(int player, int location, int sequence, int count, int placeField, boolean disfield) {
+        UIElement slot = field.findSlotForLocation(new ClientDuelState.CardLocation(player, location, sequence));
+        if (slot == null) return;
+
+        for (int i = 0; i < chosenPlaces.size(); i++) {
+            int[] chosen = chosenPlaces.get(i);
+            if (field.findSlotForLocation(new ClientDuelState.CardLocation(chosen[0], chosen[1], chosen[2])) == slot) {
+                chosenPlaces.remove(i);
+                slot.removeClass("selected");
+                updatePlaceStatus(count, disfield);
+                return;
+            }
+        }
+
+        int[] resolved = field.resolvePlaceZone(player, location, sequence, placeField);
+        if (resolved == null) return; // blocked
+
+        chosenPlaces.add(resolved);
+        slot.addClass("selected");
+        if (chosenPlaces.size() == count) {
+            callbacks.sendResponse(ResponseBuilder.selectPlaces(new ArrayList<>(chosenPlaces)));
+        } else {
+            updatePlaceStatus(count, disfield);
+        }
     }
 
     private void buildTributePrompt(DuelMessage.SelectTribute sel) {
@@ -614,6 +661,14 @@ public class PromptController {
      * Returns true if the click was consumed by a prompt, false otherwise.
      */
     public boolean handleFieldClick(int player, int location, int sequence) {
+        if (state.pendingPrompt instanceof DuelMessage.SelectPlace sel) {
+            handlePlaceClick(player, location, sequence, sel.count(), sel.field(), false);
+            return true;
+        }
+        if (state.pendingPrompt instanceof DuelMessage.SelectDisfield sel) {
+            handlePlaceClick(player, location, sequence, sel.count(), sel.field(), true);
+            return true;
+        }
         if (state.pendingPrompt instanceof DuelMessage.SelectCard) {
             handleSelectCardClick(player, location, sequence);
             return true;
@@ -776,6 +831,7 @@ public class PromptController {
     public void onResponseSent() {
         if (promptOverlay != null) promptOverlay.addClass("hidden");
         exitFieldSelectionMode();
+        chosenPlaces.clear();
         ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
         ui.rootElement.select(".selected").forEach(e -> e.removeClass("selected"));
         ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));

@@ -189,6 +189,7 @@ public class DuelMessageCodec {
                 writeLongList(buf, m.options());
             }
             case DuelMessage.SelectPlace m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeInt(m.field()); }
+            case DuelMessage.SelectDisfield m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeInt(m.field()); }
             case DuelMessage.SelectPosition m -> { buf.writeByte(m.player()); buf.writeInt(m.code()); buf.writeByte(m.positions()); }
             case DuelMessage.SelectTribute m -> {
                 buf.writeByte(m.player());
@@ -340,6 +341,7 @@ public class DuelMessageCodec {
             case MSG_SELECT_YESNO -> new DuelMessage.SelectYesNo(buf.readByte(), buf.readLong());
             case MSG_SELECT_OPTION -> new DuelMessage.SelectOption(buf.readByte(), readLongList(buf));
             case MSG_SELECT_PLACE -> new DuelMessage.SelectPlace(buf.readByte(), buf.readByte(), buf.readInt());
+            case MSG_SELECT_DISFIELD -> new DuelMessage.SelectDisfield(buf.readByte(), buf.readByte(), buf.readInt());
             case MSG_SELECT_POSITION -> new DuelMessage.SelectPosition(buf.readByte(), buf.readInt(), buf.readByte());
             case MSG_SELECT_TRIBUTE -> new DuelMessage.SelectTribute(buf.readByte(), buf.readBoolean(),
                     buf.readInt(), buf.readInt(), readTributeCardList(buf));

@@ -45,6 +45,18 @@ class ClientDuelStateTest {
         assertEquals(0, readInt32(response, 0) & 0xFFFF);
     }
 
+    // ---- SelectDisfield is treated as a prompt like SelectPlace ----
+
+    @Test
+    void selectDisfieldSetsPendingPrompt() {
+        var state = newState();
+        var disfield = new DuelMessage.SelectDisfield(0, 2, 0x0000001F);
+
+        state.applyMessage(disfield);
+
+        assertEquals(disfield, state.pendingPrompt);
+    }
+
     // ---- Answered guard: at most one response per prompt ----
 
     @Test

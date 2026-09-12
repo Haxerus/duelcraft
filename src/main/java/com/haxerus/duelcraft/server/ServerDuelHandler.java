@@ -54,6 +54,7 @@ public class ServerDuelHandler implements DuelEventListener {
             case DuelMessage.SelectYesNo sel -> { sendToPlayer(sel.player(), msg); return 1; }
             case DuelMessage.SelectOption sel -> { sendToPlayer(sel.player(), msg); return 1; }
             case DuelMessage.SelectPlace sel -> { sendToPlayer(sel.player(), msg); return 1; }
+            case DuelMessage.SelectDisfield sel -> { sendToPlayer(sel.player(), msg); return 1; }
             case DuelMessage.SelectPosition sel -> { sendToPlayer(sel.player(), msg); return 1; }
             case DuelMessage.SelectTribute sel -> { sendToPlayer(sel.player(), msg); return 1; }
             case DuelMessage.SelectCounter sel -> { sendToPlayer(sel.player(), msg); return 1; }

@@ -269,6 +269,11 @@ public sealed interface DuelMessage {
         public int type() { return MSG_SELECT_PLACE; }
     }
 
+    /** Same wire shape as SelectPlace, but the chosen zones become unusable rather than hosting a placement. */
+    record SelectDisfield(int player, int count, int field) implements DuelMessage {
+        public int type() { return MSG_SELECT_DISFIELD; }
+    }
+
     record SelectPosition(int player, int code, int positions) implements DuelMessage {
         public int type() { return MSG_SELECT_POSITION; }
     }

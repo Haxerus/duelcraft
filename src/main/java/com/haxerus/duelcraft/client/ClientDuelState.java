@@ -455,6 +455,7 @@ public class ClientDuelState {
             case DuelMessage.SelectYesNo sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
             case DuelMessage.SelectOption sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectOption player={}, options={}", sel.player(), sel.options()); }
             case DuelMessage.SelectPlace sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPlace player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
+            case DuelMessage.SelectDisfield sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectDisfield player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
             case DuelMessage.SelectPosition sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPosition player={}, code={}, pos=0x{}", sel.player(), sel.code(), Integer.toHexString(sel.positions())); }
             case DuelMessage.SelectTribute sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
             case DuelMessage.SelectCounter sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }

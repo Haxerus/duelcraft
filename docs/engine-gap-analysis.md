@@ -177,7 +177,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 | 21  | `SORT_CHAIN`           | ✅ `u32` location                                               | ✅ bytes; javadoc describes the permutation backwards (`response[i]` is the destination rank of card `i`) | ❌                                                                                                                                                                                          | ✅ `-1` default                                     | ✅                                                                 | ❌ / ✅                            |
 | 22  | `SELECT_COUNTER`       | ✅                                                              | ✅ `u16[n]`                                                                                               | ❌                                                                                                                                                                                          | ⚠️ all from card 0 (hangs if card 0 holds too few) | ✅ (no per-card cap)                                               | ❌ / ✅                            |
 | 23  | `SELECT_SUM`           | ✅                                                             | ✅                                                                                                       | ✅                                                                                                                                                                                          | ✅                                                  | ❌ none                                                            | ✅ / ✅                            |
-| 24  | `SELECT_DISFIELD`      | ⚠️ parsed into `SelectPlace`, re-tagged as type 18 on the wire | 🐞 `count > 1` cannot be expressed (one 3-byte triple emitted)                                           | ⚠️ shares the "pick a free zone" UI although it means "pick a zone to disable"                                                                                                             | ✅                                                  | ⚠️ single triple                                                  | ❌ / shared                       |
+| 24  | `SELECT_DISFIELD`      | ✅ own `SelectDisfield` record, keeps type 24 on the wire | ✅ `selectPlaces` sends `count` triples                                           | ✅ collects `count` zones, "become unusable" caption                                                                                                                             | ✅                                                  | ⚠️ single triple                                                  | ❌ / shared                       |
 | 25  | `SORT_CARD`            | ✅                                                              | ✅ (javadoc inverted)                                                                                     | ❌                                                                                                                                                                                          | ✅ `-1` default                                     | ✅                                                                 | ❌ / ✅                            |
 | 26  | `SELECT_UNSELECT_CARD` | ✅                                                              | ✅ `[1][index]`, `[-1]` finish                                                                            | ✅ per-click; `min`/`max` never displayed                                                                                                                                                   | ✅                                                  | 🐞 rejects legal unselect-list indices and `cancelable`-only `-1` | ✅ / ✅                            |
 | 132 | `ROCK_PAPER_SCISSORS`  | ✅                                                              | ✅ `int32` 1..3                                                                                           | ✅                                                                                                                                                                                          | ✅ rock                                             | ✅                                                                 | ✅ / ✅                            |
@@ -203,7 +203,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 
 - [x] `SELECT_SUM`: fix `SumCard.read` to `code u32, con u8, loc u8, seq u32, position u32, sumParam u32` (§3.1); send indices into the selectable list only; honour `selectMode` and `value2`; fix `MessageParserTest.parseSelectSum` to encode the engine layout.
 - [x] `SELECT_BATTLECMD`: Activate must send type 0 (`ClientDuelState.buildBattleCmdActions`, `ClickDispatcher.getActionIconInfo`).
-- [ ] `SELECT_DISFIELD`: give it its own record or a `type` field so the wire keeps id 24; add `selectPlaces(count, triples…)` to `ResponseBuilder`; UI that collects `count` zones and shows "disable" semantics.
+- [x] `SELECT_DISFIELD`: give it its own record or a `type` field so the wire keeps id 24; add `selectPlaces(count, triples…)` to `ResponseBuilder`; UI that collects `count` zones and shows "disable" semantics.
 - [ ] `SELECT_COUNTER` UI: per-card stepper, total must equal `count`.
 - [ ] `SORT_CARD` / `SORT_CHAIN` UI: reorderable list plus a "keep order" button that sends `sortCardsDefault()` (the button alone unblocks duels).
 - [ ] `ANNOUNCE_RACE` / `ANNOUNCE_ATTRIB` UI: checkbox grid limited to `available`, exactly `count` picks; names from `SystemStringTable`.
@@ -242,8 +242,8 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [ ] `FieldRenderer` never reads `state.overlay`, so materials would be invisible even once tracked. Detach removes the last material regardless of which one left.
 
 ### 3.5 `SELECT_DISFIELD` with `count > 1` deadlocks
-- [ ] `ResponseBuilder.selectPlace` emits one triple and `PromptController` never reads `sel.count()`. `processor.cpp:4579` passes `dis_count` (up to 5) and `libduel.cpp:3206, 3247` pass Lua-supplied counts. Short responses read as zeros, `location == 0` fails validation, `MSG_RETRY` forever.
-- [ ] The record is re-tagged as `MSG_SELECT_PLACE` on the wire (`SelectPlace.type()` is constant), so the client cannot tell the two apart.
+- [x] `ResponseBuilder.selectPlace` emits one triple and `PromptController` never reads `sel.count()`. `processor.cpp:4579` passes `dis_count` (up to 5) and `libduel.cpp:3206, 3247` pass Lua-supplied counts. Short responses read as zeros, `location == 0` fails validation, `MSG_RETRY` forever.
+- [x] The record is re-tagged as `MSG_SELECT_PLACE` on the wire (`SelectPlace.type()` is constant), so the client cannot tell the two apart.
 
 ### 3.6 Hidden information leaks
 - [ ] **`MSG_MOVE` to deck or hand.** `field::send_to` sets `pos = POS_FACEUP` for every destination except `LOCATION_REMOVED` (`operations.cpp:327-328`), so `ServerDuelHandler.hideInfo`'s face-down test passes the real code of a searched or returned card to the opponent. edopro's rule (`generic_duel.cpp:1032`): hide for the non-controller when `!(loc & (GRAVE|OVERLAY)) && ((loc & (DECK|HAND)) || (pos & FACEDOWN))`.
@@ -264,7 +264,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [ ] `ResponseValidator.selectUnselectCard` rejects indices in the unselect list and rejects `-1` when only `cancelable` is set.
 - [ ] `ResponseValidator.zoneToBit` returns `-1` for SZONE 6/7 (pendulum zones), skipping validation.
 - [ ] `FieldRenderer.getFieldBit` bases the `SELECT_PLACE` bitmask on `localPlayer` rather than `sel.player()`; equal today because prompts only reach their target.
-- [ ] `FieldRenderer.highlightValidPlaces` reads EMZ bits only from the viewer block (5/6); a prompt whose only legal zones are the opponent-side EMZ bits (21/22) shows nothing.
+- [x] `FieldRenderer.highlightValidPlaces` reads EMZ bits only from the viewer block (5/6); a prompt whose only legal zones are the opponent-side EMZ bits (21/22) shows nothing.
 - [ ] `ConfirmDeckTop`/`ConfirmCards` reveal is overwritten by the next `PILE_COUNTS` refresh because `showConfirmCards` does not reset the inspected pile.
 - [ ] `OcgCoreTest` reads `MSG_WIN` as `u8 + u32`; the body is `u8 + u8`. Latent `BufferUnderflowException` if a test duel ends.
 - [ ] `card_database.cpp:49` comment describes the lscale/rscale bit ranges backwards; the code is right (lscale bits 24-31, rscale 16-23).
@@ -276,7 +276,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] Every one of the 74 records (73 typed + `Raw`) encodes and decodes; `encode` is an exhaustive switch over the sealed interface, so a new record without a codec arm fails compilation.
 - [x] `u64` fields (`desc`, hint data, `opParam`, race masks) travel as `long`.
 - [ ] `location` bytes are read signed (§3.4); `SortableCard` is the only writer using a full `int`.
-- [ ] `MSG_SELECT_DISFIELD` ships as type 18 (§3.5).
+- [x] `MSG_SELECT_DISFIELD` ships as type 18 (§3.5).
 - [ ] No version byte and no bound on `readByteArray` lengths.
 - [ ] `decode`'s `default -> Raw(type, readByteArray(buf))` is unreachable today and would mis-frame the buffer if it ever fired.
 - [ ] Zero tests. A round-trip test over every record, including a `LocInfo` with location `0x84`, would have caught §3.4.
@@ -641,7 +641,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [ ] Selection indices from message order, display sorted separately.
 - [ ] Field-versus-panel by the location mask `0xF1` or location 0.
 - [ ] `SELECT_CHAIN` auto-pass on `specount == 0`, the three chain toggles, optional constant delay.
-- [ ] `SELECT_PLACE` count loop with un-pick, half-swap for player 1, EMZ fallback; §3.5.
+- [x] `SELECT_PLACE` count loop with un-pick, half-swap for player 1, EMZ fallback; §3.5.
 - [ ] `SELECT_TRIBUTE` auto-submit at `max` count only, Finish once the sum meets `min`.
 - [x] `SELECT_SUM` viability recomputation, must-select exclusion; §3.1.
 - [ ] `SELECT_COUNTER` as click-per-counter with a live caption, no dialog.

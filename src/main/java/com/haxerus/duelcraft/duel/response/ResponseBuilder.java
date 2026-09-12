@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.duel.response;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 
 /**
  * Builds little-endian binary response buffers for OCG_DuelSetResponse.
@@ -107,11 +108,20 @@ public class ResponseBuilder {
      * @param sequence zone index (0-4 for main, 5-6 for EMZ)
      */
     public static byte[] selectPlace(int player, int location, int sequence) {
-        return new ResponseBuilder(3)
-                .putInt8(player)
-                .putInt8(location)
-                .putInt8(sequence)
-                .build();
+        return selectPlaces(List.of(new int[]{player, location, sequence}));
+    }
+
+    /**
+     * MSG_SELECT_PLACE / MSG_SELECT_DISFIELD response for multiple zones.
+     * Format: {@code count} x [int8 player][int8 location][int8 sequence]; a zone may not repeat.
+     * @param zones {player, location, sequence} triples, in submission order
+     */
+    public static byte[] selectPlaces(List<int[]> zones) {
+        var rb = new ResponseBuilder(3 * zones.size());
+        for (int[] zone : zones) {
+            rb.putInt8(zone[0]).putInt8(zone[1]).putInt8(zone[2]);
+        }
+        return rb.build();
     }
 
     /**

@@ -10,8 +10,6 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
-import static com.haxerus.duelcraft.core.OcgConstants.*;
-
 /**
  * Routes card-slot and pile clicks to the right handler based on the current
  * pending prompt. Also owns the floating context menu (the row of action icons
@@ -23,8 +21,6 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
  *       slot click handlers or ZoneInspectorController's pile click handlers).
  *   <li>If the current prompt is SelectIdleCmd/SelectBattleCmd and the clicked
  *       card has registered actions, show the context menu.
- *   <li>Otherwise if SelectPlace is active, validate the zone and send the
- *       placement response directly.
  *   <li>Otherwise delegate to {@link PromptController#handleFieldClick}.
  * </ol>
  */
@@ -36,18 +32,16 @@ public class ClickDispatcher {
 
     private final UI ui;
     private final ClientDuelState state;
-    private final FieldRenderer field;
     private final PromptController prompt;
     private final Callbacks callbacks;
 
     private final UIElement contextMenu;
     private final UIElement canvas;
 
-    public ClickDispatcher(UI ui, ClientDuelState state, FieldRenderer field,
+    public ClickDispatcher(UI ui, ClientDuelState state,
                            PromptController prompt, UIElement canvas, Callbacks callbacks) {
         this.ui = ui;
         this.state = state;
-        this.field = field;
         this.prompt = prompt;
         this.canvas = canvas;
         this.callbacks = callbacks;
@@ -88,28 +82,11 @@ public class ClickDispatcher {
         // No actions — dismiss any open context menu
         hideContextMenu();
 
-        // SelectPlace is a pure field-bitmask check, doesn't go through PromptController
-        if (state.pendingPrompt instanceof DuelMessage.SelectPlace sel) {
-            handlePlaceSelection(sel, player, location, sequence);
-            return;
-        }
-
         prompt.handleFieldClick(player, location, sequence);
     }
 
     public void hideContextMenu() {
         if (contextMenu != null) contextMenu.addClass("hidden");
-    }
-
-    // ── SelectPlace routing ────────────────────────────────────────────────
-
-    private void handlePlaceSelection(DuelMessage.SelectPlace sel, int player, int location, int sequence) {
-        if (location != LOCATION_MZONE && location != LOCATION_SZONE) return;
-
-        int bit = field.getFieldBit(player, location, sequence);
-        if ((sel.field() & bit) != 0) return; // zone is blocked
-
-        callbacks.sendResponse(ResponseBuilder.selectPlace(player, location, sequence));
     }
 
     // ── Context menu ───────────────────────────────────────────────────────

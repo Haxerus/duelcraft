@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -136,6 +137,20 @@ class ResponseBuilderTest {
         assertEquals(1, resp[0] & 0xFF);
         assertEquals(LOCATION_SZONE, resp[1] & 0xFF);
         assertEquals(0, resp[2] & 0xFF);
+    }
+
+    @Test
+    void selectPlacesMultipleZones() {
+        byte[] resp = ResponseBuilder.selectPlaces(List.of(
+                new int[]{0, LOCATION_MZONE, 1},
+                new int[]{1, LOCATION_SZONE, 3}));
+        assertEquals(6, resp.length);
+        assertEquals(0, resp[0] & 0xFF);
+        assertEquals(LOCATION_MZONE, resp[1] & 0xFF);
+        assertEquals(1, resp[2] & 0xFF);
+        assertEquals(1, resp[3] & 0xFF);
+        assertEquals(LOCATION_SZONE, resp[4] & 0xFF);
+        assertEquals(3, resp[5] & 0xFF);
     }
 
     // ---- selectPosition ----

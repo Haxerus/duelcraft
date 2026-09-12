@@ -94,7 +94,7 @@ public class MessageParser {
                 case MSG_SELECT_YESNO     -> parseSelectYesNo(reader);
                 case MSG_SELECT_OPTION    -> parseSelectOption(reader);
                 case MSG_SELECT_PLACE     -> parseSelectPlace(reader);
-                case MSG_SELECT_DISFIELD  -> parseSelectPlace(reader); // same format
+                case MSG_SELECT_DISFIELD  -> parseSelectDisfield(reader);
                 case MSG_SELECT_POSITION  -> parseSelectPosition(reader);
                 case MSG_SELECT_TRIBUTE   -> parseSelectTribute(reader);
                 case MSG_SELECT_COUNTER   -> parseSelectCounter(reader);
@@ -485,6 +485,13 @@ public class MessageParser {
         int count = r.readUint8();
         int field = r.readInt32();
         return new DuelMessage.SelectPlace(player, count, field);
+    }
+
+    private static DuelMessage.SelectDisfield parseSelectDisfield(BufferReader r) {
+        int player = r.readUint8();
+        int count = r.readUint8();
+        int field = r.readInt32();
+        return new DuelMessage.SelectDisfield(player, count, field);
     }
 
     private static DuelMessage.SelectPosition parseSelectPosition(BufferReader r) {

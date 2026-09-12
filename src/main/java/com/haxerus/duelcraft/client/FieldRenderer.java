@@ -369,17 +369,18 @@ public class FieldRenderer {
     // ── Highlighting ───────────────────────────────────────────────────────
 
     /**
-     * Highlight valid placement zones for a SelectPlace prompt.
+     * Highlight valid placement zones for a SelectPlace/SelectDisfield prompt.
      * Bitmask is relative to the asking player (set bit = blocked zone); the asking player is the viewer.
      * Monster bits 0-6 and spell bits 8-15 of the viewer's block; the opponent's block starts at bit 16.
-     * EMZ bits (5, 6) are read from the viewer's block only, because the two shared slots are covered there.
+     * The two physical EMZ slots are each addressable from either block (bit 5/6 of the viewer's own
+     * block, or the cross-mapped bit 21/22 of the opponent's block — see {@link FieldLayout#slotId}),
+     * so both blocks check sequences 5 and 6, not just the viewer's.
      */
     public void highlightValidPlaces(int field) {
         ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
         for (Side side : Side.values()) {
             int base = side == Side.PLR ? 0 : 16;
-            int lastMonster = side == Side.PLR ? 6 : 4;
-            for (int seq = 0; seq <= lastMonster; seq++) {
+            for (int seq = 0; seq <= 6; seq++) {
                 if ((field & (1 << (base + seq))) == 0) {
                     slot(new Zone(side, LOCATION_MZONE, seq)).ifPresent(el -> el.addClass("target"));
                 }
@@ -408,12 +409,33 @@ public class FieldRenderer {
         return slot(new Zone(side(loc.controller()), loc.location(), loc.sequence())).orElse(null);
     }
 
-    /** Compute the bit position in the SelectPlace bitmask for a given zone. */
+    /** Compute the bit position in the SelectPlace/SelectDisfield bitmask for a given zone. */
     public int getFieldBit(int player, int location, int sequence) {
         // Bitmask is relative: self=0, opponent=1. Map absolute player to bitmask position.
         int bitmaskPlayer = (player == state.localPlayer) ? 0 : 1;
         int offset = bitmaskPlayer * 16;
         if (location == LOCATION_SZONE) offset += 8;
         return 1 << (offset + sequence);
+    }
+
+    /**
+     * Resolve a clicked field zone to the absolute (player, location, sequence) that should actually
+     * be submitted for a SelectPlace/SelectDisfield response, honouring the shared EMZ slots: if the
+     * clicked zone's own bit is blocked but it's an EMZ slot (MZONE 5/6), the same physical slot is
+     * also addressable via the other player's cross-mapped sequence (see {@link FieldLayout#slotId}).
+     * Returns null if the zone (and its EMZ alias, if any) is blocked.
+     */
+    public int[] resolvePlaceZone(int player, int location, int sequence, int field) {
+        if ((field & getFieldBit(player, location, sequence)) == 0) {
+            return new int[]{player, location, sequence};
+        }
+        if (location == LOCATION_MZONE && (sequence == 5 || sequence == 6)) {
+            int otherPlayer = (player == state.localPlayer) ? state.opponent() : state.localPlayer;
+            int otherSeq = sequence == 5 ? 6 : 5;
+            if ((field & getFieldBit(otherPlayer, location, otherSeq)) == 0) {
+                return new int[]{otherPlayer, location, otherSeq};
+            }
+        }
+        return null;
     }
 }
