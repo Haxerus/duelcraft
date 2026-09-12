@@ -591,45 +591,68 @@ class MessageParserTest {
         assertEquals(0, rps.player());
     }
 
+    /** Encode a SumCard: [int32 code][uint8 con][uint8 loc][int32 seq][int32 pos][int32 sumParam]. */
+    static void putSumCard(ByteBuffer buf, int code, int con, int loc, int seq, int pos, int sumParam) {
+        putCardInfo(buf, code, con, loc, seq, pos);
+        buf.putInt(sumParam);
+    }
+
     @Test
     void parseSelectSum() {
         ByteBuffer b = body(76);
         b.put((byte) 0);       // player
-        b.put((byte) 0);       // selectMode
+        b.put((byte) 0);       // selectMode (0 = exact sum)
         b.putInt(8);            // targetSum
         b.putInt(1);            // min
         b.putInt(3);            // max
 
         // 1 must-select card
         b.putInt(1);
-        b.putInt(56832966);     // code
-        b.put((byte) 0);       // controller
-        b.put((byte) LOCATION_MZONE);
-        b.putInt(0);            // sequence
-        b.putLong(4L);          // opParam
+        putSumCard(b, 56832966, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK, 4);
 
         // 2 selectable cards
         b.putInt(2);
-        b.putInt(89631139);
-        b.put((byte) 0);
-        b.put((byte) LOCATION_MZONE);
-        b.putInt(1);
-        b.putLong(8L);
-        b.putInt(46986414);
-        b.put((byte) 0);
-        b.put((byte) LOCATION_MZONE);
-        b.putInt(2);
-        b.putLong(7L);
+        putSumCard(b, 89631139, 0, LOCATION_MZONE, 1, POS_FACEDOWN_DEFENSE, (7 << 16) | 3);
+        putSumCard(b, 46986414, 1, LOCATION_MZONE, 2, POS_FACEUP_DEFENSE, 8);
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_SUM, b.array()));
         assertEquals(1, msgs.size());
         assertInstanceOf(DuelMessage.SelectSum.class, msgs.getFirst());
         var sum = (DuelMessage.SelectSum) msgs.getFirst();
         assertEquals(0, sum.player());
+        assertFalse(sum.selectMode());
         assertEquals(8, sum.targetSum());
+        assertEquals(1, sum.min());
+        assertEquals(3, sum.max());
+
         assertEquals(1, sum.mustSelect().size());
-        assertEquals(4, sum.mustSelect().getFirst().value1());
+        var must = sum.mustSelect().getFirst();
+        assertEquals(56832966, must.code());
+        assertEquals(0, must.controller());
+        assertEquals(LOCATION_MZONE, must.location());
+        assertEquals(0, must.sequence());
+        assertEquals(POS_FACEUP_ATTACK, must.position());
+        assertEquals(4, must.sumParam());
+        assertEquals(4, must.value1());
+        assertEquals(0, must.value2());
+
         assertEquals(2, sum.selectable().size());
+        // Position and sumParam are separate fields: a face-down card with both values packed.
+        var first = sum.selectable().getFirst();
+        assertEquals(89631139, first.code());
+        assertEquals(1, first.sequence());
+        assertEquals(POS_FACEDOWN_DEFENSE, first.position());
+        assertEquals((7 << 16) | 3, first.sumParam());
+        assertEquals(3, first.value1());
+        assertEquals(7, first.value2());
+
+        var second = sum.selectable().get(1);
+        assertEquals(46986414, second.code());
+        assertEquals(1, second.controller());
+        assertEquals(2, second.sequence());
+        assertEquals(POS_FACEUP_DEFENSE, second.position());
+        assertEquals(8, second.value1());
+        assertEquals(0, second.value2());
     }
 
     // ---- Misc ----

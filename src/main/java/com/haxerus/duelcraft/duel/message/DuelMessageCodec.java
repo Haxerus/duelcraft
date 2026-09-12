@@ -574,18 +574,19 @@ public class DuelMessageCodec {
         return list;
     }
 
-    // SumCard: code(4) + con(1) + loc(1) + seq(4) + opParam(8) = 18 bytes
+    // SumCard: code(4) + con(1) + loc(1) + seq(4) + position(4) + sumParam(4) = 18 bytes
     private static void writeSumCard(FriendlyByteBuf buf, DuelMessage.SumCard card) {
         buf.writeInt(card.code());
         buf.writeByte(card.controller());
         buf.writeByte(card.location());
         buf.writeInt(card.sequence());
-        buf.writeLong(card.opParam());
+        buf.writeInt(card.position());
+        buf.writeInt(card.sumParam());
     }
 
     private static DuelMessage.SumCard readSumCard(FriendlyByteBuf buf) {
         return new DuelMessage.SumCard(buf.readInt(), buf.readByte(), buf.readByte(),
-                buf.readInt(), buf.readLong());
+                buf.readInt(), buf.readInt(), buf.readInt());
     }
 
     private static void writeSumCardList(FriendlyByteBuf buf, List<DuelMessage.SumCard> list) {

@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.server;
 import com.haxerus.duelcraft.duel.DuelEventListener;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.SumSelection;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -248,8 +249,10 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.SelectCounter sel ->
                     ResponseBuilder.selectCounter(spreadCounters(sel.cards(), sel.count()));
 
-            case DuelMessage.SelectSum sel ->
-                    ResponseBuilder.selectCards(0); // pick first
+            case DuelMessage.SelectSum sel -> {
+                int[] picks = SumSelection.firstViableCombination(sel);
+                yield picks != null ? ResponseBuilder.selectSum(picks) : null;
+            }
 
             case DuelMessage.SelectUnselectCard sel -> {
                 if (sel.finishable())
@@ -313,27 +316,13 @@ public class SoloDuelHandler implements DuelEventListener {
     }
 
     // ─── Retry fallback ───────────────────────────────────────────────────
-    // SelectCard/SelectTribute/SelectCounter already compute a legal answer in
+    // SelectCard/SelectTribute/SelectCounter/SelectSum already compute a legal answer in
     // buildAutoResponse, so a retry on those just retries buildAutoResponse via the
-    // default case below. SelectSum is left as a first-card pick in buildAutoResponse
-    // (Task 3 replaces its parse/response entirely) but gets a smarter sum-aware answer
-    // here so a bad first guess can still recover. SelectUnselectCard also accepts
+    // default case below. SelectUnselectCard also accepts
     // cancelable (not just finishable) here, which buildAutoResponse doesn't check.
 
     private static byte[] buildFallbackResponse(DuelMessage msg) {
         return switch (msg) {
-            case DuelMessage.SelectSum sel -> {
-                List<Integer> picks = new ArrayList<>();
-                int sum = 0;
-                for (int i = 0; i < sel.selectable().size()
-                        && (sum < sel.targetSum() || picks.size() < sel.min()); i++) {
-                    if (sel.max() > 0 && picks.size() >= sel.max()) break;
-                    picks.add(i);
-                    sum += sel.selectable().get(i).value1();
-                }
-                yield ResponseBuilder.selectSum(picks.stream().mapToInt(Integer::intValue).toArray());
-            }
-
             case DuelMessage.SelectUnselectCard sel -> {
                 if (sel.finishable() || sel.cancelable())
                     yield ResponseBuilder.selectUnselectCardFinish();

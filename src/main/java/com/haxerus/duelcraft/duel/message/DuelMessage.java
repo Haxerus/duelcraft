@@ -388,18 +388,20 @@ public sealed interface DuelMessage {
         }
     }
 
-    record SumCard(int code, int controller, int location, int sequence, long opParam) {
+    /** Card entry in sum selection: code + con + loc + seq(uint32) + position(uint32) + sumParam(uint32). */
+    record SumCard(int code, int controller, int location, int sequence, int position, int sumParam) {
         public static SumCard read(BufferReader reader) {
             return new SumCard(
                 reader.readInt32(),
                 reader.readUint8(),
                 reader.readUint8(),
                 reader.readInt32(),
-                reader.readInt64()
+                reader.readInt32(),
+                reader.readInt32()
             );
         }
-        public int value1() { return (int)(opParam & 0xFFFF); }
-        public int value2() { return (int)((opParam >> 16) & 0xFFFF); }
+        public int value1() { return sumParam & 0xFFFF; }
+        public int value2() { return (sumParam >>> 16) & 0xFFFF; }
     }
 
     /** Card entry in tribute selection: code + con + loc + seq(uint32) + tributeCount(uint8). */

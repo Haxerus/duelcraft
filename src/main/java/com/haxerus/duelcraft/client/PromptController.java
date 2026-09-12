@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.SumSelection;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
@@ -73,6 +74,7 @@ public class PromptController {
     // handlers that don't rebuild).
     private final List<Integer> selectedIndices = new ArrayList<>();
     private final List<UIElement> sumSelectableCards = new ArrayList<>();
+    private SumSelection sumSelection;
     private boolean inFieldSelectionMode;
     private boolean isBattleCmd;
 
@@ -449,48 +451,25 @@ public class PromptController {
     }
 
     private void buildFieldSumPrompt(DuelMessage.SelectSum sel) {
-        selectedIndices.clear();
+        sumSelection = new SumSelection(sel);
         sumSelectableCards.clear();
         promptOverlay.addClass("hidden");
 
         for (var mustCard : sel.mustSelect()) {
-            var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
+            UIElement slot = slotOf(mustCard);
             if (slot != null) slot.addClass("selected");
         }
 
-        for (var sumCard : sel.selectable()) {
-            var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
-            if (slot != null) slot.addClass("selectable");
-        }
-
-        updateFieldSumStatus(sel);
-    }
-
-    private void updateFieldSumStatus(DuelMessage.SelectSum sel) {
-        if (!(statusLabel instanceof Label lbl)) return;
-        int sum = 0;
-        for (var c : sel.mustSelect()) sum += c.value1();
-        for (int idx : selectedIndices) sum += sel.selectable().get(idx).value1();
-        lbl.setText(Component.literal("Select Materials (Sum: " + sum + " / " + sel.targetSum() + ")"));
-        statusLabel.removeClass("hidden");
+        refreshSumHighlights(sel, "selectable");
+        updateSumCaption(sel, true);
+        maybeAutoSubmitSum();
     }
 
     private void buildSelectSumPrompt(DuelMessage.SelectSum sel) {
-        selectedIndices.clear();
+        sumSelection = new SumSelection(sel);
         promptOverlay.removeClass("hidden");
         clearPromptContent();
-
-        int mustSum = 0;
-        for (var c : sel.mustSelect()) mustSum += c.value1();
-        final int[] runningSum = { mustSum };
-
-        Runnable updateTitle = () -> {
-            if (promptTitle instanceof Label t)
-                t.setText(Component.literal("Select Materials (Sum: " + runningSum[0] + " / " + sel.targetSum() + ")"));
-        };
-        updateTitle.run();
+        updateSumCaption(sel, false);
 
         var scroller = createPromptCardScroller();
         sumSelectableCards.clear();
@@ -504,63 +483,93 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             scroller.addScrollViewChild(card);
 
-            var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
+            UIElement slot = slotOf(mustCard);
             if (slot != null) slot.addClass("selected");
         }
 
         for (int i = 0; i < sel.selectable().size(); i++) {
-            var sumCard = sel.selectable().get(i);
-            int code = sumCard.code();
-            int value = sumCard.value1();
+            int code = sel.selectable().get(i).code();
             int index = i;
 
             var card = new UIElement();
             card.addClass("card");
             callbacks.setCardImageBackground(card, code);
 
-            var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
-            if (slot != null) slot.addClass("target");
-
             card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                if (selectedIndices.contains(index)) {
-                    selectedIndices.remove(Integer.valueOf(index));
-                    card.removeClass("selected");
-                    if (slot != null) slot.removeClass("selected");
-                    runningSum[0] -= value;
-                } else {
-                    selectedIndices.add(index);
-                    card.addClass("selected");
-                    if (slot != null) slot.addClass("selected");
-                    runningSum[0] += value;
-                }
-                updateTitle.run();
+                toggleSumPick(sel, index, false);
             });
 
             sumSelectableCards.add(card);
             scroller.addScrollViewChild(card);
         }
 
+        refreshSumHighlights(sel, "target");
+
         var confirmBtn = new Button();
         confirmBtn.setText(Component.literal("Confirm"));
         confirmBtn.addClasses("prompt-btn");
         confirmBtn.setOnClick(e -> {
-            int totalSelected = sel.mustSelect().size() + selectedIndices.size();
-            if (runningSum[0] == sel.targetSum()
-                    && totalSelected >= sel.min() && totalSelected <= sel.max()) {
-                int mustCount = sel.mustSelect().size();
-                int[] allIndices = new int[totalSelected];
-                for (int i = 0; i < mustCount; i++) allIndices[i] = i;
-                int j = mustCount;
-                for (int idx : selectedIndices) allIndices[j++] = mustCount + idx;
-                callbacks.sendResponse(ResponseBuilder.selectSum(allIndices));
-            }
+            if (sumSelection.isComplete()) sendSumResponse();
         });
         promptButtons.addChild(confirmBtn);
+
+        maybeAutoSubmitSum();
+    }
+
+    /** Toggle one selectable card, then repaint, recaption and submit if nothing is left to pick. */
+    private void toggleSumPick(DuelMessage.SelectSum sel, int index, boolean fieldMode) {
+        if (!sumSelection.isSelected(index) && !sumSelection.canPick(index)) return;
+        sumSelection.toggle(index);
+        refreshSumHighlights(sel, fieldMode ? "selectable" : "target");
+        updateSumCaption(sel, fieldMode);
+        maybeAutoSubmitSum();
+    }
+
+    /** Mark picked cards and offer only those that can still complete a legal total. */
+    private void refreshSumHighlights(DuelMessage.SelectSum sel, String candidateClass) {
+        for (int i = 0; i < sel.selectable().size(); i++) {
+            boolean picked = sumSelection.isSelected(i);
+            boolean offered = picked || sumSelection.canPick(i);
+
+            UIElement slot = slotOf(sel.selectable().get(i));
+            if (slot != null) {
+                toggleClass(slot, "selected", picked);
+                toggleClass(slot, candidateClass, offered && !picked);
+            }
+            if (i < sumSelectableCards.size()) {
+                toggleClass(sumSelectableCards.get(i), "selected", picked);
+            }
+        }
+    }
+
+    private void updateSumCaption(DuelMessage.SelectSum sel, boolean fieldMode) {
+        String target = (sel.selectMode() ? ">=" : "") + sel.targetSum();
+        var text = Component.literal("Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")");
+        if (fieldMode) {
+            if (statusLabel instanceof Label lbl) {
+                lbl.setText(text);
+                statusLabel.removeClass("hidden");
+            }
+        } else if (promptTitle instanceof Label t) {
+            t.setText(text);
+        }
+    }
+
+    /** Submit as soon as the selection is legal and no further pick could be legal. */
+    private void maybeAutoSubmitSum() {
+        if (sumSelection.isComplete() && !sumSelection.hasPickable()) sendSumResponse();
+    }
+
+    private void sendSumResponse() {
+        callbacks.sendResponse(ResponseBuilder.selectSum(sumSelection.responseIndices()));
+    }
+
+    private UIElement slotOf(DuelMessage.SumCard card) {
+        return field.findSlotForLocation(new ClientDuelState.CardLocation(
+                card.controller(), card.location(), card.sequence()));
     }
 
     // ── Field selection mode (SelectCard with all-field candidates) ────────
@@ -659,43 +668,11 @@ public class PromptController {
     }
 
     private void handleSelectSumClick(int player, int location, int sequence, DuelMessage.SelectSum sel) {
+        if (sumSelection == null) return;
         for (int i = 0; i < sel.selectable().size(); i++) {
             var c = sel.selectable().get(i);
             if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
-                var loc = new ClientDuelState.CardLocation(player, location, sequence);
-                UIElement slot = field.findSlotForLocation(loc);
-                UIElement scrollerCard = i < sumSelectableCards.size() ? sumSelectableCards.get(i) : null;
-
-                if (selectedIndices.contains(i)) {
-                    selectedIndices.remove(Integer.valueOf(i));
-                    if (slot != null) slot.removeClass("selected");
-                    if (scrollerCard != null) scrollerCard.removeClass("selected");
-                } else {
-                    selectedIndices.add(i);
-                    if (slot != null) slot.addClass("selected");
-                    if (scrollerCard != null) scrollerCard.addClass("selected");
-                }
-
-                int sum = 0;
-                for (var m : sel.mustSelect()) sum += m.value1();
-                for (int idx : selectedIndices) sum += sel.selectable().get(idx).value1();
-
-                if (isFieldOnlySum(sel)) {
-                    updateFieldSumStatus(sel);
-                    int totalSelected = sel.mustSelect().size() + selectedIndices.size();
-                    if (sum == sel.targetSum()
-                            && totalSelected >= sel.min() && totalSelected <= sel.max()) {
-                        int mustCount = sel.mustSelect().size();
-                        int[] allIndices = new int[totalSelected];
-                        for (int j = 0; j < mustCount; j++) allIndices[j] = j;
-                        int k = mustCount;
-                        for (int idx : selectedIndices) allIndices[k++] = mustCount + idx;
-                        callbacks.sendResponse(ResponseBuilder.selectSum(allIndices));
-                    }
-                } else {
-                    if (promptTitle instanceof Label t)
-                        t.setText(Component.literal("Select Materials (Sum: " + sum + " / " + sel.targetSum() + ")"));
-                }
+                toggleSumPick(sel, i, isFieldOnlySum(sel));
                 return;
             }
         }
@@ -830,6 +807,11 @@ public class PromptController {
         scroller.addClass("prompt-card-scroller");
         promptBody.addChild(scroller);
         return scroller;
+    }
+
+    private static void toggleClass(UIElement element, String name, boolean on) {
+        if (on) element.addClass(name);
+        else element.removeClass(name);
     }
 
     private UIElement byId(String id) {
