@@ -62,6 +62,7 @@ public class LDLibDuelScreen {
     private static ClientDuelState activeState;
     private static ModularUI activeUI;
     private static UIRefresher refresher;
+    private static DuelScreen activeScreen;
 
     /**
      * Load the XML UI and open the duel screen.
@@ -91,12 +92,29 @@ public class LDLibDuelScreen {
         refresher = new UIRefresher(activeUI, state);
         UIElement canvas = activeUI.ui.selectId("duel-canvas").findFirst()
                 .orElseThrow(() -> new IllegalStateException(DUEL_UI + " has no #duel-canvas"));
-        return new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + state.opponentName));
+        activeScreen = new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + state.opponentName));
+        return activeScreen;
     }
 
     /** True while a duel is in progress: a state exists and no result has arrived yet. */
     public static boolean isDuelLive() {
         return activeState != null && activeState.winner < 0;
+    }
+
+    /** ESC while the duel is live: opens the leave-duel dialog, or closes it again. */
+    public static void togglePauseMenu() {
+        if (refresher != null) {
+            refresher.togglePauseOverlay();
+        }
+    }
+
+    /**
+     * A duel screen went away. Drops the statics unless the screen was replaced by a rebuild
+     * ({@code /duel show}) or the duel is still live, so ESC after a result cannot leave them dangling.
+     */
+    static void onScreenRemoved(DuelScreen screen) {
+        if (screen != activeScreen || isDuelLive()) return;
+        close();
     }
 
     /** Records the duel result; the result overlay appears on the next tick. */
@@ -122,6 +140,7 @@ public class LDLibDuelScreen {
         activeState = null;
         activeUI = null;
         refresher = null;
+        activeScreen = null;
     }
 
     private static ModularUI loadFromXml() {
@@ -192,6 +211,9 @@ public class LDLibDuelScreen {
         private final UIElement resultTitle;
         private final UIElement resultReason;
         private final Button resultClose;
+        private final UIElement pauseOverlay;
+        private final Button pauseConcede;
+        private final Button pauseStay;
         private final ZoneInspectorController zoneInspector;
         private final PromptController prompt;
         private final ClickDispatcher clicks;
@@ -261,6 +283,9 @@ public class LDLibDuelScreen {
             resultTitle = byId("result-title");
             resultReason = byId("result-reason");
             resultClose = byId("result-close", Button.class);
+            pauseOverlay = byId("pause-overlay");
+            pauseConcede = byId("pause-concede", Button.class);
+            pauseStay = byId("pause-stay", Button.class);
             zoneInspector = new ZoneInspectorController(ui, state, new ZoneInspectorController.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
@@ -558,7 +583,7 @@ public class LDLibDuelScreen {
                 concedeBtn.setOnClick(e -> {
                     long now = System.currentTimeMillis();
                     if (concedeArmedAt != 0 && now - concedeArmedAt <= CONCEDE_CONFIRM_MS) {
-                        PacketDistributor.sendToServer(new DuelConcedePayload());
+                        sendConcede();
                         disarmConcede();
                     } else {
                         concedeArmedAt = now;
@@ -572,6 +597,33 @@ public class LDLibDuelScreen {
                     Minecraft.getInstance().setScreen(null);
                 });
             }
+            // The pause dialog is itself the confirmation, so its Concede sends straight away.
+            if (pauseConcede != null) {
+                pauseConcede.setOnClick(e -> {
+                    hidePauseOverlay();
+                    sendConcede();
+                });
+            }
+            if (pauseStay != null) {
+                pauseStay.setOnClick(e -> hidePauseOverlay());
+            }
+        }
+
+        private static void sendConcede() {
+            PacketDistributor.sendToServer(new DuelConcedePayload());
+        }
+
+        void togglePauseOverlay() {
+            if (pauseOverlay == null) return;
+            if (pauseOverlay.hasClass("hidden")) {
+                pauseOverlay.removeClass("hidden");
+            } else {
+                pauseOverlay.addClass("hidden");
+            }
+        }
+
+        private void hidePauseOverlay() {
+            if (pauseOverlay != null) pauseOverlay.addClass("hidden");
         }
 
         private void disarmConcedeIfStale() {
