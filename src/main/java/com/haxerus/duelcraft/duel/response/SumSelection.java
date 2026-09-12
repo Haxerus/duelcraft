@@ -79,14 +79,14 @@ public final class SumSelection {
         return isValid(selected);
     }
 
-    /** Running total, counting each card's smallest contribution. */
+    /**
+     * The accepted total once the selection is legal, otherwise the total the selection is
+     * guaranteed to reach. A mode 0 selection is exact by definition, so it reports the target —
+     * a card that completes the sum through {@code value2} would otherwise read as short.
+     */
     public int currentSum() {
-        int sum = 0;
-        for (int param : mustParams) sum += minValue(param);
-        for (int i = 0; i < selected.length; i++) {
-            if (selected[i]) sum += minValue(selectableParams[i]);
-        }
-        return sum;
+        if (!atLeastMode && isComplete()) return target;
+        return minTotal(selected);
     }
 
     /** Indices into the selectable list; must-select cards are never indexed. */
@@ -149,14 +149,22 @@ public final class SumSelection {
     /** True when adding more cards can no longer help — both bounds only grow with each pick. */
     private boolean isDeadEnd(boolean[] picks) {
         int[] params = chosenParams(picks);
-        int sum = 0, smallest = Integer.MAX_VALUE;
-        for (int param : params) {
-            int low = minValue(param);
-            sum += low;
-            smallest = Math.min(smallest, low);
+        if (atLeastMode) {
+            int smallest = Integer.MAX_VALUE;
+            for (int param : params) smallest = Math.min(smallest, minValue(param));
+            return params.length > 0 && minTotal(picks) - smallest >= target;
         }
-        if (atLeastMode) return params.length > 0 && sum - smallest >= target;
-        return count(picks) >= max || sum > target;
+        return count(picks) >= max || minTotal(picks) > target;
+    }
+
+    /** Total of every card's smallest contribution, must-select cards included. */
+    private int minTotal(boolean[] picks) {
+        int sum = 0;
+        for (int param : mustParams) sum += minValue(param);
+        for (int i = 0; i < picks.length; i++) {
+            if (picks[i]) sum += minValue(selectableParams[i]);
+        }
+        return sum;
     }
 
     private int[] chosenParams(boolean[] picks) {

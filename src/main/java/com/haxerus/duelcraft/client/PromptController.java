@@ -34,7 +34,7 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
  * <ul>
  *   <li>{@link #rebuild()} — called on PROMPT dirty flag
  *   <li>{@link #handleFieldClick} — dispatch field slot click to active prompt
- *   <li>{@link #handleRightClick} — cancel field selection / finish unselect-card
+ *   <li>{@link #handleRightClick} — cancel field selection / finish unselect-card / confirm a sum
  *   <li>{@link #onResponseSent()} — clear prompt UI after a response is sent
  *   <li>{@link #isBattleCmd()} — context menu icon lookup needs to know if
  *       we're in the battle phase command menu
@@ -547,14 +547,17 @@ public class PromptController {
 
     private void updateSumCaption(DuelMessage.SelectSum sel, boolean fieldMode) {
         String target = (sel.selectMode() ? ">=" : "") + sel.targetSum();
-        var text = Component.literal("Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")");
+        String text = "Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")";
         if (fieldMode) {
+            // A complete selection that can still be extended has no other way out — SELECT_SUM
+            // has no cancel encoding, so the field prompt must offer the confirm gesture.
+            if (sumSelection.isComplete()) text += "  (Right-click to confirm)";
             if (statusLabel instanceof Label lbl) {
-                lbl.setText(text);
+                lbl.setText(Component.literal(text));
                 statusLabel.removeClass("hidden");
             }
         } else if (promptTitle instanceof Label t) {
-            t.setText(text);
+            t.setText(Component.literal(text));
         }
     }
 
@@ -731,6 +734,13 @@ public class PromptController {
                 && !sel.unselectableCards().isEmpty()) {
             e.stopPropagation();
             callbacks.sendResponse(ResponseBuilder.selectUnselectCardFinish());
+            return true;
+        }
+        if (state.pendingPrompt instanceof DuelMessage.SelectSum
+                && promptOverlay.hasClass("hidden")
+                && sumSelection != null && sumSelection.isComplete()) {
+            e.stopPropagation();
+            sendSumResponse();
             return true;
         }
         if (state.pendingPrompt instanceof DuelMessage.SelectTribute sel && sel.cancelable()) {

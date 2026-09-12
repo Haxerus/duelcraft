@@ -95,6 +95,17 @@ class SumSelectionTest {
         var byHigh = new SumSelection(prompt(false, 7, 1, 1, new int[0], new int[]{both}));
         byHigh.toggle(0);
         assertTrue(byHigh.isComplete(), "value2 = 7 completes the sum");
+        assertEquals(7, byHigh.currentSum(), "the caption must report the accepted total, not value1");
+    }
+
+    @Test
+    void aCompleteSelectionCanStillBeExtendable() {
+        // Card A pays 4 or 8, card B pays 4: {A} is already exact, {A, B} is exact too, so the
+        // UI cannot rely on "nothing left to pick" to submit.
+        var sel = new SumSelection(prompt(false, 8, 1, 3, new int[0], new int[]{(8 << 16) | 4, 4}));
+        sel.toggle(0);
+        assertTrue(sel.isComplete());
+        assertTrue(sel.hasPickable(), "a second card would also be legal");
     }
 
     // ---- Mode 1: sum at least the target ----
@@ -107,6 +118,7 @@ class SumSelectionTest {
 
         sel.toggle(1);
         assertTrue(sel.isComplete(), "3 + 3 reaches 5");
+        assertEquals(6, sel.currentSum(), "mode 1 reports the total reached, not the target");
     }
 
     @Test
