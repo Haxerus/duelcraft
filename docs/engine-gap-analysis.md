@@ -238,7 +238,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 
 ### 3.4 XYZ overlay moves never apply on the client
 - [ ] `card::get_info_location()` reports a material as `{host con, host loc | LOCATION_OVERLAY, host seq, material seq}` (`card.cpp:216-222`), so `location` is `0x84`/`0x88`, never `0x80`. `ClientDuelState.markLocationDirty/removeCard/placeCard` switch on `case LOCATION_OVERLAY` (exact `0x80`) and fall to `default`.
-- [ ] `DuelMessageCodec.writeLocInfo/readLocInfo` (and every card-list writer except `SortableCard`) store `location` with `writeByte`/`readByte`; values `≥ 0x80` decode negative. Use `readUnsignedByte` throughout.
+- [x] `DuelMessageCodec.writeLocInfo/readLocInfo` (and every card-list writer except `SortableCard`) store `location` with `writeByte`/`readByte`; values `≥ 0x80` decode negative. Use `readUnsignedByte` throughout.
 - [ ] `FieldRenderer` never reads `state.overlay`, so materials would be invisible even once tracked. Detach removes the last material regardless of which one left.
 
 ### 3.5 `SELECT_DISFIELD` with `count > 1` deadlocks
@@ -275,11 +275,11 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 
 - [x] Every one of the 74 records (73 typed + `Raw`) encodes and decodes; `encode` is an exhaustive switch over the sealed interface, so a new record without a codec arm fails compilation.
 - [x] `u64` fields (`desc`, hint data, `opParam`, race masks) travel as `long`.
-- [ ] `location` bytes are read signed (§3.4); `SortableCard` is the only writer using a full `int`.
+- [x] `location` bytes are read signed (§3.4); `SortableCard` is the only writer using a full `int`.
 - [x] `MSG_SELECT_DISFIELD` ships as type 18 (§3.5).
 - [ ] No version byte and no bound on `readByteArray` lengths.
-- [ ] `decode`'s `default -> Raw(type, readByteArray(buf))` is unreachable today and would mis-frame the buffer if it ever fired.
-- [ ] Zero tests. A round-trip test over every record, including a `LocInfo` with location `0x84`, would have caught §3.4.
+- [x] `decode`'s `default -> Raw(type, readByteArray(buf))` is unreachable today and would mis-frame the buffer if it ever fired.
+- [x] Zero tests. A round-trip test over every record, including a `LocInfo` with location `0x84`, would have caught §3.4.
 
 ---
 
@@ -440,7 +440,7 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [x] 45 of 72 parser cases have byte-level tests; all 366 shared constants match the engine header (values checked, including octal link markers).
 - [ ] **Parsed but untested (28):** `RETRY`, `SELECT_BATTLECMD`, `SELECT_IDLECMD`, `SORT_CHAIN`, `SELECT_COUNTER`, `SELECT_DISFIELD`, `SORT_CARD`, `SWAP`, `FIELD_DISABLED`, `SPSUMMONING`, `SPSUMMONED`, `FLIPSUMMONING`, `FLIPSUMMONED`, `CHAIN_SOLVED`, `CHAIN_DISABLED`, `CARD_SELECTED`, `BECOME_TARGET`, `UNEQUIP`, `CARD_TARGET`, `CANCEL_TARGET`, `PAY_LPCOST`, `ADD_COUNTER`, `REMOVE_COUNTER`, `TOSS_DICE`, `ANNOUNCE_ATTRIB`, `ANNOUNCE_CARD`, `ANNOUNCE_NUMBER`, `CARD_HINT`. The two idle/battle command parsers (six and two variable-length lists with three entry widths) are the highest-risk untested code.
 - [x] `MessageParserTest.parseSelectSum` encodes the parser's wrong layout; rewrite from the engine layout (§3.1). Add an offset-level check, not just entry size, for every card-list parser.
-- [ ] `DuelMessageCodec`: no tests at all. Add a round trip over every record with overlay locations (`0x84`) and `u64` descs.
+- [x] `DuelMessageCodec`: no tests at all. Add a round trip over every record with overlay locations (`0x84`) and `u64` descs.
 - [ ] `ResponseBuilder`: `selectCardsCancel`, `sortCardsDefault` untested. `ResponseValidator`: `selectCmd`, `selectSum`, `announceCard` have no methods; `sortChain` untested.
 - [ ] `FieldQueryTest`: add `RACE` u64, `OVERLAY_CARD`, `COUNTERS`, `TARGET_CARD`, `REASON_CARD`/`EQUIP_CARD` present and absent, empty buffer, missing `QUERY_END`.
 - [ ] `OcgCoreTest`: never calls `nDuelQuery`, so `FieldQuery` is never run on real engine bytes; re-declares ~30 constants locally instead of importing `OcgConstants`; `MSG_WIN` read is wrong (§3.9); `testQueryField` asserts only non-empty.
