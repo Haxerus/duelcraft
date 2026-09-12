@@ -43,6 +43,11 @@ public class ClientDuelState {
         return !dirtyFlags.isEmpty();
     }
 
+    /** Mark everything dirty so a rebuilt UI renders the current state (used when reopening the screen). */
+    public void markAllDirty() {
+        dirtyFlags.addAll(EnumSet.allOf(DirtyFlag.class));
+    }
+
     /** Mark all visual zones dirty (used when card images finish loading). */
     public void markAllVisualsDirty() {
         dirtyFlags.addAll(EnumSet.of(
@@ -196,9 +201,17 @@ public class ClientDuelState {
     public int rpsHand0;
     public int rpsHand1;
 
-    // Winner (-1 = ongoing)
+    // Winner (-1 = ongoing, 2 = draw)
     public int winner = -1;
     public int winReason;
+
+    /** Records the duel result, from MSG_WIN or a host-synthesised DuelEndPayload. */
+    public void applyResult(int winner, int reason) {
+        this.winner = winner;
+        this.winReason = reason;
+        dirtyFlags.add(DirtyFlag.WINNER);
+        LOGGER.info("[State] Result: winner={}, reason={}", winner, reason);
+    }
 
     public ClientDuelState(int localPlayer, String opponentName, int lp0, int lp1,
                            int deckSize, int extraSize, long duelFlags) {
@@ -263,12 +276,7 @@ public class ClientDuelState {
                 LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
                         lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
             }
-            case DuelMessage.Win win -> {
-                winner = win.winner();
-                winReason = win.reason();
-                dirtyFlags.add(DirtyFlag.WINNER);
-                LOGGER.info("[State] Win: player={}, reason={}", winner, winReason);
-            }
+            case DuelMessage.Win win -> applyResult(win.winner(), win.reason());
             case DuelMessage.NewTurn nt -> {
                 currentTurn = nt.player();
                 turnCount++;

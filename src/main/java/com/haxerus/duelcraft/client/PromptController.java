@@ -1069,26 +1069,6 @@ public class PromptController {
         return false;
     }
 
-    // ── Win overlay (reuses the prompt overlay DOM) ────────────────────────
-
-    /** Show the game-over overlay with a "You Win!"/"You Lose!" message and a Close button. */
-    public void showWinOverlay(boolean localWon, Runnable onClose) {
-        if (promptOverlay == null) return;
-        promptOverlay.removeClass("hidden");
-        if (promptTitle instanceof Label title) {
-            title.setText(Component.literal(localWon ? "You Win!" : "You Lose!"));
-        }
-        if (promptBody != null) promptBody.clearAllChildren();
-        if (promptButtons != null) {
-            promptButtons.clearAllChildren();
-            var closeBtn = new Button();
-            closeBtn.setText(Component.literal("Close"));
-            closeBtn.addClass("prompt-btn");
-            closeBtn.setOnClick(e -> onClose.run());
-            promptButtons.addChild(closeBtn);
-        }
-    }
-
     // ── Cleanup after a response is sent ───────────────────────────────────
 
     public void onResponseSent() {

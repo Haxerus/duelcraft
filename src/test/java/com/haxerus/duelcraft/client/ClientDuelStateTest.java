@@ -136,4 +136,28 @@ class ClientDuelStateTest {
         var loc = new ClientDuelState.CardLocation(0, LOCATION_HAND, 0);
         assertFalse(state.cardActions.getOrDefault(loc, List.of()).isEmpty());
     }
+
+    // ---- Duel result (MSG_WIN or a host-synthesised DuelEndPayload) ----
+
+    @Test
+    void applyResultStoresTheWinnerAndRaisesTheWinnerFlag() {
+        var state = newState();
+
+        state.applyResult(1, 4); // opponent wins by disconnect
+
+        assertEquals(1, state.winner);
+        assertEquals(4, state.winReason);
+        assertTrue(state.consumeDirtyFlags().contains(ClientDuelState.DirtyFlag.WINNER));
+    }
+
+    @Test
+    void winMessageGoesThroughApplyResult() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Win(0, 1));
+
+        assertEquals(0, state.winner);
+        assertEquals(1, state.winReason);
+        assertTrue(state.consumeDirtyFlags().contains(ClientDuelState.DirtyFlag.WINNER));
+    }
 }

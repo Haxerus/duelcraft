@@ -23,6 +23,12 @@ public final class DuelScreen extends ModularUIScreen {
         this.canvas = canvas;
     }
 
+    /** ESC must not abandon a live duel; {@code /duel show} reopens the screen if it closes another way. */
+    @Override
+    public boolean shouldCloseOnEsc() {
+        return !LDLibDuelScreen.isDuelLive();
+    }
+
     @Override
     public void init() {
         super.init();

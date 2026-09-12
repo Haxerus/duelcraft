@@ -369,6 +369,11 @@
         text-color: #AAAAAA;
         horizontal-align: center;
         }
+
+        #concede-btn {
+        width: 44;
+        height: 14;
+        }
         /* ── Card Info Banner (left overlay) ── */
         #card-info-banner {
         position: absolute;
@@ -551,6 +556,48 @@
         min-height: 48;
         }
 
+        /* ── Duel Result Overlay (shown when the duel ends) ── */
+        #result-overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background: rect(#96000000);
+        }
+
+        #result-overlay.hidden {
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #result-dialog {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 4;
+        padding-all: 8;
+        width: 200;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        #result-title {
+        height: 14;
+        font-size: 12;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        #result-reason {
+        height: 10;
+        font-size: 8;
+        text-color: #AAAAAA;
+        horizontal-align: center;
+        }
+
         /* ── Vertical name list inside prompt dialogs (ANNOUNCE_CARD search) ── */
         .prompt-name-scroller {
         scroller-view-mode: VERTICAL;
@@ -650,6 +697,7 @@
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
+            <button id="concede-btn" text="Concede" />
             <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
         </element>
 
@@ -877,6 +925,15 @@
                 <element id="prompt-buttons">
                     <!-- Confirm/Cancel buttons added dynamically -->
                 </element>
+            </element>
+        </element>
+
+        <!-- Duel Result Overlay (winner and reason, shown when the duel ends) -->
+        <element id="result-overlay" class="hidden">
+            <element id="result-dialog">
+                <label id="result-title">Duel over</label>
+                <label id="result-reason">Life points</label>
+                <button id="result-close" class="prompt-btn" text="Close" />
             </element>
         </element>
 

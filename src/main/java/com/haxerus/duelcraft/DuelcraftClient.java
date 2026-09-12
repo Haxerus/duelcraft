@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft;
 
+import com.haxerus.duelcraft.client.DuelClientCommand;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardDatabaseDownloader;
 import com.haxerus.duelcraft.client.carddata.CardImageManager;
@@ -12,6 +13,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.common.NeoForge;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
@@ -26,6 +28,7 @@ public class DuelcraftClient {
     public DuelcraftClient(IEventBus modBus, ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         modBus.addListener(DuelcraftClient::onClientSetup);
+        NeoForge.EVENT_BUS.addListener(DuelClientCommand::register);
     }
 
     private static void onClientSetup(FMLClientSetupEvent event) {

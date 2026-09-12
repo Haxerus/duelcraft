@@ -2,6 +2,8 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.server.DuelConcedePayload;
+import com.haxerus.duelcraft.server.DuelEndPayload;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.DataBindingBuilder;
@@ -54,6 +56,8 @@ public class LDLibDuelScreen {
             ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/duel_screen.xml");
     /** How many hits the ANNOUNCE_CARD search dialog lists at once. */
     private static final int DECLARABLE_SEARCH_LIMIT = 50;
+    /** How long the concede button stays armed after the first click. */
+    private static final long CONCEDE_CONFIRM_MS = 3000L;
 
     private static ClientDuelState activeState;
     private static ModularUI activeUI;
@@ -69,13 +73,37 @@ public class LDLibDuelScreen {
 
     /** Builds the screen without showing it. The UI test harness opens the result itself. */
     public static DuelScreen create(DuelStartPayload startInfo) {
-        activeState = new ClientDuelState(startInfo.localPlayer(), startInfo.opponentName(),
-                startInfo.lp0(), startInfo.lp1(), startInfo.deckSize(), startInfo.extraSize(), startInfo.duelFlags());
+        return build(new ClientDuelState(startInfo.localPlayer(), startInfo.opponentName(),
+                startInfo.lp0(), startInfo.lp1(), startInfo.deckSize(), startInfo.extraSize(), startInfo.duelFlags()));
+    }
+
+    /** Rebuilds the screen around the live duel state ({@code /duel show}); null when no duel is in progress. */
+    public static DuelScreen reopen() {
+        if (activeState == null) return null;
+        DuelScreen screen = build(activeState);
+        activeState.markAllDirty();
+        return screen;
+    }
+
+    private static DuelScreen build(ClientDuelState state) {
+        activeState = state;
         activeUI = loadFromXml();
-        refresher = new UIRefresher(activeUI, activeState);
+        refresher = new UIRefresher(activeUI, state);
         UIElement canvas = activeUI.ui.selectId("duel-canvas").findFirst()
                 .orElseThrow(() -> new IllegalStateException(DUEL_UI + " has no #duel-canvas"));
-        return new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + startInfo.opponentName()));
+        return new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + state.opponentName));
+    }
+
+    /** True while a duel is in progress: a state exists and no result has arrived yet. */
+    public static boolean isDuelLive() {
+        return activeState != null && activeState.winner < 0;
+    }
+
+    /** Records the duel result; the result overlay appears on the next tick. */
+    public static void showResult(int winner, int reason) {
+        if (activeState != null) {
+            activeState.applyResult(winner, reason);
+        }
     }
 
     /**
@@ -154,8 +182,16 @@ public class LDLibDuelScreen {
         private final Button phaseBtnCenter;
         private final Button phaseBtnRight;
 
+        // Concede: the first click arms the button, a second one within CONCEDE_CONFIRM_MS sends it.
+        private final Button concedeBtn;
+        private long concedeArmedAt;
+
         // Overlays
         private final UIElement cardInfoBanner;
+        private final UIElement resultOverlay;
+        private final UIElement resultTitle;
+        private final UIElement resultReason;
+        private final Button resultClose;
         private final ZoneInspectorController zoneInspector;
         private final PromptController prompt;
         private final ClickDispatcher clicks;
@@ -217,8 +253,14 @@ public class LDLibDuelScreen {
             phaseBtnCenter = byId("phase-btn-center", Button.class);
             phaseBtnRight = byId("phase-btn-right", Button.class);
 
+            concedeBtn = byId("concede-btn", Button.class);
+
             // ── Overlays ──
             cardInfoBanner = byId("card-info-banner");
+            resultOverlay = byId("result-overlay");
+            resultTitle = byId("result-title");
+            resultReason = byId("result-reason");
+            resultClose = byId("result-close", Button.class);
             zoneInspector = new ZoneInspectorController(ui, state, new ZoneInspectorController.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
@@ -282,6 +324,7 @@ public class LDLibDuelScreen {
             ui.rootElement.addEventListener(UIEvents.TICK, this::onTick);
 
             wirePhaseButtons();
+            wireLifecycleButtons();
             field.wireFieldClicks();
             zoneInspector.wirePileClicks();
             clicks.wireOutsideDismiss();
@@ -368,6 +411,7 @@ public class LDLibDuelScreen {
         // ── Tick handler: process dirty flags ──
 
         private void onTick(UIEvent event) {
+            disarmConcedeIfStale();
             if (!state.isDirty()) return;
             var flags = state.consumeDirtyFlags();
 
@@ -412,7 +456,7 @@ public class LDLibDuelScreen {
             if (flags.contains(DirtyFlag.CHAIN))
                 updateStatusLabel();
             if (flags.contains(DirtyFlag.WINNER))
-                showWinOverlay();
+                showResultOverlay();
             if (flags.contains(DirtyFlag.CONFIRM))
                 zoneInspector.showConfirmCards();
         }
@@ -508,9 +552,62 @@ public class LDLibDuelScreen {
             };
         }
 
-        private void showWinOverlay() {
-            prompt.showWinOverlay(state.winner == state.localPlayer,
-                    () -> Minecraft.getInstance().setScreen(null));
+        /** Concede sends nothing on the first click; the button says "Confirm?" until it goes stale. */
+        private void wireLifecycleButtons() {
+            if (concedeBtn != null) {
+                concedeBtn.setOnClick(e -> {
+                    long now = System.currentTimeMillis();
+                    if (concedeArmedAt != 0 && now - concedeArmedAt <= CONCEDE_CONFIRM_MS) {
+                        PacketDistributor.sendToServer(new DuelConcedePayload());
+                        disarmConcede();
+                    } else {
+                        concedeArmedAt = now;
+                        concedeBtn.setText(Component.literal("Confirm?"));
+                    }
+                });
+            }
+            if (resultClose != null) {
+                resultClose.setOnClick(e -> {
+                    LDLibDuelScreen.close();
+                    Minecraft.getInstance().setScreen(null);
+                });
+            }
+        }
+
+        private void disarmConcedeIfStale() {
+            if (concedeArmedAt != 0 && System.currentTimeMillis() - concedeArmedAt > CONCEDE_CONFIRM_MS) {
+                disarmConcede();
+            }
+        }
+
+        private void disarmConcede() {
+            concedeArmedAt = 0;
+            if (concedeBtn != null) concedeBtn.setText(Component.literal("Concede"));
+        }
+
+        private void showResultOverlay() {
+            if (resultOverlay == null || state.winner < 0) return;
+            resultOverlay.removeClass("hidden");
+            setLabelText(resultTitle, state.winner == DuelEndPayload.WINNER_DRAW ? "Draw"
+                    : state.winner == state.localPlayer ? "You win" : "You lose");
+            setLabelText(resultReason, state.winner == DuelEndPayload.WINNER_DRAW
+                    ? "No winner" : winReasonText(state.winReason));
+        }
+
+        private static void setLabelText(UIElement element, String text) {
+            if (element instanceof Label label) label.setText(Component.literal(text));
+        }
+
+        /** Engine MSG_WIN reasons plus the host-synthesised ones carried by {@link DuelEndPayload}. */
+        private static String winReasonText(int reason) {
+            return switch (reason) {
+                case DuelEndPayload.REASON_SURRENDER -> "Surrender";
+                case 1 -> "Life points";
+                case 2 -> "Deck out";
+                case DuelEndPayload.REASON_TIMEOUT -> "Timeout";
+                case DuelEndPayload.REASON_DISCONNECT -> "Disconnect";
+                default -> "Card effect";
+            };
         }
 
         private void updatePhaseButtons() {
