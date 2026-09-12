@@ -183,7 +183,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 | 132 | `ROCK_PAPER_SCISSORS`  | ✅                                                              | ✅ `int32` 1..3                                                                                           | ✅                                                                                                                                                                                          | ✅ rock                                             | ✅                                                                 | ✅ / ✅                            |
 | 140 | `ANNOUNCE_RACE`        | ✅ `u64` mask                                                   | ✅ `int64`                                                                                                | ✅ checkbox grid, no OK button                                                                                                                                                              | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
 | 141 | `ANNOUNCE_ATTRIB`      | ✅ `u32` mask                                                   | ✅ `int32`                                                                                                | ✅ checkbox grid, no OK button                                                                                                                                                              | ✅                                                  | ✅                                                                 | ❌ / ✅                            |
-| 142 | `ANNOUNCE_CARD`        | ✅ `u8 count` + `u64` opcodes                                    | ✅ `int32` code                                                                                           | ⚠️ interim: raw passcode text field (Task 10 replaces with a search dialog)                                                                                                                | ✅ human declares for the AI (no server-side card DB in test mode) | ❌                                                                 | ✅ / ✅                            |
+| 142 | `ANNOUNCE_CARD`        | ✅ `u8 count` + `u64` opcodes                                    | ✅ `int32` code                                                                                           | ✅                                                                                                                | ✅ human declares for the AI (no server-side card DB in test mode) | ❌                                                                 | ✅ / ✅                            |
 | 143 | `ANNOUNCE_NUMBER`      | ✅                                                              | ✅ `int32` index                                                                                          | ✅ reuses `buildOptionPrompt`                                                                                                                                                               | ✅ index 0                                          | ✅                                                                 | ❌ / ✅                            |
 
 ### 2.1 Engine facts a future UI must respect
@@ -208,7 +208,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 - [x] `SORT_CARD` / `SORT_CHAIN` UI: reorderable list plus a "keep order" button that sends `sortCardsDefault()` (the button alone unblocks duels).
 - [x] `ANNOUNCE_RACE` / `ANNOUNCE_ATTRIB` UI: checkbox grid limited to `available`, exactly `count` picks; names from `SystemStringTable`.
 - [x] `ANNOUNCE_NUMBER` UI: reuse `buildOptionPrompt` over the `List<Long>`.
-- [ ] `ANNOUNCE_CARD`: parse opcodes, add `ResponseBuilder.announceCard(code)`, add the solo AI case, build a name-search UI with an opcode filter.
+- [x] `ANNOUNCE_CARD`: parse opcodes, add `ResponseBuilder.announceCard(code)`, add the solo AI case, build a name-search UI with an opcode filter.
 - [ ] `SELECT_CARD`: add Confirm in field mode when `min < max`; show `HINT_SELECTMSG` as the caption; guard `handleFieldClick` by `inFieldSelectionMode`.
 - [ ] `SELECT_TRIBUTE`: Confirm button instead of auto-submit at `min`.
 - [ ] `SELECT_CHAIN`: label options with `desc` text; handle forced + empty list; show `speCount`.
@@ -254,7 +254,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] `QUERY_IS_HIDDEN` (`EFFECT_DARKNESS_HIDE`) is neither requested nor honoured.
 
 ### 3.7 Seven prompts have no UI
-- [ ] `SelectCounter`, `SortCard`, `SortChain`, `AnnounceRace`, `AnnounceAttrib`, `AnnounceNumber`, `AnnounceCard` hit `PromptController.rebuild`'s `default`: a full-screen dimmed overlay titled with the class name, no buttons, no timeout. The only exit is `/duel forfeit`. In `/duel test` the solo AI masks all but `AnnounceCard` when the AI is the one prompted.
+- [x] `SelectCounter`, `SortCard`, `SortChain`, `AnnounceRace`, `AnnounceAttrib`, `AnnounceNumber`, `AnnounceCard` hit `PromptController.rebuild`'s `default`: a full-screen dimmed overlay titled with the class name, no buttons, no timeout. The only exit is `/duel forfeit`. In `/duel test` the solo AI masks all but `AnnounceCard` when the AI is the one prompted.
 
 ### 3.8 `ANNOUNCE_CARD` has no response path at all
 - [x] Not parsed (raw body), no `ResponseBuilder` method, no UI, no solo AI case. Any card-declaring effect (e.g. "Prohibition", "Mind Crush") wedges the duel for both human and AI.
@@ -647,7 +647,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] `SELECT_COUNTER` as click-per-counter with a live caption, no dialog.
 - [x] `SORT_CARD`/`SORT_CHAIN` click-order list, right-click skip; auto-decline setting for chains skipped (no settings menu in this mod).
 - [x] `ANNOUNCE_RACE`/`ATTRIB` checkbox grids submitting at exactly `count`.
-- [ ] `ANNOUNCE_CARD` search over a port of `is_declarable`.
+- [x] `ANNOUNCE_CARD` search over a port of `is_declarable`.
 - [x] `ANNOUNCE_NUMBER` via the option dialog, answering with the index.
 - [ ] Effect disambiguation through the option dialog with `desc` text, skipped when one effect survives; separate Activate / Resolve / Reset entries by client mode.
 - [ ] `SELECT_POSITION` with card-image buttons.
