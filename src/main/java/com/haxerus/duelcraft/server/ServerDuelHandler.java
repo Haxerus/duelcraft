@@ -26,7 +26,11 @@ public class ServerDuelHandler implements DuelEventListener {
         this.duelId = duelId;
     }
 
-    /** Player index of the last prompt forwarded (Task 11 uses this for the response ownership check). */
+    // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
+    private boolean winSent;
+
+    /** Player index of the last prompt forwarded; the response ownership check compares against it. */
+    @Override
     public int pendingPlayer() { return pendingPlayer; }
 
     @Override
@@ -42,6 +46,7 @@ public class ServerDuelHandler implements DuelEventListener {
                 var payload = new DuelEndPayload(win.winner(), win.reason());
                 PacketDistributor.sendToPlayer(player0, payload);
                 PacketDistributor.sendToPlayer(player1, payload);
+                winSent = true;
                 return 2;
             }
             case DuelMessage.SelectIdleCmd sel -> { sendToPlayer(sel.player(), msg); return 1; }
@@ -93,6 +98,11 @@ public class ServerDuelHandler implements DuelEventListener {
 
     @Override
     public void onDuelEnd() {
-        DuelManager.get().endDuel(duelId);
+        if (winSent) {
+            DuelManager.get().endDuel(duelId);
+        } else {
+            // The engine stopped without MSG_WIN; nobody won, but both clients still need a result.
+            DuelManager.get().finishDuel(duelId, DuelEndPayload.WINNER_DRAW, 0);
+        }
     }
 }

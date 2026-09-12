@@ -19,5 +19,7 @@ public class DuelNetworking {
         // Client → Server
         registrar.playToServer(DuelResponsePayload.TYPE, DuelResponsePayload.STREAM_CODEC,
                 ServerPayloadHandler::handleResponse);
+        registrar.playToServer(DuelConcedePayload.TYPE, DuelConcedePayload.STREAM_CODEC,
+                ServerPayloadHandler::handleConcede);
     }
 }

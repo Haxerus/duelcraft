@@ -8,6 +8,15 @@ import net.minecraft.resources.ResourceLocation;
 
 public record DuelEndPayload(int winner, int reason) implements CustomPacketPayload {
 
+    /** {@code winner} value the engine uses for a draw. */
+    public static final int WINNER_DRAW = 2;
+
+    // Host-synthesised reasons, following edopro. The engine's own MSG_WIN reasons are
+    // 1 (life points), 2 (deck out) and anything else (card effect).
+    public static final int REASON_SURRENDER = 0;
+    public static final int REASON_TIMEOUT = 3;
+    public static final int REASON_DISCONNECT = 4;
+
     public static final Type<DuelEndPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("duelcraft", "duel_end"));
 

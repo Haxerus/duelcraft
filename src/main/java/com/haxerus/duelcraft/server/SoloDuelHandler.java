@@ -39,6 +39,9 @@ public class SoloDuelHandler implements DuelEventListener {
     private int lastPromptTarget = -1;
     private int retryCount;
 
+    // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
+    private boolean winSent;
+
     public SoloDuelHandler(ServerPlayer player, UUID duelId) {
         this.player = player;
         this.duelId = duelId;
@@ -50,6 +53,7 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.Retry ignored -> handleRetry(msg);
             case DuelMessage.Win win -> {
                 PacketDistributor.sendToPlayer(player, new DuelEndPayload(win.winner(), win.reason()));
+                winSent = true;
                 yield 2;
             }
 
@@ -159,9 +163,18 @@ public class SoloDuelHandler implements DuelEventListener {
                 new DuelMessagePayload(MessageSanitizer.forRecipient(msg, HUMAN_PLAYER)));
     }
 
+    /** The prompt the human is expected to answer; the AI answers its own prompts internally. */
+    @Override
+    public int pendingPlayer() { return lastPromptTarget; }
+
     @Override
     public void onDuelEnd() {
-        DuelManager.get().endDuel(duelId);
+        if (winSent) {
+            DuelManager.get().endDuel(duelId);
+        } else {
+            // The engine stopped without MSG_WIN; nobody won, but the client still needs a result.
+            DuelManager.get().finishDuel(duelId, DuelEndPayload.WINNER_DRAW, 0);
+        }
     }
 
     // ─── AI Auto-Response Logic ───────────────────────────────

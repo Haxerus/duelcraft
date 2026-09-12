@@ -13,6 +13,7 @@ import com.mojang.logging.LogUtils;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.slf4j.Logger;
@@ -30,17 +31,25 @@ public class DuelManager {
     private Map<UUID, DuelSession> activeDuels;
     private Map<UUID, UUID> playerToDuel;
     private Map<UUID, SoloDuelHandler> soloHandlers;
+    /** Duellists of each active duel by engine index; index 1 is null in solo mode (the AI). */
+    private Map<UUID, ServerPlayer[]> duelSeats;
     private DeckRegistry deckRegistry;
     private final Map<UUID, String> playerCurrentDeck = new HashMap<>();
 
-    // FIXME: Temporary for testing
-    public Map<UUID, DuelCommand.PendingChallenge> duelInvites; // target -> pending
+    /** Outstanding challenges, target -> pending; entries expire after {@link DuelCommand#INVITE_TIMEOUT_MS}. */
+    public Map<UUID, DuelCommand.PendingChallenge> duelInvites;
 
     public static DuelManager get() { return instance; }
 
     public static void onServerStarting(ServerStartingEvent event) {
         instance = new DuelManager();
         instance.init();
+    }
+
+    /** A duellist who logs out forfeits; their outstanding invites go with them. */
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (instance == null || !(event.getEntity() instanceof ServerPlayer player)) return;
+        instance.handleLogout(player);
     }
 
     public static void onServerStopped(ServerStoppedEvent event) {
@@ -59,6 +68,7 @@ public class DuelManager {
         activeDuels = new HashMap<>();
         playerToDuel = new HashMap<>();
         soloHandlers = new HashMap<>();
+        duelSeats = new HashMap<>();
         duelInvites = new HashMap<>();
 
         Path decksDir = FMLPaths.GAMEDIR.get().resolve("duelcraft").resolve("decks");
@@ -76,6 +86,7 @@ public class DuelManager {
 
         activeDuels.clear();
         playerToDuel.clear();
+        duelSeats.clear();
         if (engine != null) {
             engine.close();
             engine = null;
@@ -103,6 +114,7 @@ public class DuelManager {
         activeDuels.put(duelId, session);
         playerToDuel.put(player.getUUID(), duelId);
         soloHandlers.put(duelId, handler);
+        duelSeats.put(duelId, new ServerPlayer[]{player, null});
 
         LOGGER.info("Solo duel {}: seed={}, rule={}, player={}, aiDeck={}",
                 duelId, seed, rule.id(), playerDeckName, aiDeckName);
@@ -174,6 +186,7 @@ public class DuelManager {
         activeDuels.put(duelId, session);
         playerToDuel.put(p1.getUUID(), duelId);
         playerToDuel.put(p2.getUUID(), duelId);
+        duelSeats.put(duelId, new ServerPlayer[]{p1, p2});
 
         LOGGER.info("Duel {}: seed={}, rule={}, decks=[{}, {}]",
                 duelId, seed, rule.id(), team1Name, team2Name);
@@ -201,13 +214,68 @@ public class DuelManager {
         if (duelId == null) return;
         DuelSession session = activeDuels.get(duelId);
         if (session == null || session.isEnded()) return;
+
+        int seat = seatOf(duelId, player.getUUID());
+        if (!session.listener().acceptsResponseFrom(seat)) {
+            LOGGER.warn("Duel {}: dropping response from {} (seat {}), prompt belongs to player {}",
+                    duelId, player.getName().getString(), seat, session.listener().pendingPlayer());
+            return;
+        }
+
         session.setResponse(response);
         processSoloAutoResponseByDuelId(duelId);
+    }
+
+    /** Engine index of {@code playerUUID} in {@code duelId}, or -1 when they are not a duellist. */
+    private int seatOf(UUID duelId, UUID playerUUID) {
+        ServerPlayer[] seats = duelSeats.get(duelId);
+        if (seats == null) return -1;
+        for (int seat = 0; seat < seats.length; seat++) {
+            if (seats[seat] != null && seats[seat].getUUID().equals(playerUUID)) return seat;
+        }
+        return -1;
+    }
+
+    /** The player gives up: the opponent wins by surrender. */
+    public void forfeit(ServerPlayer player) {
+        UUID duelId = playerToDuel.get(player.getUUID());
+        if (duelId == null) return;
+        int seat = seatOf(duelId, player.getUUID());
+        LOGGER.info("Duel {}: {} forfeits", duelId, player.getName().getString());
+        finishDuel(duelId, 1 - seat, DuelEndPayload.REASON_SURRENDER);
+    }
+
+    private void handleLogout(ServerPlayer player) {
+        UUID playerUUID = player.getUUID();
+        duelInvites.remove(playerUUID);
+        duelInvites.values().removeIf(pending -> pending.challengerUUID().equals(playerUUID));
+
+        UUID duelId = playerToDuel.get(playerUUID);
+        if (duelId == null) return;
+        int seat = seatOf(duelId, playerUUID);
+        LOGGER.info("Duel {}: {} disconnected", duelId, player.getName().getString());
+        finishDuel(duelId, 1 - seat, DuelEndPayload.REASON_DISCONNECT);
+    }
+
+    /**
+     * End a duel with a result: tell every still-connected duellist, then close the session.
+     * The single path for forfeit, disconnect and an engine end without MSG_WIN.
+     */
+    public void finishDuel(UUID duelId, int winner, int reason) {
+        if (!activeDuels.containsKey(duelId)) return;
+        var payload = new DuelEndPayload(winner, reason);
+        for (ServerPlayer seat : duelSeats.getOrDefault(duelId, new ServerPlayer[0])) {
+            if (seat != null && !seat.hasDisconnected()) {
+                PacketDistributor.sendToPlayer(seat, payload);
+            }
+        }
+        endDuel(duelId);
     }
 
     public void endDuel(UUID duelId) {
         DuelSession session = activeDuels.remove(duelId);
         soloHandlers.remove(duelId);
+        duelSeats.remove(duelId);
         if (session != null) {
             session.close();
             playerToDuel.values().removeIf(id -> id.equals(duelId));

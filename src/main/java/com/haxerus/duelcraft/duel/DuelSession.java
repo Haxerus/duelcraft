@@ -191,6 +191,10 @@ public class DuelSession implements AutoCloseable {
         return ended;
     }
 
+    public DuelEventListener listener() {
+        return listener;
+    }
+
     @Override
     public void close() {
         OcgCore.nDestroyDuel(engine.getHandle(), duelHandle);

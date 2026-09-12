@@ -24,6 +24,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class DuelCommand {
 
+    /** How long a duel challenge stays acceptable. */
+    public static final long INVITE_TIMEOUT_MS = 60_000L;
+
     private static final SuggestionProvider<CommandSourceStack> DECK_NAMES =
             (ctx, builder) -> {
                 DeckRegistry reg = DuelManager.get().getDeckRegistry();
@@ -109,7 +112,11 @@ public class DuelCommand {
             return 0;
         }
 
-        DuelManager.get().duelInvites.put(target.getUUID(), new PendingChallenge(sender.getUUID(), seed, rule));
+        if (!deckLoads(sender, sender)) return 0;
+        if (!deckLoads(target, sender)) return 0;
+
+        DuelManager.get().duelInvites.put(target.getUUID(),
+                new PendingChallenge(sender.getUUID(), seed, rule, System.currentTimeMillis()));
         sender.sendSystemMessage(Component.literal("Sent duel challenge (seed=" + seed + ", rule=" + rule.id() + ")."));
         target.sendSystemMessage(Component.literal("You have been challenged to a duel."));
         return 1;
@@ -120,6 +127,11 @@ public class DuelCommand {
         var pending = DuelManager.get().duelInvites.get(player.getUUID());
         if (pending == null) {
             player.sendSystemMessage(Component.literal("No duel invites."));
+            return 0;
+        }
+        if (pending.isExpired(System.currentTimeMillis())) {
+            DuelManager.get().duelInvites.remove(player.getUUID());
+            player.sendSystemMessage(Component.literal("That duel challenge has expired."));
             return 0;
         }
 
@@ -164,8 +176,21 @@ public class DuelCommand {
             player.sendSystemMessage(Component.literal("No active duel."));
             return 0;
         }
-        DuelManager.get().endDuel(duelID);
+        DuelManager.get().forfeit(player);
         return 1;
+    }
+
+    /** Whether {@code who}'s current deck loads right now; failures are reported to {@code sender} in accept's wording. */
+    private static boolean deckLoads(ServerPlayer who, ServerPlayer sender) {
+        try {
+            DuelManager.get().resolveDeck(who);
+            return true;
+        } catch (IOException | DeckLoader.DeckParseException e) {
+            sender.sendSystemMessage(Component.literal(who == sender
+                    ? "Your deck could not be loaded: " + e.getMessage()
+                    : who.getName().getString() + "'s deck could not be loaded: " + e.getMessage()));
+            return false;
+        }
     }
 
     // --- test ---
@@ -239,6 +264,10 @@ public class DuelCommand {
         return 1;
     }
 
-    /** Pending challenge: who challenged, the agreed seed, and the rule set. */
-    public record PendingChallenge(UUID challengerUUID, long seed, DuelRule rule) {}
+    /** Pending challenge: who challenged, the agreed seed, the rule set, and when it was sent. */
+    public record PendingChallenge(UUID challengerUUID, long seed, DuelRule rule, long sentAtMillis) {
+        public boolean isExpired(long nowMillis) {
+            return nowMillis - sentAtMillis > INVITE_TIMEOUT_MS;
+        }
+    }
 }

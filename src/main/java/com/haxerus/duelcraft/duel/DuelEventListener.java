@@ -22,4 +22,16 @@ public interface DuelEventListener {
      * Called when the duel has ended (either by MSG_WIN or engine status END).
      */
     void onDuelEnd();
+
+    /**
+     * Player index of the prompt currently awaiting a response, or -1 when none is pending.
+     */
+    int pendingPlayer();
+
+    /**
+     * True when {@code seat} owns the pending prompt, so that player's response may be applied.
+     */
+    default boolean acceptsResponseFrom(int seat) {
+        return seat >= 0 && seat == pendingPlayer();
+    }
 }
