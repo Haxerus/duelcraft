@@ -2,7 +2,6 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
-import com.haxerus.duelcraft.server.DuelStartPayload;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
@@ -15,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ClientDuelStateTest {
 
     private static ClientDuelState newState() {
-        return new ClientDuelState(new DuelStartPayload(0, "Opponent", 8000, 8000, 40, 15, 0L));
+        return new ClientDuelState(0, "Opponent", 8000, 8000, 40, 15, 0L);
     }
 
     /** Read a little-endian int32 from the response at a byte offset. */

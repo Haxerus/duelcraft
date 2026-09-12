@@ -3,9 +3,8 @@ package com.haxerus.duelcraft.client;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
-import com.haxerus.duelcraft.server.DuelStartPayload;
-import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -20,7 +19,7 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
  * Owned by DuelScreen — lives only while the duel screen is open.
  */
 public class ClientDuelState {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientDuelState.class);
 
     // ── Dirty flags for efficient UI refresh ──
     public enum DirtyFlag {
@@ -182,16 +181,17 @@ public class ClientDuelState {
     public int winner = -1;
     public int winReason;
 
-    public ClientDuelState(DuelStartPayload startInfo) {
-        this.localPlayer = startInfo.localPlayer();
-        this.opponentName = startInfo.opponentName();
-        this.duelFlags = startInfo.duelFlags();
-        this.lp[0] = startInfo.lp0();
-        this.lp[1] = startInfo.lp1();
-        this.deckCount[0] = startInfo.deckSize();
-        this.deckCount[1] = startInfo.deckSize();
+    public ClientDuelState(int localPlayer, String opponentName, int lp0, int lp1,
+                           int deckSize, int extraSize, long duelFlags) {
+        this.localPlayer = localPlayer;
+        this.opponentName = opponentName;
+        this.duelFlags = duelFlags;
+        this.lp[0] = lp0;
+        this.lp[1] = lp1;
+        this.deckCount[0] = deckSize;
+        this.deckCount[1] = deckSize;
         // Extra deck: codes unknown at start, use 0 as placeholder
-        for (int i = 0; i < startInfo.extraSize(); i++) {
+        for (int i = 0; i < extraSize; i++) {
             extra[0].add(0);
             extra[1].add(0);
         }

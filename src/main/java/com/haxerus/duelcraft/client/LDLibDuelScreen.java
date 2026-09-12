@@ -66,7 +66,8 @@ public class LDLibDuelScreen {
 
     /** Builds the screen without showing it. The UI test harness opens the result itself. */
     public static DuelScreen create(DuelStartPayload startInfo) {
-        activeState = new ClientDuelState(startInfo);
+        activeState = new ClientDuelState(startInfo.localPlayer(), startInfo.opponentName(),
+                startInfo.lp0(), startInfo.lp1(), startInfo.deckSize(), startInfo.extraSize(), startInfo.duelFlags());
         activeUI = loadFromXml();
         refresher = new UIRefresher(activeUI, activeState);
         UIElement canvas = activeUI.ui.selectId("duel-canvas").findFirst()
