@@ -1,6 +1,7 @@
 package com.haxerus.duelcraft;
 
 import com.haxerus.duelcraft.client.DuelClientCommand;
+import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardDatabaseDownloader;
 import com.haxerus.duelcraft.client.carddata.CardImageManager;
@@ -11,6 +12,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
@@ -29,6 +31,12 @@ public class DuelcraftClient {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         modBus.addListener(DuelcraftClient::onClientSetup);
         NeoForge.EVENT_BUS.addListener(DuelClientCommand::register);
+        NeoForge.EVENT_BUS.addListener(DuelcraftClient::onLoggingOut);
+    }
+
+    /** Leaving the server drops any duel screen state, so a rejoin cannot resume a dead duel. */
+    private static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        LDLibDuelScreen.close();
     }
 
     private static void onClientSetup(FMLClientSetupEvent event) {
