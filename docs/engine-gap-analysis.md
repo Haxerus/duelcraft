@@ -69,7 +69,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 38  | `MSG_DECK_TOP`         | ✅ 14 sites                                                     | ❌                                                      | ❌       | ❌    | `u8 p, u32 offsetFromTop, u32 code, u32 pos` (13 bytes). Public information (reversed or revealed deck top); edopro broadcasts it to both players.                                                                     |
 | 39  | `MSG_SHUFFLE_EXTRA`    | ✅ `field.cpp:967`                                              | ⚠️ codes read and discarded by design                  | ✅ no-op | ✅    | `UpdateData(EXTRA)` rebuilds the list at every pause.                                                                                                                                                                  |
 | 42  | `MSG_CONFIRM_EXTRATOP` | ✅ `libduel.cpp:854`                                            | ❌                                                      | ❌       | ❌    | Byte-identical to `CONFIRM_DECKTOP`; a `case` plus a record is the whole fix.                                                                                                                                          |
-| 90  | `MSG_DRAW`             | ✅ `operations.cpp:482`                                         | ⚠️                                                     | ✅       | ✅    | Engine writes `u32 code, u32 position` per card (not a top-bit flag). Parser reads both and drops `position`, the only signal that a reversed-deck draw is public.                                                     |
+| 90  | `MSG_DRAW`             | ✅ `operations.cpp:482`                                         | ✅                                                     | ✅       | ✅    | Engine writes `u32 code, u32 position` per card (not a top-bit flag). Parser reads both and drops `position`, the only signal that a reversed-deck draw is public.                                                     |
 | 190 | `MSG_REMOVE_CARDS`     | ✅ `libduel.cpp:536-554`                                        | ❌                                                      | ❌       | ❌    | `u32 n (≤255), n×loc_info`, batched across messages. Removed cards linger in `ClientDuelState`.                                                                                                                        |
 
 ### 1.3 Card movement and position
@@ -151,7 +151,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 - [ ] Parse `MSG_SWAP_GRAVE_DECK` (35): swap the GY list into the deck count and route bitmask-flagged cards to the Extra Deck.
 - [ ] Decide on `MSG_PLAYER_HINT` (165): parse `u8 player, u8 type, u64 desc` once a UI consumes it.
 - [ ] Parse `MSG_MATCH_KILL` (170) when match play exists.
-- [ ] Keep `MSG_DRAW`'s per-card `position` in the record.
+- [x] Keep `MSG_DRAW`'s per-card `position` in the record.
 - [ ] Keep `position` in `SELECT_CHAIN` entries (needed for overlay-material chain options); `ActivatableCard` has no field for it.
 - [x] Rename `Battle.atkDamage/defDamage` to destroy flags (naming only; layout is correct).
 - [ ] Delete the dead `MSG_START` and `MSG_UNEQUIP` parser cases, records, codec arms and client branches; delete `DuelMessage.UpdateCard` and its arms.
@@ -246,12 +246,12 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] The record is re-tagged as `MSG_SELECT_PLACE` on the wire (`SelectPlace.type()` is constant), so the client cannot tell the two apart.
 
 ### 3.6 Hidden information leaks
-- [ ] **`MSG_MOVE` to deck or hand.** `field::send_to` sets `pos = POS_FACEUP` for every destination except `LOCATION_REMOVED` (`operations.cpp:327-328`), so `ServerDuelHandler.hideInfo`'s face-down test passes the real code of a searched or returned card to the opponent. edopro's rule (`generic_duel.cpp:1032`): hide for the non-controller when `!(loc & (GRAVE|OVERLAY)) && ((loc & (DECK|HAND)) || (pos & FACEDOWN))`.
-- [ ] `MSG_CONFIRM_CARDS` is broadcast to both players; edopro sends it only to the target player when the revealed cards sit in the deck or extra deck (`generic_duel.cpp:985-1004`), so a private deck peek reaches the opponent here.
-- [ ] **Prompt payloads are unsanitised.** edopro zeroes the code of every `SELECT_CARD`, `SELECT_TRIBUTE` and `SELECT_UNSELECT_CARD` candidate the prompted player does not control (`generic_duel.cpp:933-977`); Duelcraft forwards the engine's codes, so a face-down opponent card offered as a target leaks.
-- [ ] `SoloDuelHandler` performs no sanitisation; the human sees the AI's face-down and hand codes (test mode only).
-- [ ] `sanitizeCard` keeps `flags` while zeroing values, so a recipient sees `QUERY_ATTACK` "present" with `attack == 0`.
-- [ ] `QUERY_IS_HIDDEN` (`EFFECT_DARKNESS_HIDE`) is neither requested nor honoured.
+- [x] **`MSG_MOVE` to deck or hand.** `field::send_to` sets `pos = POS_FACEUP` for every destination except `LOCATION_REMOVED` (`operations.cpp:327-328`), so `ServerDuelHandler.hideInfo`'s face-down test passes the real code of a searched or returned card to the opponent. edopro's rule (`generic_duel.cpp:1032`): hide for the non-controller when `!(loc & (GRAVE|OVERLAY)) && ((loc & (DECK|HAND)) || (pos & FACEDOWN))`.
+- [x] `MSG_CONFIRM_CARDS` is broadcast to both players; edopro sends it only to the target player when the revealed cards sit in the deck or extra deck (`generic_duel.cpp:985-1004`), so a private deck peek reaches the opponent here.
+- [x] **Prompt payloads are unsanitised.** edopro zeroes the code of every `SELECT_CARD`, `SELECT_TRIBUTE` and `SELECT_UNSELECT_CARD` candidate the prompted player does not control (`generic_duel.cpp:933-977`); Duelcraft forwards the engine's codes, so a face-down opponent card offered as a target leaks.
+- [x] `SoloDuelHandler` performs no sanitisation; the human sees the AI's face-down and hand codes (test mode only).
+- [x] `sanitizeCard` keeps `flags` while zeroing values, so a recipient sees `QUERY_ATTACK` "present" with `attack == 0`.
+- [x] `QUERY_IS_HIDDEN` (`EFFECT_DARKNESS_HIDE`) is neither requested nor honoured.
 
 ### 3.7 Seven prompts have no UI
 - [ ] `SelectCounter`, `SortCard`, `SortChain`, `AnnounceRace`, `AnnounceAttrib`, `AnnounceNumber`, `AnnounceCard` hit `PromptController.rebuild`'s `default`: a full-screen dimmed overlay titled with the class name, no buttons, no timeout. The only exit is `/duel forfeit`. In `/duel test` the solo AI masks all but `AnnounceCard` when the AI is the one prompted.
@@ -367,7 +367,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 | Recipient | Messages |
 |---|---|
 | Prompted player only, unsanitised | all 21 prompt records (correct: prompts only reach their target) |
-| Both, sanitised per recipient | `Draw`, `Move` (🐞 §3.6), `ShuffleHand`, `Set`, `UpdateData`, `UpdateCard`, `PosChange` |
+| Both, sanitised per recipient | `Draw`, `Move`, `ShuffleHand`, `Set`, `UpdateData`, `UpdateCard`, `PosChange` |
 | Both, verbatim | everything else including `Retry`, `Hint`, `ConfirmCards`, `BecomeTarget`, `TossCoin/Dice`, and all `Raw` |
 | Converted | `Win` → `DuelEndPayload` to both, return 2 |
 
@@ -603,15 +603,15 @@ Plumbing edopro applies to every prompt (`duelclient.cpp`, `event_handler.cpp`, 
 Items already tracked in §3 are referenced, not repeated.
 
 **Host**
-- [ ] Zero the code of prompt candidates the prompted player does not control (`SELECT_CARD`, `SELECT_TRIBUTE`, `SELECT_UNSELECT_CARD`; `generic_duel.cpp:933-977`).
-- [ ] Route `MSG_HINT` by type: 1/2/3/5 to the target only, 4/6-9/11 to the others, 10 to everyone (`:843-880`).
-- [ ] Send `MSG_CONFIRM_CARDS` only to the target player when the cards are in the deck or extra deck (`:985-1005`); §3.6.
-- [ ] Adopt the `MSG_MOVE` hide predicate (`:1032-1033`); §3.6.
-- [ ] Keep face-up draws visible to the opponent (`:1080-1084`).
+- [x] Zero the code of prompt candidates the prompted player does not control (`SELECT_CARD`, `SELECT_TRIBUTE`, `SELECT_UNSELECT_CARD`; `generic_duel.cpp:933-977`).
+- [x] Route `MSG_HINT` by type: 1/2/3/5 to the target only, 4/6-9/11 to the others, 10 to everyone (`:843-880`).
+- [x] Send `MSG_CONFIRM_CARDS` only to the target player when the cards are in the deck or extra deck (`:985-1005`); §3.6.
+- [x] Adopt the `MSG_MOVE` hide predicate (`:1032-1033`); §3.6.
+- [x] Keep face-up draws visible to the opponent (`:1080-1084`).
 - [ ] Send `MSG_MISSED_EFFECT` to the controller only once parsed (`:1094-1098`).
 - [ ] Synthesise `MSG_WAITING` for the non-prompted player (`:1326-1343`).
 - [ ] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
-- [ ] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
+- [x] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
 - [ ] Take the full-information copy before sanitising and keep it for a future replay.
 - [ ] Response gate: per-player pending-response state plus the responder-equals-prompted check edopro lacks (`:1284-1297`).
 - [ ] Rock-paper-scissors before the duel and let the winner choose who goes first; make the first player engine player 0 (`:444-565`).
