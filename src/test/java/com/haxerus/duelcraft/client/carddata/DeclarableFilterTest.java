@@ -125,6 +125,20 @@ class DeclarableFilterTest {
     }
 
     @Test
+    @DisplayName("GETSETCARD is disabled in the engine and falls through as a plain operand")
+    void getSetCardFallsThrough() {
+        // playerop.cpp:1035 comments the case out, so the opcode value itself lands on the stack.
+        assertTrue(DeclarableFilter.matches(List.of(OPCODE_GETSETCARD), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
+    @DisplayName("DIV by zero yields 0 rather than throwing")
+    void divByZero() {
+        assertFalse(DeclarableFilter.matches(List.of(10L, 0L, OPCODE_DIV), monster(0, TYPE_MONSTER)));
+        assertTrue(DeclarableFilter.matches(List.of(10L, 2L, OPCODE_DIV), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
     @DisplayName("aliases are rejected unless ALLOW_ALIASES appears")
     void aliasRules() {
         CardFacts alt = new CardFacts(1235, 1234, 0x5b, TYPE_MONSTER, RACE_DRAGON, ATTRIBUTE_LIGHT);

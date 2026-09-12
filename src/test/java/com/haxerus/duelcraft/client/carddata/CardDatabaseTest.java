@@ -107,6 +107,19 @@ class CardDatabaseTest {
     }
 
     @Test
+    void searchDeclarable_blankQueryStopsAtLimit() {
+        // No exact match is possible for a blank query, so the scan must stop at the limit instead
+        // of filtering the whole table.
+        assertEquals(7, db.searchDeclarable("", ANY_CARD, 7).size());
+    }
+
+    @Test
+    void searchDeclarable_resultsShareTheGetCardCache() {
+        CardInfo fromSearch = db.searchDeclarable("89631139", ANY_CARD, 50).getFirst();
+        assertSame(fromSearch, db.getCard(89631139), "search results should populate the code cache");
+    }
+
+    @Test
     void searchDeclarable_emptyOpcodeListMatchesNothing() {
         assertTrue(db.searchDeclarable("dark magician", List.of(), 50).isEmpty());
     }
