@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft.client;
 
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.duel.response.SumSelection;
@@ -18,6 +19,7 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -88,6 +90,10 @@ public class PromptController {
     // SortCard/SortChain: ordinal assignment for the active prompt, plus the labels drawn on each card.
     private SortSelection sortSelection;
     private final List<Label> sortOrdinalLabels = new ArrayList<>();
+
+    // AnnounceRace/AnnounceAttrib: checked bits for the active prompt, plus the "Select N" caption.
+    private BitSelection bitSelection;
+    private Label bitSelectionCaption;
 
     // SelectPlace/SelectDisfield: {player, location, sequence} triples chosen so far, in click order.
     private final List<int[]> chosenPlaces = new ArrayList<>();
@@ -170,6 +176,15 @@ public class PromptController {
             case DuelMessage.SortCard sel -> buildSortPrompt(sel.cards(), 205, "Sort Cards");
             case DuelMessage.SortChain sel -> buildSortPrompt(sel.cards(), 206, "Sort Chain");
 
+            case DuelMessage.AnnounceNumber sel -> {
+                String title = callbacks.systemString(565);
+                buildOptionPrompt(title != null ? title : "Declare a number",
+                        sel.options().stream().map(String::valueOf).toList(),
+                        i -> callbacks.sendResponse(ResponseBuilder.announceNumber(i)));
+            }
+            case DuelMessage.AnnounceRace sel -> buildAnnounceRacePrompt(sel);
+            case DuelMessage.AnnounceAttrib sel -> buildAnnounceAttribPrompt(sel);
+
             // Interim UI: raw passcode entry. Task 10 replaces this with a card search dialog.
             case DuelMessage.AnnounceCard ignored -> buildAnnounceCardPrompt();
 
@@ -250,6 +265,62 @@ public class PromptController {
             }
         });
         promptButtons.addChild(okBtn);
+    }
+
+    // ── AnnounceRace / AnnounceAttrib (checkbox grid, no OK button) ─────────
+
+    private void buildAnnounceRacePrompt(DuelMessage.AnnounceRace sel) {
+        bitSelection = new BitSelection(sel.available(), sel.count());
+        // edopro shows these names via strings.conf system strings 1020-1044ish; CardStringHelper
+        // already has the same names hardcoded from OcgConstants RACE_* bits, so it's reused here.
+        buildBitSelectionPrompt(563, "Declare a race", sel.count(),
+                bit -> CardStringHelper.raceName(1L << bit),
+                () -> callbacks.sendResponse(ResponseBuilder.announceRace(bitSelection.mask())));
+    }
+
+    private void buildAnnounceAttribPrompt(DuelMessage.AnnounceAttrib sel) {
+        bitSelection = new BitSelection(sel.available(), sel.count());
+        // edopro shows these names via strings.conf system strings 1010-1016; CardStringHelper
+        // already has the same names hardcoded from OcgConstants ATTRIBUTE_* bits, so it's reused here.
+        buildBitSelectionPrompt(562, "Declare an attribute", sel.count(),
+                bit -> CardStringHelper.attributeName(1 << bit),
+                () -> callbacks.sendResponse(ResponseBuilder.announceAttrib((int) bitSelection.mask())));
+    }
+
+    /**
+     * One toggle button per bit set in {@code bitSelection}'s available mask; submits as soon as
+     * exactly {@code count} are checked (edopro: no OK button for these two prompts).
+     */
+    private void buildBitSelectionPrompt(int titleStringCode, String fallbackTitle, int count,
+                                         IntFunction<String> labelFor, Runnable onComplete) {
+        promptOverlay.removeClass("hidden");
+        String title = callbacks.systemString(titleStringCode);
+        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : fallbackTitle));
+        clearPromptContent();
+
+        bitSelectionCaption = new Label();
+        promptBody.addChild(bitSelectionCaption);
+
+        for (int bit : bitSelection.bits()) {
+            var btn = new Button();
+            btn.setId("announce-bit-" + bit);
+            btn.setText(Component.literal(labelFor.apply(bit)));
+            btn.addClass("prompt-btn");
+            btn.setOnClick(e -> {
+                bitSelection.toggle(bit);
+                toggleClass(btn, "selected", bitSelection.isChecked(bit));
+                updateBitSelectionCaption(count);
+                if (bitSelection.isComplete()) onComplete.run();
+            });
+            promptButtons.addChild(btn);
+        }
+        updateBitSelectionCaption(count);
+    }
+
+    private void updateBitSelectionCaption(int count) {
+        if (bitSelectionCaption == null || bitSelection == null) return;
+        int remaining = count - Long.bitCount(bitSelection.mask());
+        bitSelectionCaption.setText(Component.literal("Select " + remaining));
     }
 
     private void buildChainPrompt(DuelMessage.SelectChain sel) {
