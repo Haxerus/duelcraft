@@ -52,7 +52,7 @@ public sealed interface DuelMessage {
 
     // ---- Card Movement ----
 
-    record Draw(int player, List<Integer> codes) implements DuelMessage {
+    record Draw(int player, List<DrawnCard> cards) implements DuelMessage {
         public int type() { return MSG_DRAW; }
     }
 
@@ -369,6 +369,13 @@ public sealed interface DuelMessage {
     }
 
     // ---- Shared sub-records for cards within selection messages ----
+
+    /** Drawn card: code + position(uint32). The position is the only signal that a draw is public. */
+    record DrawnCard(int code, int position) {
+        public static DrawnCard read(BufferReader reader) {
+            return new DrawnCard(reader.readInt32(), reader.readInt32());
+        }
+    }
 
     record ConfirmCard(int code, int controller, int location, int sequence) {
         public static ConfirmCard read(BufferReader reader) {

@@ -125,12 +125,15 @@ class MessageParserTest {
         b.putInt(3);          // count
         b.putInt(89631139); b.putInt(POS_FACEDOWN_DEFENSE);  // Blue-Eyes
         b.putInt(46986414); b.putInt(POS_FACEDOWN_DEFENSE);  // Dark Magician
-        b.putInt(55144522); b.putInt(POS_FACEDOWN_DEFENSE);  // Pot of Greed
+        b.putInt(55144522); b.putInt(POS_FACEUP_ATTACK);      // Pot of Greed, reversed deck
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_DRAW, b.array()));
         var draw = (DuelMessage.Draw) msgs.getFirst();
         assertEquals(0, draw.player());
-        assertEquals(List.of(89631139, 46986414, 55144522), draw.codes());
+        assertEquals(List.of(89631139, 46986414, 55144522),
+                draw.cards().stream().map(DuelMessage.DrawnCard::code).toList());
+        assertEquals(List.of(POS_FACEDOWN_DEFENSE, POS_FACEDOWN_DEFENSE, POS_FACEUP_ATTACK),
+                draw.cards().stream().map(DuelMessage.DrawnCard::position).toList());
     }
 
     @Test

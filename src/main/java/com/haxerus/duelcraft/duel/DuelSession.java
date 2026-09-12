@@ -122,7 +122,7 @@ public class DuelSession implements AutoCloseable {
         int flags = QUERY_CODE | QUERY_POSITION | QUERY_TYPE | QUERY_LEVEL | QUERY_RANK
                 | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
                 | QUERY_BASE_ATTACK | QUERY_BASE_DEFENSE | QUERY_STATUS
-                | QUERY_LINK | QUERY_IS_PUBLIC;
+                | QUERY_LINK | QUERY_IS_PUBLIC | QUERY_IS_HIDDEN;
 
         for (int player = 0; player < 2; player++) {
             sendLocationStats(eng, flags, player, LOCATION_MZONE);

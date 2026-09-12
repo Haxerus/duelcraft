@@ -186,12 +186,11 @@ public class MessageParser {
     private static DuelMessage.Draw parseDraw(BufferReader r) {
         int player = r.readUint8();
         int count = r.readInt32();
-        List<Integer> codes = new ArrayList<>(count);
+        List<DuelMessage.DrawnCard> cards = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            codes.add(r.readInt32());
-            r.readInt32(); // position info (not needed for draw)
+            cards.add(DuelMessage.DrawnCard.read(r));
         }
-        return new DuelMessage.Draw(player, codes);
+        return new DuelMessage.Draw(player, cards);
     }
 
     private static DuelMessage.Move parseMove(BufferReader r) {

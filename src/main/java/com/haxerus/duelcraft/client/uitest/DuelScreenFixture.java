@@ -48,7 +48,9 @@ public final class DuelScreenFixture {
         FieldLayout layout = FieldLayout.fromFlags(rule.flags());
 
         for (int p = 0; p < 2; p++) {
-            LDLibDuelScreen.applyMessage(new DuelMessage.Draw(p, CODES.subList(0, 10)));
+            LDLibDuelScreen.applyMessage(new DuelMessage.Draw(p, CODES.subList(0, 10).stream()
+                    .map(code -> new DuelMessage.DrawnCard(code, POS_FACEDOWN_DEFENSE))
+                    .toList()));
         }
 
         int first = layout.columns() == 3 ? 1 : 0;

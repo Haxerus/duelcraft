@@ -49,6 +49,7 @@ public final class FieldQuery {
             case QUERY_REASON       -> card.reason = buf.getInt();
             case QUERY_STATUS       -> card.status = buf.getInt();
             case QUERY_IS_PUBLIC    -> card.isPublic = buf.get() != 0;
+            case QUERY_IS_HIDDEN    -> card.isHidden = buf.get() != 0;
             case QUERY_LSCALE       -> card.lscale = buf.getInt();
             case QUERY_RSCALE       -> card.rscale = buf.getInt();
             case QUERY_COVER        -> card.cover = buf.getInt();

@@ -1,15 +1,13 @@
 package com.haxerus.duelcraft.server;
 
-import com.haxerus.duelcraft.core.OcgConstants;
 import com.haxerus.duelcraft.duel.DuelEventListener;
+import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
-import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
 
-import java.util.List;
 import java.util.UUID;
 
 public class ServerDuelHandler implements DuelEventListener {
@@ -68,7 +66,7 @@ public class ServerDuelHandler implements DuelEventListener {
             case DuelMessage.AnnounceCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
             case DuelMessage.RockPaperScissors sel -> { sendToPlayer(sel.player(), msg); return 1; }
             default -> {
-                broadcastToBoth(msg);
+                broadcast(msg);
                 return 0;
             }
         }
@@ -76,98 +74,21 @@ public class ServerDuelHandler implements DuelEventListener {
 
     private void sendToPlayer(int playerIndex, DuelMessage msg) {
         pendingPlayer = playerIndex;
+        send(playerIndex, msg);
+    }
+
+    private void send(int playerIndex, DuelMessage msg) {
         var player = playerIndex == 0 ? player0 : player1;
-        PacketDistributor.sendToPlayer(player, new DuelMessagePayload(msg));
+        PacketDistributor.sendToPlayer(player,
+                new DuelMessagePayload(MessageSanitizer.forRecipient(msg, playerIndex)));
     }
 
-    private void broadcastToBoth(DuelMessage msg) {
-        // Send each player a version with opponent's hidden info removed
-        PacketDistributor.sendToPlayer(player0, new DuelMessagePayload(hideInfo(msg, 0)));
-        PacketDistributor.sendToPlayer(player1, new DuelMessagePayload(hideInfo(msg, 1)));
-    }
-
-    /**
-     * Sanitize a message for a specific recipient by zeroing out card codes
-     * the player shouldn't see (opponent's hand cards, face-down cards).
-     */
-    private static DuelMessage hideInfo(DuelMessage msg, int recipient) {
-        return switch (msg) {
-            case DuelMessage.Draw draw -> {
-                if (draw.player() != recipient) {
-                    // Opponent drew — hide the codes
-                    yield new DuelMessage.Draw(draw.player(),
-                            draw.codes().stream().map(c -> 0).toList());
-                }
-                yield draw;
-            }
-            case DuelMessage.Move move -> {
-                // Hide code if the card is going face-down and we don't control it
-                if (move.to().controller() != recipient && isFaceDown(move.to().position())) {
-                    yield new DuelMessage.Move(0, move.from(), move.to(), move.reason());
-                }
-                // Hide code if it was in opponent's hand (source is hand, not ours)
-                if (move.from().controller() != recipient
-                        && move.from().location() == OcgConstants.LOCATION_HAND
-                        && isFaceDown(move.to().position())) {
-                    yield new DuelMessage.Move(0, move.from(), move.to(), move.reason());
-                }
-                yield move;
-            }
-            case DuelMessage.ShuffleHand sh -> {
-                if (sh.player() != recipient) {
-                    yield new DuelMessage.ShuffleHand(sh.player(),
-                            sh.codes().stream().map(c -> 0).toList());
-                }
-                yield sh;
-            }
-            case DuelMessage.Set set -> {
-                // Set cards are always face-down — hide code from opponent
-                if (set.location().controller() != recipient) {
-                    yield new DuelMessage.Set(0, set.location());
-                }
-                yield set;
-            }
-            case DuelMessage.UpdateData upd -> {
-                if (upd.player() != recipient) {
-                    var sanitized = upd.cards().stream()
-                            .map(ServerDuelHandler::sanitizeCard)
-                            .toList();
-                    yield new DuelMessage.UpdateData(upd.player(), upd.location(), sanitized);
-                }
-                yield upd;
-            }
-            case DuelMessage.UpdateCard upd -> {
-                if (upd.player() != recipient) {
-                    yield new DuelMessage.UpdateCard(upd.player(), upd.location(),
-                            upd.sequence(), sanitizeCard(upd.card()));
-                }
-                yield upd;
-            }
-            case DuelMessage.PosChange pc -> {
-                // Hide code from opponent when card transitions to face-down
-                if (pc.controller() != recipient && isFaceDown(pc.newPosition())) {
-                    yield new DuelMessage.PosChange(0, pc.controller(), pc.location(),
-                            pc.sequence(), pc.prevPosition(), pc.newPosition());
-                }
-                yield pc;
-            }
-            default -> msg;
-        };
-    }
-
-    private static QueriedCard sanitizeCard(QueriedCard card) {
-        if (card == null) return null;
-        boolean faceDown = (card.position & OcgConstants.POS_FACEDOWN) != 0;
-        if (!faceDown || card.isPublic) return card;
-
-        var sanitized = new QueriedCard();
-        sanitized.flags = card.flags;
-        sanitized.position = card.position;
-        return sanitized;
-    }
-
-    private static boolean isFaceDown(int position) {
-        return (position & OcgConstants.POS_FACEDOWN) != 0;
+    /** Sends each player the copy of {@code msg} they are allowed to see, if they may see it at all. */
+    private void broadcast(DuelMessage msg) {
+        var recipients = MessageSanitizer.recipientsOf(msg);
+        for (int playerIndex = 0; playerIndex < 2; playerIndex++) {
+            if (recipients.includes(playerIndex)) send(playerIndex, msg);
+        }
     }
 
     @Override

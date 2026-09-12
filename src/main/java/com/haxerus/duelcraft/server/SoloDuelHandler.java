@@ -1,6 +1,7 @@
 package com.haxerus.duelcraft.server;
 
 import com.haxerus.duelcraft.duel.DuelEventListener;
+import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.duel.response.SumSelection;
@@ -22,6 +23,9 @@ public class SoloDuelHandler implements DuelEventListener {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final int MAX_AI_RETRIES = 3;
+
+    /** The real player; the AI is player 1. */
+    private static final int HUMAN_PLAYER = 0;
 
     private final ServerPlayer player;
     private final UUID duelId;
@@ -73,8 +77,9 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.RockPaperScissors sel -> routePrompt(sel.player(), msg);
 
             default -> {
-                // Broadcast info messages to the human player only
-                sendToPlayer(msg);
+                // Broadcast info messages to the human player only, and only when the host
+                // policy lets them see the message at all
+                if (MessageSanitizer.recipientsOf(msg).includes(HUMAN_PLAYER)) sendToPlayer(msg);
                 yield 0;
             }
         };
@@ -150,7 +155,8 @@ public class SoloDuelHandler implements DuelEventListener {
     }
 
     private void sendToPlayer(DuelMessage msg) {
-        PacketDistributor.sendToPlayer(player, new DuelMessagePayload(msg));
+        PacketDistributor.sendToPlayer(player,
+                new DuelMessagePayload(MessageSanitizer.forRecipient(msg, HUMAN_PLAYER)));
     }
 
     @Override

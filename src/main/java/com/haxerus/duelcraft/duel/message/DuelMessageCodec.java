@@ -60,7 +60,7 @@ public class DuelMessageCodec {
             // Card movement
             case DuelMessage.Draw m -> {
                 buf.writeByte(m.player());
-                writeIntList(buf, m.codes());
+                writeDrawnCardList(buf, m.cards());
             }
             case DuelMessage.Move m -> {
                 buf.writeInt(m.code());
@@ -266,7 +266,7 @@ public class DuelMessageCodec {
             case MSG_NEW_PHASE -> new DuelMessage.NewPhase(buf.readUnsignedShort());
 
             // Card movement
-            case MSG_DRAW -> new DuelMessage.Draw(buf.readByte(), readIntList(buf));
+            case MSG_DRAW -> new DuelMessage.Draw(buf.readByte(), readDrawnCardList(buf));
             case MSG_MOVE -> new DuelMessage.Move(buf.readInt(), readLocInfo(buf), readLocInfo(buf), buf.readInt());
             case MSG_POS_CHANGE -> new DuelMessage.PosChange(buf.readInt(),
                     buf.readByte(), buf.readByte(), buf.readByte(), buf.readByte(), buf.readByte());
@@ -448,6 +448,21 @@ public class DuelMessageCodec {
         int count = buf.readUnsignedByte();
         List<Integer> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) list.add((int) buf.readByte());
+        return list;
+    }
+
+    private static void writeDrawnCardList(FriendlyByteBuf buf, List<DuelMessage.DrawnCard> list) {
+        buf.writeInt(list.size());
+        for (var card : list) {
+            buf.writeInt(card.code());
+            buf.writeInt(card.position());
+        }
+    }
+
+    private static List<DuelMessage.DrawnCard> readDrawnCardList(FriendlyByteBuf buf) {
+        int count = buf.readInt();
+        List<DuelMessage.DrawnCard> list = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) list.add(new DuelMessage.DrawnCard(buf.readInt(), buf.readInt()));
         return list;
     }
 

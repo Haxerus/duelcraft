@@ -283,11 +283,11 @@ public class ClientDuelState {
 
             // ---- Card Movement ----
             case DuelMessage.Draw draw -> {
-                hand[draw.player()].addAll(draw.codes());
-                deckCount[draw.player()] -= draw.codes().size();
+                for (var card : draw.cards()) hand[draw.player()].add(card.code());
+                deckCount[draw.player()] -= draw.cards().size();
                 dirtyFlags.add(handFlag(draw.player()));
                 dirtyFlags.add(DirtyFlag.PILE_COUNTS);
-                LOGGER.debug("[State] Draw: player={}, codes={}", draw.player(), draw.codes());
+                LOGGER.debug("[State] Draw: player={}, cards={}", draw.player(), draw.cards());
             }
             case DuelMessage.Move move -> {
                 LOGGER.debug("[State] Move: code={}, from=[p{} loc=0x{} seq={}] to=[p{} loc=0x{} seq={} pos=0x{}], reason=0x{}",

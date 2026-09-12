@@ -54,6 +54,18 @@ class FieldQueryTest {
     }
 
     @Test
+    void isHiddenIsOneByteAndReadsTrue() {
+        ByteBuffer b = buf(7 + 10 + 6);
+        u8Block(b, QUERY_IS_HIDDEN, 1);
+        u32Block(b, QUERY_ATTACK, 1800);
+        endBlock(b);
+
+        QueriedCard card = FieldQuery.parse(b.array());
+        assertTrue(card.isHidden);
+        assertEquals(1800, card.attack);
+    }
+
+    @Test
     void publicFlagSetReadsTrue() {
         ByteBuffer b = buf(7 + 6);
         u8Block(b, QUERY_IS_PUBLIC, 1);
