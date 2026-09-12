@@ -25,6 +25,8 @@ import java.util.*;
 public class DuelManager {
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static final ServerPlayer[] NO_SEATS = new ServerPlayer[0];
+
     private static DuelManager instance;
 
     private DuelEngine engine;
@@ -264,7 +266,7 @@ public class DuelManager {
     public void finishDuel(UUID duelId, int winner, int reason) {
         if (!activeDuels.containsKey(duelId)) return;
         var payload = new DuelEndPayload(winner, reason);
-        for (ServerPlayer seat : duelSeats.getOrDefault(duelId, new ServerPlayer[0])) {
+        for (ServerPlayer seat : duelSeats.getOrDefault(duelId, NO_SEATS)) {
             if (seat != null && !seat.hasDisconnected()) {
                 PacketDistributor.sendToPlayer(seat, payload);
             }

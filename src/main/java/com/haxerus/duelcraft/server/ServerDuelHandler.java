@@ -20,14 +20,14 @@ public class ServerDuelHandler implements DuelEventListener {
     // Player index of the last prompt forwarded via sendToPlayer; Retry only reaches this player.
     private int pendingPlayer = -1;
 
+    // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
+    private boolean winSent;
+
     public ServerDuelHandler(ServerPlayer player0, ServerPlayer player1, UUID duelId) {
         this.player0 = player0;
         this.player1 = player1;
         this.duelId = duelId;
     }
-
-    // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
-    private boolean winSent;
 
     /** Player index of the last prompt forwarded; the response ownership check compares against it. */
     @Override
