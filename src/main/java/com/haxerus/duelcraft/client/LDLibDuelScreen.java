@@ -29,6 +29,7 @@ import com.haxerus.duelcraft.client.carddata.CardImageManager;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.client.carddata.OptionTextResolver;
+import com.haxerus.duelcraft.client.carddata.SystemStringTable;
 import org.slf4j.Logger;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -251,6 +252,14 @@ public class LDLibDuelScreen {
                 }
                 @Override public String resolveDesc(long desc) {
                     return descResolver.resolve(desc);
+                }
+                @Override public String systemString(int code) {
+                    SystemStringTable table = DuelcraftClient.getSystemStringTable();
+                    return table != null ? table.getSystem(code) : null;
+                }
+                @Override public String counterName(int counterType) {
+                    SystemStringTable table = DuelcraftClient.getSystemStringTable();
+                    return table != null ? table.getCounter(counterType) : null;
                 }
             });
             UIElement canvas = byId("duel-canvas");

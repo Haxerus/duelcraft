@@ -55,6 +55,10 @@ public class PromptController {
         String cardDisplayName(int code);
         /** Resolve a ygopro-core description code to human-readable text. */
         String resolveDesc(long desc);
+        /** Resolve a system string by code (strings.conf {@code !system}), or null if unknown. */
+        String systemString(int code);
+        /** Resolve a counter type's display name (strings.conf {@code !counter}), or null if unknown. */
+        String counterName(int counterType);
     }
 
     private final UI ui;
@@ -78,6 +82,12 @@ public class PromptController {
     private SumSelection sumSelection;
     private boolean inFieldSelectionMode;
     private boolean isBattleCmd;
+
+    // SelectCounter: per-card removal tally for the active prompt.
+    private CounterSelection counterSelection;
+    // SortCard/SortChain: ordinal assignment for the active prompt, plus the labels drawn on each card.
+    private SortSelection sortSelection;
+    private final List<Label> sortOrdinalLabels = new ArrayList<>();
 
     // SelectPlace/SelectDisfield: {player, location, sequence} triples chosen so far, in click order.
     private final List<int[]> chosenPlaces = new ArrayList<>();
@@ -154,6 +164,11 @@ public class PromptController {
 
             case DuelMessage.SelectPlace sel -> buildPlacePrompt(sel.count(), sel.field(), false);
             case DuelMessage.SelectDisfield sel -> buildPlacePrompt(sel.count(), sel.field(), true);
+
+            case DuelMessage.SelectCounter sel -> buildCounterPrompt(sel);
+
+            case DuelMessage.SortCard sel -> buildSortPrompt(sel.cards(), 205, "Sort Cards");
+            case DuelMessage.SortChain sel -> buildSortPrompt(sel.cards(), 206, "Sort Chain");
 
             // Interim UI: raw passcode entry. Task 10 replaces this with a card search dialog.
             case DuelMessage.AnnounceCard ignored -> buildAnnounceCardPrompt();
@@ -388,6 +403,102 @@ public class PromptController {
             callbacks.sendResponse(ResponseBuilder.selectPlaces(new ArrayList<>(chosenPlaces)));
         } else {
             updatePlaceStatus(count, disfield);
+        }
+    }
+
+    // ── SelectCounter (field-only, click removes one counter at a time) ────
+
+    private void buildCounterPrompt(DuelMessage.SelectCounter sel) {
+        counterSelection = new CounterSelection(sel);
+        promptOverlay.addClass("hidden");
+        refreshCounterHighlights(sel);
+        updateCounterStatus(sel);
+    }
+
+    private void refreshCounterHighlights(DuelMessage.SelectCounter sel) {
+        for (int i = 0; i < sel.cards().size(); i++) {
+            var c = sel.cards().get(i);
+            UIElement slot = field.findSlotForLocation(
+                    new ClientDuelState.CardLocation(c.controller(), c.location(), c.sequence()));
+            if (slot != null) toggleClass(slot, "target", counterSelection.canPick(i));
+        }
+    }
+
+    private void updateCounterStatus(DuelMessage.SelectCounter sel) {
+        if (!(statusLabel instanceof Label lbl)) return;
+        String name = callbacks.counterName(sel.counterType());
+        if (name == null) name = "counter type " + sel.counterType();
+        lbl.setText(Component.literal("Remove " + counterSelection.remaining() + " \"" + name + "\""));
+        statusLabel.removeClass("hidden");
+    }
+
+    private void handleSelectCounterClick(int player, int location, int sequence, DuelMessage.SelectCounter sel) {
+        if (counterSelection == null) return;
+        for (int i = 0; i < sel.cards().size(); i++) {
+            var c = sel.cards().get(i);
+            if (c.controller() != player || c.location() != location || c.sequence() != sequence) continue;
+            if (!counterSelection.canPick(i)) return;
+
+            counterSelection.pick(i);
+            refreshCounterHighlights(sel);
+            updateCounterStatus(sel);
+            if (counterSelection.isComplete()) {
+                callbacks.sendResponse(ResponseBuilder.selectCounter(counterSelection.response()));
+            }
+            return;
+        }
+    }
+
+    // ── SortCard / SortChain (overlay card list, click assigns the next ordinal) ──
+
+    private void buildSortPrompt(List<DuelMessage.SortableCard> cards, int titleStringCode, String fallbackTitle) {
+        sortSelection = new SortSelection(cards.size());
+        sortOrdinalLabels.clear();
+        promptOverlay.removeClass("hidden");
+        String title = callbacks.systemString(titleStringCode);
+        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : fallbackTitle));
+        clearPromptContent();
+
+        var scroller = createPromptCardScroller();
+        for (int i = 0; i < cards.size(); i++) {
+            int idx = i;
+            int code = cards.get(i).code();
+
+            var card = new UIElement();
+            card.setId("sort-card-" + i);
+            card.addClass("card");
+            callbacks.setCardImageBackground(card, code);
+            card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
+            card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
+            card.addEventListener(UIEvents.CLICK, ev -> {
+                ev.stopPropagation();
+                sortSelection.assign(idx);
+                refreshSortOrdinals();
+                if (sortSelection.isComplete()) {
+                    callbacks.sendResponse(ResponseBuilder.sortCards(sortSelection.response()));
+                }
+            });
+
+            var ordinalLabel = new Label();
+            ordinalLabel.addClass("card-ordinal");
+            card.addChild(ordinalLabel);
+            sortOrdinalLabels.add(ordinalLabel);
+
+            scroller.addScrollViewChild(card);
+        }
+        refreshSortOrdinals();
+
+        var keepOrderBtn = new Button();
+        keepOrderBtn.setText(Component.literal("Keep Order"));
+        keepOrderBtn.addClasses("prompt-btn");
+        keepOrderBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.sortCardsDefault()));
+        promptButtons.addChild(keepOrderBtn);
+    }
+
+    private void refreshSortOrdinals() {
+        for (int i = 0; i < sortOrdinalLabels.size(); i++) {
+            int ordinal = sortSelection.ordinalOf(i);
+            sortOrdinalLabels.get(i).setText(Component.literal(ordinal == 0 ? "" : String.valueOf(ordinal)));
         }
     }
 
@@ -713,6 +824,10 @@ public class PromptController {
             handleSelectTributeClick(player, location, sequence, sel);
             return true;
         }
+        if (state.pendingPrompt instanceof DuelMessage.SelectCounter sel) {
+            handleSelectCounterClick(player, location, sequence, sel);
+            return true;
+        }
         return false;
     }
 
@@ -829,6 +944,11 @@ public class PromptController {
         if (state.pendingPrompt instanceof DuelMessage.SelectTribute sel && sel.cancelable()) {
             e.stopPropagation();
             callbacks.sendResponse(ResponseBuilder.selectCardsCancel());
+            return true;
+        }
+        if (state.pendingPrompt instanceof DuelMessage.SortCard || state.pendingPrompt instanceof DuelMessage.SortChain) {
+            e.stopPropagation();
+            callbacks.sendResponse(ResponseBuilder.sortCardsDefault());
             return true;
         }
         return false;

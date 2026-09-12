@@ -551,6 +551,17 @@
         min-height: 48;
         }
 
+        /* ── Sort ordinal badge (SortCard/SortChain) ── */
+        .card-ordinal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-size: 8;
+        background: rect(#CC0000FF);
+        text-color: #FFFFFF;
+        padding-horizontal: 2;
+        }
+
         .target {
         overlay: rect(#6600FFFF);
         }

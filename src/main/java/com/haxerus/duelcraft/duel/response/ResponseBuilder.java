@@ -154,8 +154,10 @@ public class ResponseBuilder {
 
     /**
      * MSG_SORT_CARD / MSG_SORT_CHAIN response.
-     * @param order permutation of indices (e.g., {2, 0, 1} means card 2 first).
-     *              Must be a valid permutation (each index 0..n-1 appears exactly once).
+     * @param order destination rank per original card, i.e. {@code order[i]} is where card
+     *              {@code i} ends up (e.g., {2, 0, 1} sends card 0 to slot 2, card 1 to slot 0,
+     *              card 2 to slot 1). Must be a valid permutation (each index 0..n-1 appears
+     *              exactly once).
      */
     public static byte[] sortCards(int... order) {
         var rb = new ResponseBuilder(order.length);
