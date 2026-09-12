@@ -52,6 +52,8 @@ public class LDLibDuelScreen {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ResourceLocation DUEL_UI =
             ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/duel_screen.xml");
+    /** How many hits the ANNOUNCE_CARD search dialog lists at once. */
+    private static final int DECLARABLE_SEARCH_LIMIT = 50;
 
     private static ClientDuelState activeState;
     private static ModularUI activeUI;
@@ -260,6 +262,13 @@ public class LDLibDuelScreen {
                 @Override public String counterName(int counterType) {
                     SystemStringTable table = DuelcraftClient.getSystemStringTable();
                     return table != null ? table.getCounter(counterType) : null;
+                }
+                @Override public boolean cardSearchAvailable() {
+                    return DuelcraftClient.getCardDatabase() != null;
+                }
+                @Override public List<CardInfo> searchDeclarable(String query, List<Long> opcodes) {
+                    CardDatabase cards = DuelcraftClient.getCardDatabase();
+                    return cards != null ? cards.searchDeclarable(query, opcodes, DECLARABLE_SEARCH_LIMIT) : List.of();
                 }
             });
             UIElement canvas = byId("duel-canvas");

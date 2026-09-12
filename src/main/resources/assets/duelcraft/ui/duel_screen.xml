@@ -551,6 +551,33 @@
         min-height: 48;
         }
 
+        /* ── Vertical name list inside prompt dialogs (ANNOUNCE_CARD search) ── */
+        .prompt-name-scroller {
+        scroller-view-mode: VERTICAL;
+        scroller-vertical-display: ALWAYS;
+        align-self: stretch;
+        }
+
+        .prompt-name-scroller .__scroller_view_view-container__ {
+        flex-direction: column;
+        gap-all: 1;
+        }
+
+        .prompt-name-scroller .__scroller_view_view-port__ {
+        background: built-in(ui-gdp:RECT_LIGHT);
+        height: 80;
+        }
+
+        .prompt-name-btn {
+        align-self: stretch;
+        height: 12;
+        padding-all: 1;
+        }
+
+        .prompt-name-btn .__button_text__ {
+        font-size: 7;
+        }
+
         /* ── Sort ordinal badge (SortCard/SortChain) ── */
         .card-ordinal {
         position: absolute;

@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft.client;
 
+import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
@@ -61,6 +62,10 @@ public class PromptController {
         String systemString(int code);
         /** Resolve a counter type's display name (strings.conf {@code !counter}), or null if unknown. */
         String counterName(int counterType);
+        /** True when the client card database is loaded, so the ANNOUNCE_CARD search can run. */
+        boolean cardSearchAvailable();
+        /** Cards an ANNOUNCE_CARD prompt accepts, matching {@code query} by passcode or name. */
+        List<CardInfo> searchDeclarable(String query, List<Long> opcodes);
     }
 
     private final UI ui;
@@ -185,8 +190,7 @@ public class PromptController {
             case DuelMessage.AnnounceRace sel -> buildAnnounceRacePrompt(sel);
             case DuelMessage.AnnounceAttrib sel -> buildAnnounceAttribPrompt(sel);
 
-            // Interim UI: raw passcode entry. Task 10 replaces this with a card search dialog.
-            case DuelMessage.AnnounceCard ignored -> buildAnnounceCardPrompt();
+            case DuelMessage.AnnounceCard sel -> buildAnnounceCardPrompt(sel);
 
             default -> {
                 promptOverlay.removeClass("hidden");
@@ -243,13 +247,53 @@ public class PromptController {
         }
     }
 
-    /** Interim UI (Task 10 replaces this with a card search dialog): raw passcode entry. */
-    private void buildAnnounceCardPrompt() {
+    /**
+     * edopro's declare-a-card dialog: a search box over the client card database, filtered by the
+     * prompt's {@code is_declarable} opcodes, and one button per hit. Clicking a hit answers with
+     * its passcode. Without a card database there is nothing to search, so this degrades to raw
+     * passcode entry.
+     */
+    private void buildAnnounceCardPrompt(DuelMessage.AnnounceCard sel) {
         promptOverlay.removeClass("hidden");
-        if (promptTitle instanceof Label t) t.setText(Component.literal("Declare a card"));
+        String title = callbacks.systemString(564);
+        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : "Declare a card name"));
         clearPromptContent();
 
+        if (!callbacks.cardSearchAvailable()) {
+            buildPasscodeEntry();
+            return;
+        }
+
+        var results = new ScrollerView();
+        results.addClass("prompt-name-scroller");
+
+        var search = new TextField();
+        search.setId("announce-card-search");
+        search.getLayout().widthPercent(100);
+        search.textFieldStyle(style -> style.placeholder(Component.literal("Name or passcode")));
+        search.setTextResponder(text -> refreshDeclarableResults(results, text, sel.opcodes()));
+
+        promptBody.addChild(search);
+        promptBody.addChild(results);
+        refreshDeclarableResults(results, "", sel.opcodes());
+    }
+
+    private void refreshDeclarableResults(ScrollerView results, String query, List<Long> opcodes) {
+        results.clearAllScrollViewChildren();
+        for (CardInfo card : callbacks.searchDeclarable(query, opcodes)) {
+            int code = card.code();
+            var btn = new Button();
+            btn.setText(Component.literal(card.name()));
+            btn.addClass("prompt-name-btn");
+            btn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.announceCard(code)));
+            results.addScrollViewChild(btn);
+        }
+    }
+
+    /** ANNOUNCE_CARD fallback when no card database is available: type the passcode yourself. */
+    private void buildPasscodeEntry() {
         var input = new TextField();
+        input.setId("announce-card-search");
         input.getLayout().widthPercent(100);
         promptBody.addChild(input);
 
