@@ -154,8 +154,8 @@ public sealed interface DuelMessage {
         public int type() { return MSG_ATTACK; }
     }
 
-    record Battle(LocInfo attacker, int atkAtk, int atkDef, int atkDamage,
-                  LocInfo defender, int defAtk, int defDef, int defDamage) implements DuelMessage {
+    record Battle(LocInfo attacker, int atkAtk, int atkDef, int atkDestroyed,
+                  LocInfo defender, int defAtk, int defDef, int defDestroyed) implements DuelMessage {
         public int type() { return MSG_BATTLE; }
     }
 

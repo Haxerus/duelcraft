@@ -300,16 +300,18 @@ class MessageParserTest {
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
         b.putInt(3000);  // attacker ATK
         b.putInt(2500);  // attacker DEF
-        b.put((byte) 0); // da (damage flag)
+        b.put((byte) 1); // attacker destroyed
         putLocInfo(b, 1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
         b.putInt(2500);  // defender ATK
         b.putInt(2100);  // defender DEF
-        b.put((byte) 0); // dd (damage flag)
+        b.put((byte) 0); // defender destroyed
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_BATTLE, b.array()));
         var battle = (DuelMessage.Battle) msgs.getFirst();
         assertEquals(3000, battle.atkAtk());
         assertEquals(2500, battle.defAtk());
+        assertEquals(1, battle.atkDestroyed());
+        assertEquals(0, battle.defDestroyed());
     }
 
     @Test

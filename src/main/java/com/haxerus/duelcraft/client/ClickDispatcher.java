@@ -162,18 +162,18 @@ public class ClickDispatcher {
     private ActionIconInfo getActionIconInfo(int actionType, boolean isBattleCmd) {
         if (isBattleCmd) {
             return switch (actionType) {
-                case 1 -> new ActionIconInfo("#FF4444", "Attack");
-                case 2 -> new ActionIconInfo("#FF6644", "Activate");
+                case ClientDuelState.BattleAction.ATTACK -> new ActionIconInfo("#FF4444", "Attack");
+                case ClientDuelState.BattleAction.ACTIVATE -> new ActionIconInfo("#FF6644", "Activate");
                 default -> new ActionIconInfo("#AAAAAA", "Action");
             };
         }
         return switch (actionType) {
-            case 0 -> new ActionIconInfo("#FFCC00", "Summon");
-            case 1 -> new ActionIconInfo("#44CC44", "Special Summon");
-            case 2 -> new ActionIconInfo("#44AAFF", "Reposition");
-            case 3 -> new ActionIconInfo("#6688FF", "Set");
-            case 4 -> new ActionIconInfo("#8866FF", "Set S/T");
-            case 5 -> new ActionIconInfo("#FF6644", "Activate");
+            case ClientDuelState.IdleAction.SUMMON -> new ActionIconInfo("#FFCC00", "Summon");
+            case ClientDuelState.IdleAction.SPECIAL_SUMMON -> new ActionIconInfo("#44CC44", "Special Summon");
+            case ClientDuelState.IdleAction.REPOSITION -> new ActionIconInfo("#44AAFF", "Reposition");
+            case ClientDuelState.IdleAction.SET_MONSTER -> new ActionIconInfo("#6688FF", "Set");
+            case ClientDuelState.IdleAction.SET_SPELL_TRAP -> new ActionIconInfo("#8866FF", "Set S/T");
+            case ClientDuelState.IdleAction.ACTIVATE -> new ActionIconInfo("#FF6644", "Activate");
             default -> new ActionIconInfo("#AAAAAA", "Action");
         };
     }

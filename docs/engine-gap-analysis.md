@@ -153,7 +153,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 - [ ] Parse `MSG_MATCH_KILL` (170) when match play exists.
 - [ ] Keep `MSG_DRAW`'s per-card `position` in the record.
 - [ ] Keep `position` in `SELECT_CHAIN` entries (needed for overlay-material chain options); `ActivatableCard` has no field for it.
-- [ ] Rename `Battle.atkDamage/defDamage` to destroy flags (naming only; layout is correct).
+- [x] Rename `Battle.atkDamage/defDamage` to destroy flags (naming only; layout is correct).
 - [ ] Delete the dead `MSG_START` and `MSG_UNEQUIP` parser cases, records, codec arms and client branches; delete `DuelMessage.UpdateCard` and its arms.
 
 ---
@@ -202,7 +202,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 ### 2.2 Prompt work items
 
 - [ ] `SELECT_SUM`: fix `SumCard.read` to `code u32, con u8, loc u8, seq u32, position u32, sumParam u32` (§3.1); send indices into the selectable list only; honour `selectMode` and `value2`; fix `MessageParserTest.parseSelectSum` to encode the engine layout.
-- [ ] `SELECT_BATTLECMD`: Activate must send type 0 (`ClientDuelState.buildBattleCmdActions`, `ClickDispatcher.getActionIconInfo`).
+- [x] `SELECT_BATTLECMD`: Activate must send type 0 (`ClientDuelState.buildBattleCmdActions`, `ClickDispatcher.getActionIconInfo`).
 - [ ] `SELECT_DISFIELD`: give it its own record or a `type` field so the wire keeps id 24; add `selectPlaces(count, triples…)` to `ResponseBuilder`; UI that collects `count` zones and shows "disable" semantics.
 - [ ] `SELECT_COUNTER` UI: per-card stepper, total must equal `count`.
 - [ ] `SORT_CARD` / `SORT_CHAIN` UI: reorderable list plus a "keep order" button that sends `sortCardsDefault()` (the button alone unblocks duels).
@@ -230,7 +230,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [ ] `min`/`max` are applied to selectable picks only, not to `mustSelect.size() + picks`.
 
 ### 3.2 Battle-phase Activate sends the wrong action type
-- [ ] `ClientDuelState.buildBattleCmdActions` and `ClickDispatcher.getActionIconInfo` use 2 for Activate; the engine reads 0 activate, 1 attack, 2 to M2, 3 end battle (`playerop.cpp:55-67`). Effects cannot be activated in the Battle Phase; when M2 is unavailable the engine answers `MSG_RETRY`.
+- [x] `ClientDuelState.buildBattleCmdActions` and `ClickDispatcher.getActionIconInfo` use 2 for Activate; the engine reads 0 activate, 1 attack, 2 to M2, 3 end battle (`playerop.cpp:55-67`). Effects cannot be activated in the Battle Phase; when M2 is unavailable the engine answers `MSG_RETRY`.
 
 ### 3.3 `MSG_RETRY` hides the prompt
 - [ ] `LDLibDuelScreen.sendResponse` nulls `pendingPrompt` before the engine answers; `Retry` sets `PROMPT` dirty and `PromptController.rebuild` hides on null. The engine never re-sends the `SELECT_*` (`playerop.cpp:154, 178, 199, 590` return `FALSE` after `MSG_RETRY`). edopro does not recover: its host ends the duel on `MSG_RETRY` (`generic_duel.cpp:836-841`, recorded as a draw) and its client only shows an error popup (`duelclient.cpp:1348`); it relies on client-side validation so a retry never happens. Duelcraft needs one of the two: restore the last prompt on `Retry`, or validate before sending (the original purpose of `ResponseValidator`). Compounded by 3.2 and 3.5.
@@ -636,7 +636,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [ ] Coin and dice results as log plus toast.
 
 **Prompts**
-- [ ] `answered` guard and send-after-close (`duelclient.cpp:4269-4271`).
+- [x] `answered` guard and send-after-close (`duelclient.cpp:4269-4271`).
 - [ ] Shared Cancel/Finish button with three states bound to right-click; Finish once `min` is met in field mode.
 - [ ] Selection indices from message order, display sorted separately.
 - [ ] Field-versus-panel by the location mask `0xF1` or location 0.

@@ -117,9 +117,9 @@ public class DuelMessageCodec {
             case DuelMessage.Attack m -> { writeLocInfo(buf, m.attacker()); writeLocInfo(buf, m.target()); }
             case DuelMessage.Battle m -> {
                 writeLocInfo(buf, m.attacker());
-                buf.writeInt(m.atkAtk()); buf.writeInt(m.atkDef()); buf.writeByte(m.atkDamage());
+                buf.writeInt(m.atkAtk()); buf.writeInt(m.atkDef()); buf.writeByte(m.atkDestroyed());
                 writeLocInfo(buf, m.defender());
-                buf.writeInt(m.defAtk()); buf.writeInt(m.defDef()); buf.writeByte(m.defDamage());
+                buf.writeInt(m.defAtk()); buf.writeInt(m.defDef()); buf.writeByte(m.defDestroyed());
             }
             case DuelMessage.AttackDisabled ignored -> {}
             case DuelMessage.DamageStepStart ignored -> {}
