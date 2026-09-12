@@ -8,6 +8,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.mojang.logging.LogUtils;
@@ -154,6 +155,9 @@ public class PromptController {
             case DuelMessage.SelectPlace sel -> buildPlacePrompt(sel.count(), sel.field(), false);
             case DuelMessage.SelectDisfield sel -> buildPlacePrompt(sel.count(), sel.field(), true);
 
+            // Interim UI: raw passcode entry. Task 10 replaces this with a card search dialog.
+            case DuelMessage.AnnounceCard ignored -> buildAnnounceCardPrompt();
+
             default -> {
                 promptOverlay.removeClass("hidden");
                 if (promptTitle instanceof Label title) {
@@ -207,6 +211,30 @@ public class PromptController {
             btn.setOnClick(e -> onSelect.accept(idx));
             promptButtons.addChild(btn);
         }
+    }
+
+    /** Interim UI (Task 10 replaces this with a card search dialog): raw passcode entry. */
+    private void buildAnnounceCardPrompt() {
+        promptOverlay.removeClass("hidden");
+        if (promptTitle instanceof Label t) t.setText(Component.literal("Declare a card"));
+        clearPromptContent();
+
+        var input = new TextField();
+        input.getLayout().widthPercent(100);
+        promptBody.addChild(input);
+
+        var okBtn = new Button();
+        okBtn.setText(Component.literal("OK"));
+        okBtn.addClass("prompt-btn");
+        okBtn.setOnClick(e -> {
+            try {
+                int code = Integer.parseInt(input.getValue().trim());
+                callbacks.sendResponse(ResponseBuilder.announceCard(code));
+            } catch (NumberFormatException ignored) {
+                // Invalid/empty input: keep the dialog open.
+            }
+        });
+        promptButtons.addChild(okBtn);
     }
 
     private void buildChainPrompt(DuelMessage.SelectChain sel) {

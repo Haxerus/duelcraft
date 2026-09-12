@@ -601,6 +601,20 @@ class MessageParserTest {
     }
 
     @Test
+    void parseAnnounceCard() {
+        ByteBuffer b = body(2 + 8 + 8);
+        b.put((byte) 1);  // player
+        b.put((byte) 2);  // count
+        b.putLong(0x12L);
+        b.putLong(0x34L);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ANNOUNCE_CARD, b.array()));
+        var ac = (DuelMessage.AnnounceCard) msgs.getFirst();
+        assertEquals(1, ac.player());
+        assertEquals(List.of(0x12L, 0x34L), ac.opcodes());
+    }
+
+    @Test
     void parseRockPaperScissors() {
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ROCK_PAPER_SCISSORS, new byte[]{0}));
         var rps = (DuelMessage.RockPaperScissors) msgs.getFirst();

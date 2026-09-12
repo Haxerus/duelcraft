@@ -106,7 +106,7 @@ public class MessageParser {
                 case MSG_ANNOUNCE_RACE    -> parseAnnounceRace(reader);
                 case MSG_ANNOUNCE_ATTRIB  -> parseAnnounceAttrib(reader);
                 case MSG_ANNOUNCE_NUMBER  -> parseAnnounceNumber(reader);
-                case MSG_ANNOUNCE_CARD    -> parseRawSelection(reader, bodyLength, MSG_ANNOUNCE_CARD);
+                case MSG_ANNOUNCE_CARD    -> parseAnnounceCard(reader);
                 case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(reader.readUint8());
                 case MSG_CONFIRM_DECKTOP -> parseConfirmDeckTop(reader);
                 case MSG_CONFIRM_CARDS   -> parseConfirmCards(reader);
@@ -613,17 +613,14 @@ public class MessageParser {
         return new DuelMessage.AnnounceNumber(player, options);
     }
 
-    private static DuelMessage.AnnounceCard parseRawSelection(BufferReader r, int bodyLength,
-                                                               int msgType) {
-        int startPos = r.remaining();
+    private static DuelMessage.AnnounceCard parseAnnounceCard(BufferReader r) {
         int player = r.readUint8();
-        int consumed = startPos - r.remaining();
-        int remaining = bodyLength - consumed;
-        byte[] rawBody = new byte[remaining];
-        for (int i = 0; i < remaining; i++) {
-            rawBody[i] = (byte) r.readUint8();
+        int count = r.readUint8();
+        List<Long> opcodes = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            opcodes.add(r.readInt64());
         }
-        return new DuelMessage.AnnounceCard(player, rawBody);
+        return new DuelMessage.AnnounceCard(player, opcodes);
     }
 
     // ---- Confirm / Hand Result ----

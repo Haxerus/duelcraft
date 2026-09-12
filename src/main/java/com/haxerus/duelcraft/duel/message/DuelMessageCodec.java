@@ -224,7 +224,7 @@ public class DuelMessageCodec {
             case DuelMessage.AnnounceRace m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeLong(m.available()); }
             case DuelMessage.AnnounceAttrib m -> { buf.writeByte(m.player()); buf.writeByte(m.count()); buf.writeInt(m.available()); }
             case DuelMessage.AnnounceNumber m -> { buf.writeByte(m.player()); writeLongList(buf, m.options()); }
-            case DuelMessage.AnnounceCard m -> { buf.writeByte(m.player()); writeByteArray(buf, m.rawBody()); }
+            case DuelMessage.AnnounceCard m -> { buf.writeByte(m.player()); writeLongList(buf, m.opcodes()); }
             case DuelMessage.RockPaperScissors m -> buf.writeByte(m.player());
             case DuelMessage.HandResult m -> { buf.writeByte(m.hand0()); buf.writeByte(m.hand1()); }
 
@@ -358,7 +358,7 @@ public class DuelMessageCodec {
             case MSG_ANNOUNCE_RACE -> new DuelMessage.AnnounceRace(buf.readByte(), buf.readByte(), buf.readLong());
             case MSG_ANNOUNCE_ATTRIB -> new DuelMessage.AnnounceAttrib(buf.readByte(), buf.readByte(), buf.readInt());
             case MSG_ANNOUNCE_NUMBER -> new DuelMessage.AnnounceNumber(buf.readByte(), readLongList(buf));
-            case MSG_ANNOUNCE_CARD -> new DuelMessage.AnnounceCard(buf.readByte(), readByteArray(buf));
+            case MSG_ANNOUNCE_CARD -> new DuelMessage.AnnounceCard(buf.readByte(), readLongList(buf));
             case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(buf.readByte());
             case MSG_HAND_RES -> new DuelMessage.HandResult(buf.readByte(), buf.readByte());
 

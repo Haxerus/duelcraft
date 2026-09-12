@@ -319,6 +319,13 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.AnnounceNumber sel ->
                     ResponseBuilder.announceNumber(0);
 
+            case DuelMessage.AnnounceCard sel -> {
+                // No server-side card database in test mode to pick a legal declaration from;
+                // the human declares for the AI (routePrompt's null-response fallback).
+                LOGGER.info("[Solo AI] AnnounceCard has no AI heuristic, human declares for the AI");
+                yield null;
+            }
+
             case DuelMessage.RockPaperScissors sel ->
                     ResponseBuilder.rockPaperScissors(1); // always rock
 

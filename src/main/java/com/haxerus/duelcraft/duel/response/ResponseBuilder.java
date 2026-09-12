@@ -225,4 +225,12 @@ public class ResponseBuilder {
     public static byte[] announceNumber(int index) {
         return new ResponseBuilder(4).putInt32(index).build();
     }
+
+    /**
+     * MSG_ANNOUNCE_CARD response.
+     * @param code the declared card's passcode
+     */
+    public static byte[] announceCard(int code) {
+        return new ResponseBuilder(4).putInt32(code).build();
+    }
 }

@@ -241,6 +241,15 @@ class ResponseBuilderTest {
         assertEquals(3, readInt32(resp, 0));
     }
 
+    // ---- announceCard ----
+
+    @Test
+    void announceCard() {
+        byte[] resp = ResponseBuilder.announceCard(89631139);
+        assertEquals(4, resp.length);
+        assertEquals(89631139, readInt32(resp, 0));
+    }
+
     // ---- selectSum (same format as selectCards) ----
 
     @Test

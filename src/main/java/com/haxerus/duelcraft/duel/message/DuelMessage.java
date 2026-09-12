@@ -320,7 +320,7 @@ public sealed interface DuelMessage {
         public int type() { return MSG_ANNOUNCE_NUMBER; }
     }
 
-    record AnnounceCard(int player, byte[] rawBody) implements DuelMessage {
+    record AnnounceCard(int player, List<Long> opcodes) implements DuelMessage {
         public int type() { return MSG_ANNOUNCE_CARD; }
     }
 
