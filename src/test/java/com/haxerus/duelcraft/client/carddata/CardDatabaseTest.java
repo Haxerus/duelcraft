@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.client.carddata;
 import org.junit.jupiter.api.*;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -69,5 +70,44 @@ class CardDatabaseTest {
         assertEquals("Dark Magician", card.name());
         assertNotNull(card.desc());
         assertFalse(card.desc().isEmpty());
+    }
+
+    /** A lone truthy operand: every non-alias, non-token card is declarable. */
+    private static final List<Long> ANY_CARD = List.of(1L);
+
+    @Test
+    void searchDeclarable_passcodeQueryFindsThatCard() {
+        List<CardInfo> results = db.searchDeclarable("89631139", ANY_CARD, 50);
+        assertFalse(results.isEmpty());
+        assertEquals(89631139, results.getFirst().code());
+        assertEquals("Blue-Eyes White Dragon", results.getFirst().name());
+    }
+
+    @Test
+    void searchDeclarable_nameSubstringPutsExactMatchFirst() {
+        List<CardInfo> results = db.searchDeclarable("dark magician", ANY_CARD, 50);
+        assertEquals("Dark Magician", results.getFirst().name(), "exact name match must sort first");
+        assertTrue(results.size() > 1, "'Dark Magician' is a substring of several other card names");
+        assertTrue(results.stream().allMatch(c -> c.name().toLowerCase().contains("dark magician")));
+    }
+
+    @Test
+    void searchDeclarable_opcodesFilterOutNonMatchingCards() {
+        // "Dark Magic" matches both spells ("Dark Magic Attack") and monsters ("Dark Magician").
+        assertTrue(db.searchDeclarable("dark magic", ANY_CARD, 50).stream().anyMatch(CardInfo::isMonster));
+        List<CardInfo> spells = db.searchDeclarable("dark magic", List.of((long) TYPE_SPELL, OPCODE_ISTYPE), 50);
+        assertFalse(spells.isEmpty());
+        assertTrue(spells.stream().allMatch(CardInfo::isSpell));
+        assertTrue(spells.stream().noneMatch(c -> c.code() == 46986414), "Dark Magician must be filtered out");
+    }
+
+    @Test
+    void searchDeclarable_respectsLimit() {
+        assertEquals(5, db.searchDeclarable("dragon", ANY_CARD, 5).size());
+    }
+
+    @Test
+    void searchDeclarable_emptyOpcodeListMatchesNothing() {
+        assertTrue(db.searchDeclarable("dark magician", List.of(), 50).isEmpty());
     }
 }
