@@ -184,11 +184,27 @@ public class SoloDuelHandler implements DuelEventListener {
                 yield ResponseBuilder.selectCmd(3, 0); // end battle
             }
 
-            case DuelMessage.SelectCard sel ->
-                    ResponseBuilder.selectCards(0); // pick first card
+            case DuelMessage.SelectCard sel -> {
+                // Legal minimum: cancel when nothing is required and cancel is offered,
+                // otherwise the first max(min, 1) cards.
+                if (sel.min() == 0 && sel.cancelable())
+                    yield ResponseBuilder.selectCardsCancel();
+                int n = Math.min(Math.max(sel.min(), 1), sel.cards().size());
+                int[] indices = new int[n];
+                for (int i = 0; i < n; i++) indices[i] = i;
+                yield ResponseBuilder.selectCards(indices);
+            }
 
-            case DuelMessage.SelectTribute sel ->
-                    ResponseBuilder.selectCards(0); // tribute first card
+            case DuelMessage.SelectTribute sel -> {
+                // Over-tribute is legal, so stop at the first card that meets or exceeds min.
+                List<Integer> picks = new ArrayList<>();
+                int sum = 0;
+                for (int i = 0; i < sel.cards().size() && sum < sel.min(); i++) {
+                    picks.add(i);
+                    sum += sel.cards().get(i).tributeCount();
+                }
+                yield ResponseBuilder.selectCards(picks.stream().mapToInt(Integer::intValue).toArray());
+            }
 
             case DuelMessage.SelectChain sel -> {
                 if (sel.forced() && sel.chains() != null && !sel.chains().isEmpty())
@@ -229,12 +245,8 @@ public class SoloDuelHandler implements DuelEventListener {
                 yield ResponseBuilder.selectPosition(0x8);
             }
 
-            case DuelMessage.SelectCounter sel -> {
-                // Remove counters from first card
-                int[] counts = new int[sel.cards().size()];
-                counts[0] = sel.count();
-                yield ResponseBuilder.selectCounter(counts);
-            }
+            case DuelMessage.SelectCounter sel ->
+                    ResponseBuilder.selectCounter(spreadCounters(sel.cards(), sel.count()));
 
             case DuelMessage.SelectSum sel ->
                     ResponseBuilder.selectCards(0); // pick first
@@ -288,31 +300,28 @@ public class SoloDuelHandler implements DuelEventListener {
         };
     }
 
-    // ─── Retry fallback: a legal (not just plausible) answer for card-list prompts ───
-    // buildAutoResponse's card-list cases ignore min/caps (e.g. always picking one card),
-    // which is exactly what MSG_RETRY reports as illegal — so retrying with the same
-    // answer would just retry forever. This picks an answer the engine facts (§2.1 of
-    // docs/engine-gap-analysis.md) guarantee is legal; everything else keeps the default.
+    /** Spreads {@code count} across cards without exceeding any single card's own counter count. */
+    private static int[] spreadCounters(List<DuelMessage.CounterCard> cards, int count) {
+        int[] counts = new int[cards.size()];
+        int remaining = count;
+        for (int i = 0; i < counts.length && remaining > 0; i++) {
+            int take = Math.min(remaining, cards.get(i).counterCount());
+            counts[i] = take;
+            remaining -= take;
+        }
+        return counts;
+    }
+
+    // ─── Retry fallback ───────────────────────────────────────────────────
+    // SelectCard/SelectTribute/SelectCounter already compute a legal answer in
+    // buildAutoResponse, so a retry on those just retries buildAutoResponse via the
+    // default case below. SelectSum is left as a first-card pick in buildAutoResponse
+    // (Task 3 replaces its parse/response entirely) but gets a smarter sum-aware answer
+    // here so a bad first guess can still recover. SelectUnselectCard also accepts
+    // cancelable (not just finishable) here, which buildAutoResponse doesn't check.
 
     private static byte[] buildFallbackResponse(DuelMessage msg) {
         return switch (msg) {
-            case DuelMessage.SelectCard sel -> {
-                int n = Math.min(Math.max(sel.min(), 0), sel.cards().size());
-                int[] indices = new int[n];
-                for (int i = 0; i < n; i++) indices[i] = i;
-                yield ResponseBuilder.selectCards(indices);
-            }
-
-            case DuelMessage.SelectTribute sel -> {
-                List<Integer> picks = new ArrayList<>();
-                int sum = 0;
-                for (int i = 0; i < sel.cards().size() && sum < sel.min(); i++) {
-                    picks.add(i);
-                    sum += sel.cards().get(i).tributeCount();
-                }
-                yield ResponseBuilder.selectCards(picks.stream().mapToInt(Integer::intValue).toArray());
-            }
-
             case DuelMessage.SelectSum sel -> {
                 List<Integer> picks = new ArrayList<>();
                 int sum = 0;
@@ -329,17 +338,6 @@ public class SoloDuelHandler implements DuelEventListener {
                 if (sel.finishable() || sel.cancelable())
                     yield ResponseBuilder.selectUnselectCardFinish();
                 yield ResponseBuilder.selectUnselectCard(0);
-            }
-
-            case DuelMessage.SelectCounter sel -> {
-                int[] counts = new int[sel.cards().size()];
-                int remaining = sel.count();
-                for (int i = 0; i < counts.length && remaining > 0; i++) {
-                    int take = Math.min(remaining, sel.cards().get(i).counterCount());
-                    counts[i] = take;
-                    remaining -= take;
-                }
-                yield ResponseBuilder.selectCounter(counts);
             }
 
             default -> buildAutoResponse(msg);
