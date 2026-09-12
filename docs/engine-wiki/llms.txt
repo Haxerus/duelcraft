@@ -1,0 +1,26 @@
+# ygopro-core embedding wiki
+
+> Source-grounded integration contracts for ygopro-core API 11.0 at 7471af3c268669b9ae5c23664ba0cb2f37a5eca0, with EDOPro 48ec006c49d7899b39f39420b9a71dea5ecdd22a and Duelcraft JNI host examples. Read only the pages needed for the task. Check source-versions.md before assuming freshness.
+
+## Entry
+- [Task router and invariants](README.md): Start here.
+- [Source versions](source-versions.md): Evidence, differences, maintenance and scope.
+- [Source fingerprints](sources.json): Cited-file SHA-256 values and repository revisions.
+
+## Engine embedding
+- [Architecture](architecture.md): Responsibility boundary, internals and source map.
+- [Build and compatibility](build-and-compatibility.md): C++17, Lua requirements, linking and upgrades.
+- [Core API](core-api.md): All exports, structs, creation errors, pump, ownership and concurrency.
+- [Data and scripts](data-and-scripts.md): Database mapping, callbacks, caches and Lua initialization.
+- [Rules and coordinates](rules-and-coordinates.md): Teams, zones, deck insertion, flags and reproducibility.
+
+## Binary contracts
+- [Protocol](protocol.md): Framing, primitives and message handling.
+- [Message index](message-index.md): Public MSG constants with producer/consumer references.
+- [Responses](responses.md): Prompt-specific answers, indexes, constraints and retry.
+- [Queries](queries.md): Chunk layouts, flags, field snapshots and visibility.
+
+## Host implementations and verification
+- [EDOPro host](edopro-host.md): Lifecycle, transport, hidden information, refreshes and replays.
+- [Duelcraft JNI](duelcraft-jni.md): Native/Java bridge and local session/network behavior.
+- [Integration recipes](integration-recipes.md): Implementation sequence, test matrix and troubleshooting.

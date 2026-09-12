@@ -1,0 +1,726 @@
+{
+  "schema_version": 1,
+  "inspected_date": "2026-09-08",
+  "hash_normalization": "Replace CRLF and CR with LF before SHA-256; no other content normalization.",
+  "repositories": [
+    {
+      "name": "Duelcraft",
+      "path": "../..",
+      "head": "b910dd5f5aa3c7faa1ae6e1d3d499ed1b1936463"
+    },
+    {
+      "name": "ygopro-core",
+      "path": "../../native/ygopro-core",
+      "head": "7471af3c268669b9ae5c23664ba0cb2f37a5eca0",
+      "api": "11.0"
+    },
+    {
+      "name": "Lua",
+      "path": "../../native/ygopro-core/lua/src",
+      "head": "6e22fedb74cf0c9b6656e9fce8b7331db847c605"
+    },
+    {
+      "name": "EDOPro",
+      "path": "../../../edopro",
+      "head": "48ec006c49d7899b39f39420b9a71dea5ecdd22a"
+    },
+    {
+      "name": "EDOPro core",
+      "path": "../../../edopro/ocgcore",
+      "head": "158aebe758be3c46249c75d602e3f16d63d2ef31",
+      "api": "11.0"
+    }
+  ],
+  "files": [
+    {
+      "path": "../../build.gradle",
+      "sha256_lf": "f90f5a91914c125ce5b687c80bdae1ac84fea30960a9c935458af671fd22733f",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/jni-bridge/CMakeLists.txt",
+      "sha256_lf": "4ebeaaac9c6a13eebc4bfaec04a15d9d654402f4b472074658d931e5d8187ad9",
+      "cited_by": [
+        "build-and-compatibility.md",
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/jni-bridge/include/duel_engine.h",
+      "sha256_lf": "e7c376f591738a7144694730c145044c256817ad7c7971de840d7313141a49ea",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/jni-bridge/src/card_database.cpp",
+      "sha256_lf": "d044d701f630a860914813a7c96231e6d16ab731ba64d3b859f37b56d94caf82",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/jni-bridge/src/duel_engine.cpp",
+      "sha256_lf": "9d6fb2ab5c8713656c7e256fb16c577dff5b17f552555db24262fff15b922d05",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/jni-bridge/src/jni_interface.cpp",
+      "sha256_lf": "a0af8c7ad1c6e9230707d2a2ba1e525ca78f70d0f2c705e5a036b8e8190ae22d",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/jni-bridge/src/script_provider.cpp",
+      "sha256_lf": "a42775c5d387740d42f6477b8b36520cbd7fd793c79b14875606340210514721",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/.gitmodules",
+      "sha256_lf": "b4181a086d5c9ddcf455f5d776d70d59bdd7dfdf564b0bf682e5a49a24a10976",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/card.cpp",
+      "sha256_lf": "9b984e23177291ad382d34964d7186dc8aa3ebfffccf82da5e972009855f113f",
+      "cited_by": [
+        "architecture.md",
+        "message-index.md",
+        "queries.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/card.h",
+      "sha256_lf": "4f6fa45da9b48a6460a8f642bfec63ec5d83c217b6a885afd5cc8bb33a22de42",
+      "cited_by": [
+        "architecture.md",
+        "protocol.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/common.h",
+      "sha256_lf": "c298975e123572342e064cbcb57d4b39de563d957ca8d61af401dc2d8c8eefb8",
+      "cited_by": [
+        "architecture.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/COPYING",
+      "sha256_lf": "8d56b405468aad11f87ab5763f901e276e08d9646ff5c8481b1762b6b789e9ed",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/duel.cpp",
+      "sha256_lf": "a0c336f5d009c3a76f3e1db3f8b41fd81f2d0f4af8f0b15a5bfa0817cce546ef",
+      "cited_by": [
+        "architecture.md",
+        "core-api.md",
+        "data-and-scripts.md",
+        "duelcraft-jni.md",
+        "edopro-host.md",
+        "protocol.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/duel.h",
+      "sha256_lf": "b1c514e311717b8439d0b14e84d904d972d8e7ad580a7ef4ae8d5ead0620ccf8",
+      "cited_by": [
+        "architecture.md",
+        "core-api.md",
+        "data-and-scripts.md",
+        "protocol.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/effect.h",
+      "sha256_lf": "c4c8b674f1567c9643ca9e5efa50bb019811660bf7ed7c89fef69c446a98650a",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/effect_constants.h",
+      "sha256_lf": "3a98c850dd23bd2a4359970328ddd57e4e9f33912b01ab0befe831b84392fa88",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/field.cpp",
+      "sha256_lf": "180c7b45a519646687ba336521cc550cca0381d17f6e90e1c1049dce0c8f1762",
+      "cited_by": [
+        "architecture.md",
+        "message-index.md",
+        "protocol.md",
+        "queries.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/field.h",
+      "sha256_lf": "724629864d125db6ff2eb293165062c24e84801224331ffe0544e12c62aace83",
+      "cited_by": [
+        "architecture.md",
+        "queries.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/group.h",
+      "sha256_lf": "c3a245495ae7755e731da3242b7d38ee8661c4ddebe82106fb1e0383ddd5f124",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/interpreter.cpp",
+      "sha256_lf": "0a68dad275153d1c2a7abb20722d71917521cb77b9712268749d98339d648e2e",
+      "cited_by": [
+        "architecture.md",
+        "build-and-compatibility.md",
+        "core-api.md",
+        "data-and-scripts.md",
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/interpreter.h",
+      "sha256_lf": "ff701e67b47d8e5b5851607b9ddec5915a9ba698ba6c103479727dbd692b8e2f",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/jni/Android.mk",
+      "sha256_lf": "f00b383d3376ade63dafd38d1700b82b88b0854706e168bf229519736cd0d235",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/libdebug.cpp",
+      "sha256_lf": "121d4989b765c38b856c5353168ee8ba69b2ea7b32bccc7b6affb7d8bdcceb26",
+      "cited_by": [
+        "integration-recipes.md",
+        "message-index.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/libduel.cpp",
+      "sha256_lf": "4ab920702a710596d76bcf6db262be8c3ea7d1647ed5d5aa197c9850300c4e7f",
+      "cited_by": [
+        "architecture.md",
+        "data-and-scripts.md",
+        "message-index.md",
+        "protocol.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/libgroup.cpp",
+      "sha256_lf": "605d663dad15e23879491526c447753bcd1c8ccb65bcb1987dbc7835c9a2354b",
+      "cited_by": [
+        "message-index.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/LICENSE",
+      "sha256_lf": "a41ba74388f0ccea349231375fee6da760aebfc8f71f4b998a7f3656d890e674",
+      "cited_by": [
+        "build-and-compatibility.md",
+        "data-and-scripts.md",
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/lua/premake5.lua",
+      "sha256_lf": "ed4a12f63d312b563aab1edace2059c772054dee6b54181992e3b6a0f4837543",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/meson.build",
+      "sha256_lf": "051b0806be34f6cfdca7fc3a49297de6b9c72c6724874bb7d1b8736ebdd16a97",
+      "cited_by": [
+        "build-and-compatibility.md",
+        "source-versions.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/ocgapi.cpp",
+      "sha256_lf": "df86a7de6a8b18ca1746ded40f86e560a2635816c3c35f2d3c2cd614a30f9f12",
+      "cited_by": [
+        "architecture.md",
+        "core-api.md",
+        "data-and-scripts.md",
+        "duelcraft-jni.md",
+        "protocol.md",
+        "queries.md",
+        "rules-and-coordinates.md",
+        "source-versions.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/ocgapi.h",
+      "sha256_lf": "7201b3c36888df2820e44de9ad7006e4dd71a2f079b178ce1f37389bb75c3125",
+      "cited_by": [
+        "architecture.md",
+        "build-and-compatibility.md",
+        "core-api.md",
+        "duelcraft-jni.md",
+        "edopro-host.md",
+        "protocol.md",
+        "queries.md",
+        "responses.md",
+        "rules-and-coordinates.md",
+        "source-versions.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/ocgapi_constants.h",
+      "sha256_lf": "0e325485f496e3e48b744ee30ee3e5bb748a742f5f2bfa7c3048b9382b137188",
+      "cited_by": [
+        "architecture.md",
+        "core-api.md",
+        "message-index.md",
+        "protocol.md",
+        "queries.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/ocgapi_types.h",
+      "sha256_lf": "31b83b359f9b9fe9d7c09288b6b9370ca1ba78cf9fa8573971c4385be3fb7775",
+      "cited_by": [
+        "architecture.md",
+        "core-api.md",
+        "data-and-scripts.md",
+        "duelcraft-jni.md",
+        "edopro-host.md",
+        "protocol.md",
+        "queries.md",
+        "rules-and-coordinates.md",
+        "source-versions.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/operations.cpp",
+      "sha256_lf": "12176478ea04e6b2998ddd13d291543486757cd9a42571ac8e5622ab855a1f2c",
+      "cited_by": [
+        "architecture.md",
+        "message-index.md",
+        "protocol.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/playerop.cpp",
+      "sha256_lf": "2b4c3f844f15afd2e25a394ea281bd3bf0f56efb137bc2784d92b4e1e0059895",
+      "cited_by": [
+        "architecture.md",
+        "message-index.md",
+        "protocol.md",
+        "responses.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/premake5.lua",
+      "sha256_lf": "53955546b809c078b75522f955c8cf49329c87e1e11ff4e34f46092a29d0d78a",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/processor.cpp",
+      "sha256_lf": "b795f687a62ca1cb80fb1876725e06b860e32632a0749b268136f9c75b2355e2",
+      "cited_by": [
+        "architecture.md",
+        "message-index.md",
+        "protocol.md",
+        "responses.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/processor_unit.h",
+      "sha256_lf": "46c18d1f4016d95fa472cd112277ee8d4c47292be15984948840387bfb7bb625",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/processor_visit.cpp",
+      "sha256_lf": "623a8f569b69a823ed653ca9a1a09d8b6b535937ecc0955bcc2275f820540250",
+      "cited_by": [
+        "architecture.md",
+        "core-api.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/progressivebuffer.h",
+      "sha256_lf": "9199c3920e4de330a82903641705380bc153dbbb8202514adb95031434c19383",
+      "cited_by": [
+        "integration-recipes.md",
+        "protocol.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/README.md",
+      "sha256_lf": "5d7987750dd785cdaa94d9bb9053f302413a92c35adfef86f9324eaf29f3174b",
+      "cited_by": [
+        "build-and-compatibility.md",
+        "core-api.md",
+        "duelcraft-jni.md",
+        "source-versions.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/scriptlib.cpp",
+      "sha256_lf": "4d9509666cdaf1e29c941f5dfef128e1ff796fbe1ccf837e4005461ad4a16d40",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/scriptlib.h",
+      "sha256_lf": "55de79e6f4bd6540151bad3cba0a5186ff74190f728fc4da2a03eb5d78844aee",
+      "cited_by": [
+        "architecture.md"
+      ]
+    },
+    {
+      "path": "../../native/ygopro-core/scripts/generate.bat",
+      "sha256_lf": "0ad8fa0a31d9c9628d171d4d3efdb5fc404768bb0150d66a50b60e689fb46851",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/client/carddata/CardDatabase.java",
+      "sha256_lf": "1f9aeeaacbbe8ceafebf87ce07d7508bb636ba9ecd092e5a99aba7b6c712252f",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/client/ClientPayloadHandler.java",
+      "sha256_lf": "5cda40cc44b0145d4d950b57ac814416b46616dc3bc9afff22bbbe371029cec0",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/client/LDLibDuelScreen.java",
+      "sha256_lf": "907f60fa7c446e8627454575b2c15606159904466d9659a0d01f927c24423353",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/core/DuelEngine.java",
+      "sha256_lf": "5ed5eb4937d573005b4fac21cfba1a905d1f1531528ec2fa4f6a45e1afbf4b24",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/core/NativeLoader.java",
+      "sha256_lf": "496e8a1c01f2661bd50de706b661bd3487c6b25fe81c58e55db720927962b084",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/core/OcgCore.java",
+      "sha256_lf": "7cf0bcab3e1afc0dd543a1b0f042b8e3d1a260b01f5c1fbc343c414f82596615",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/duel/DuelSession.java",
+      "sha256_lf": "c1e6ac60cc218a8baf9bbda3a534acb911504536150110279d4e2ba211eaa77d",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/duel/message/DuelMessageCodec.java",
+      "sha256_lf": "7f4de514363ba7382a5bfccd6647a0c6f1f5411e7eb0f2611c915cc46d509818",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/duel/message/FieldQuery.java",
+      "sha256_lf": "b19af043611bc606835bfdc6d787d3e1230492f05fe752137c4f55c58346b492",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/duel/message/MessageParser.java",
+      "sha256_lf": "1c31102cb5e7d7d4b3f921bcc3ee0a109b56070cb0434ef5d70798b2c4811765",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/duel/response/ResponseBuilder.java",
+      "sha256_lf": "c9d216222d62e1c88b84708f3cd383fe51a16d07a9656a7260d0e077d0ddf909",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/duel/response/ResponseValidator.java",
+      "sha256_lf": "91ebccb753c51478b3cd5dc4895d7cf71279f1e977162bd317d8689bc179a62b",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/DuelcraftClient.java",
+      "sha256_lf": "98883c3f41b9eabd330954470a83f77512fa7b34b909a217892adfa1a9d47410",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/server/DuelManager.java",
+      "sha256_lf": "ad5d1b0bd79818825f2e1e3dc51d7579417e579b02b4185db675976b6769b6a2",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/server/DuelMessagePayload.java",
+      "sha256_lf": "89e004b47c637f481aca0f15299c5a65ee0579adb4a21861d972048d6b7802cf",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/server/DuelNetworking.java",
+      "sha256_lf": "6d3a46b1e7ad3b630d665781246e873cf707f18a5d31c255d8ac274a85e59ef8",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/server/DuelResponsePayload.java",
+      "sha256_lf": "c3fdcac18d3da3093997c824db3e2aa6f6b7ef59a2101b2f1c9a69a04f2648ec",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/server/ServerDuelHandler.java",
+      "sha256_lf": "638e86f3c0b4bac92ecb77a7f9d64c5b0e043f19061906c458fdc8d48824ea96",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../src/main/java/com/haxerus/duelcraft/server/ServerPayloadHandler.java",
+      "sha256_lf": "672d382e0f140760a4d79fc55d1db3db8fd88e60c57f0f2a4c252d823fd401d1",
+      "cited_by": [
+        "duelcraft-jni.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/COPYING",
+      "sha256_lf": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/core_utils.cpp",
+      "sha256_lf": "81a57e62168ceff2a5b0c107d3a242f6f14e5b15f59c205d135fbdad385c94b5",
+      "cited_by": [
+        "data-and-scripts.md",
+        "edopro-host.md",
+        "protocol.md",
+        "queries.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/data_handler.cpp",
+      "sha256_lf": "e0c111066f5cfa3f98e51bb0cc2479c6be283ed5132184559a308b8249e3727d",
+      "cited_by": [
+        "data-and-scripts.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/data_manager.cpp",
+      "sha256_lf": "ce51aba1514ec36ef12ca9d2846234977611a4b224d03c6bb1bd8039dbfd301c",
+      "cited_by": [
+        "architecture.md",
+        "data-and-scripts.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/data_manager.h",
+      "sha256_lf": "b9d48d0139a769191086b95802c3bcd6e722275172873d70f1cc09540f6dfb8e",
+      "cited_by": [
+        "data-and-scripts.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/deck_manager.cpp",
+      "sha256_lf": "80034e77b93ece12eeb59ae638abe39108e367c3162206c0fe81f2b64e0a308c",
+      "cited_by": [
+        "edopro-host.md",
+        "rules-and-coordinates.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/dllinterface.cpp",
+      "sha256_lf": "9c114e0f2252b8e3900060faefcaf2898bb12c52ef18e7d83bd0d9b32696175b",
+      "cited_by": [
+        "build-and-compatibility.md",
+        "edopro-host.md",
+        "protocol.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/duelclient.cpp",
+      "sha256_lf": "3ad6d2020304c79d576293b0b441db05e6340466b39527152e3309dc92161a18",
+      "cited_by": [
+        "architecture.md",
+        "message-index.md",
+        "protocol.md",
+        "responses.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/event_handler.cpp",
+      "sha256_lf": "eab328fa41ee3eb8f0d2f85d2350c299a3eb42a9e41aae020acee1600af64069",
+      "cited_by": [
+        "responses.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/game.cpp",
+      "sha256_lf": "75ab1f7fc877cf2f0b395be3b7b59fdece7f7bbe6f3d9b7076e36a6c9a96d6be",
+      "cited_by": [
+        "data-and-scripts.md",
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/generic_duel.cpp",
+      "sha256_lf": "f73ebf766ce5c8d943462fdb38fbf09349764d4e53217d46a7dedc218e6c7242",
+      "cited_by": [
+        "edopro-host.md",
+        "queries.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/netserver.cpp",
+      "sha256_lf": "da6f159cbd050ffcb9b2cf9a5c2c7ff1e8c8c136596b0de186e7df7ad44a1607",
+      "cited_by": [
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/netserver.h",
+      "sha256_lf": "891c370a3cad95e2942065176c452bed0b1072d42ab6e926bf85aaef3610cf53",
+      "cited_by": [
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/network.h",
+      "sha256_lf": "ddcfaf89e254c2335654d83d243456be1b0b3485411759b8c70bab7f0427c0c8",
+      "cited_by": [
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/ocgapi_types.h",
+      "sha256_lf": "8ef3b38527743ba42a088d0fb48c7806d835d7d12e06d7b32fccbeb42e493af9",
+      "cited_by": [
+        "edopro-host.md",
+        "source-versions.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/ocgcore_functions.inl",
+      "sha256_lf": "4bfd446ec2b6778bf60d200adfbad056f42e599b0d0044f6ff1b2e1aec341be8",
+      "cited_by": [
+        "build-and-compatibility.md",
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/old_replay_mode.cpp",
+      "sha256_lf": "dfeb748e07959a0b4d1dbc4cf80162a91d9619eaa26fe7070b95bbeef17107e5",
+      "cited_by": [
+        "edopro-host.md",
+        "integration-recipes.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/replay.cpp",
+      "sha256_lf": "006413b8a7b2ce5d614a24b9e5d60134250b995c6313389e86da4d8d910e16fd",
+      "cited_by": [
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/replay_mode.cpp",
+      "sha256_lf": "d20082342d354cb6655697703501e9f59188ebcb0573d3aef44250979c6d2c39",
+      "cited_by": [
+        "architecture.md",
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/gframe/single_mode.cpp",
+      "sha256_lf": "0d093a0fe3c10d72e7af3c4aa02dd6c81d1c7f48204debfeb0d38d3b0d02edf4",
+      "cited_by": [
+        "edopro-host.md",
+        "integration-recipes.md",
+        "message-index.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/LICENSE",
+      "sha256_lf": "092ee622331a024ab58bcde9aa9e318f1b91919b4347f73bc29ce7401b5cbfdc",
+      "cited_by": [
+        "data-and-scripts.md",
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/ocgcore/ocgapi.h",
+      "sha256_lf": "ed1fc99fe5f3a0db3be8822f0c860f2b8aaf4368be4ac36fa92179ffe51abf4e",
+      "cited_by": [
+        "edopro-host.md"
+      ]
+    },
+    {
+      "path": "../../../edopro/README.md",
+      "sha256_lf": "b9d80a37cfcea33835c19899373a635bd1e340448260d6d03fe4a0ed590cdef3",
+      "cited_by": [
+        "build-and-compatibility.md"
+      ]
+    }
+  ]
+}
