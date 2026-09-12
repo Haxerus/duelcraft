@@ -75,4 +75,53 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.Retry());
         assertTrue(state.markResponseSent());
     }
+
+    // ---- Retry restores the prompt (Task 2) ----
+
+    @Test
+    void retryRestoresThePendingPromptAfterItWasSent() {
+        var state = newState();
+        var prompt = new DuelMessage.SelectYesNo(0, 42L);
+        state.applyMessage(prompt);
+
+        assertTrue(state.markResponseSent());
+        state.onResponseSent();
+        assertNull(state.pendingPrompt);
+
+        state.applyMessage(new DuelMessage.Retry());
+
+        assertEquals(prompt, state.pendingPrompt);
+        assertTrue(state.markResponseSent());
+    }
+
+    @Test
+    void retrySetsAStatusMessage() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.SelectYesNo(0, 42L));
+        state.markResponseSent();
+        state.onResponseSent();
+
+        state.applyMessage(new DuelMessage.Retry());
+
+        assertEquals("Invalid response, try again", state.retryMessage);
+    }
+
+    @Test
+    void retryRebuildsCardActionsForIdleCmd() {
+        var state = newState();
+        var summonable = new DuelMessage.IdleCmdCard(12345, 0, LOCATION_HAND, 0);
+        var idleCmd = new DuelMessage.SelectIdleCmd(0, List.of(summonable), List.of(), List.of(),
+                List.of(), List.of(), List.of(), true, true, false);
+        state.applyMessage(idleCmd);
+
+        state.markResponseSent();
+        state.onResponseSent();
+        assertTrue(state.cardActions.isEmpty());
+
+        state.applyMessage(new DuelMessage.Retry());
+
+        assertEquals(idleCmd, state.pendingPrompt);
+        var loc = new ClientDuelState.CardLocation(0, LOCATION_HAND, 0);
+        assertFalse(state.cardActions.getOrDefault(loc, List.of()).isEmpty());
+    }
 }

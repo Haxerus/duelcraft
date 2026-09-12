@@ -19,18 +19,25 @@ public class ServerDuelHandler implements DuelEventListener {
     private final ServerPlayer player1;
     private final UUID duelId;
 
+    // Player index of the last prompt forwarded via sendToPlayer; Retry only reaches this player.
+    private int pendingPlayer = -1;
+
     public ServerDuelHandler(ServerPlayer player0, ServerPlayer player1, UUID duelId) {
         this.player0 = player0;
         this.player1 = player1;
         this.duelId = duelId;
     }
 
+    /** Player index of the last prompt forwarded (Task 11 uses this for the response ownership check). */
+    public int pendingPlayer() { return pendingPlayer; }
+
     @Override
     public int onMessage(DuelMessage msg) {
         switch (msg) {
             case DuelMessage.Retry ignored -> {
-                // Bad response — broadcast retry so the client re-prompts
-                broadcastToBoth(msg);
+                // Bad response — edopro ends the duel here, but Duelcraft continues, so only
+                // the player who owns the rejected prompt needs to see it.
+                if (pendingPlayer >= 0) sendToPlayer(pendingPlayer, msg);
                 return 1; // stop processing, wait for corrected response
             }
             case DuelMessage.Win win -> {
@@ -67,6 +74,7 @@ public class ServerDuelHandler implements DuelEventListener {
     }
 
     private void sendToPlayer(int playerIndex, DuelMessage msg) {
+        pendingPlayer = playerIndex;
         var player = playerIndex == 0 ? player0 : player1;
         PacketDistributor.sendToPlayer(player, new DuelMessagePayload(msg));
     }

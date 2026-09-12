@@ -8,6 +8,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -18,11 +20,19 @@ import java.util.UUID;
 public class SoloDuelHandler implements DuelEventListener {
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    private static final int MAX_AI_RETRIES = 3;
+
     private final ServerPlayer player;
     private final UUID duelId;
 
     /** Set by DuelManager after creating the session, used for auto-responses. */
     private Runnable pendingAutoResponse;
+
+    // Last prompt routed and who it went to, so a Retry can tell whether the AI's own
+    // answer was rejected; reset whenever a new prompt arrives.
+    private DuelMessage lastPrompt;
+    private int lastPromptTarget = -1;
+    private int retryCount;
 
     public SoloDuelHandler(ServerPlayer player, UUID duelId) {
         this.player = player;
@@ -32,10 +42,7 @@ public class SoloDuelHandler implements DuelEventListener {
     @Override
     public int onMessage(DuelMessage msg) {
         return switch (msg) {
-            case DuelMessage.Retry ignored -> {
-                sendToPlayer(msg);
-                yield 1;
-            }
+            case DuelMessage.Retry ignored -> handleRetry(msg);
             case DuelMessage.Win win -> {
                 PacketDistributor.sendToPlayer(player, new DuelEndPayload(win.winner(), win.reason()));
                 yield 2;
@@ -72,6 +79,10 @@ public class SoloDuelHandler implements DuelEventListener {
     }
 
     private int routePrompt(int targetPlayer, DuelMessage msg) {
+        lastPrompt = msg;
+        lastPromptTarget = targetPlayer;
+        retryCount = 0;
+
         if (targetPlayer == 0) {
             // Human player — send to client as normal
             sendToPlayer(msg);
@@ -90,8 +101,43 @@ public class SoloDuelHandler implements DuelEventListener {
             LOGGER.warn("[Solo AI] No auto-response for {}, sending to player as fallback",
                     msg.getClass().getSimpleName());
             sendToPlayer(msg);
+            lastPromptTarget = 0;
             return 1;
         }
+    }
+
+    /**
+     * MSG_RETRY handling. If the human's response was rejected, forward as before. If the AI's own
+     * response was rejected, re-answer with a more careful fallback (bounded) instead of hanging;
+     * after too many retries, hand the prompt to the human so the duel isn't wedged.
+     */
+    private int handleRetry(DuelMessage retryMsg) {
+        if (lastPromptTarget != 1 || lastPrompt == null) {
+            sendToPlayer(retryMsg);
+            return 1;
+        }
+
+        retryCount++;
+        if (retryCount > MAX_AI_RETRIES) {
+            LOGGER.error("[Solo AI] Giving up after {} retries on {}, forwarding prompt to the player",
+                    MAX_AI_RETRIES, lastPrompt.getClass().getSimpleName());
+            sendToPlayer(lastPrompt);
+            lastPromptTarget = 0;
+            return 1;
+        }
+
+        byte[] response = buildFallbackResponse(lastPrompt);
+        if (response == null) {
+            LOGGER.error("[Solo AI] No fallback response for {}, forwarding prompt to the player",
+                    lastPrompt.getClass().getSimpleName());
+            sendToPlayer(lastPrompt);
+            lastPromptTarget = 0;
+            return 1;
+        }
+        LOGGER.warn("[Solo AI] Retry {}/{} on {}, re-answering with fallback",
+                retryCount, MAX_AI_RETRIES, lastPrompt.getClass().getSimpleName());
+        pendingAutoResponse = () -> DuelManager.get().handleSoloAutoResponse(duelId, response);
+        return 1;
     }
 
     /** Check if there's a pending AI response that needs to be applied. */
@@ -239,6 +285,64 @@ public class SoloDuelHandler implements DuelEventListener {
                     ResponseBuilder.rockPaperScissors(1); // always rock
 
             default -> null;
+        };
+    }
+
+    // ─── Retry fallback: a legal (not just plausible) answer for card-list prompts ───
+    // buildAutoResponse's card-list cases ignore min/caps (e.g. always picking one card),
+    // which is exactly what MSG_RETRY reports as illegal — so retrying with the same
+    // answer would just retry forever. This picks an answer the engine facts (§2.1 of
+    // docs/engine-gap-analysis.md) guarantee is legal; everything else keeps the default.
+
+    private static byte[] buildFallbackResponse(DuelMessage msg) {
+        return switch (msg) {
+            case DuelMessage.SelectCard sel -> {
+                int n = Math.min(Math.max(sel.min(), 0), sel.cards().size());
+                int[] indices = new int[n];
+                for (int i = 0; i < n; i++) indices[i] = i;
+                yield ResponseBuilder.selectCards(indices);
+            }
+
+            case DuelMessage.SelectTribute sel -> {
+                List<Integer> picks = new ArrayList<>();
+                int sum = 0;
+                for (int i = 0; i < sel.cards().size() && sum < sel.min(); i++) {
+                    picks.add(i);
+                    sum += sel.cards().get(i).tributeCount();
+                }
+                yield ResponseBuilder.selectCards(picks.stream().mapToInt(Integer::intValue).toArray());
+            }
+
+            case DuelMessage.SelectSum sel -> {
+                List<Integer> picks = new ArrayList<>();
+                int sum = 0;
+                for (int i = 0; i < sel.selectable().size()
+                        && (sum < sel.targetSum() || picks.size() < sel.min()); i++) {
+                    if (sel.max() > 0 && picks.size() >= sel.max()) break;
+                    picks.add(i);
+                    sum += sel.selectable().get(i).value1();
+                }
+                yield ResponseBuilder.selectSum(picks.stream().mapToInt(Integer::intValue).toArray());
+            }
+
+            case DuelMessage.SelectUnselectCard sel -> {
+                if (sel.finishable() || sel.cancelable())
+                    yield ResponseBuilder.selectUnselectCardFinish();
+                yield ResponseBuilder.selectUnselectCard(0);
+            }
+
+            case DuelMessage.SelectCounter sel -> {
+                int[] counts = new int[sel.cards().size()];
+                int remaining = sel.count();
+                for (int i = 0; i < counts.length && remaining > 0; i++) {
+                    int take = Math.min(remaining, sel.cards().get(i).counterCount());
+                    counts[i] = take;
+                    remaining -= take;
+                }
+                yield ResponseBuilder.selectCounter(counts);
+            }
+
+            default -> buildAutoResponse(msg);
         };
     }
 }

@@ -160,6 +160,14 @@ public class PromptController {
                 LOGGER.warn("Unhandled prompt type: {}", state.pendingPrompt.getClass().getSimpleName());
             }
         }
+
+        if (state.retryMessage != null) {
+            if (statusLabel != null) {
+                statusLabel.removeClass("hidden");
+                if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(state.retryMessage));
+            }
+            state.retryMessage = null;
+        }
     }
 
     // ── Prompt builders ────────────────────────────────────────────────────

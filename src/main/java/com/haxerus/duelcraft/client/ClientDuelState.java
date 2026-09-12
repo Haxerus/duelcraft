@@ -124,6 +124,12 @@ public class ClientDuelState {
     // Pending selection prompt (null = no prompt)
     public DuelMessage pendingPrompt;
 
+    // Last prompt record received, kept after pendingPrompt is cleared so MSG_RETRY can restore it.
+    private DuelMessage lastPrompt;
+
+    // One-shot status text for the UI after MSG_RETRY; PromptController shows it and clears it.
+    public String retryMessage;
+
     // Answered guard: at most one response per prompt (edopro's "answered" flag).
     // Reset whenever a new prompt (or Retry) arrives.
     private boolean responseSent;
@@ -133,6 +139,19 @@ public class ClientDuelState {
         if (responseSent) return false;
         responseSent = true;
         return true;
+    }
+
+    /** Called by the screen right after a response is sent: clears the active prompt UI, keeping lastPrompt. */
+    public void onResponseSent() {
+        pendingPrompt = null;
+        clearCardActions();
+    }
+
+    /** Sets a new pending prompt, remembering it for Retry and resetting the answered guard. */
+    private void setPrompt(DuelMessage msg) {
+        pendingPrompt = msg;
+        lastPrompt = msg;
+        responseSent = false;
     }
 
     // MSG_SELECT_BATTLECMD action types (playerop.cpp select_battle_command).
@@ -213,6 +232,10 @@ public class ClientDuelState {
             // ---- System ----
             case DuelMessage.Retry ignored -> {
                 responseSent = false;
+                pendingPrompt = lastPrompt;
+                if (pendingPrompt instanceof DuelMessage.SelectIdleCmd sel) buildIdleCmdActions(sel);
+                else if (pendingPrompt instanceof DuelMessage.SelectBattleCmd sel) buildBattleCmdActions(sel);
+                retryMessage = "Invalid response, try again";
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.warn("[State] RETRY — last response was invalid, re-prompting");
             }
@@ -397,7 +420,7 @@ public class ClientDuelState {
 
             // ---- Selection prompts — set pendingPrompt for the UI ----
             case DuelMessage.SelectIdleCmd sel -> {
-                pendingPrompt = msg; responseSent = false;
+                setPrompt(msg);
                 buildIdleCmdActions(sel);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.info("[State] SelectIdleCmd: summon={}, spSummon={}, repos={}, setMon={}, setST={}, activate={}, battle={}, end={}",
@@ -411,13 +434,13 @@ public class ClientDuelState {
                 }
             }
             case DuelMessage.SelectBattleCmd sel -> {
-                pendingPrompt = msg; responseSent = false;
+                setPrompt(msg);
                 buildBattleCmdActions(sel);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.debug("[State] Prompt: SelectBattleCmd player={}, actions={}", sel.player(), cardActions.size());
             }
             case DuelMessage.SelectCard sel -> {
-                pendingPrompt = msg; responseSent = false;
+                setPrompt(msg);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.info("[State] Prompt: SelectCard player={}, min={}, max={}, cards={}",
                         sel.player(), sel.min(), sel.max(), sel.cards().size());
@@ -427,17 +450,17 @@ public class ClientDuelState {
                             c.sequence(), Integer.toHexString(c.position()));
                 }
             }
-            case DuelMessage.SelectChain sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
-            case DuelMessage.SelectEffectYn sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
-            case DuelMessage.SelectYesNo sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
-            case DuelMessage.SelectOption sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectOption player={}, options={}", sel.player(), sel.options()); }
-            case DuelMessage.SelectPlace sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPlace player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
-            case DuelMessage.SelectPosition sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPosition player={}, code={}, pos=0x{}", sel.player(), sel.code(), Integer.toHexString(sel.positions())); }
-            case DuelMessage.SelectTribute sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
-            case DuelMessage.SelectCounter sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }
-            case DuelMessage.SelectSum sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectSum player={}", sel.player()); }
+            case DuelMessage.SelectChain sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
+            case DuelMessage.SelectEffectYn sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
+            case DuelMessage.SelectYesNo sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
+            case DuelMessage.SelectOption sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectOption player={}, options={}", sel.player(), sel.options()); }
+            case DuelMessage.SelectPlace sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPlace player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
+            case DuelMessage.SelectPosition sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPosition player={}, code={}, pos=0x{}", sel.player(), sel.code(), Integer.toHexString(sel.positions())); }
+            case DuelMessage.SelectTribute sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
+            case DuelMessage.SelectCounter sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }
+            case DuelMessage.SelectSum sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectSum player={}", sel.player()); }
             case DuelMessage.SelectUnselectCard sel -> {
-                pendingPrompt = msg; responseSent = false;
+                setPrompt(msg);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.info("[State] Prompt: SelectUnselectCard player={} hint=0x{} selectable={} alreadySelected={}",
                         sel.player(), Integer.toHexString(lastHintType),
@@ -451,13 +474,13 @@ public class ClientDuelState {
                             c.code(), c.controller(), Integer.toHexString(c.location()), c.sequence());
                 }
             }
-            case DuelMessage.SortCard sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortCard player={}", sel.player()); }
-            case DuelMessage.SortChain sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortChain player={}", sel.player()); }
-            case DuelMessage.AnnounceRace sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceRace player={}", sel.player()); }
-            case DuelMessage.AnnounceAttrib sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceAttrib player={}", sel.player()); }
-            case DuelMessage.AnnounceNumber sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceNumber player={}", sel.player()); }
-            case DuelMessage.AnnounceCard sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceCard player={}", sel.player()); }
-            case DuelMessage.RockPaperScissors sel -> { pendingPrompt = msg; responseSent = false; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: RockPaperScissors player={}", sel.player()); }
+            case DuelMessage.SortCard sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortCard player={}", sel.player()); }
+            case DuelMessage.SortChain sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortChain player={}", sel.player()); }
+            case DuelMessage.AnnounceRace sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceRace player={}", sel.player()); }
+            case DuelMessage.AnnounceAttrib sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceAttrib player={}", sel.player()); }
+            case DuelMessage.AnnounceNumber sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceNumber player={}", sel.player()); }
+            case DuelMessage.AnnounceCard sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceCard player={}", sel.player()); }
+            case DuelMessage.RockPaperScissors sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: RockPaperScissors player={}", sel.player()); }
 
             // ---- Confirm/reveal ----
             case DuelMessage.ConfirmDeckTop confirm -> {

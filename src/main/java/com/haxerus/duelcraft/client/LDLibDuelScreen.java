@@ -114,8 +114,7 @@ public class LDLibDuelScreen {
             return;
         }
         PacketDistributor.sendToServer(new DuelResponsePayload(response));
-        state.pendingPrompt = null;
-        state.clearCardActions();
+        state.onResponseSent();
         if (refresher != null) {
             refresher.onResponseSent();
         }
