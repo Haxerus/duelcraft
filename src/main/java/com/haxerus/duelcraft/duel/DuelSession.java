@@ -6,11 +6,9 @@ import com.haxerus.duelcraft.duel.message.FieldQuery;
 import com.haxerus.duelcraft.duel.message.MessageParser;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
-import static com.haxerus.duelcraft.core.OcgConstants.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class DuelSession implements AutoCloseable {
@@ -62,6 +60,8 @@ public class DuelSession implements AutoCloseable {
         }
 
         OcgCore.nStartDuel(eng, duelHandle);
+        // Both extra decks; the opening hands follow as MSG_DRAW (RefreshSchedule.atDuelStart).
+        emitRefreshes(RefreshSchedule.atDuelStart());
     }
 
     /**
@@ -82,30 +82,30 @@ public class DuelSession implements AutoCloseable {
             if (messageBuffer != null && messageBuffer.length > 0) {
                 List<DuelMessage> messages = MessageParser.parse(messageBuffer);
                 for (DuelMessage msg : messages) {
-                    // Auto-pass empty chain prompts (no chainable cards, not forced)
+                    // Auto-pass empty chain prompts (no chainable cards, not forced). The rest of
+                    // the batch was parsed before the prompt, so it still belongs to the players.
                     if (msg instanceof DuelMessage.SelectChain chain
                             && chain.count() == 0 && !chain.forced()) {
                         LOGGER.debug("[Session] Auto-passing empty chain for player {}", chain.player());
                         OcgCore.nDuelSetResponse(eng, duelHandle,
                                 ResponseBuilder.selectChain(-1));
                         autoResponded = true;
-                        break;
+                        continue;
                     }
 
+                    emitRefreshes(RefreshSchedule.before(msg));
                     int result = listener.onMessage(msg);
                     if (result != 0) {
-                        sendFieldStats();
                         if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
                             ended = true;
                             listener.onDuelEnd();
                         }
                         return;
                     }
+                    emitRefreshes(RefreshSchedule.after(msg));
                 }
             }
         } while (status == OcgConstants.DUEL_STATUS_CONTINUE || autoResponded);
-
-        sendFieldStats();
 
         if (status == OcgConstants.DUEL_STATUS_END) {
             ended = true;
@@ -113,48 +113,45 @@ public class DuelSession implements AutoCloseable {
         }
     }
 
-    /**
-     * Query the engine for current field stats and send UpdateData messages
-     * to the listener. Called when the engine pauses (waiting for input or end).
-     */
-    private void sendFieldStats() {
+    /** Runs each scheduled query and hands the result to the listener as UpdateData / UpdateCard. */
+    private void emitRefreshes(List<RefreshSchedule.Refresh> refreshes) {
         long eng = engine.getHandle();
-        int flags = QUERY_CODE | QUERY_POSITION | QUERY_TYPE | QUERY_LEVEL | QUERY_RANK
-                | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE
-                | QUERY_BASE_ATTACK | QUERY_BASE_DEFENSE | QUERY_STATUS
-                | QUERY_LINK | QUERY_IS_PUBLIC | QUERY_IS_HIDDEN;
-
-        for (int player = 0; player < 2; player++) {
-            sendLocationStats(eng, flags, player, LOCATION_MZONE);
-            sendLocationStats(eng, flags, player, LOCATION_SZONE);
-            sendLocationStats(eng, flags, player, LOCATION_EXTRA);
+        for (RefreshSchedule.Refresh refresh : refreshes) {
+            if (refresh.isWholeLocation()) emitLocation(eng, refresh);
+            else emitSingle(eng, refresh);
         }
     }
 
-    private void sendLocationStats(long eng, int flags, int player, int location) {
-        int slotCount = switch (location) {
-            case LOCATION_MZONE -> 7;
-            case LOCATION_SZONE -> 8;
-            default -> OcgCore.nDuelQueryCount(eng, duelHandle, player, location);
-        };
-        var cards = new ArrayList<QueriedCard>(slotCount);
-
-        for (int seq = 0; seq < slotCount; seq++) {
-            byte[] data = OcgCore.nDuelQuery(eng, duelHandle, flags, player, location, seq, 0);
-            if (data == null || data.length == 0) {
-                cards.add(null);
-            } else {
-                try {
-                    cards.add(FieldQuery.parse(data));
-                } catch (Exception e) {
-                    LOGGER.warn("[Query] Failed to parse slot p={} loc=0x{} seq={}: {}",
-                            player, Integer.toHexString(location), seq, e.getMessage());
-                    cards.add(null);
-                }
-            }
+    private void emitLocation(long eng, RefreshSchedule.Refresh refresh) {
+        byte[] data = OcgCore.nDuelQueryLocation(eng, duelHandle,
+                refresh.flags(), refresh.player(), refresh.location());
+        if (data == null || data.length == 0) return;
+        List<QueriedCard> cards;
+        try {
+            cards = FieldQuery.parseLocation(data);
+        } catch (RuntimeException e) {
+            LOGGER.warn("[Query] Failed to parse location p={} loc=0x{}: {}",
+                    refresh.player(), Integer.toHexString(refresh.location()), e.getMessage());
+            return;
         }
+        listener.onMessage(new DuelMessage.UpdateData(refresh.player(), refresh.location(), cards));
+    }
 
-        listener.onMessage(new DuelMessage.UpdateData(player, location, cards));
+    private void emitSingle(long eng, RefreshSchedule.Refresh refresh) {
+        byte[] data = OcgCore.nDuelQuery(eng, duelHandle, refresh.flags(),
+                refresh.player(), refresh.location(), refresh.sequence(), 0);
+        if (data == null || data.length == 0) return;
+        QueriedCard card;
+        try {
+            card = FieldQuery.parse(data);
+        } catch (RuntimeException e) {
+            LOGGER.warn("[Query] Failed to parse slot p={} loc=0x{} seq={}: {}",
+                    refresh.player(), Integer.toHexString(refresh.location()),
+                    refresh.sequence(), e.getMessage());
+            return;
+        }
+        listener.onMessage(new DuelMessage.UpdateCard(refresh.player(), refresh.location(),
+                refresh.sequence(), card));
     }
 
     /**
