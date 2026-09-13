@@ -65,6 +65,10 @@ public class LDLibDuelScreen {
     /** How long a HINT_ZONE flash and a HINT_CARD reveal stay up (edopro: 40 and 30 frames). */
     private static final long ZONE_FLASH_MS = 1000L;
     private static final long CARD_REVEAL_MS = 1500L;
+    /** How long the attack pair, an LP number and a turn/phase banner stay up (edopro: 40, 30 and 40 frames). */
+    private static final long ATTACK_MS = 1500L;
+    private static final long LP_DELTA_MS = 1000L;
+    private static final long BANNER_MS = 1200L;
 
     private static ClientDuelState activeState;
     private static ModularUI activeUI;
@@ -208,6 +212,7 @@ public class LDLibDuelScreen {
         private final UIElement titleLabel;
         private final UIElement turnPhaseLabel;
         private final UIElement statusLabel;
+        private final UIElement chainCountLabel;
 
         // Zone slots: [player 0/1][sequence]
         private final FieldRenderer field;
@@ -243,6 +248,21 @@ public class LDLibDuelScreen {
         private long zoneFlashStartedAt;
         private long cardRevealUntil;
 
+        // Feedback surfaces: the attack pair, the two floating LP numbers and the turn/phase banner.
+        // Each remembers the state timestamp it is showing, so a repeat restarts instead of being
+        // swallowed — the same trick the HINT_ZONE flash uses.
+        private final UIElement bannerLabel;
+        private final UIElement[] lpDeltaLabels = new UIElement[2];
+        private long attackShownAt;
+        private final long[] lpDeltaShownAt = new long[2];
+        private long bannerShownAt;
+
+        // Duel log panel
+        private final UIElement logPanel;
+        private final ScrollerView logList;
+        private final Button logToggle;
+        private final Button logClose;
+
         // Overlays
         private final UIElement cardInfoBanner;
         private final UIElement resultOverlay;
@@ -274,6 +294,17 @@ public class LDLibDuelScreen {
             titleLabel = byId("duel-title-label");
             turnPhaseLabel = byId("hud-turn-phase");
             statusLabel = byId("status-label");
+            chainCountLabel = byId("chain-count");
+            bannerLabel = byId("banner");
+            // The local player's LP bar is always the left one, so its number sits on the left.
+            lpDeltaLabels[0] = byId("lp-delta-0");
+            lpDeltaLabels[1] = byId("lp-delta-1");
+            addClassTo(lpDeltaLabels[plr], "lp-left");
+            addClassTo(lpDeltaLabels[opp], "lp-right");
+            logPanel = byId("duel-log");
+            logList = byId("duel-log-list", ScrollerView.class);
+            logToggle = byId("log-toggle", Button.class);
+            logClose = byId("duel-log-close", Button.class);
 
             // ── Field slots (owned by FieldRenderer) ──
             field = new FieldRenderer(ui, state, FieldLayout.fromFlags(state.duelFlags), new FieldRenderer.Callbacks() {
@@ -500,6 +531,7 @@ public class LDLibDuelScreen {
         private void onTick(UIEvent event) {
             disarmConcedeIfStale();
             updateHintSurfaces();
+            updateFeedbackSurfaces();
             if (!state.isDirty()) return;
             var flags = state.consumeDirtyFlags();
 
@@ -541,8 +573,17 @@ public class LDLibDuelScreen {
             if (flags.contains(DirtyFlag.TURN_PHASE))
                 updatePhaseButtons();
 
-            if (flags.contains(DirtyFlag.CHAIN))
+            if (flags.contains(DirtyFlag.CHAIN)) {
+                updateChainCount();
                 updateStatusLabel();
+            }
+            // Markers live on the zone slots, so a zone rebuild drops them: redraw whenever either
+            // the chain or a slot the chain could be sitting on has changed.
+            if (flags.contains(DirtyFlag.CHAIN) || (!state.chain.isEmpty() && flags.stream()
+                    .anyMatch(flag -> flag.name().startsWith("MZONE") || flag.name().startsWith("SZONE"))))
+                field.refreshChainMarkers();
+            if (flags.contains(DirtyFlag.LOG) && logPanel != null && !logPanel.hasClass("hidden"))
+                rebuildLog();
             if (flags.contains(DirtyFlag.WINNER))
                 showResultOverlay();
             if (flags.contains(DirtyFlag.CONFIRM))
@@ -624,6 +665,18 @@ public class LDLibDuelScreen {
             if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(message));
         }
 
+        /** Chain depth on its own element, so prompt captions and chain text stop overwriting each other. */
+        private void updateChainCount() {
+            if (chainCountLabel == null) return;
+            if (state.chain.isEmpty()) {
+                chainCountLabel.addClass("hidden");
+                return;
+            }
+            chainCountLabel.removeClass("hidden");
+            if (chainCountLabel instanceof Label lbl)
+                lbl.setText(Component.literal("Chain: " + state.chain.size()));
+        }
+
         private void updateStatusLabel() {
             if (statusLabel == null) return;
             if (state.rpsHand0 > 0 && state.rpsHand1 > 0) {
@@ -636,11 +689,9 @@ public class LDLibDuelScreen {
                 state.rpsHand1 = 0;
                 return;
             }
-            if (!state.chain.isEmpty()) {
-                statusLabel.removeClass("hidden");
-                if (statusLabel instanceof Label lbl)
-                    lbl.setText(Component.literal("Chain: " + state.chain.size()));
-            } else if (state.pendingPrompt == null && !state.isLocalTurn()) {
+            // A live prompt owns the label; PromptController wrote its caption there.
+            if (state.pendingPrompt != null) return;
+            if (!state.isLocalTurn()) {
                 statusLabel.removeClass("hidden");
                 if (statusLabel instanceof Label lbl)
                     lbl.setText(Component.literal("Waiting..."));
@@ -694,6 +745,48 @@ public class LDLibDuelScreen {
                     if (hintModal != null) hintModal.addClass("hidden");
                 });
             }
+            if (logToggle != null) {
+                logToggle.setOnClick(e -> {
+                    if (logPanel == null) return;
+                    if (logPanel.hasClass("hidden")) {
+                        logPanel.removeClass("hidden");
+                        rebuildLog();
+                    } else {
+                        logPanel.addClass("hidden");
+                    }
+                    e.stopPropagation();
+                });
+            }
+            if (logClose != null) {
+                logClose.setOnClick(e -> {
+                    if (logPanel != null) logPanel.addClass("hidden");
+                });
+            }
+        }
+
+        // ── Duel log panel ──
+
+        /** Rewrites the panel from {@link DuelLog}; only called while it is open. */
+        private void rebuildLog() {
+            if (logList == null) return;
+            logList.clearAllScrollViewChildren();
+            for (var entry : state.duelLog.entries()) {
+                var line = new Label();
+                line.addClass("log-line");
+                line.setText(Component.literal(entry.text()));
+                if (entry.code() != 0) {
+                    int code = entry.code();
+                    line.addEventListener(UIEvents.CLICK, e -> {
+                        showCardInfo(code);
+                        e.stopPropagation();
+                    });
+                }
+                logList.addScrollViewChild(line);
+            }
+        }
+
+        private static void addClassTo(UIElement element, String styleClass) {
+            if (element != null) element.addClass(styleClass);
         }
 
         // ── Hint surfaces (MSG_HINT), polled like the concede timer ──
@@ -742,6 +835,61 @@ public class LDLibDuelScreen {
             if (state.pendingModal != null && hintModal != null && hintModal.hasClass("hidden")) {
                 setLabelText(hintModalText, state.pendingModal);
                 hintModal.removeClass("hidden");
+            }
+        }
+
+        /**
+         * The three timed battle surfaces: the attack pair, the floating LP numbers and the
+         * turn/phase banner. Each is keyed on the timestamp the state recorded, so a repeated
+         * event restarts it rather than being swallowed by the one already up.
+         */
+        private void updateFeedbackSurfaces() {
+            long now = System.currentTimeMillis();
+
+            if (state.attack != null && state.attack.at() != attackShownAt) {
+                field.clearAttack();
+                field.showAttack(state.attack.attacker(), state.attack.target());
+                if (state.attack.target() == null) {
+                    // A direct attack is aimed at the player, so their LP bar takes the mark.
+                    int defender = 1 - state.attack.attacker().controller();
+                    (defender == state.localPlayer ? plrLpBar : oppLpBar).addClass("attacked");
+                }
+                attackShownAt = state.attack.at();
+            } else if (attackShownAt != 0 && now - attackShownAt > ATTACK_MS) {
+                field.clearAttack();
+                state.attack = null;
+                attackShownAt = 0;
+            }
+
+            for (int player = 0; player < 2; player++) {
+                UIElement label = lpDeltaLabels[player];
+                if (label == null) continue;
+                var delta = state.lpDelta[player];
+                if (delta != null && delta.at() != lpDeltaShownAt[player]) {
+                    label.removeClass("lp-damage");
+                    label.removeClass("lp-recover");
+                    label.removeClass("lp-cost");
+                    label.addClass(delta.styleClass());
+                    setLabelText(label, delta.text());
+                    label.removeClass("hidden");
+                    lpDeltaShownAt[player] = delta.at();
+                } else if (lpDeltaShownAt[player] != 0 && now - lpDeltaShownAt[player] > LP_DELTA_MS) {
+                    label.addClass("hidden");
+                    state.lpDelta[player] = null;
+                    lpDeltaShownAt[player] = 0;
+                }
+            }
+
+            if (bannerLabel != null) {
+                if (state.bannerText != null && state.bannerAt != bannerShownAt) {
+                    setLabelText(bannerLabel, state.bannerText);
+                    bannerLabel.removeClass("hidden");
+                    bannerShownAt = state.bannerAt;
+                } else if (bannerShownAt != 0 && now - bannerShownAt > BANNER_MS) {
+                    bannerLabel.addClass("hidden");
+                    state.bannerText = null;
+                    bannerShownAt = 0;
+                }
             }
         }
 

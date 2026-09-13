@@ -227,6 +227,122 @@
         display: none;
         }
 
+        /* ── Chain depth, on its own row so prompt captions keep the status label ── */
+        #chain-count {
+        position: absolute;
+        bottom: 62;
+        left: 0;
+        width: 100%;
+        font-size: 8;
+        text-color: #FF88FF;
+        horizontal-align: center;
+        }
+
+        #chain-count.hidden {
+        display: none;
+        }
+
+        /* ── Turn and phase banner (edopro's showcard 101 / phase card, about a second) ──
+           Below the field, above the chain count, so it covers no card and no button. */
+        #banner {
+        position: absolute;
+        bottom: 80;
+        left: 0;
+        width: 100%;
+        font-size: 14;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        padding-vertical: 3;
+        background: rect(#aa000000);
+        }
+
+        #banner.hidden {
+        display: none;
+        }
+
+        /* ── Floating LP number, under the LP bar of the player it belongs to.
+           Above the side panels, which both start at the same top edge. ── */
+        .lp-delta {
+        position: absolute;
+        top: 21;
+        width: 30%;
+        font-size: 12;
+        horizontal-align: center;
+        z-index: 5;
+        }
+
+        .lp-delta.lp-left {
+        left: 4;
+        }
+
+        .lp-delta.lp-right {
+        right: 4;
+        }
+
+        .lp-delta.lp-damage {
+        text-color: #FF4444;
+        }
+
+        .lp-delta.lp-recover {
+        text-color: #44FF44;
+        }
+
+        .lp-delta.lp-cost {
+        text-color: #6699FF;
+        }
+
+        .lp-delta.hidden {
+        display: none;
+        }
+
+        /* ── Duel log (over the card info banner, toggled from the HUD) ── */
+        #duel-log {
+        position: absolute;
+        left: 0;
+        top: 20;
+        bottom: 0;
+        width: 210;
+        flex-direction: column;
+        gap-all: 2;
+        padding-all: 4;
+        background: built-in(ui-gdp:RECT);
+        }
+
+        #duel-log.hidden {
+        width: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #duel-log-title {
+        height: 12;
+        font-size: 9;
+        text-color: #FFFFFF;
+        }
+
+        #duel-log-list {
+        flex: 1;
+        }
+
+        #duel-log-list .__scroller_view_view-container__ {
+        flex-direction: column;
+        gap-all: 1;
+        padding-all: 2;
+        }
+
+        .log-line {
+        width: 100%;
+        adaptive-height: true;
+        text-wrap: wrap;
+        font-size: 7;
+        text-color: #DDDDDD;
+        }
+
+        #log-toggle {
+        width: 28;
+        height: 14;
+        }
+
         /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
         .player-hints {
         position: absolute;
@@ -884,6 +1000,36 @@
         overlay: rect(#88FFFF00);
         }
 
+        /* ── Battle: the two ends of an attack, for about a second and a half ── */
+        .attacking {
+        overlay: rect(#66FF8800);
+        }
+
+        .attacked {
+        overlay: rect(#66FF0000);
+        }
+
+        /* ── Chain link number, drawn on the slot the effect triggered from ── */
+        .chain-marker {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        font-size: 5;
+        background: rect(#CC7722AA);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        .chain-marker.chain-solving {
+        background: rect(#CCFFAA00);
+        text-color: #000000;
+        }
+
+        .chain-marker.negated {
+        background: rect(#CCCC0000);
+        text-color: #FFDDDD;
+        }
+
         /* ── Card Action Context Menu ── */
         #context-menu {
         position: absolute;
@@ -933,6 +1079,7 @@
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
+            <button id="log-toggle" text="Log" />
             <button id="concede-btn" text="Concede" />
             <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
         </element>
@@ -1119,8 +1266,18 @@
         <!-- Status Label (chain / waiting overlay) -->
         <label id="status-label" class="hidden">Waiting...</label>
 
+        <!-- Chain depth, kept off the status label so prompt captions are not overwritten -->
+        <label id="chain-count" class="hidden">Chain: 1</label>
+
         <!-- Hint toast (one declaration hint at a time, a couple of seconds each) -->
         <label id="toast" class="hidden">Opponent declared: []</label>
+
+        <!-- Turn and phase banner (MSG_NEW_TURN / MSG_NEW_PHASE) -->
+        <label id="banner" class="hidden">Battle Phase</label>
+
+        <!-- Floating LP numbers, one per absolute player index -->
+        <label id="lp-delta-0" class="lp-delta hidden">-500</label>
+        <label id="lp-delta-1" class="lp-delta hidden">-500</label>
 
         <!-- Refcounted player hints (MSG_PLAYER_HINT), under each player's name -->
         <label id="plr-hints" class="player-hints" />
@@ -1154,6 +1311,15 @@
             </scroller-view>
             <text id="card-atk-def-label" class="card-label">ATK 2600 / DEF 2000</text>
             <text id="card-hints" class="card-label hidden" />
+        </element>
+
+        <!-- Duel log (left, toggled from the HUD; declared after the card info banner so it wins) -->
+        <element id="duel-log" class="hidden">
+            <label id="duel-log-title">Duel log</label>
+            <scroller-view id="duel-log-list">
+                <!-- Log lines added dynamically in Java -->
+            </scroller-view>
+            <button id="duel-log-close" text="Close" />
         </element>
 
         <!-- Zone Inspector (right, toggled by clicking a pile) -->

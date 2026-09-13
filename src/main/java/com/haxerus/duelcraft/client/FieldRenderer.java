@@ -6,6 +6,7 @@ import com.haxerus.duelcraft.client.FieldLayout.Side;
 import com.haxerus.duelcraft.client.FieldLayout.Zone;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
+import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
@@ -164,7 +165,8 @@ public class FieldRenderer {
                 .filter(c -> c.hasClass("card") || c.hasClass("card-back")
                         || c.hasClass("stat-atk-def") || c.hasClass("stat-level")
                         || c.hasClass("card-materials") || c.hasClass("card-counters")
-                        || c.hasClass("card-scales") || c.hasClass("card-turns"))
+                        || c.hasClass("card-scales") || c.hasClass("card-turns")
+                        || c.hasClass("chain-marker"))
                 .toList()
                 .forEach(slot::removeChild);
 
@@ -295,6 +297,10 @@ public class FieldRenderer {
         // Only show stats for monsters (check if QUERY_ATTACK was present in the flags)
         if ((stats.flags & QUERY_ATTACK) == 0) return;
 
+        // MSG_BATTLE's combat values win while the damage step lasts (duelclient.cpp:3805).
+        int attack = card.combatAttack != null ? card.combatAttack : stats.attack;
+        int defense = card.combatDefense != null ? card.combatDefense : stats.defense;
+
         boolean isOpp = player != state.localPlayer;
 
         CardDatabase db = DuelcraftClient.getCardDatabase();
@@ -306,17 +312,17 @@ public class FieldRenderer {
         var atkDefLabel = new Label();
         atkDefLabel.addClass("stat-atk-def");
         if (isOpp) atkDefLabel.addClass("opp");
-        String atkText = stats.attack == -2 ? "?" : String.valueOf(stats.attack);
+        String atkText = attack == -2 ? "?" : String.valueOf(attack);
         if (isLink) {
             atkDefLabel.setText(Component.literal(atkText));
         } else {
-            String defText = stats.defense == -2 ? "?" : String.valueOf(stats.defense);
+            String defText = defense == -2 ? "?" : String.valueOf(defense);
             atkDefLabel.setText(Component.literal(atkText + "/" + defText));
         }
 
         // Color based on buff/debuff (ATK takes priority)
-        if (stats.baseAttack > 0 && stats.attack != stats.baseAttack) {
-            if (stats.attack > stats.baseAttack) atkDefLabel.addClass("stat-buffed");
+        if (stats.baseAttack > 0 && attack != stats.baseAttack) {
+            if (attack > stats.baseAttack) atkDefLabel.addClass("stat-buffed");
             else atkDefLabel.addClass("stat-debuffed");
         }
         slot.addChild(atkDefLabel);
@@ -433,6 +439,50 @@ public class FieldRenderer {
             slot.removeClass("has-card");
             callbacks.clearPendingImage(slot);
         }
+    }
+
+    // ── Chain markers and the attack pair ───────────────────────────────────
+
+    /**
+     * Draws one numbered badge per chain link on the slot the effect triggered from, falling back
+     * to the activating card's own slot ({@code duelclient.cpp:3390-3397} draws the marker at the
+     * trigger location). A link triggered from the hand has no slot and is left unmarked.
+     */
+    public void refreshChainMarkers() {
+        for (UIElement slot : slots.values()) {
+            slot.getChildren().stream()
+                    .filter(child -> child.hasClass("chain-marker"))
+                    .toList()
+                    .forEach(slot::removeChild);
+        }
+        for (var link : state.chain) {
+            UIElement slot = slot(new Zone(side(link.trigController), link.trigLocation, link.trigSequence))
+                    .or(() -> slot(new Zone(side(link.location.controller()),
+                            link.location.location(), link.location.sequence())))
+                    .orElse(null);
+            if (slot == null) continue;
+            var marker = new Label();
+            marker.addClass("chain-marker");
+            if (link.solving) marker.addClass("chain-solving");
+            if (link.negated) marker.addClass("negated");
+            marker.setText(Component.literal(String.valueOf(link.chainIndex)));
+            slot.addChild(marker);
+        }
+    }
+
+    /** Marks both ends of an attack; a null {@code target} means it is aimed at the player. */
+    public void showAttack(LocInfo attacker, LocInfo target) {
+        slotAt(attacker).ifPresent(el -> el.addClass("attacking"));
+        if (target != null) slotAt(target).ifPresent(el -> el.addClass("attacked"));
+    }
+
+    public void clearAttack() {
+        ui.rootElement.select(".attacking").forEach(e -> e.removeClass("attacking"));
+        ui.rootElement.select(".attacked").forEach(e -> e.removeClass("attacked"));
+    }
+
+    private Optional<UIElement> slotAt(LocInfo loc) {
+        return slot(new Zone(side(loc.controller()), loc.location(), loc.sequence()));
     }
 
     // ── Highlighting ───────────────────────────────────────────────────────
