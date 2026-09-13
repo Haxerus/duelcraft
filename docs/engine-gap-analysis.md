@@ -18,16 +18,16 @@ This document supersedes sections 1 to 3 of `docs/engine-implementation-checklis
 | Never written by the core | 11 | `WAITING`, `START`, `UPDATE_DATA`, `UPDATE_CARD`, `REQUEST_DECK`, `REFRESH_DECK`, `UNEQUIP`, `BE_CHAIN_TARGET`, `CREATE_RELATION`, `RELEASE_RELATION`, `CUSTOM_MSG` (host-side or legacy constants) |
 | Written but unreachable in Duelcraft | 4 | `TAG_SWAP` (needs `duelist > 0`), `RELOAD_FIELD`, `AI_NAME`, `SHOW_HINT` (Debug library only) |
 | Messages a Duelcraft duel can actually receive | 80 | |
-| … parsed into a typed record | 80 | 74 exact, 5 partial, 1 incorrect (`SELECT_SUM`) |
+| … parsed into a typed record | 80 | all 80 exact |
 | … falling through to `Raw` | 0 | |
-| Prompt messages | 21 | 14 have a client UI (3 of those with verified response defects), 7 have none and wedge a real duel |
-| Non-prompt records delivered to the client | 50 | 22 handled (`Retry` and `Hint` defectively), 18 deliberate no-ops, 10 dropped by the `default` branch |
-| `QUERY_*` flags | 27 | 14 requested by the server, 19 parsed by `FieldQuery`, 7 skipped; 3 of 8 locations refreshed |
-| `OCG_*` API functions | 13 | 12 exposed to Java, 10 used in production; `QueryLocation`, `QueryField` unused |
-| Parser cases with a byte-level test | 66 / 72 | `SELECT_IDLECMD` and `SELECT_BATTLECMD` untested; `DuelMessageCodec` has zero tests |
-| edopro divergences (§12.6) | 44 | 17 host (routing, hiding, refresh, lobby), 12 client model, 15 prompt behaviours |
+| Prompt messages | 21 | all 21 have a client UI |
+| Non-prompt records delivered to the client | 62 | 56 handled, 6 deliberate no-ops (`Summoned`, `SpSummoned`, `FlipSummoned`, `Chained`, `ShuffleExtra`, `DamageStepStart`), 0 dropped; `applyMessage`'s `default` is reachable only by `Raw`, which nothing decodes to |
+| `QUERY_*` flags | 27 | 20 requested by the server, 26 parsed by `FieldQuery` (`QUERY_END` is the terminator), 6 never requested; 5 of 8 locations refreshed per `RefreshSchedule`: MZONE, SZONE, HAND, EXTRA, GRAVE |
+| `OCG_*` API functions | 13 | 12 exposed to Java, 11 used in production; `QueryField` unused |
+| Parser cases with a byte-level test | 66 / 72 | `SELECT_IDLECMD` and `SELECT_BATTLECMD` untested |
+| edopro divergences (§12.6) | 48 | 17 host (routing, hiding, refresh, lobby), 15 client model, 16 prompt behaviours; 40 closed on this branch, 8 open |
 
-**Verified defects that break gameplay** (details in §3): `SELECT_SUM` parse and response, battle-phase Activate action code, `MSG_RETRY` hiding the prompt, overlay moves never applied, `SELECT_DISFIELD` with count > 1, face-up-destination `MSG_MOVE` leaking hidden codes, seven prompts without UI, `ANNOUNCE_CARD` with no response path at all.
+**Verified defects that break gameplay** (details in §3): `SELECT_SUM` parse and response, battle-phase Activate action code, `MSG_RETRY` hiding the prompt, overlay moves never applied, `SELECT_DISFIELD` with count > 1, face-up-destination `MSG_MOVE` leaking hidden codes, seven prompts without UI, `ANNOUNCE_CARD` with no response path at all. All eight are closed on branch `engine-gap-fixes`.
 
 ---
 
@@ -69,7 +69,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 38  | `MSG_DECK_TOP`         | ✅ 14 sites                                                     | ✅                                                      | ✅       | ✅    | `u8 p, u32 offsetFromTop, u32 code, u32 pos` (13 bytes). Public information (reversed or revealed deck top); edopro broadcasts it to both players.                                                                     |
 | 39  | `MSG_SHUFFLE_EXTRA`    | ✅ `field.cpp:967`                                              | ⚠️ codes read and discarded by design                  | ✅ no-op | ✅    | `UpdateData(EXTRA)` rebuilds the list at every pause.                                                                                                                                                                  |
 | 42  | `MSG_CONFIRM_EXTRATOP` | ✅ `libduel.cpp:854`                                            | ✅                                                      | ✅       | ✅    | Byte-identical to `CONFIRM_DECKTOP`.                                                                                                                                          |
-| 90  | `MSG_DRAW`             | ✅ `operations.cpp:482`                                         | ✅                                                     | ✅       | ✅    | Engine writes `u32 code, u32 position` per card (not a top-bit flag). Parser reads both and drops `position`, the only signal that a reversed-deck draw is public.                                                     |
+| 90  | `MSG_DRAW`             | ✅ `operations.cpp:482`                                         | ✅                                                     | ✅       | ✅    | Engine writes `u32 code, u32 position` per card (not a top-bit flag). Parser keeps both, and `MessageSanitizer` uses `position` to leave a face-up (reversed-deck) draw visible to the opponent.                                                     |
 | 190 | `MSG_REMOVE_CARDS`     | ✅ `libduel.cpp:536-554`                                        | ✅                                                      | ✅       | ✅    | `u32 n (≤255), n×loc_info`, batched across messages.                                                                                                                        |
 
 ### 1.3 Card movement and position
@@ -141,6 +141,8 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 
 ### 1.7 Message parsing work items
 
+A ticked box describes the defect as it was; the tick means closed on branch `engine-gap-fixes`.
+
 - [x] Parse `MSG_CONFIRM_EXTRATOP` (42) by reusing the `CONFIRM_DECKTOP` body; route to the zone inspector.
 - [x] Parse `MSG_REVERSE_DECK` (37) as an empty record; track a `deckReversed` flag so `DECK_TOP` can render.
 - [x] Parse `MSG_DECK_TOP` (38): `u8 p, u32 offsetFromTop, u32 code, u32 pos`; sanitise for the opponent unless the position is face-up.
@@ -164,26 +166,26 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 
 | #   | Prompt                 | Parse                                                          | Response                                                                                                 | Client UI                                                                                                                                                                                  | AI                                                 | Validator                                                         | Tests                            |
 | --- | ---------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------- |
-| 10  | `SELECT_BATTLECMD`     | ✅                                                              | 🐞 client sends Activate as type 2 ("to Main Phase 2"); engine wants 0 (`playerop.cpp:56-66`)            | ✅ context menu + M2/EP buttons; `directAttack` flag unused                                                                                                                                 | ✅                                                  | ❌ none                                                            | ✅ / ✅                            |
-| 11  | `SELECT_IDLECMD`       | ✅                                                              | ✅ `(index << 16) \| type`                                                                                | ✅ shuffle-hand button when `canShuffle`; several effects on one card open the `desc` option dialog                                                                 | ✅                                                  | ❌ none                                                            | ✅ / ✅                            |
+| 10  | `SELECT_BATTLECMD`     | ✅                                                              | 🐞 client sends Activate as type 2 ("to Main Phase 2"); engine wants 0 (`playerop.cpp:56-66`)            | ✅ context menu + M2/EP buttons; `directAttack` flag unused                                                                                                                                 | ✅                                                  | ✅ `selectCmd`                                                     | ✅ / ✅                            |
+| 11  | `SELECT_IDLECMD`       | ✅                                                              | ✅ `(index << 16) \| type`                                                                                | ✅ shuffle-hand button when `canShuffle`; several effects on one card open the `desc` option dialog                                                                 | ✅                                                  | ✅ `selectCmd`                                                     | ✅ / ✅                            |
 | 12  | `SELECT_EFFECTYN`      | ✅                                                              | ✅                                                                                                        | ✅ desc resolved, prompt card highlighted on the field; card image and zone not shown                                                                                                                                             | ✅ yes                                              | ✅                                                                 | ✅ / ✅                            |
 | 13  | `SELECT_YESNO`         | ✅                                                              | ✅                                                                                                        | ✅                                                                                                                                                                                          | ✅ yes                                              | ✅                                                                 | ✅ / ✅                            |
 | 14  | `SELECT_OPTION`        | ✅ `u8` count                                                   | ✅                                                                                                        | ✅                                                                                                                                                                                          | ✅ index 0                                          | ✅                                                                 | ✅ / ✅                            |
 | 15  | `SELECT_CARD`          | ✅                                                              | ✅ type-0 list, `-1` cancel                                                                               | ⚠️ shared Cancel/Finish button, auto-submit at `max` or when every candidate is picked, field clicks blocked while the dialog is open; dialog mode has no names/stats | ⚠️ one card, ignores `min`                         | ✅                                                                 | ✅ / ✅                            |
 | 16  | `SELECT_CHAIN`         | ⚠️ `position` dropped                                          | ✅ `-1` decline                                                                                           | ✅ one image per card, several effects open the `desc` option dialog, hint 550/556; `speCount`/hint timings unused                                                      | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
-| 18  | `SELECT_PLACE`         | ✅                                                              | ✅ (engine always sends count 1)                                                                          | ✅ zone highlight; opponent EMZ bits never highlighted                                                                                                                                      | ✅                                                  | ⚠️ `zoneToBit` misses SZONE 6/7                                   | ✅ / ✅                            |
+| 18  | `SELECT_PLACE`         | ✅                                                              | ✅ (engine always sends count 1)                                                                          | ✅ zone highlight; opponent EMZ bits never highlighted                                                                                                                                      | ✅                                                  | ✅ `zoneToBit` covers SZONE 6/7                                   | ✅ / ✅                            |
 | 19  | `SELECT_POSITION`      | ✅                                                              | ✅                                                                                                        | ✅ card-image buttons, turned sideways for defense, card back for the face-down variants                                                                                                        | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
-| 20  | `SELECT_TRIBUTE`       | ✅                                                              | ✅                                                                                                        | ✅ auto-submit only at `max` cards; Finish once the summed tribute meets `min`, so over-tributing stays reachable                                                                                               | ⚠️ one card, ignores `min`                         | 🐞 checks card count where the engine checks the tribute sum      | ✅ / shared                       |
+| 20  | `SELECT_TRIBUTE`       | ✅                                                              | ✅                                                                                                        | ✅ auto-submit only at `max` cards; Finish once the summed tribute meets `min`, so over-tributing stays reachable                                                                                               | ⚠️ one card, ignores `min`                         | ✅ bounds the summed tribute count      | ✅ / shared                       |
 | 21  | `SORT_CHAIN`           | ✅ `u32` location                                               | ✅ bytes; javadoc describes the permutation backwards (`response[i]` is the destination rank of card `i`) | ✅                                                                                                                                                                                          | ✅ `-1` default                                     | ✅                                                                 | ✅ / ✅                            |
-| 22  | `SELECT_COUNTER`       | ✅                                                              | ✅ `u16[n]`                                                                                               | ✅                                                                                                                                                                                          | ⚠️ all from card 0 (hangs if card 0 holds too few) | ✅ (no per-card cap)                                               | ✅ / ✅                            |
-| 23  | `SELECT_SUM`           | ✅                                                             | ✅                                                                                                       | ✅                                                                                                                                                                                          | ✅                                                  | ❌ none                                                            | ✅ / ✅                            |
-| 24  | `SELECT_DISFIELD`      | ✅ own `SelectDisfield` record, keeps type 24 on the wire | ✅ `selectPlaces` sends `count` triples                                           | ✅ collects `count` zones, "become unusable" caption                                                                                                                             | ✅                                                  | ⚠️ single triple                                                  | ❌ / shared                       |
-| 25  | `SORT_CARD`            | ✅                                                              | ✅ (javadoc inverted)                                                                                     | ✅                                                                                                                                                                                          | ✅ `-1` default                                     | ✅                                                                 | ✅ / ✅                            |
-| 26  | `SELECT_UNSELECT_CARD` | ✅                                                              | ✅ `[1][index]`, `[-1]` finish                                                                            | ✅ per-click; caption shows the running count and `min`/`max`                                                                                                                                                   | ✅                                                  | 🐞 rejects legal unselect-list indices and `cancelable`-only `-1` | ✅ / ✅                            |
+| 22  | `SELECT_COUNTER`       | ✅                                                              | ✅ `u16[n]`                                                                                               | ✅                                                                                                                                                                                          | ✅ spread across the cards, capped per card | ✅ (no per-card cap)                                               | ✅ / ✅                            |
+| 23  | `SELECT_SUM`           | ✅                                                             | ✅                                                                                                       | ✅                                                                                                                                                                                          | ✅                                                  | ✅ `selectSum`                                                     | ✅ / ✅                            |
+| 24  | `SELECT_DISFIELD`      | ✅ own `SelectDisfield` record, keeps type 24 on the wire | ✅ `selectPlaces` sends `count` triples                                           | ✅ collects `count` zones, "become unusable" caption                                                                                                                             | ✅                                                  | ✅ `selectDisfield`, `count` triples                                                  | ✅ / ✅                       |
+| 25  | `SORT_CARD`            | ✅                                                              | ✅                                                                                     | ✅                                                                                                                                                                                          | ✅ `-1` default                                     | ✅                                                                 | ✅ / ✅                            |
+| 26  | `SELECT_UNSELECT_CARD` | ✅                                                              | ✅ `[1][index]`, `[-1]` finish                                                                            | ✅ per-click; caption shows the running count and `min`/`max`                                                                                                                                                   | ✅                                                  | ✅ unselect-list indices and `cancelable`-only `-1` accepted | ✅ / ✅                            |
 | 132 | `ROCK_PAPER_SCISSORS`  | ✅                                                              | ✅ `int32` 1..3                                                                                           | ✅                                                                                                                                                                                          | ✅ rock                                             | ✅                                                                 | ✅ / ✅                            |
 | 140 | `ANNOUNCE_RACE`        | ✅ `u64` mask                                                   | ✅ `int64`                                                                                                | ✅ checkbox grid, no OK button                                                                                                                                                              | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
 | 141 | `ANNOUNCE_ATTRIB`      | ✅ `u32` mask                                                   | ✅ `int32`                                                                                                | ✅ checkbox grid, no OK button                                                                                                                                                              | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
-| 142 | `ANNOUNCE_CARD`        | ✅ `u8 count` + `u64` opcodes                                    | ✅ `int32` code                                                                                           | ✅                                                                                                                | ✅ human declares for the AI (no server-side card DB in test mode) | ❌                                                                 | ✅ / ✅                            |
+| 142 | `ANNOUNCE_CARD`        | ✅ `u8 count` + `u64` opcodes                                    | ✅ `int32` code                                                                                           | ✅                                                                                                                | ✅ human declares for the AI (no server-side card DB in test mode) | ✅ `announceCard`                                                  | ✅ / ✅                            |
 | 143 | `ANNOUNCE_NUMBER`      | ✅                                                              | ✅ `int32` index                                                                                          | ✅ reuses `buildOptionPrompt`                                                                                                                                                               | ✅ index 0                                          | ✅                                                                 | ✅ / ✅                            |
 
 ### 2.1 Engine facts a future UI must respect
@@ -200,6 +202,8 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 - `SELECT_OPTION`, `SELECT_EFFECTYN`, `SELECT_YESNO`, `SELECT_POSITION`, `SELECT_SUM` have no cancel encoding.
 
 ### 2.2 Prompt work items
+
+A ticked box describes the defect as it was; the tick means closed on branch `engine-gap-fixes`.
 
 - [x] `SELECT_SUM`: fix `SumCard.read` to `code u32, con u8, loc u8, seq u32, position u32, sumParam u32` (§3.1); send indices into the selectable list only; honour `selectMode` and `value2`; fix `MessageParserTest.parseSelectSum` to encode the engine layout.
 - [x] `SELECT_BATTLECMD`: Activate must send type 0 (`ClientDuelState.buildBattleCmdActions`, `ClickDispatcher.getActionIconInfo`).
@@ -221,6 +225,8 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 ---
 
 ## 3. Verified correctness defects
+
+A ticked box describes the defect as it was; the tick means closed on branch `engine-gap-fixes`.
 
 Ranked by gameplay impact. Each was confirmed against the engine source at the cited lines.
 
@@ -254,7 +260,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] `QUERY_IS_HIDDEN` (`EFFECT_DARKNESS_HIDE`) is neither requested nor honoured.
 
 ### 3.7 Seven prompts have no UI
-- [x] `SelectCounter`, `SortCard`, `SortChain`, `AnnounceRace`, `AnnounceAttrib`, `AnnounceNumber`, `AnnounceCard` hit `PromptController.rebuild`'s `default`: a full-screen dimmed overlay titled with the class name, no buttons, no timeout. The only exit is `/duel forfeit`. In `/duel test` the solo AI masks all but `AnnounceCard` when the AI is the one prompted.
+- [x] `SelectCounter`, `SortCard`, `SortChain`, `AnnounceRace`, `AnnounceAttrib`, `AnnounceNumber` and `AnnounceCard` hit `PromptController.rebuild`'s `default`: a full-screen dimmed overlay titled with the class name, no buttons, no timeout. All seven have a UI now, and the ESC leave dialog with its Concede button is the way out of a prompt nothing can answer. In `/duel test` the solo AI masked all but `AnnounceCard` when the AI was the one prompted.
 
 ### 3.8 `ANNOUNCE_CARD` has no response path at all
 - [x] Not parsed (raw body), no `ResponseBuilder` method, no UI, no solo AI case. Any card-declaring effect (e.g. "Prohibition", "Mind Crush") wedges the duel for both human and AI.
@@ -266,24 +272,27 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [ ] `FieldRenderer.getFieldBit` bases the `SELECT_PLACE` bitmask on `localPlayer` rather than `sel.player()`; equal today because prompts only reach their target.
 - [x] `FieldRenderer.highlightValidPlaces` reads EMZ bits only from the viewer block (5/6); a prompt whose only legal zones are the opponent-side EMZ bits (21/22) shows nothing.
 - [x] `ConfirmDeckTop`/`ConfirmCards` reveal is overwritten by the next `PILE_COUNTS` refresh because `showConfirmCards` does not reset the inspected pile.
-- [ ] `OcgCoreTest` reads `MSG_WIN` as `u8 + u32`; the body is `u8 + u8`. Latent `BufferUnderflowException` if a test duel ends.
+- [x] `OcgCoreTest` reads `MSG_WIN` as `u8 + u32`; the body is `u8 + u8`. Latent `BufferUnderflowException` if a test duel ends.
 - [x] `card_database.cpp:49` comment describes the lscale/rscale bit ranges backwards; the code is right (lscale bits 24-31, rscale 16-23).
 
 ---
 
 ## 4. Wire codec (`DuelMessageCodec`)
 
+A ticked box describes the defect as it was; the tick means closed on branch `engine-gap-fixes`.
+
 - [x] Every one of the 74 records (73 typed + `Raw`) encodes and decodes; `encode` is an exhaustive switch over the sealed interface, so a new record without a codec arm fails compilation.
 - [x] `u64` fields (`desc`, hint data, `opParam`, race masks) travel as `long`.
 - [x] `location` bytes are read signed (§3.4); `SortableCard` is the only writer using a full `int`.
 - [x] `MSG_SELECT_DISFIELD` ships as type 18 (§3.5).
-- [ ] No version byte and no bound on `readByteArray` lengths.
+- [x] No bound on `readByteArray` lengths. Now capped at 1 MiB, tested at the boundary and on a negative length.
+- [ ] No version byte.
 - [x] `decode`'s `default -> Raw(type, readByteArray(buf))` is unreachable today and would mis-frame the buffer if it ever fired.
 - [x] Zero tests. A round-trip test over every record, including a `LocInfo` with location `0x84`, would have caught §3.4.
 
 ---
 
-## 5. Query pipeline (`DuelSession.sendFieldStats` → `FieldQuery` → `UpdateData`)
+## 5. Query pipeline (`RefreshSchedule` → `DuelSession.emitRefreshes` → `FieldQuery` → `UpdateData`/`UpdateCard`)
 
 ### 5.1 `QUERY_*` flag coverage
 
@@ -308,18 +317,20 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 | `IS_PUBLIC` | u8 | ✅ hand, pile, single | ✅ | server sanitiser only |
 | `LSCALE` / `RSCALE` | u32 | ✅ spell zone, hand, single | ✅ | ✅ scale badge on the slot |
 | `LINK` | u32 link + u32 marker | ✅ | ✅ | ❌ |
-| `IS_HIDDEN` | u8 | ✅ | ✅ | server sanitiser only |
-| `COVER` | u32 | ✅ | ✅ | ❌ |
+| `IS_HIDDEN` | u8 | ✅ monster zone, spell zone, hand, single | ✅ | server sanitiser only |
+| `COVER` | u32 | ✅ monster zone, spell zone, hand, single | ✅ | ❌ |
 | `END` | terminator | n/a | ✅ | |
 
 ### 5.2 Behaviour and gaps
+
+A ticked box describes the defect as it was; the tick means closed on branch `engine-gap-fixes`.
 
 - [x] Per-slot `OCG_DuelQuery` with `u16 size, u32 flag` blocks; `FieldQuery` resyncs on each block's declared size, so an unknown flag cannot shift later fields.
 - [x] Empty slot (`length == 0`) handled as `null`.
 - [x] Only `MZONE` (7 slots, hardcoded), `SZONE` (8, hardcoded) and `EXTRA` are refreshed, for both players, after **every** engine pause (≥30 JNI calls and 2 to 3 payloads per player per pause). `HAND`, `GRAVE`, `REMOVED`, `DECK`, `OVERLAY` are never refreshed; those piles live on `MOVE`/`DRAW` deltas alone. edopro refreshes per event: hand after `DRAW`, a single slot after `MOVE`/`POS_CHANGE` face-up, extra after `SHUFFLE_EXTRA`.
 - [x] `UpdateData` updates `mzoneStats`/`szoneStats` only; it never writes `code`/`position` back into `mzone[]`/`szone[]`, so movement-tracked state cannot self-heal. `szoneStats` is populated and never read.
 - [x] `UpdateData` is sent **after** the prompt it should precede (early-return path in `process()`). Now `RefreshSchedule.before(msg)` runs ahead of the message.
-- [ ] The empty-chain auto-pass `break`s out of the batch, discarding already-parsed trailing messages. Left as `break`: `OCG_DuelProcess` returns as soon as a processor unit needs an answer (`ocgapi.cpp:115-118`, `processor_visit.cpp:14-21`), so the prompt is always the last record of its batch and nothing trails it.
+- [x] The empty-chain auto-pass `break`s out of the batch, discarding already-parsed trailing messages. Left as `break`: `OCG_DuelProcess` returns as soon as a processor unit needs an answer (`ocgapi.cpp:115-118`, `processor_visit.cpp:14-21`), so the prompt is always the last record of its batch and nothing trails it.
 - [ ] `OCG_DuelQueryField` (full snapshot: `u32 flags`, per player `u32 lp`, 7 + 8 slot records, six pile counts, chain links) is exposed but unused. `QueryField` is the natural basis for reconnect/ESC-reopen resync. (`OCG_DuelQueryLocation` now backs every whole-location refresh.)
 - [x] `FieldQuery` stops silently on a truncated trailing block (`remaining() >= 6` guard) with no error for a missing `QUERY_END`. Now throws; the caller drops that one refresh.
 - [x] `FieldQuery.parse` is never run against real engine output; `OcgCoreTest` never calls `nDuelQuery`.
@@ -366,9 +377,9 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 
 | Recipient | Messages |
 |---|---|
-| Prompted player only, unsanitised | all 21 prompt records (correct: prompts only reach their target) |
+| Prompted player only, sanitised per recipient | all 21 prompt records (prompts only reach their target; `MessageSanitizer` zeroes the candidate codes the prompted player does not control) |
 | Both, sanitised per recipient | `Draw`, `Move`, `ShuffleHand`, `Set`, `UpdateData`, `UpdateCard`, `PosChange` |
-| Both, verbatim | everything else including `Retry`, `Hint`, `ConfirmCards`, `BecomeTarget`, `TossCoin/Dice`, and all `Raw` |
+| Both, or the recipients `MessageSanitizer.recipientsOf` names | everything else: `Retry` goes to the prompted player only, `Hint` by type, a deck or extra `ConfirmCards` to its target, `MissedEffect` to its controller; the rest reach both |
 | Converted | `Win` → `DuelEndPayload` to both, return 2 |
 
 ### 7.2 Gaps
@@ -392,7 +403,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 
 ## 8. Client state and rendering gaps
 
-Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structural gaps beyond the per-message rows:
+Non-prompt records: 56 handled, 6 deliberate no-ops, none dropped (§1). Structural gaps beyond the per-message rows:
 
 - [x] **Card object model.** edopro moves one card object between containers, so counters, equip links, targets and materials travel with it (§12.4). Duelcraft's parallel code/position arrays are the root cause of the `Swap`, overlay and counter gaps below.
 - [x] **Win/lose.** `DuelEndPayload` closes the screen at once; the win overlay code path is unreachable. Wanted: a result overlay with winner and reason, a concede button, and `LDLibDuelScreen.close()` on every exit so statics do not linger.
@@ -408,7 +419,7 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [x] **Pendulum scales** never shown (`LSCALE`/`RSCALE` not requested). Now requested for the spell zones and badged on the slot.
 - [x] **Card hints** (`CHINT_TURN` counters, `CHINT_DESC_ADD`) not shown. Now a badge and info-banner lines.
 - [x] **Hint captions**: prompt titles are hard-coded ("Select 1-1 card(s)") instead of `HINT_SELECTMSG`. Now the hint wins wherever edopro uses `select_hint`.
-- [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong. `extraPos[]` is filled only in the dead `Start` branch.
+- [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong.
 - [x] `Swap` handles MZONE↔MZONE only and does not move stats or overlays.
 - [ ] `Move.reason` ignored (no destroy/banish/return distinction).
 - [x] Battle sub-phases collapse to "Battle"; no phase-track widget. There is nothing to expand: all ten `MSG_NEW_PHASE` sites (`processor.cpp:2787, 2793, 2832, 2858, 3365, 3414, 3450, 3469, 3562, 3580`) announce only DRAW, STANDBY, MAIN1, BATTLE_START, MAIN2 and END, so `BATTLE_STEP`/`DAMAGE`/`DAMAGE_CAL`/`BATTLE` never reach the client. A phase-track widget is still open.
@@ -452,6 +463,8 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 
 ## 11. Recommended order
 
+Steps 1-10 are closed on branch `engine-gap-fixes`. Still open: match mode, composable `DUEL_*` flags, the per-turn time limit, `QueryField` resync, `MSG_START`-style deck counts for the opponent, and CI (`-PskipNative` plus `assumeTrue` on the data paths).
+
 1. **Unblock real duels.** §3.2 Activate code (two constants), §3.3 keep the prompt across `Retry` or validate before sending, §3.1 `SELECT_SUM` parse and indices, §3.5 `DISFIELD` count, `ANNOUNCE_CARD` response path plus solo AI case. Add edopro's `answered` guard and send-after-close so a double click cannot answer twice (§12.5). Each is small and each currently ends a duel.
 2. **Stop the leaks.** §3.6: the `MSG_MOVE` rule, `CONFIRM_CARDS` deck/extra routing, prompt candidate codes; route hints by type; keep face-up draws visible (§12.1).
 3. **Codec hardening.** Unsigned `location` bytes, keep type 24 on the wire, round-trip test for all 74 records.
@@ -488,7 +501,7 @@ edopro serialises each message once, sends it to the owning team, mutates the bu
 | `MSG_MATCH_KILL` | Only when `best_of > 1`, else nobody (`:1126-1132`). | Unparsed. | ➖ |
 | `MSG_RETRY` | Everyone, then the duel **ends** as a draw (`:836-842`, return 2 → `DuelEndProc`). | Broadcast; duel continues with the prompt hidden. | see §3.3 |
 | `MSG_WIN` | Everyone; match bookkeeping (`:890-901`). | Converted to `DuelEndPayload`. | ✅ |
-| `MSG_WAITING` | Synthesised by `WaitforResponse` (`:1326-1343`) to every duellist except the prompted one, with a time-limit packet. Not recorded. | Not synthesised. | ❌ |
+| `MSG_WAITING` | Synthesised by `WaitforResponse` (`:1326-1343`) to every duellist except the prompted one, with a time-limit packet. Not recorded. | Synthesised the same way, without the time-limit packet. | ✅ |
 | Everything else | Everyone verbatim, cached for late-joining spectators. | Everyone verbatim. | ✅ |
 
 Observers only ever receive the public projection: never prompts, `MSG_WAITING`, hint types 1/2/3/5, deck or extra `CONFIRM_CARDS`, or the timeout `MSG_WIN`.
@@ -541,7 +554,7 @@ edopro's client keeps one `ClientCard` object per card and moves the same object
 |---|---|---|---|
 | `MSG_RETRY` | Error modal (string 1434), nothing else (`duelclient.cpp:1348`). | Prompt hidden. | both wrong; §3.3 |
 | `MSG_HINT` | `SELECTMSG` → caption of the next prompt (`:1412`); `MESSAGE` → blocking modal; `OPSELECTED` → log + toast 1510/1512; `RACE`/`ATTRIB`/`CODE` → log + toast 1511; `NUMBER` → toast 1512; `CARD`/`EFFECT` → card reveal; `ZONE` → zone flash + log using the `SELECT_PLACE` bit layout; `EVENT` → nothing. | Same, minus the log lines and the `EFFECT` reveal. | ✅ |
-| `MSG_WAITING` | "Waiting..." (1390) in the hint line (`:1631`). | n/a (not synthesised). | ❌ |
+| `MSG_WAITING` | "Waiting..." (1390) in the hint line (`:1631`). | "Waiting for opponent..." on the status label until the client's own next prompt. | ✅ |
 | `MSG_START` | Creates blank face-down card objects for both decks and extras (`client_field.cpp:114-131`); "Duel Start" banner. | Counts only. | structural |
 | `MSG_CONFIRM_DECKTOP` / `EXTRATOP` | Writes the codes into the deck objects permanently (until a shuffle zeroes them); log 207 plus one line per card; slide-and-flip animation (`:2513`, `:2548`). | Zone inspector; `EXTRATOP` unparsed. | ⚠️ |
 | `MSG_CONFIRM_CARDS` | Sets codes; on-field/hand cards flip and highlight for 90 frames, deck/extra cards open the card panel; log 208 (`:2582`). | Zone inspector. | ⚠️ |
@@ -600,7 +613,7 @@ Plumbing edopro applies to every prompt (`duelclient.cpp`, `event_handler.cpp`, 
 
 ### 12.6 Divergence checklist
 
-Items already tracked in §3 are referenced, not repeated.
+Items already tracked in §3 are referenced, not repeated. A ticked box describes the defect as it was; the tick means closed on branch `engine-gap-fixes`.
 
 **Host**
 - [x] Zero the code of prompt candidates the prompted player does not control (`SELECT_CARD`, `SELECT_TRIBUTE`, `SELECT_UNSELECT_CARD`; `generic_duel.cpp:933-977`).
@@ -613,7 +626,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
 - [x] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
 - [ ] Take the full-information copy before sanitising and keep it for a future replay.
-- [x] Response gate: per-player pending-response state plus the responder-equals-prompted check edopro lacks (`:1284-1297`).
+- [x] Response gate: the responder-equals-prompted check edopro lacks (`:1284-1297`). `pendingPlayer` names the last prompted seat and is deliberately never cleared, because `MSG_RETRY` routing needs it after the response has been taken.
 - [x] Rock-paper-scissors before the duel and let the winner choose who goes first; make the first player engine player 0 (`:444-565`).
 - [ ] Synthesised start packet with both players' deck and extra counts from `OCG_DuelQueryCount` (`:696-721`).
 - [x] Deck legality at ready time per `CheckDeckSize`/`CheckDeckContent` (main and extra sizes and the copy limit only; banlist, alias collapsing, forbidden and extra-deck types need a server-side card database).
