@@ -135,10 +135,13 @@ public class PromptController {
 
     // ── Shared Cancel/Finish button ────────────────────────────────────────
 
-    /** Puts the shared button (and its dialog twin) in one of its three states. */
+    /**
+     * Puts the shared button in one of its three states. A dialog-mode prompt carries its own copy
+     * inside the dialog, and then the one under the field stays down so only one is on screen.
+     */
     private void setActionButton(ActionButton state, Runnable action) {
         actionButtonAction = state == ActionButton.HIDDEN ? null : action;
-        applyActionButton(promptActionBtn, state);
+        applyActionButton(promptActionBtn, dialogActionBtn != null ? ActionButton.HIDDEN : state);
         applyActionButton(dialogActionBtn, state);
     }
 
