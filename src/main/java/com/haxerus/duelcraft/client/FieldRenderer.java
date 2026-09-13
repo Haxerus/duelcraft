@@ -206,7 +206,9 @@ public class FieldRenderer {
 
             slot.addChild(cardVisual);
             addBadges(slot, card);
-            if (state.highlighted.contains(card) || !card.targetedBy.isEmpty()) slot.addClass("targeted");
+            // Only the transient highlight tints a slot. `targetedBy` is a persistent effect-target
+            // relation (card.cpp:2338-2347) that edopro reveals on hover, not as a standing tint.
+            if (state.highlighted.contains(card)) slot.addClass("targeted");
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
         } else {
             slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));

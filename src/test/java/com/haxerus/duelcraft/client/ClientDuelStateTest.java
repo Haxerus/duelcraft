@@ -197,6 +197,23 @@ class ClientDuelStateTest {
         assertTrue(state.hand[0].isEmpty());
     }
 
+    /** A material this client never tracked still has to land on the host, not vanish. */
+    @Test
+    void overlayAttachFromAnUnknownSourceStillReachesTheHost() {
+        var state = newState();
+        draw(state, 0, 11111);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+
+        // Source names an empty monster zone, so the card cannot be resolved.
+        move(state, 22222, new LocInfo(1, LOCATION_MZONE, 4, POS_FACEUP_ATTACK),
+                new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+
+        var host = state.mzone[0][0];
+        assertEquals(List.of(22222), codesOf(host.materials));
+        assertEquals(0, host.materials.getFirst().sequence);
+    }
+
     @Test
     void overlayDetachRenumbersTheSurvivingMaterials() {
         var state = newState();

@@ -710,10 +710,14 @@ public class ClientDuelState {
         if (card != null) return card;
         // Out-of-range sequence into a pile: fall back to the tail so the count stays honest.
         var list = pile(loc.controller(), loc.location());
-        if (list == null || list.isEmpty()) return null;
-        LOGGER.warn("[State] No card at p{} loc=0x{} seq={}; using the last one",
+        if (list != null && !list.isEmpty()) {
+            LOGGER.warn("[State] No card at p{} loc=0x{} seq={}; using the last one",
+                    loc.controller(), Integer.toHexString(loc.location()), loc.sequence());
+            return list.getLast();
+        }
+        LOGGER.warn("[State] No card at p{} loc=0x{} seq={}",
                 loc.controller(), Integer.toHexString(loc.location()), loc.sequence());
-        return list.getLast();
+        return null;
     }
 
     // ---- Move handling (edopro duelclient.cpp MSG_MOVE, :3044-3215) ----
@@ -726,7 +730,10 @@ public class ClientDuelState {
         if (card == null) {
             // A token appearing, or a card this client never saw. Nowhere to go means nothing to do.
             if (to.location() == 0) return;
-            place(new ClientCard(move.code(), to.controller(), to.location(), to.sequence(), to.position()), to);
+            ClientCard appeared = new ClientCard(move.code(), to.controller(),
+                    to.location(), to.sequence(), to.position());
+            if ((to.location() & LOCATION_OVERLAY) != 0) attachMaterial(appeared, to);
+            else place(appeared, to);
             return;
         }
         if (to.location() == 0) {
@@ -836,11 +843,18 @@ public class ClientDuelState {
     }
 
     /** Writes a query result onto a card, self-healing code and position when they are carried. */
-    private static void applyQuery(ClientCard card, QueriedCard query) {
+    private void applyQuery(ClientCard card, QueriedCard query) {
         if (card == null || query == null) return;
         card.stats = query;
-        if (query.code != 0) card.code = query.code;
-        if (query.position != 0) card.position = query.position;
+        boolean visualChanged = false;
+        if (query.code != 0 && query.code != card.code) {
+            card.code = query.code;
+            visualChanged = true;
+        }
+        if (query.position != 0 && query.position != card.position) {
+            card.position = query.position;
+            visualChanged = true;
+        }
         if ((query.flags & QUERY_OVERLAY_CARD) != 0) {
             for (int i = 0; i < Math.min(query.overlayCards.size(), card.materials.size()); i++) {
                 card.materials.get(i).code = query.overlayCards.get(i);
@@ -852,7 +866,10 @@ public class ClientDuelState {
             for (int packed : query.counters) {
                 card.counters.put(packed & 0xFFFF, (packed >>> 16) & 0xFFFF);
             }
+            visualChanged = true;
         }
+        // A corrected code, position or counter total changes what the slot draws, not just its stats.
+        if (visualChanged) markZoneDirty(card.controller, card.location);
     }
 
     // ---- Helpers for the UI ----
