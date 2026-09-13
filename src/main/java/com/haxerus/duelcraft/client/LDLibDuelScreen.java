@@ -472,6 +472,10 @@ public class LDLibDuelScreen {
 
             String localName = Minecraft.getInstance().getUser().getName();
 
+            // The bars fill against the LP this duel started with, not the XML's 8000 default.
+            plrLpBar.setMaxValue(state.startingLp[plr]);
+            oppLpBar.setMaxValue(state.startingLp[opp]);
+
             plrLpBar.bindDataSource(SupplierDataSource.of(
                     () -> (float) state.lp[plr]
             )).label(label -> label.bindDataSource(SupplierDataSource.of(
@@ -691,10 +695,11 @@ public class LDLibDuelScreen {
             }
             // A live prompt owns the label; PromptController wrote its caption there.
             if (state.pendingPrompt != null) return;
-            if (!state.isLocalTurn()) {
+            if (state.waitingForOpponent || !state.isLocalTurn()) {
                 statusLabel.removeClass("hidden");
                 if (statusLabel instanceof Label lbl)
-                    lbl.setText(Component.literal("Waiting..."));
+                    lbl.setText(Component.literal(state.waitingForOpponent
+                            ? ClientDuelState.WAITING_TEXT : "Waiting..."));
             } else {
                 statusLabel.addClass("hidden");
             }

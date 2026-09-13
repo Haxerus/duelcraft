@@ -83,6 +83,9 @@ public class ClientDuelState {
     // Life points per player
     public final int[] lp = new int[2];
 
+    // LP each player started with, from the start payload; the LP bars use it as their maximum.
+    public final int[] startingLp = new int[2];
+
     // Turn / phase
     public int currentTurn;
     public int currentPhase;
@@ -180,6 +183,12 @@ public class ClientDuelState {
     // Pending selection prompt (null = no prompt)
     public DuelMessage pendingPrompt;
 
+    /** MSG_WAITING: the opponent is answering a prompt of their own. Cleared by our next prompt. */
+    public boolean waitingForOpponent;
+
+    /** Status text for {@link #waitingForOpponent}, edopro's system string 1390. */
+    public static final String WAITING_TEXT = "Waiting for opponent...";
+
     // Last prompt record received, kept after pendingPrompt is cleared so MSG_RETRY can restore it.
     private DuelMessage lastPrompt;
 
@@ -208,6 +217,7 @@ public class ClientDuelState {
         pendingPrompt = msg;
         lastPrompt = msg;
         responseSent = false;
+        waitingForOpponent = false;
         // edopro spends select_hint on the prompt it captions (duelclient.cpp:2016); a prompt that
         // arrives without one falls back to its own text. Retry keeps the caption it was given.
         promptCaptionDesc = selectHint;
@@ -291,6 +301,8 @@ public class ClientDuelState {
         this.duelFlags = duelFlags;
         this.lp[0] = lp0;
         this.lp[1] = lp1;
+        this.startingLp[0] = lp0;
+        this.startingLp[1] = lp1;
         // Decks and extra decks start as blank face-down cards: codes arrive later (reveals, queries).
         for (int p = 0; p < 2; p++) {
             fillBlanks(deck[p], p, LOCATION_DECK, deckSize);
@@ -306,6 +318,11 @@ public class ClientDuelState {
     public void applyMessage(DuelMessage msg) {
         switch (msg) {
             // ---- System ----
+            case DuelMessage.Waiting ignored -> {
+                waitingForOpponent = true;
+                dirtyFlags.add(DirtyFlag.PROMPT);
+                LOGGER.debug("[State] Waiting for the opponent");
+            }
             case DuelMessage.Retry ignored -> {
                 responseSent = false;
                 pendingPrompt = lastPrompt;

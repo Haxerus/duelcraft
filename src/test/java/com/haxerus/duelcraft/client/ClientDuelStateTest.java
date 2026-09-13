@@ -853,4 +853,26 @@ class ClientDuelStateTest {
                 List.copyOf(state.banners));
         assertEquals("Battle", state.phaseName());
     }
+
+    // ---- MSG_WAITING (host-synthesised, never from the engine) ----
+
+    @Test
+    void waitingRaisesTheFlagAndRefreshesThePrompt() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Waiting());
+
+        assertTrue(state.waitingForOpponent);
+        assertTrue(state.consumeDirtyFlags().contains(ClientDuelState.DirtyFlag.PROMPT));
+    }
+
+    @Test
+    void ourNextPromptClearsTheWaitingFlag() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.Waiting());
+
+        state.applyMessage(new DuelMessage.SelectYesNo(0, 30L));
+
+        assertFalse(state.waitingForOpponent);
+    }
 }

@@ -201,9 +201,11 @@ public class PromptController {
         setActionButton(ActionButton.HIDDEN, null);
         if (state.pendingPrompt == null) {
             if (promptOverlay != null) promptOverlay.addClass("hidden");
-            if (statusLabel != null) statusLabel.addClass("hidden");
+            showWaitingOrHide();
             return;
         }
+        // Our own prompt takes the label back from MSG_WAITING; the builders that use it re-show it.
+        if (statusLabel != null) statusLabel.addClass("hidden");
 
         switch (state.pendingPrompt) {
             case DuelMessage.SelectIdleCmd ignored -> {
@@ -288,6 +290,17 @@ public class PromptController {
             }
             state.retryMessage = null;
         }
+    }
+
+    /** With no prompt of our own, MSG_WAITING owns the status label. */
+    private void showWaitingOrHide() {
+        if (statusLabel == null) return;
+        if (!state.waitingForOpponent) {
+            statusLabel.addClass("hidden");
+            return;
+        }
+        statusLabel.removeClass("hidden");
+        if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(ClientDuelState.WAITING_TEXT));
     }
 
     // ── Prompt builders ────────────────────────────────────────────────────
