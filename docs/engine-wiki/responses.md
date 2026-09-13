@@ -10,7 +10,7 @@ Only prompt messages consume `OCG_DuelSetResponse`. Responses are unframed byte 
 | `MSG_SELECT_IDLECMD` | same packing | type 0 summon, 1 special summon, 2 position, 3 monster set, 4 spell/trap set, 5 activate; 6 Battle Phase, 7 End Phase, 8 shuffle hand | [`SelectIdleCmd`](../../native/ygopro-core/playerop.cpp#L69) |
 | `MSG_SELECT_EFFECTYN`, `MSG_SELECT_YESNO` | `i32` 0 or 1 | no/yes | [`SelectEffectYesNo`](../../native/ygopro-core/playerop.cpp#L166), [`SelectYesNo`](../../native/ygopro-core/playerop.cpp#L189) |
 | `MSG_SELECT_OPTION` | `i32 index` | zero-based index into options | [`SelectOption`](../../native/ygopro-core/playerop.cpp#L205) |
-| `MSG_SELECT_CHAIN` | `i32 index`, or `-1` | `-1` declines only when `forced == 0` | [`SelectChain`](../../native/ygopro-core/playerop.cpp#L454) |
+| `MSG_SELECT_CHAIN` | `i32 index`, or `-1` | `-1` declines only when `forced == 0`; Duelcraft's Chain OFF and hold-C controls use this optional-only path through `ResponseValidator.selectChain` | [`SelectChain`](../../native/ygopro-core/playerop.cpp#L454) |
 | `MSG_SELECT_POSITION` | `i32 position` | exactly one of `1,2,4,8`, and present in offered mask | [`SelectPosition`](../../native/ygopro-core/playerop.cpp#L604) |
 | `MSG_ROCK_PAPER_SCISSORS` | `i32` 1..3 | hand value; core prompts players in sequence | [`RockPaperScissors`](../../native/ygopro-core/playerop.cpp#L1120) |
 | `MSG_ANNOUNCE_RACE` | `u64 mask` | subset of offered mask with the requested popcount | [`AnnounceRace`](../../native/ygopro-core/playerop.cpp#L916) |

@@ -91,6 +91,9 @@ public class ClientDuelState {
     public int currentPhase;
     public int turnCount;
 
+    // Per-duel preference; survives closing and reopening the screen.
+    public boolean chainPromptsEnabled = true;
+
     // Hands — one card object per held card (code 0 = hidden from this client)
     @SuppressWarnings("unchecked")
     public final List<ClientCard>[] hand = new List[]{ new ArrayList<>(), new ArrayList<>() };

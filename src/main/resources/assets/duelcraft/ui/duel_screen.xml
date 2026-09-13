@@ -184,11 +184,10 @@
 
         /* Controls grow upward beside the hand without moving the board or permanent buttons. */
         #duel-controls {
+        z-index: 10;
         position: absolute;
-        left: 100%;
-        bottom: 8;
-        margin-left: 4;
-        width: 64;
+        /* Java anchors this canvas-level layer to the field's right edge and hand baseline. */
+        width: 68;
         flex-direction: column;
         align-items: stretch;
         gap-all: 4;
@@ -203,6 +202,9 @@
 
         .duel-control-btn .__button_text__ {
         font-size: 8;
+        adaptive-width: false;
+        width: 100%;
+        margin-horizontal: 0;
         }
 
         #duel-controls-divider {
@@ -211,7 +213,7 @@
         background: rect(#4444AA);
         }
 
-        #shuffle-btn.hidden {
+        #shuffle-btn.hidden, #prompt-toggle-btn.hidden {
         display: none;
         }
 
@@ -809,6 +811,10 @@
         align-self: center;
         }
 
+        #prompt-overlay.inspection-hidden {
+        display: none;
+        }
+
         .prompt-btn .__button_text__ {
         font-size: 8;
         }
@@ -878,6 +884,7 @@
 
         /* ── Duel Result Overlay (shown when the duel ends) ── */
         #result-overlay {
+        z-index: 20;
         position: absolute;
         left: 0;
         top: 0;
@@ -926,6 +933,7 @@
 
         /* ── Hint Modal (HINT_MESSAGE; above the prompts, below the pause dialog) ── */
         #hint-modal {
+        z-index: 20;
         position: absolute;
         left: 0;
         top: 0;
@@ -963,6 +971,7 @@
 
         /* ── Pause Overlay (ESC while the duel is live; drawn above every other overlay) ── */
         #pause-overlay {
+        z-index: 20;
         position: absolute;
         left: 0;
         top: 0;
@@ -1362,12 +1371,15 @@
             <scroller-view id="player-hand" class="hand-row">
                 <!-- Hand cards are added dynamically in Java -->
             </scroller-view>
-            <element id="duel-controls">
-                <button id="shuffle-btn" class="duel-control-btn hidden" text="Shuffle" />
-                <button id="log-toggle" class="duel-control-btn" text="Log" />
-                <element id="duel-controls-divider" />
-                <button id="concede-btn" class="duel-control-btn" text="Concede" />
-            </element>
+        </element>
+
+        <element id="duel-controls">
+            <button id="shuffle-btn" class="duel-control-btn hidden" text="Shuffle" />
+            <button id="prompt-toggle-btn" class="duel-control-btn hidden" text="Hide Prompt" />
+            <button id="chain-toggle-btn" class="duel-control-btn" text="Chain: ON" />
+            <button id="log-toggle" class="duel-control-btn" text="Log" />
+            <element id="duel-controls-divider" />
+            <button id="concede-btn" class="duel-control-btn" text="Concede" />
         </element>
 
         <!-- ══════════ OVERLAYS (absolute positioned) ══════════ -->

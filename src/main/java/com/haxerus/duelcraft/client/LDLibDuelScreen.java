@@ -117,6 +117,10 @@ public class LDLibDuelScreen {
         }
     }
 
+    static void setChainSkipHeld(boolean held) {
+        if (refresher != null) refresher.chainSkipHeld = held;
+    }
+
     /**
      * A duel screen went away. Drops the statics unless the screen was replaced by a rebuild
      * ({@code /duel show}) or the duel is still live, so ESC after a result cannot leave them dangling.
@@ -173,6 +177,8 @@ public class LDLibDuelScreen {
      * never reaches the server; the prompt stays open for another try.
      */
     static void sendResponse(ClientDuelState state, Supplier<byte[]> builder) {
+        // Inspection must not submit a phase change, shuffle, or another field action.
+        if (refresher != null && refresher.state == state && refresher.prompt.isInspectingField()) return;
         byte[] response;
         try {
             response = builder.get();
@@ -231,6 +237,9 @@ public class LDLibDuelScreen {
         private final Button phaseBtnRight;
         // Shuffle hand: shown only while the idle command offers it (engine action type 8).
         private final Button shuffleBtn;
+        private final Button chainToggleBtn;
+        private final Button promptToggleBtn;
+        private boolean chainSkipHeld;
 
         // Concede opens the same confirmation dialog as ESC.
         private final Button concedeBtn;
@@ -342,6 +351,16 @@ public class LDLibDuelScreen {
             phaseBtnCenter = byId("phase-btn-center", Button.class);
             phaseBtnRight = byId("phase-btn-right", Button.class);
             shuffleBtn = byId("shuffle-btn", Button.class);
+            chainToggleBtn = byId("chain-toggle-btn", Button.class);
+            promptToggleBtn = byId("prompt-toggle-btn", Button.class);
+            // A sibling of the modal is needed for both drawing and hit testing above its dimmer.
+            var canvas = byId("duel-canvas");
+            var fieldArea = byId("field-area");
+            var controls = byId("duel-controls");
+            fieldArea.addEventListener(UIEvents.LAYOUT_CHANGED, e -> controls.layout(l -> l
+                    .left(fieldArea.getPositionX() - canvas.getPositionX() + fieldArea.getSizeWidth() + 4)
+                    .bottom(canvas.getPositionY() + canvas.getSizeHeight()
+                            - fieldArea.getPositionY() - fieldArea.getSizeHeight() + 8)));
 
             concedeBtn = byId("concede-btn", Button.class);
 
@@ -418,7 +437,6 @@ public class LDLibDuelScreen {
                     return cards != null ? cards.searchDeclarable(query, opcodes, DECLARABLE_SEARCH_LIMIT) : List.of();
                 }
             });
-            UIElement canvas = byId("duel-canvas");
             clicks = new ClickDispatcher(ui, state, prompt, canvas,
                     response -> LDLibDuelScreen.sendResponse(state, response));
 
@@ -427,6 +445,25 @@ public class LDLibDuelScreen {
 
             // ── Register tick handler for dirty-flag-driven updates ──
             ui.rootElement.addEventListener(UIEvents.TICK, this::onTick);
+            chainToggleBtn.getStyle().tooltips(Component.literal("Toggle optional chain prompts."),
+                    Component.literal("Hold C to skip temporarily."),
+                    Component.literal("Forced choices always appear."));
+            chainToggleBtn.setOnClick(e -> {
+                e.stopPropagation();
+                if (e.button == 0 && !isBlockingOverlayUp()) {
+                    state.chainPromptsEnabled = !state.chainPromptsEnabled;
+                    updatePromptControls();
+                }
+            });
+            promptToggleBtn.setOnClick(e -> {
+                e.stopPropagation();
+                if (e.button == 0 && !isBlockingOverlayUp()) {
+                    prompt.toggleInspection();
+                    if (prompt.isInspectingField()) modularUI.requestFocus(null);
+                    clicks.hideContextMenu();
+                    updatePromptControls();
+                }
+            });
 
             wirePhaseButtons();
             wireLifecycleButtons();
@@ -533,6 +570,9 @@ public class LDLibDuelScreen {
         private void onTick(UIEvent event) {
             updateHintSurfaces();
             updateFeedbackSurfaces();
+            if (state.winner < 0 && !isBlockingOverlayUp() && (!state.chainPromptsEnabled || chainSkipHeld))
+                prompt.skipOptionalChain();
+            updatePromptControls();
             if (!state.isDirty()) return;
             var flags = state.consumeDirtyFlags();
 
@@ -589,6 +629,15 @@ public class LDLibDuelScreen {
                 showResultOverlay();
             if (flags.contains(DirtyFlag.CONFIRM))
                 zoneInspector.showConfirmCards();
+            updatePromptControls();
+        }
+
+        private void updatePromptControls() {
+            chainToggleBtn.setText(Component.literal(chainSkipHeld ? "OFF (hold C)"
+                    : state.chainPromptsEnabled ? "Chain: ON" : "Chain: OFF"));
+            if (prompt.hasDialog()) promptToggleBtn.removeClass("hidden");
+            else promptToggleBtn.addClass("hidden");
+            promptToggleBtn.setText(Component.literal(prompt.isInspectingField() ? "Show Prompt" : "Hide Prompt"));
         }
 
         // ── Rebuilders ──
