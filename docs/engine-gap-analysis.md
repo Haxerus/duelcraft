@@ -18,8 +18,8 @@ This document supersedes sections 1 to 3 of `docs/engine-implementation-checklis
 | Never written by the core | 11 | `WAITING`, `START`, `UPDATE_DATA`, `UPDATE_CARD`, `REQUEST_DECK`, `REFRESH_DECK`, `UNEQUIP`, `BE_CHAIN_TARGET`, `CREATE_RELATION`, `RELEASE_RELATION`, `CUSTOM_MSG` (host-side or legacy constants) |
 | Written but unreachable in Duelcraft | 4 | `TAG_SWAP` (needs `duelist > 0`), `RELOAD_FIELD`, `AI_NAME`, `SHOW_HINT` (Debug library only) |
 | Messages a Duelcraft duel can actually receive | 80 | |
-| … parsed into a typed record | 70 | 64 exact, 5 partial, 1 incorrect (`SELECT_SUM`) |
-| … falling through to `Raw` | 10 | `SWAP_GRAVE_DECK`, `SHUFFLE_SET_CARD`, `REVERSE_DECK`, `DECK_TOP`, `CONFIRM_EXTRATOP`, `RANDOM_SELECTED`, `MISSED_EFFECT`, `PLAYER_HINT`, `MATCH_KILL`, `REMOVE_CARDS` |
+| … parsed into a typed record | 80 | 74 exact, 5 partial, 1 incorrect (`SELECT_SUM`) |
+| … falling through to `Raw` | 0 | |
 | Prompt messages | 21 | 14 have a client UI (3 of those with verified response defects), 7 have none and wedge a real duel |
 | Non-prompt records delivered to the client | 50 | 22 handled (`Retry` and `Hint` defectively), 18 deliberate no-ops, 10 dropped by the `default` branch |
 | `QUERY_*` flags | 27 | 14 requested by the server, 19 parsed by `FieldQuery`, 7 skipped; 3 of 8 locations refreshed |
@@ -52,25 +52,25 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 130 | `MSG_TOSS_COIN`    | ✅ `operations.cpp:6034, 6059`          | ✅ `u8 p, u8 n, u8[n]`                                               | ❌      | ✅    | Dropped by `default`.                                                                                                                                                                                                                                                                                                                            |
 | 131 | `MSG_TOSS_DICE`    | ✅ 4 sites                              | ✅ same shape; two-player rolls arrive as two messages               | ❌      | ❌    | Dropped.                                                                                                                                                                                                                                                                                                                                         |
 | 133 | `MSG_HAND_RES`     | ✅ `playerop.cpp:1151`                  | ✅ packed `u8 = h0 \| h1 << 2`                                       | ⚠️     | ✅    | Status text set via the `CHAIN` dirty flag and never cleared.                                                                                                                                                                                                                                                                                    |
-| 170 | `MSG_MATCH_KILL`   | ✅ `operations.cpp:609`                 | ❌                                                                   |        | ❌    | `u32 code`. Match play only; edopro reads it only when `best_of > 1`.                                                                                                                                                                                                                                                                            |
+| 170 | `MSG_MATCH_KILL`   | ✅ `operations.cpp:609`                 | ✅ `u32 code`                                                         | ⚠️ stored | ✅    | `u32 code`. Match play only; edopro reads it only when `best_of > 1`.                                                                                                                                                                                                                                                                            |
 
 ### 1.2 Deck, hand, reveals
 
 | #   | Message                | Core                                                           | Parse                                                  | Client  | Test | Notes                                                                                                                                                                                                                  |
 | --- | ---------------------- | -------------------------------------------------------------- | ------------------------------------------------------ | ------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 30  | `MSG_CONFIRM_DECKTOP`  | ✅ `libduel.cpp:832`                                            | ✅ `u8 p, u32 n, n×{u32 code, u8 con, u8 loc, u32 seq}` | ⚠️      | ✅    | Opens the zone inspector. `player` ignored (title never says whose deck); a later `PILE_COUNTS` refresh overwrites the list with the previously inspected pile.                                                        |
-| 31  | `MSG_CONFIRM_CARDS`    | ✅ 3 sites (`Duel.ConfirmCards`, reversed-deck draw, set-group) | ✅ same layout                                          | ⚠️      | ✅    | Same inspector issues.                                                                                                                                                                                                 |
-| 32  | `MSG_SHUFFLE_DECK`     | ✅ `field.cpp:987`                                              | ✅ `u8`                                                 | ✅ no-op | ✅    | Deck is count-only.                                                                                                                                                                                                    |
+| 30  | `MSG_CONFIRM_DECKTOP`  | ✅ `libduel.cpp:832`                                            | ✅ `u8 p, u32 n, n×{u32 code, u8 con, u8 loc, u32 seq}` | ✅      | ✅    | Opens the zone inspector, titled for the pile's owner, and writes the revealed codes onto the deck's card objects.                                                        |
+| 31  | `MSG_CONFIRM_CARDS`    | ✅ 3 sites (`Duel.ConfirmCards`, reversed-deck draw, set-group) | ✅ same layout                                          | ✅      | ✅    | Same inspector, titled for the owner of the revealed cards.                                                                                                                                                                                                 |
+| 32  | `MSG_SHUFFLE_DECK`     | ✅ `field.cpp:987`                                              | ✅ `u8`                                                 | ✅      | ✅    | Zeroes every deck card's code and orientation, as edopro does.                                                                                                                                                                                                    |
 | 33  | `MSG_SHUFFLE_HAND`     | ✅ `field.cpp:967`                                              | ✅ `u8 p, u32 n, u32[n]`                                | ✅       | ✅    | Codes zeroed for the opponent server-side.                                                                                                                                                                             |
 | 34  | `MSG_REFRESH_DECK`     | ➖ legacy                                                       |                                                        |         |      |                                                                                                                                                                                                                        |
-| 35  | `MSG_SWAP_GRAVE_DECK`  | ✅ `field.cpp:1048`                                             | ❌                                                      | ❌       | ❌    | `u8 p, u32 extraCount, u32 maskBytes, mask[]`. The middle `u32` is an Extra Deck count that edopro discards; the bitmask flags which swapped-in cards route to the Extra Deck. GY and deck piles desync when it fires. |
-| 36  | `MSG_SHUFFLE_SET_CARD` | ✅ `libduel.cpp:1404`, `operations.cpp:2958`                    | ❌                                                      | ❌       | ❌    | `u8 loc, u8 n, n×loc_info (old), n×loc_info`. The second block is a sparse XYZ-material-follow list (zeros in the set-group path), not new positions. Face-down cards desync when it fires.                            |
-| 37  | `MSG_REVERSE_DECK`     | ✅ `processor.cpp:4926`                                         | ❌                                                      | ❌       | ❌    | Empty body. Cheapest gap to close.                                                                                                                                                                                     |
-| 38  | `MSG_DECK_TOP`         | ✅ 14 sites                                                     | ❌                                                      | ❌       | ❌    | `u8 p, u32 offsetFromTop, u32 code, u32 pos` (13 bytes). Public information (reversed or revealed deck top); edopro broadcasts it to both players.                                                                     |
+| 35  | `MSG_SWAP_GRAVE_DECK`  | ✅ `field.cpp:1048`                                             | ✅                                                      | ✅       | ✅    | `u8 p, u32 extraCount, u32 maskBytes, mask[]`. The middle `u32` is an Extra Deck count that edopro discards; the bitmask flags which swapped-in cards route to the Extra Deck. |
+| 36  | `MSG_SHUFFLE_SET_CARD` | ✅ `libduel.cpp:1404`, `operations.cpp:2958`                    | ✅                                                      | ✅       | ✅    | `u8 loc, u8 n, n×loc_info (old), n×loc_info`. The second block is a sparse XYZ-material-follow list (zeros in the set-group path), not new positions.                                                                  |
+| 37  | `MSG_REVERSE_DECK`     | ✅ `processor.cpp:4926`                                         | ✅                                                      | ✅       | ✅    | Empty body. Toggles one global `deckReversed` flag, as edopro's.                                                                                                                                                                                     |
+| 38  | `MSG_DECK_TOP`         | ✅ 14 sites                                                     | ✅                                                      | ✅       | ✅    | `u8 p, u32 offsetFromTop, u32 code, u32 pos` (13 bytes). Public information (reversed or revealed deck top); edopro broadcasts it to both players.                                                                     |
 | 39  | `MSG_SHUFFLE_EXTRA`    | ✅ `field.cpp:967`                                              | ⚠️ codes read and discarded by design                  | ✅ no-op | ✅    | `UpdateData(EXTRA)` rebuilds the list at every pause.                                                                                                                                                                  |
-| 42  | `MSG_CONFIRM_EXTRATOP` | ✅ `libduel.cpp:854`                                            | ❌                                                      | ❌       | ❌    | Byte-identical to `CONFIRM_DECKTOP`; a `case` plus a record is the whole fix.                                                                                                                                          |
+| 42  | `MSG_CONFIRM_EXTRATOP` | ✅ `libduel.cpp:854`                                            | ✅                                                      | ✅       | ✅    | Byte-identical to `CONFIRM_DECKTOP`.                                                                                                                                          |
 | 90  | `MSG_DRAW`             | ✅ `operations.cpp:482`                                         | ✅                                                     | ✅       | ✅    | Engine writes `u32 code, u32 position` per card (not a top-bit flag). Parser reads both and drops `position`, the only signal that a reversed-deck draw is public.                                                     |
-| 190 | `MSG_REMOVE_CARDS`     | ✅ `libduel.cpp:536-554`                                        | ❌                                                      | ❌       | ❌    | `u32 n (≤255), n×loc_info`, batched across messages. Removed cards linger in `ClientDuelState`.                                                                                                                        |
+| 190 | `MSG_REMOVE_CARDS`     | ✅ `libduel.cpp:536-554`                                        | ✅                                                      | ✅       | ✅    | `u32 n (≤255), n×loc_info`, batched across messages.                                                                                                                        |
 
 ### 1.3 Card movement and position
 
@@ -88,7 +88,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 64 | `MSG_FLIPSUMMONING` | ✅ `operations.cpp:2373` | ✅ | ✅ | ❌ | |
 | 65 | `MSG_FLIPSUMMONED` | ✅ | ✅ empty | ✅ no-op | ❌ | |
 | 80 | `MSG_CARD_SELECTED` | ✅ `processor.cpp:2031` | ✅ `u32 n, n×loc_info` (no player byte) | ✅ | ❌ | Attack-target flow only. Highlights the named cards until the next prompt. |
-| 81 | `MSG_RANDOM_SELECTED` | ✅ `libgroup.cpp:326` | ❌ | ❌ | ❌ | `u8 p, u32 n, n×loc_info`. Random discards and targets get no reveal. |
+| 81 | `MSG_RANDOM_SELECTED` | ✅ `libgroup.cpp:326` | ✅ | ✅ | ✅ | `u8 p, u32 n, n×loc_info`. Highlights the picked cards until the next prompt. |
 | 83 | `MSG_BECOME_TARGET` | ✅ 3 sites | ✅ `u32 n, n×loc_info` | ✅ | ✅ | Highlights the targeted cards until the next prompt. |
 
 ### 1.4 Chains
@@ -102,7 +102,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 74 | `MSG_CHAIN_END` | ✅ | ✅ empty | ✅ | ✅ | |
 | 75 | `MSG_CHAIN_NEGATED` | ✅ `operations.cpp:36` | ✅ `u8` | ⚠️ no-op | ✅ | Negation invisible to the player. |
 | 76 | `MSG_CHAIN_DISABLED` | ✅ 2 sites | ✅ `u8` | ⚠️ no-op | ❌ | |
-| 120 | `MSG_MISSED_EFFECT` | ✅ `processor.cpp:4374` | ❌ | ❌ | ❌ | `loc_info, u32 code`. "Missed the timing" feedback. |
+| 120 | `MSG_MISSED_EFFECT` | ✅ `processor.cpp:4374` | ✅ | ⚠️ | ✅ | `loc_info, u32 code`. Highlights the card and logs it; no "missed the timing" toast yet. |
 | 121 | `MSG_BE_CHAIN_TARGET` | ➖ | | | | |
 | 122 | `MSG_CREATE_RELATION` | ➖ | | | | |
 | 123 | `MSG_RELEASE_RELATION` | ➖ | | | | |
@@ -132,7 +132,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 101 | `MSG_ADD_COUNTER` | ✅ `card.cpp:2241` | ✅ `u16 type, u8 con, u8 loc, u8 seq, u16 n` | ✅ | ✅ | Per-card counter map; the total is badged on the card. |
 | 102 | `MSG_REMOVE_COUNTER` | ✅ 4 sites | ✅ same | ✅ | ❌ | |
 | 160 | `MSG_CARD_HINT` | ✅ 5 sites | ✅ `loc_info, u8 type, u64 value` | ❌ | ❌ | `CHINT_TURN` counters, `CHINT_DESC_ADD/REMOVE` never shown. Scripts can emit types 0 to 5; 6 and 7 are engine-only. |
-| 165 | `MSG_PLAYER_HINT` | ✅ `field.cpp:1332-1402` | ❌ deliberately `Raw` | | ✅ asserts Raw | `u8 player, u8 type (PHINT_DESC_ADD 6 / REMOVE 7), u64 desc`. Emitted only as a side effect of `EFFECT_FLAG_PLAYER_TARGET \| EFFECT_FLAG_CLIENT_HINT` effects. |
+| 165 | `MSG_PLAYER_HINT` | ✅ `field.cpp:1332-1402` | ✅ | ⚠️ refcounted, no UI | ✅ | `u8 player, u8 type (PHINT_DESC_ADD 6 / REMOVE 7), u64 desc`. Emitted only as a side effect of `EFFECT_FLAG_PLAYER_TARGET \| EFFECT_FLAG_CLIENT_HINT` effects. |
 | 161 | `MSG_TAG_SWAP` | ➖ unreachable | | | | `field::tag_swap` returns early unless `OCG_NewCardInfo.duelist > 0`; Duelcraft always passes 0. |
 | 162 | `MSG_RELOAD_FIELD` | ➖ Debug only | | | | Only from `Debug.ReloadFieldEnd`. Same payload as `OCG_DuelQueryField` minus the id byte, so a resync could be synthesised from the query instead. |
 | 163 | `MSG_AI_NAME` | ➖ Debug only | | | | `u16 len, bytes, u8 0`. |
@@ -141,18 +141,18 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 
 ### 1.7 Message parsing work items
 
-- [ ] Parse `MSG_CONFIRM_EXTRATOP` (42) by reusing the `CONFIRM_DECKTOP` body; route to the zone inspector.
-- [ ] Parse `MSG_REVERSE_DECK` (37) as an empty record; track a `deckReversed` flag so `DECK_TOP` can render.
-- [ ] Parse `MSG_DECK_TOP` (38): `u8 p, u32 offsetFromTop, u32 code, u32 pos`; sanitise for the opponent unless the position is face-up.
-- [ ] Parse `MSG_RANDOM_SELECTED` (81): `u8 p, u32 n, n×loc_info`; flash the selected cards.
-- [ ] Parse `MSG_MISSED_EFFECT` (120): `loc_info, u32 code`; show a "missed timing" marker.
-- [ ] Parse `MSG_REMOVE_CARDS` (190): `u32 n, n×loc_info`; remove from client state.
-- [ ] Parse `MSG_SHUFFLE_SET_CARD` (36) and re-place face-down cards; treat the second block as an XYZ-material-follow list.
-- [ ] Parse `MSG_SWAP_GRAVE_DECK` (35): swap the GY list into the deck count and route bitmask-flagged cards to the Extra Deck.
-- [ ] Decide on `MSG_PLAYER_HINT` (165): parse `u8 player, u8 type, u64 desc` once a UI consumes it.
-- [ ] Parse `MSG_MATCH_KILL` (170) when match play exists.
+- [x] Parse `MSG_CONFIRM_EXTRATOP` (42) by reusing the `CONFIRM_DECKTOP` body; route to the zone inspector.
+- [x] Parse `MSG_REVERSE_DECK` (37) as an empty record; track a `deckReversed` flag so `DECK_TOP` can render.
+- [x] Parse `MSG_DECK_TOP` (38): `u8 p, u32 offsetFromTop, u32 code, u32 pos`; sanitise for the opponent unless the position is face-up.
+- [x] Parse `MSG_RANDOM_SELECTED` (81): `u8 p, u32 n, n×loc_info`; flash the selected cards.
+- [x] Parse `MSG_MISSED_EFFECT` (120): `loc_info, u32 code`; show a "missed timing" marker.
+- [x] Parse `MSG_REMOVE_CARDS` (190): `u32 n, n×loc_info`; remove from client state.
+- [x] Parse `MSG_SHUFFLE_SET_CARD` (36) and re-place face-down cards; treat the second block as an XYZ-material-follow list.
+- [x] Parse `MSG_SWAP_GRAVE_DECK` (35): swap the GY list into the deck count and route bitmask-flagged cards to the Extra Deck.
+- [x] Decide on `MSG_PLAYER_HINT` (165): parse `u8 player, u8 type, u64 desc` once a UI consumes it.
+- [x] Parse `MSG_MATCH_KILL` (170) when match play exists.
 - [x] Keep `MSG_DRAW`'s per-card `position` in the record.
-- [ ] Keep `position` in `SELECT_CHAIN` entries (needed for overlay-material chain options); `ActivatableCard` has no field for it.
+- [x] Keep `position` in `SELECT_CHAIN` entries (needed for overlay-material chain options); `ActivatableCard` has no field for it.
 - [x] Rename `Battle.atkDamage/defDamage` to destroy flags (naming only; layout is correct).
 - [ ] Delete the dead `MSG_START` and `MSG_UNEQUIP` parser cases, records, codec arms and client branches; delete `DuelMessage.UpdateCard` and its arms.
 
@@ -265,7 +265,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [ ] `ResponseValidator.zoneToBit` returns `-1` for SZONE 6/7 (pendulum zones), skipping validation.
 - [ ] `FieldRenderer.getFieldBit` bases the `SELECT_PLACE` bitmask on `localPlayer` rather than `sel.player()`; equal today because prompts only reach their target.
 - [x] `FieldRenderer.highlightValidPlaces` reads EMZ bits only from the viewer block (5/6); a prompt whose only legal zones are the opponent-side EMZ bits (21/22) shows nothing.
-- [ ] `ConfirmDeckTop`/`ConfirmCards` reveal is overwritten by the next `PILE_COUNTS` refresh because `showConfirmCards` does not reset the inspected pile.
+- [x] `ConfirmDeckTop`/`ConfirmCards` reveal is overwritten by the next `PILE_COUNTS` refresh because `showConfirmCards` does not reset the inspected pile.
 - [ ] `OcgCoreTest` reads `MSG_WIN` as `u8 + u32`; the body is `u8 + u8`. Latent `BufferUnderflowException` if a test duel ends.
 - [ ] `card_database.cpp:49` comment describes the lscale/rscale bit ranges backwards; the code is right (lscale bits 24-31, rscale 16-23).
 
@@ -607,7 +607,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] Send `MSG_CONFIRM_CARDS` only to the target player when the cards are in the deck or extra deck (`:985-1005`); §3.6.
 - [x] Adopt the `MSG_MOVE` hide predicate (`:1032-1033`); §3.6.
 - [x] Keep face-up draws visible to the opponent (`:1080-1084`).
-- [ ] Send `MSG_MISSED_EFFECT` to the controller only once parsed (`:1094-1098`).
+- [x] Send `MSG_MISSED_EFFECT` to the controller only once parsed (`:1094-1098`).
 - [ ] Synthesise `MSG_WAITING` for the non-prompted player (`:1326-1343`).
 - [x] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
 - [x] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
