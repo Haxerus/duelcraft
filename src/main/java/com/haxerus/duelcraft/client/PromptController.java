@@ -565,7 +565,7 @@ public class PromptController {
         for (int i = 0; i < sel.cards().size(); i++) {
             int idx = i;
             var cardInfo = sel.cards().get(i);
-            int code = cardInfo.code();
+            int code = state.candidateCode(cardInfo);
 
             var card = new UIElement();
             card.addClass("card");
@@ -938,7 +938,7 @@ public class PromptController {
 
         for (int i = 0; i < sel.selectableCards().size(); i++) {
             var cardInfo = sel.selectableCards().get(i);
-            int code = cardInfo.code();
+            int code = state.candidateCode(cardInfo);
             int index = i;
 
             var card = new UIElement();
@@ -955,7 +955,7 @@ public class PromptController {
 
         for (int i = 0; i < sel.unselectableCards().size(); i++) {
             var cardInfo = sel.unselectableCards().get(i);
-            int code = cardInfo.code();
+            int code = state.candidateCode(cardInfo);
             int index = i;
 
             var card = new UIElement();

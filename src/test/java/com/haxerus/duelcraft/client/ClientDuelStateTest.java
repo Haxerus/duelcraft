@@ -875,4 +875,74 @@ class ClientDuelStateTest {
 
         assertFalse(state.waitingForOpponent);
     }
+
+    // ---- Sanitised prompt candidates (code 0) are resolved from our own field state ----
+
+    /** A candidate in the opponent's graveyard: the server strips the code, the pile still knows it. */
+    @Test
+    void candidateCodeResolvesAStrippedCandidateFromAPile() {
+        var state = newState();
+        draw(state, 1, 11111);
+        move(state, 11111, new LocInfo(1, LOCATION_HAND, 0, 0),
+                new LocInfo(1, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK));
+
+        var stripped = new DuelMessage.CardInfo(0, 1, LOCATION_GRAVE, 0, 0);
+
+        assertEquals(11111, state.candidateCode(stripped));
+    }
+
+    /** A candidate that is an xyz material: location carries LOCATION_OVERLAY, position is the index. */
+    @Test
+    void candidateCodeResolvesAStrippedOverlayCandidate() {
+        var state = newState();
+        draw(state, 1, 11111, 22222);
+        move(state, 11111, new LocInfo(1, LOCATION_HAND, 0, 0),
+                new LocInfo(1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK));
+        move(state, 22222, new LocInfo(1, LOCATION_HAND, 0, 0),
+                new LocInfo(1, LOCATION_MZONE | LOCATION_OVERLAY, 2, 0));
+
+        var stripped = new DuelMessage.CardInfo(0, 1, LOCATION_MZONE | LOCATION_OVERLAY, 2, 0);
+
+        assertEquals(22222, state.candidateCode(stripped));
+    }
+
+    /** edopro overwrites only when the message carries a code (duelclient.cpp MSG_SELECT_CARD). */
+    @Test
+    void candidateCodeKeepsTheCodeTheMessageCarries() {
+        var state = newState();
+        draw(state, 1, 11111);
+        move(state, 11111, new LocInfo(1, LOCATION_HAND, 0, 0),
+                new LocInfo(1, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK));
+
+        assertEquals(22222, state.candidateCode(
+                new DuelMessage.CardInfo(22222, 1, LOCATION_GRAVE, 0, 0)));
+    }
+
+    /** A face-down card we never saw stays blank rather than borrowing a neighbour's code. */
+    @Test
+    void candidateCodeStaysZeroWhenTheSlotIsUnknown() {
+        var state = newState();
+
+        assertEquals(0, state.candidateCode(
+                new DuelMessage.CardInfo(0, 1, LOCATION_GRAVE, 3, 0)));
+    }
+
+    // ---- A highlighted card that leaves play drops its highlight ----
+
+    @Test
+    void aCardLeavingPlayDropsItsHighlight() {
+        var state = newState();
+        draw(state, 0, 11111);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        state.applyMessage(new DuelMessage.CardSelected(
+                List.of(new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK))));
+        assertEquals(1, state.highlighted.size());
+
+        // A token vanishing: to.location() == 0 means the card is gone for good.
+        move(state, 11111, new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK),
+                new LocInfo(0, 0, 0, 0));
+
+        assertTrue(state.highlighted.isEmpty());
+    }
 }

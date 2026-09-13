@@ -147,6 +147,31 @@ public class ClientDuelState {
         return list != null && sequence >= 0 && sequence < list.size() ? list.get(sequence) : null;
     }
 
+    /**
+     * The card at a location, materials included: {@code LOCATION_OVERLAY} in {@code location} makes
+     * {@code position} the material index ({@code card::get_info_location()}). Null when the slot is
+     * empty; no pile-tail fallback, so callers get the exact slot or nothing.
+     */
+    public ClientCard cardAt(int player, int location, int sequence, int position) {
+        if ((location & LOCATION_OVERLAY) == 0) return cardAt(player, location, sequence);
+        ClientCard host = cardAt(player, location & ~LOCATION_OVERLAY, sequence);
+        if (host == null) return null;
+        return position >= 0 && position < host.materials.size() ? host.materials.get(position) : null;
+    }
+
+    /**
+     * The code to draw for a prompt candidate. The server zeroes the code of every SELECT_CARD and
+     * SELECT_UNSELECT_CARD candidate the prompted player does not control ({@code MessageSanitizer},
+     * `generic_duel.cpp:933-977`); edopro's client resolves each candidate from its own field state
+     * and overwrites the code only when the message carries one (`duelclient.cpp` MSG_SELECT_CARD:
+     * {@code pcard = GetCard(c,l,s); if(code) pcard->SetCode(code);}).
+     */
+    public int candidateCode(DuelMessage.CardInfo info) {
+        if (info.code() != 0) return info.code();
+        ClientCard card = cardAt(info.controller(), info.location(), info.sequence(), info.position());
+        return card != null ? card.code : 0;
+    }
+
     /** The list backing a non-field location, or null for the field and unknown locations. */
     public List<ClientCard> pile(int player, int location) {
         return switch (location) {
@@ -1061,10 +1086,7 @@ public class ClientDuelState {
     private ClientCard resolveCard(LocInfo loc) {
         if (loc.location() == 0) return null;
         if ((loc.location() & LOCATION_OVERLAY) != 0) {
-            ClientCard host = cardAt(loc.controller(), loc.location() & ~LOCATION_OVERLAY, loc.sequence());
-            if (host == null) return null;
-            return loc.position() >= 0 && loc.position() < host.materials.size()
-                    ? host.materials.get(loc.position()) : null;
+            return cardAt(loc.controller(), loc.location(), loc.sequence(), loc.position());
         }
         ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
         if (card != null) return card;
@@ -1103,6 +1125,7 @@ public class ClientDuelState {
             detachEquips(card);
             clearCombat(card);
             removeFrom(card, from);
+            highlighted.remove(card);
             return;
         }
 
