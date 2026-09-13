@@ -18,7 +18,7 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /**
  * The feedback layer: two chain links marked on the slots they triggered from, the duel log open
- * from the HUD, and a floating LP number next to the damaged player's bar. The damage comes last
+ * from the control panel, and a floating LP number next to the damaged player's bar. The damage comes last
  * so the number is still up when the screenshot is taken.
  */
 @OnlyIn(Dist.CLIENT)

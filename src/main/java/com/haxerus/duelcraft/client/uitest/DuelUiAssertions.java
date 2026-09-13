@@ -30,7 +30,7 @@ public final class DuelUiAssertions {
         }
         if (ctx.el("#hint-modal").isVisible()) surface(ctx, "#hint-modal-dialog");
         if (ctx.el("#context-menu").isVisible()) surface(ctx, "#context-menu");
-        for (String id : new String[]{"card-info-banner", "zone-inspector", "duel-log"}) {
+        for (String id : new String[]{"card-info-banner", "zone-inspector", "duel-log", "duel-controls"}) {
             if (ctx.el("#" + id).isVisible()) surface(ctx, "#" + id);
         }
         for (var ref : ctx.all(".prompt-btn")) {

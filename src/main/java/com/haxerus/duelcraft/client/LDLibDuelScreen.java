@@ -58,8 +58,6 @@ public class LDLibDuelScreen {
             ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/duel_screen.xml");
     /** How many hits the ANNOUNCE_CARD search dialog lists at once. */
     private static final int DECLARABLE_SEARCH_LIMIT = 50;
-    /** How long the concede button stays armed after the first click. */
-    private static final long CONCEDE_CONFIRM_MS = 3000L;
     /** How long one hint toast stays up (edopro waits 40 frames, `duelclient.cpp:1427`). */
     private static final long TOAST_MS = 2500L;
     /** How long a HINT_ZONE flash and a HINT_CARD reveal stay up (edopro: 40 and 30 frames). */
@@ -234,9 +232,8 @@ public class LDLibDuelScreen {
         // Shuffle hand: shown only while the idle command offers it (engine action type 8).
         private final Button shuffleBtn;
 
-        // Concede: the first click arms the button, a second one within CONCEDE_CONFIRM_MS sends it.
+        // Concede opens the same confirmation dialog as ESC.
         private final Button concedeBtn;
-        private long concedeArmedAt;
 
         // Hint surfaces (MSG_HINT / MSG_CARD_HINT / MSG_PLAYER_HINT)
         private final UIElement toastLabel;
@@ -534,7 +531,6 @@ public class LDLibDuelScreen {
         // ── Tick handler: process dirty flags ──
 
         private void onTick(UIEvent event) {
-            disarmConcedeIfStale();
             updateHintSurfaces();
             updateFeedbackSurfaces();
             if (!state.isDirty()) return;
@@ -722,19 +718,10 @@ public class LDLibDuelScreen {
             };
         }
 
-        /** Concede sends nothing on the first click; the button says "Confirm?" until it goes stale. */
+        /** Lifecycle actions share the leave-duel confirmation dialog. */
         private void wireLifecycleButtons() {
             if (concedeBtn != null) {
-                concedeBtn.setOnClick(e -> {
-                    long now = System.currentTimeMillis();
-                    if (concedeArmedAt != 0 && now - concedeArmedAt <= CONCEDE_CONFIRM_MS) {
-                        sendConcede();
-                        disarmConcede();
-                    } else {
-                        concedeArmedAt = now;
-                        concedeBtn.setText(Component.literal("Confirm?"));
-                    }
-                });
+                concedeBtn.setOnClick(e -> togglePauseOverlay());
             }
             if (resultClose != null) {
                 resultClose.setOnClick(e -> {
@@ -806,7 +793,7 @@ public class LDLibDuelScreen {
             if (element != null) element.addClass(styleClass);
         }
 
-        // ── Hint surfaces (MSG_HINT), polled like the concede timer ──
+        // ── Hint surfaces (MSG_HINT), polled each tick ──
 
         /**
          * Drives the four timed hint surfaces from {@link ClientDuelState}: the toast queue, the
@@ -940,17 +927,6 @@ public class LDLibDuelScreen {
 
         private void hidePauseOverlay() {
             if (pauseOverlay != null) pauseOverlay.addClass("hidden");
-        }
-
-        private void disarmConcedeIfStale() {
-            if (concedeArmedAt != 0 && System.currentTimeMillis() - concedeArmedAt > CONCEDE_CONFIRM_MS) {
-                disarmConcede();
-            }
-        }
-
-        private void disarmConcede() {
-            concedeArmedAt = 0;
-            if (concedeBtn != null) concedeBtn.setText(Component.literal("Concede"));
         }
 
         private void showResultOverlay() {

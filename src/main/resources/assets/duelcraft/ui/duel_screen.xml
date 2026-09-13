@@ -182,18 +182,33 @@
         opacity: 0;
         }
 
-        /* Hand action outside the field's flow, so availability never moves the zones. */
-        #shuffle-btn {
+        /* Controls grow upward beside the hand without moving the board or permanent buttons. */
+        #duel-controls {
         position: absolute;
         left: 100%;
         bottom: 8;
         margin-left: 4;
-        width: 40;
+        width: 64;
+        flex-direction: column;
+        align-items: stretch;
+        gap-all: 4;
+        padding-all: 4;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        .duel-control-btn {
+        width: 100%;
         height: 20;
         }
 
-        #shuffle-btn .__button_text__ {
+        .duel-control-btn .__button_text__ {
         font-size: 8;
+        }
+
+        #duel-controls-divider {
+        height: 1;
+        margin-top: 2;
+        background: rect(#4444AA);
         }
 
         #shuffle-btn.hidden {
@@ -354,11 +369,6 @@
         text-wrap: wrap;
         font-size: 7;
         text-color: #DDDDDD;
-        }
-
-        #log-toggle {
-        width: 28;
-        height: 14;
         }
 
         /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
@@ -609,10 +619,6 @@
         horizontal-align: center;
         }
 
-        #concede-btn {
-        width: 44;
-        height: 14;
-        }
         /* ── Card Info Banner (left overlay) ── */
         #card-info-banner {
         position: absolute;
@@ -1177,8 +1183,6 @@
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
-            <button id="log-toggle" text="Log" />
-            <button id="concede-btn" text="Concede" />
             <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
         </element>
 
@@ -1356,7 +1360,12 @@
             <scroller-view id="player-hand" class="hand-row">
                 <!-- Hand cards are added dynamically in Java -->
             </scroller-view>
-            <button id="shuffle-btn" class="hidden" text="Shuffle" />
+            <element id="duel-controls">
+                <button id="shuffle-btn" class="duel-control-btn hidden" text="Shuffle" />
+                <button id="log-toggle" class="duel-control-btn" text="Log" />
+                <element id="duel-controls-divider" />
+                <button id="concede-btn" class="duel-control-btn" text="Concede" />
+            </element>
         </element>
 
         <!-- ══════════ OVERLAYS (absolute positioned) ══════════ -->
