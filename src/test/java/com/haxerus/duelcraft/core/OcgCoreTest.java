@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -411,6 +412,48 @@ class OcgCoreTest {
         OcgCore.nDestroyDuel(engine, duel2);
         duel = 0; // prevent AfterAll from double-destroying
         System.out.println("Destroy/recreate test passed");
+    }
+
+    /** The data reader reports a code it cannot find, once, through the Java log hook. */
+    @Test
+    @Order(11)
+    void testUnknownCardCodeIsReportedOnce() {
+        List<String> lines = Collections.synchronizedList(new ArrayList<>());
+        long[] seed = { 7, 7, 7, 7 };
+        long logDuel = OcgCore.nCreateDuel(engine, seed, DUEL_MODE_MR5, 8000, 5, 1, 8000, 5, 1);
+        assertNotEquals(0, logDuel, "Duel creation failed");
+        try {
+            OcgCore.setLogListener(lines::add);
+            OcgCore.setCurrentDuel("duel@test");
+            // 1 is not a real card code, so the engine's data reader finds nothing. Added twice
+            // to prove the warning is not repeated (the engine caches per duel, the bridge per engine).
+            OcgCore.nDuelNewCard(engine, logDuel, 0, 0, 1, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
+            OcgCore.nDuelNewCard(engine, logDuel, 0, 0, 1, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
+            OcgCore.nDuelProcess(engine, logDuel);
+        } finally {
+            OcgCore.setCurrentDuel(null);
+            OcgCore.setLogListener(null);
+            OcgCore.nDestroyDuel(engine, logDuel);
+        }
+
+        List<String> unknownCode = lines.stream()
+                .filter(line -> line.contains("card code 1 is not in the card database"))
+                .toList();
+        assertEquals(1, unknownCode.size(),
+                "Expected exactly one warning naming code 1, captured: " + lines);
+        assertTrue(unknownCode.getFirst().startsWith("[duel@test] "),
+                "Native log lines should carry the duel tag: " + unknownCode.getFirst());
+    }
+
+    /** A card database that cannot be opened fails loudly instead of returning a null handle. */
+    @Test
+    @Order(12)
+    void testCreateEngineWithUnreadableDatabaseThrows() {
+        String missing = "C:/duelcraft-no-such-card-database.cdb";
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> OcgCore.nCreateEngine(new String[]{ missing }, new String[0]));
+        assertTrue(thrown.getMessage().contains(missing),
+                "The exception should name the database that failed: " + thrown.getMessage());
     }
 
     // --- Helpers ---
