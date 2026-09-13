@@ -8,14 +8,20 @@ import com.haxerus.duelcraft.core.DuelEngine;
 import com.haxerus.duelcraft.core.DuelOptions;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.core.OcgCore;
+import com.haxerus.duelcraft.core.PlayerOptions;
 import com.haxerus.duelcraft.duel.DuelSession;
+import com.haxerus.duelcraft.duel.FirstTurnLobby;
 import com.mojang.logging.LogUtils;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -41,6 +47,9 @@ public class DuelManager {
     /** Outstanding challenges, target -> pending; entries expire after {@link DuelCommand#INVITE_TIMEOUT_MS}. */
     public Map<UUID, DuelCommand.PendingChallenge> duelInvites;
 
+    /** First-turn rolls in progress; both duellists map to the same roll. */
+    private final Map<UUID, FirstTurnRoll> firstTurnRolls = new HashMap<>();
+
     public static DuelManager get() { return instance; }
 
     public static void onServerStarting(ServerStartingEvent event) {
@@ -52,6 +61,11 @@ public class DuelManager {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         if (instance == null || !(event.getEntity() instanceof ServerPlayer player)) return;
         instance.handleLogout(player);
+    }
+
+    /** Expires first-turn rolls nobody finished; the invite timeout applies to each step. */
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (instance != null) instance.expireFirstTurnRolls();
     }
 
     public static void onServerStopped(ServerStoppedEvent event) {
@@ -100,7 +114,7 @@ public class DuelManager {
      * The player's deck is shuffled with {@code seed} and the AI's with {@code seed + 1}, so two
      * identical lists still produce different draws. Deck names are used only for logging.
      */
-    public void startSoloDuel(ServerPlayer player, long seed, DuelRule rule,
+    public void startSoloDuel(ServerPlayer player, long seed, DuelRule rule, PlayerOptions playerOptions,
                               Deck playerDeck, Deck aiDeck,
                               String playerDeckName, String aiDeckName) {
         if (playerToDuel.containsKey(player.getUUID())) {
@@ -108,7 +122,7 @@ public class DuelManager {
             return;
         }
 
-        DuelOptions options = DuelOptions.of(seed, rule);
+        DuelOptions options = DuelOptions.of(seed, rule, playerOptions);
         UUID duelId = UUID.randomUUID();
         var handler = new SoloDuelHandler(player, duelId);
         var session = new DuelSession(engine, options, handler);
@@ -118,8 +132,8 @@ public class DuelManager {
         soloHandlers.put(duelId, handler);
         duelSeats.put(duelId, new ServerPlayer[]{player, null});
 
-        LOGGER.info("Solo duel {}: seed={}, rule={}, player={}, aiDeck={}",
-                duelId, seed, rule.id(), playerDeckName, aiDeckName);
+        LOGGER.info("Solo duel {}: seed={}, rule={}, options={}, player={}, aiDeck={}",
+                duelId, seed, rule.id(), playerOptions, playerDeckName, aiDeckName);
 
         Deck shuffledPlayer = playerDeck.shuffled(seed);
         Deck shuffledAi = aiDeck.shuffled(seed + 1);
@@ -172,7 +186,7 @@ public class DuelManager {
     }
 
     /** Team 1 shuffles with {@code seed}, team 2 with {@code seed + 1}; see {@link #startSoloDuel}. */
-    public void startDuel(ServerPlayer p1, ServerPlayer p2, long seed, DuelRule rule,
+    public void startDuel(ServerPlayer p1, ServerPlayer p2, long seed, DuelRule rule, PlayerOptions playerOptions,
                           Deck team1Deck, Deck team2Deck,
                           String team1Name, String team2Name) {
         if (playerToDuel.containsKey(p1.getUUID()) || playerToDuel.containsKey(p2.getUUID())) {
@@ -180,7 +194,7 @@ public class DuelManager {
             return;
         }
 
-        DuelOptions options = DuelOptions.of(seed, rule);
+        DuelOptions options = DuelOptions.of(seed, rule, playerOptions);
         UUID duelId = UUID.randomUUID();
         var handler = new ServerDuelHandler(p1, p2, duelId);
         var session = new DuelSession(engine, options, handler);
@@ -190,8 +204,8 @@ public class DuelManager {
         playerToDuel.put(p2.getUUID(), duelId);
         duelSeats.put(duelId, new ServerPlayer[]{p1, p2});
 
-        LOGGER.info("Duel {}: seed={}, rule={}, decks=[{}, {}]",
-                duelId, seed, rule.id(), team1Name, team2Name);
+        LOGGER.info("Duel {}: seed={}, rule={}, options={}, first={}, decks=[{}, {}]",
+                duelId, seed, rule.id(), playerOptions, p1.getName().getString(), team1Name, team2Name);
 
         Deck shuffled1 = team1Deck.shuffled(seed);
         Deck shuffled2 = team2Deck.shuffled(seed + 1);
@@ -252,6 +266,8 @@ public class DuelManager {
         duelInvites.remove(playerUUID);
         duelInvites.values().removeIf(pending -> pending.challengerUUID().equals(playerUUID));
 
+        cancelFirstTurnRoll(playerUUID, player.getName().getString() + " disconnected.");
+
         UUID duelId = playerToDuel.get(playerUUID);
         if (duelId == null) return;
         int seat = seatOf(duelId, playerUUID);
@@ -286,6 +302,161 @@ public class DuelManager {
 
     public UUID getPlayerActiveDuel(ServerPlayer player) {
         return playerToDuel.get(player.getUUID());
+    }
+
+    // --- First-turn roll (edopro's pre-duel rock-paper-scissors, generic_duel.cpp:474-565) ---
+
+    /** One pending roll: the two duellists with everything the duel needs once they have answered. */
+    private static final class FirstTurnRoll {
+        final ServerPlayer[] players;
+        final Deck[] decks;
+        final String[] deckNames;
+        final long seed;
+        final DuelRule rule;
+        final PlayerOptions playerOptions;
+        final FirstTurnLobby.Hand[] hands = new FirstTurnLobby.Hand[2];
+        /** Seat that won the roll and picks who goes first; -1 while the hands are still coming in. */
+        int chooser = -1;
+        long promptedAtMillis = System.currentTimeMillis();
+
+        FirstTurnRoll(ServerPlayer p0, ServerPlayer p1, long seed, DuelRule rule, PlayerOptions playerOptions,
+                      Deck deck0, Deck deck1, String deckName0, String deckName1) {
+            this.players = new ServerPlayer[]{p0, p1};
+            this.decks = new Deck[]{deck0, deck1};
+            this.deckNames = new String[]{deckName0, deckName1};
+            this.seed = seed;
+            this.rule = rule;
+            this.playerOptions = playerOptions;
+        }
+
+        int seatOf(UUID playerUUID) {
+            return players[0].getUUID().equals(playerUUID) ? 0 : 1;
+        }
+    }
+
+    /** Whether the player is in a duel or still answering a first-turn roll. */
+    public boolean isBusy(ServerPlayer player) {
+        return playerToDuel.containsKey(player.getUUID()) || firstTurnRolls.containsKey(player.getUUID());
+    }
+
+    /** Rolls for the first turn; the duel starts once the winner has chosen who goes first. */
+    public void beginFirstTurnRoll(ServerPlayer challenger, ServerPlayer accepter, long seed, DuelRule rule,
+                                   PlayerOptions playerOptions, Deck challengerDeck, Deck accepterDeck,
+                                   String challengerDeckName, String accepterDeckName) {
+        var roll = new FirstTurnRoll(challenger, accepter, seed, rule, playerOptions,
+                challengerDeck, accepterDeck, challengerDeckName, accepterDeckName);
+        firstTurnRolls.put(challenger.getUUID(), roll);
+        firstTurnRolls.put(accepter.getUUID(), roll);
+        promptHands(roll);
+    }
+
+    /** A duellist throws their hand; equal hands are replayed, as edopro replays ties. */
+    public void submitHand(ServerPlayer player, FirstTurnLobby.Hand hand) {
+        var roll = firstTurnRolls.get(player.getUUID());
+        if (roll == null || roll.chooser >= 0) {
+            player.sendSystemMessage(Component.literal("No first-turn roll to answer."));
+            return;
+        }
+        int seat = roll.seatOf(player.getUUID());
+        if (roll.hands[seat] != null) {
+            player.sendSystemMessage(Component.literal("You already chose " + name(roll.hands[seat]) + "."));
+            return;
+        }
+        roll.hands[seat] = hand;
+        player.sendSystemMessage(Component.literal("You chose " + name(hand) + "."));
+        if (roll.hands[0] == null || roll.hands[1] == null) return;
+
+        for (int seatIndex = 0; seatIndex < 2; seatIndex++) {
+            roll.players[seatIndex].sendSystemMessage(Component.literal(
+                    "You: " + name(roll.hands[seatIndex]) + " vs " + name(roll.hands[1 - seatIndex])));
+        }
+
+        int winner = FirstTurnLobby.resolve(roll.hands[0], roll.hands[1]);
+        if (winner == FirstTurnLobby.TIE) {
+            promptHands(roll);
+            return;
+        }
+        roll.chooser = winner;
+        roll.promptedAtMillis = System.currentTimeMillis();
+        roll.players[winner].sendSystemMessage(Component.literal("You won the roll. Go first? ")
+                .append(button("Yes", "/duel first yes")).append(" ")
+                .append(button("No", "/duel first no")));
+        roll.players[1 - winner].sendSystemMessage(Component.literal(
+                roll.players[winner].getName().getString() + " won the roll and is choosing who goes first."));
+    }
+
+    /** The roll winner answers; whoever goes first becomes engine player 0 (generic_duel.cpp:547-565). */
+    public void submitFirstTurnChoice(ServerPlayer player, boolean goFirst) {
+        var roll = firstTurnRolls.get(player.getUUID());
+        if (roll == null || roll.chooser < 0 || roll.seatOf(player.getUUID()) != roll.chooser) {
+            player.sendSystemMessage(Component.literal("Nothing to choose right now."));
+            return;
+        }
+        int first = goFirst ? roll.chooser : 1 - roll.chooser;
+        int second = 1 - first;
+        removeRoll(roll);
+        for (ServerPlayer duellist : roll.players) {
+            duellist.sendSystemMessage(Component.literal(
+                    roll.players[first].getName().getString() + " goes first."));
+        }
+        startDuel(roll.players[first], roll.players[second], roll.seed, roll.rule, roll.playerOptions,
+                roll.decks[first], roll.decks[second], roll.deckNames[first], roll.deckNames[second]);
+    }
+
+    private void promptHands(FirstTurnRoll roll) {
+        roll.hands[0] = null;
+        roll.hands[1] = null;
+        roll.promptedAtMillis = System.currentTimeMillis();
+        for (ServerPlayer duellist : roll.players) {
+            duellist.sendSystemMessage(Component.literal("Rock-paper-scissors for the first turn: ")
+                    .append(button("Rock", "/duel hand rock")).append(" ")
+                    .append(button("Paper", "/duel hand paper")).append(" ")
+                    .append(button("Scissors", "/duel hand scissors")));
+        }
+    }
+
+    /** Drops rolls nobody answered in time, as {@link DuelCommand#INVITE_TIMEOUT_MS} drops invites. */
+    private void expireFirstTurnRolls() {
+        if (firstTurnRolls.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        for (FirstTurnRoll roll : new LinkedHashSet<>(firstTurnRolls.values())) {
+            if (now - roll.promptedAtMillis > DuelCommand.INVITE_TIMEOUT_MS) {
+                removeRoll(roll);
+                for (ServerPlayer duellist : roll.players) {
+                    if (!duellist.hasDisconnected()) {
+                        duellist.sendSystemMessage(Component.literal(
+                                "The first-turn roll timed out; the duel was cancelled."));
+                    }
+                }
+            }
+        }
+    }
+
+    /** Cancels the roll this player is in, if any, telling whoever is left why. */
+    private void cancelFirstTurnRoll(UUID playerUUID, String reason) {
+        var roll = firstTurnRolls.get(playerUUID);
+        if (roll == null) return;
+        removeRoll(roll);
+        for (ServerPlayer duellist : roll.players) {
+            if (!duellist.hasDisconnected()) {
+                duellist.sendSystemMessage(Component.literal(reason + " The duel was cancelled."));
+            }
+        }
+    }
+
+    private void removeRoll(FirstTurnRoll roll) {
+        for (ServerPlayer duellist : roll.players) firstTurnRolls.remove(duellist.getUUID());
+    }
+
+    private static String name(FirstTurnLobby.Hand hand) {
+        return hand.name().charAt(0) + hand.name().substring(1).toLowerCase(Locale.ROOT);
+    }
+
+    /** A chat button that runs {@code command} when clicked. */
+    private static Component button(String label, String command) {
+        return Component.literal("[" + label + "]").withStyle(style -> style
+                .withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
     }
 
     public DeckRegistry getDeckRegistry() { return deckRegistry; }
