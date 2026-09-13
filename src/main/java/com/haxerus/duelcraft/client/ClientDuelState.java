@@ -9,8 +9,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -83,45 +85,63 @@ public class ClientDuelState {
     public int currentPhase;
     public int turnCount;
 
-    // Hands — card codes per player (0 = unknown/face-down for opponent)
+    // Hands — one card object per held card (code 0 = hidden from this client)
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] hand = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] hand = new List[]{ new ArrayList<>(), new ArrayList<>() };
 
-    // Monster zones: [player][0-4 = main, 5-6 = EMZ] — card code, 0 = empty
-    public final int[][] mzone = new int[2][7];
-    public final int[][] mzonePos = new int[2][7];
+    // Monster zones: [player][0-4 = main, 5-6 = EMZ] — null = empty
+    public final ClientCard[][] mzone = new ClientCard[2][7];
 
-    // Spell/Trap zones: [player][0-4 = S/T, 5 = field zone] — card code, 0 = empty
-    public final int[][] szone = new int[2][8];     // 0-4: S/T, 5: field spell, 6-7: pendulum zones
-    public final int[][] szonePos = new int[2][8];
+    // Spell/Trap zones: [player][0-4 = S/T, 5 = field spell, 6-7 = pendulum] — null = empty
+    public final ClientCard[][] szone = new ClientCard[2][8];
 
-    // Per-zone card stats (updated by MSG_UPDATE_DATA/CARD)
-    public final QueriedCard[][] mzoneStats = new QueriedCard[2][7];
-    public final QueriedCard[][] szoneStats = new QueriedCard[2][8];
-
-    // Deck — count only (face-down, not browsable)
-    public final int[] deckCount = new int[2];
-
-    // Extra deck, graveyard, banished — full card lists (browsable in UI)
+    // Deck, extra deck, graveyard, banished — card lists; the deck holds blank face-down cards
+    // from the start payload so deck-top reveals have objects to write codes into.
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] extra = new List[]{ new ArrayList<>(), new ArrayList<>() };
-    // Parallel to extra[]: position bits per card. Face-up pendulums returning from field
-    // get POS_FACEUP_*; regular extra deck entries are face-down.
+    public final List<ClientCard>[] deck = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] extraPos = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] extra = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] grave = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] grave = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] banished = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] banished = new List[]{ new ArrayList<>(), new ArrayList<>() };
 
-    // Overlay (XYZ material) cards — keyed by monster zone: [player][sequence] -> list of material codes
-    @SuppressWarnings("unchecked")
-    public final List<Integer>[][] overlay = new List[2][7];
+    // Zones the engine has disabled, as a 16-bit mask per absolute player (MSG_FIELD_DISABLED).
+    // Bit layout matches SelectPlace: monster zones 0-6, spell/trap zones 8-15.
+    public final int[] disabledZones = new int[2];
+
+    // Cards the engine just targeted or selected; cleared when the next prompt arrives.
+    public final Set<ClientCard> highlighted = new LinkedHashSet<>();
 
     // Convenience accessors for pile counts (derived from list size)
+    public int deckCount(int player) { return deck[player].size(); }
     public int extraCount(int player) { return extra[player].size(); }
     public int graveCount(int player) { return grave[player].size(); }
     public int banishedCount(int player) { return banished[player].size(); }
+
+    /** The card occupying a field zone or sitting at {@code sequence} of a pile, or null. */
+    public ClientCard cardAt(int player, int location, int sequence) {
+        if (location == LOCATION_MZONE) {
+            return sequence >= 0 && sequence < mzone[player].length ? mzone[player][sequence] : null;
+        }
+        if (location == LOCATION_SZONE) {
+            return sequence >= 0 && sequence < szone[player].length ? szone[player][sequence] : null;
+        }
+        var list = pile(player, location);
+        return list != null && sequence >= 0 && sequence < list.size() ? list.get(sequence) : null;
+    }
+
+    /** The list backing a non-field location, or null for the field and unknown locations. */
+    public List<ClientCard> pile(int player, int location) {
+        return switch (location) {
+            case LOCATION_HAND -> hand[player];
+            case LOCATION_DECK -> deck[player];
+            case LOCATION_EXTRA -> extra[player];
+            case LOCATION_GRAVE -> grave[player];
+            case LOCATION_REMOVED -> banished[player];
+            default -> null;
+        };
+    }
 
     // Current chain links
     public final List<ChainLink> chain = new ArrayList<>();
@@ -157,6 +177,7 @@ public class ClientDuelState {
         pendingPrompt = msg;
         lastPrompt = msg;
         responseSent = false;
+        clearHighlights();
     }
 
     // MSG_SELECT_BATTLECMD action types (playerop.cpp select_battle_command).
@@ -220,19 +241,13 @@ public class ClientDuelState {
         this.duelFlags = duelFlags;
         this.lp[0] = lp0;
         this.lp[1] = lp1;
-        this.deckCount[0] = deckSize;
-        this.deckCount[1] = deckSize;
-        // Extra deck: codes unknown at start, use 0 as placeholder
-        for (int i = 0; i < extraSize; i++) {
-            extra[0].add(0);
-            extra[1].add(0);
+        // Decks and extra decks start as blank face-down cards: codes arrive later (reveals, queries).
+        for (int p = 0; p < 2; p++) {
+            fillBlanks(deck[p], p, LOCATION_DECK, deckSize);
+            fillBlanks(extra[p], p, LOCATION_EXTRA, extraSize);
         }
-        // Init overlay lists for each monster zone
-        for (int p = 0; p < 2; p++)
-            for (int s = 0; s < 7; s++)
-                overlay[p][s] = new ArrayList<>();
         LOGGER.debug("[State] Init: localPlayer={}, LP={}|{}, deck={}|{}, extra={}|{}",
-                localPlayer, lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
+                localPlayer, lp[0], lp[1], deckCount(0), deckCount(1), extraCount(0), extraCount(1));
     }
 
     /**
@@ -265,16 +280,16 @@ public class ClientDuelState {
                 lp[0] = start.lp0();
                 lp[1] = start.lp1();
                 startingLP = Math.max(lp[0], lp[1]);
-                deckCount[0] = start.deckCount0();
-                deckCount[1] = start.deckCount1();
-                // Reset extra deck lists to new size (codes unknown, placeholder 0)
-                extra[0].clear();
-                extra[1].clear();
-                for (int i = 0; i < start.extraCount0(); i++) { extra[0].add(0); extraPos[0].add(POS_FACEDOWN_DEFENSE); }
-                for (int i = 0; i < start.extraCount1(); i++) { extra[1].add(0); extraPos[1].add(POS_FACEDOWN_DEFENSE); }
+                // Reset the deck and extra deck lists to the announced sizes (codes still unknown).
+                deck[0].clear(); deck[1].clear();
+                extra[0].clear(); extra[1].clear();
+                fillBlanks(deck[0], 0, LOCATION_DECK, start.deckCount0());
+                fillBlanks(deck[1], 1, LOCATION_DECK, start.deckCount1());
+                fillBlanks(extra[0], 0, LOCATION_EXTRA, start.extraCount0());
+                fillBlanks(extra[1], 1, LOCATION_EXTRA, start.extraCount1());
                 dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
-                        lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
+                        lp[0], lp[1], deckCount(0), deckCount(1), extraCount(0), extraCount(1));
             }
             case DuelMessage.Win win -> applyResult(win.winner(), win.reason());
             case DuelMessage.NewTurn nt -> {
@@ -291,11 +306,19 @@ public class ClientDuelState {
 
             // ---- Card Movement ----
             case DuelMessage.Draw draw -> {
-                for (var card : draw.cards()) hand[draw.player()].add(card.code());
-                deckCount[draw.player()] -= draw.cards().size();
-                dirtyFlags.add(handFlag(draw.player()));
+                int p = draw.player();
+                for (var drawn : draw.cards()) {
+                    // edopro writes the code onto the deck-top object and then moves it to the hand.
+                    ClientCard card = deck[p].isEmpty()
+                            ? new ClientCard(0, p, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE)
+                            : deck[p].removeLast();
+                    card.code = drawn.code();
+                    putAt(card, p, LOCATION_HAND, hand[p].size());
+                }
+                renumber(deck[p]);
+                dirtyFlags.add(handFlag(p));
                 dirtyFlags.add(DirtyFlag.PILE_COUNTS);
-                LOGGER.debug("[State] Draw: player={}, cards={}", draw.player(), draw.cards());
+                LOGGER.debug("[State] Draw: player={}, cards={}", p, draw.cards());
             }
             case DuelMessage.Move move -> {
                 LOGGER.debug("[State] Move: code={}, from=[p{} loc=0x{} seq={}] to=[p{} loc=0x{} seq={} pos=0x{}], reason=0x{}",
@@ -304,41 +327,54 @@ public class ClientDuelState {
                         move.to().controller(), Integer.toHexString(move.to().location()), move.to().sequence(),
                         Integer.toHexString(move.to().position()), Integer.toHexString(move.reason()));
                 applyMove(move);
-                markLocationDirty(move.from());
-                markLocationDirty(move.to());
+                markZoneDirty(move.from().controller(), move.from().location());
+                markZoneDirty(move.to().controller(), move.to().location());
             }
             case DuelMessage.PosChange pc -> {
-                if (pc.location() == LOCATION_MZONE) {
-                    if (pc.code() != 0) mzone[pc.controller()][pc.sequence()] = pc.code();
-                    mzonePos[pc.controller()][pc.sequence()] = pc.newPosition();
-                    dirtyFlags.add(mzoneFlag(pc.controller()));
-                } else if (pc.location() == LOCATION_SZONE) {
-                    if (pc.code() != 0) szone[pc.controller()][pc.sequence()] = pc.code();
-                    szonePos[pc.controller()][pc.sequence()] = pc.newPosition();
-                    dirtyFlags.add(szoneFlag(pc.controller()));
+                ClientCard card = cardAt(pc.controller(), pc.location(), pc.sequence());
+                if (card != null) {
+                    if ((pc.prevPosition() & POS_FACEUP) != 0 && (pc.newPosition() & POS_FACEDOWN) != 0) {
+                        card.counters.clear();
+                        clearTargets(card);
+                    }
+                    if (pc.code() != 0) card.code = pc.code();
+                    card.position = pc.newPosition();
                 }
+                markZoneDirty(pc.controller(), pc.location());
             }
             case DuelMessage.Set set -> {
+                // MSG_MOVE already placed the card (operations.cpp emits the move first);
+                // MSG_SET only confirms the code and the face-down position.
                 LOGGER.debug("[State] Set: code={}, loc=[p{} loc=0x{} seq={}]",
                         set.code(), set.location().controller(),
                         Integer.toHexString(set.location().location()), set.location().sequence());
-                placeCard(set.location(), set.code());
-                markLocationDirty(set.location());
+                var loc = set.location();
+                ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+                if (card == null) {
+                    place(new ClientCard(set.code(), loc.controller(), loc.location(),
+                            loc.sequence(), loc.position()), loc);
+                } else {
+                    if (set.code() != 0) card.code = set.code();
+                    card.position = loc.position();
+                }
+                markZoneDirty(loc.controller(), loc.location());
             }
             case DuelMessage.Swap swap -> {
                 swapCards(swap.loc1(), swap.loc2());
-                markLocationDirty(swap.loc1());
-                markLocationDirty(swap.loc2());
+                markZoneDirty(swap.loc1().controller(), swap.loc1().location());
+                markZoneDirty(swap.loc2().controller(), swap.loc2().location());
             }
 
             // ---- Summons ----
             case DuelMessage.Summoning ignored -> { } // card appears via MSG_MOVE
             case DuelMessage.SpSummoning ignored -> { }
             case DuelMessage.FlipSummoning fs -> {
-                if (fs.location().location() == LOCATION_MZONE) {
-                    mzone[fs.location().controller()][fs.location().sequence()] = fs.code();
-                    mzonePos[fs.location().controller()][fs.location().sequence()] = fs.location().position();
-                    dirtyFlags.add(mzoneFlag(fs.location().controller()));
+                var loc = fs.location();
+                ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+                if (card != null) {
+                    if (fs.code() != 0) card.code = fs.code();
+                    card.position = loc.position();
+                    markZoneDirty(loc.controller(), loc.location());
                 }
             }
             case DuelMessage.Summoned ignored -> { }
@@ -381,40 +417,32 @@ public class ClientDuelState {
             // ---- Field stat updates ----
             case DuelMessage.UpdateData upd -> {
                 var cards = upd.cards();
-                if (upd.location() == LOCATION_MZONE) {
-                    for (int i = 0; i < Math.min(cards.size(), mzoneStats[upd.player()].length); i++) {
-                        mzoneStats[upd.player()][i] = cards.get(i);
+                if (upd.location() == LOCATION_MZONE || upd.location() == LOCATION_SZONE) {
+                    for (int i = 0; i < cards.size(); i++) {
+                        applyQuery(cardAt(upd.player(), upd.location(), i), cards.get(i));
                     }
-                } else if (upd.location() == LOCATION_SZONE) {
-                    for (int i = 0; i < Math.min(cards.size(), szoneStats[upd.player()].length); i++) {
-                        szoneStats[upd.player()][i] = cards.get(i);
+                } else {
+                    var list = pile(upd.player(), upd.location());
+                    if (list != null) {
+                        resize(list, upd.player(), upd.location(), cards.size());
+                        for (int i = 0; i < cards.size(); i++) applyQuery(list.get(i), cards.get(i));
+                        dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                     }
-                } else if (upd.location() == LOCATION_EXTRA) {
-                    // Update extra deck card codes and positions from query results
-                    extra[upd.player()].clear();
-                    extraPos[upd.player()].clear();
-                    for (var card : cards) {
-                        extra[upd.player()].add(card != null ? card.code : 0);
-                        extraPos[upd.player()].add(card != null ? card.position : POS_FACEDOWN_DEFENSE);
-                    }
-                    dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 }
                 dirtyFlags.add(DirtyFlag.FIELD_STATS);
             }
             case DuelMessage.UpdateCard upd -> {
-                if (upd.location() == LOCATION_MZONE && upd.sequence() < mzoneStats[upd.player()].length) {
-                    mzoneStats[upd.player()][upd.sequence()] = upd.card();
-                } else if (upd.location() == LOCATION_SZONE && upd.sequence() < szoneStats[upd.player()].length) {
-                    szoneStats[upd.player()][upd.sequence()] = upd.card();
-                }
+                applyQuery(cardAt(upd.player(), upd.location(), upd.sequence()), upd.card());
                 dirtyFlags.add(DirtyFlag.FIELD_STATS);
             }
 
             // ---- Deck/Hand ----
             case DuelMessage.ShuffleDeck ignored -> { }
             case DuelMessage.ShuffleHand sh -> {
-                hand[sh.player()].clear();
-                hand[sh.player()].addAll(sh.codes());
+                // edopro re-codes the existing hand objects rather than replacing them.
+                var list = hand[sh.player()];
+                resize(list, sh.player(), LOCATION_HAND, sh.codes().size());
+                for (int i = 0; i < list.size(); i++) list.get(i).code = sh.codes().get(i);
                 dirtyFlags.add(handFlag(sh.player()));
             }
             case DuelMessage.ShuffleExtra ignored -> { }
@@ -505,12 +533,68 @@ public class ClientDuelState {
                 LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
             case DuelMessage.CardSelected sel -> {
-                // Informational: engine reporting which cards were just selected
                 LOGGER.info("[State] CardSelected: count={}", sel.cards().size());
-                for (var loc : sel.cards()) {
-                    LOGGER.info("[State]   selected: ctrl={} loc=0x{} seq={} pos=0x{}",
-                            loc.controller(), Integer.toHexString(loc.location()),
-                            loc.sequence(), Integer.toHexString(loc.position()));
+                highlight(sel.cards());
+            }
+            case DuelMessage.BecomeTarget bt -> {
+                LOGGER.debug("[State] BecomeTarget: count={}", bt.targets().size());
+                highlight(bt.targets());
+            }
+
+            // ---- Relationships, counters, disabled zones ----
+            case DuelMessage.FieldDisabled fd -> {
+                disabledZones[0] = fd.field() & 0xFFFF;
+                disabledZones[1] = (fd.field() >>> 16) & 0xFFFF;
+                dirtyFlags.addAll(EnumSet.of(DirtyFlag.MZONE_0, DirtyFlag.MZONE_1,
+                        DirtyFlag.SZONE_0, DirtyFlag.SZONE_1));
+                LOGGER.debug("[State] FieldDisabled: p0=0x{}, p1=0x{}",
+                        Integer.toHexString(disabledZones[0]), Integer.toHexString(disabledZones[1]));
+            }
+            case DuelMessage.AddCounter add -> {
+                ClientCard card = cardAt(add.controller(), add.location(), add.sequence());
+                if (card != null) {
+                    card.counters.merge(add.counterType(), add.count(), Integer::sum);
+                    markZoneDirty(add.controller(), add.location());
+                }
+            }
+            case DuelMessage.RemoveCounter rem -> {
+                ClientCard card = cardAt(rem.controller(), rem.location(), rem.sequence());
+                if (card != null) {
+                    int left = card.counters.getOrDefault(rem.counterType(), 0) - rem.count();
+                    if (left > 0) card.counters.put(rem.counterType(), left);
+                    else card.counters.remove(rem.counterType());
+                    markZoneDirty(rem.controller(), rem.location());
+                }
+            }
+            case DuelMessage.Equip eq -> {
+                ClientCard card = resolveCard(eq.card());
+                ClientCard target = resolveCard(eq.target());
+                if (card != null && target != null) {
+                    detachEquipTarget(card);
+                    card.equipTarget = target;
+                    target.equippedBy.add(card);
+                }
+            }
+            case DuelMessage.Unequip uneq -> {
+                ClientCard card = resolveCard(uneq.card());
+                if (card != null) detachEquipTarget(card);
+            }
+            case DuelMessage.CardTarget ct -> {
+                ClientCard card = resolveCard(ct.card());
+                ClientCard target = resolveCard(ct.target());
+                if (card != null && target != null) {
+                    card.targets.add(target);
+                    target.targetedBy.add(card);
+                    markZoneDirty(ct.target().controller(), ct.target().location());
+                }
+            }
+            case DuelMessage.CancelTarget ct -> {
+                ClientCard card = resolveCard(ct.card());
+                ClientCard target = resolveCard(ct.target());
+                if (card != null && target != null) {
+                    card.targets.remove(target);
+                    target.targetedBy.remove(card);
+                    markZoneDirty(ct.target().controller(), ct.target().location());
                 }
             }
             case DuelMessage.HandResult res -> {
@@ -527,128 +611,247 @@ public class ClientDuelState {
 
     // ---- Dirty flag helpers ----
 
-    private void markLocationDirty(LocInfo loc) {
-        switch (loc.location()) {
-            case LOCATION_HAND -> dirtyFlags.add(handFlag(loc.controller()));
-            case LOCATION_MZONE -> dirtyFlags.add(mzoneFlag(loc.controller()));
-            case LOCATION_SZONE -> dirtyFlags.add(szoneFlag(loc.controller()));
-            case LOCATION_OVERLAY -> dirtyFlags.add(mzoneFlag(loc.controller()));
+    /** Marks the container a card sits in; overlay locations resolve to their host zone. */
+    private void markZoneDirty(int controller, int location) {
+        switch (location & ~LOCATION_OVERLAY) {
+            case LOCATION_HAND -> dirtyFlags.add(handFlag(controller));
+            case LOCATION_MZONE -> dirtyFlags.add(mzoneFlag(controller));
+            case LOCATION_SZONE -> dirtyFlags.add(szoneFlag(controller));
             case LOCATION_DECK, LOCATION_EXTRA, LOCATION_GRAVE, LOCATION_REMOVED ->
                     dirtyFlags.add(DirtyFlag.PILE_COUNTS);
             default -> { }
         }
     }
 
-    // ---- Move handling ----
+    // ---- Card containers ----
+
+    private static void fillBlanks(List<ClientCard> list, int player, int location, int count) {
+        for (int i = 0; i < count; i++) {
+            list.add(new ClientCard(0, player, location, list.size(), POS_FACEDOWN_DEFENSE));
+        }
+    }
+
+    /** Grows a pile with blank cards or drops the tail so it matches a queried size. */
+    private static void resize(List<ClientCard> list, int player, int location, int size) {
+        while (list.size() > size) list.removeLast();
+        fillBlanks(list, player, location, size - list.size());
+    }
+
+    private static void renumber(List<ClientCard> list) {
+        for (int i = 0; i < list.size(); i++) list.get(i).sequence = i;
+    }
+
+    /** Puts a card into a container without touching its position (used by Draw and Swap). */
+    private void putAt(ClientCard card, int controller, int location, int sequence) {
+        card.controller = controller;
+        card.location = location;
+        card.sequence = sequence;
+        if (location == LOCATION_MZONE) {
+            mzone[controller][sequence] = card;
+            return;
+        }
+        if (location == LOCATION_SZONE) {
+            szone[controller][sequence] = card;
+            return;
+        }
+        var list = pile(controller, location);
+        if (list == null) return;
+        list.add(Math.min(Math.max(sequence, 0), list.size()), card);
+        renumber(list);
+    }
+
+    private void place(ClientCard card, LocInfo to) {
+        card.position = to.position();
+        putAt(card, to.controller(), to.location(), to.sequence());
+    }
+
+    /** Takes a card out of the container named by {@code from}, renumbering what is left behind. */
+    private void removeFrom(ClientCard card, LocInfo from) {
+        if ((from.location() & LOCATION_OVERLAY) != 0) {
+            detachMaterial(card, from);
+            return;
+        }
+        if (from.location() == LOCATION_MZONE) {
+            clearSlot(mzone[from.controller()], card, from.sequence());
+            return;
+        }
+        if (from.location() == LOCATION_SZONE) {
+            clearSlot(szone[from.controller()], card, from.sequence());
+            return;
+        }
+        var list = pile(from.controller(), from.location());
+        if (list != null && list.remove(card)) renumber(list);
+    }
+
+    private static void clearSlot(ClientCard[] zones, ClientCard card, int sequence) {
+        if (sequence >= 0 && sequence < zones.length && zones[sequence] == card) {
+            zones[sequence] = null;
+            return;
+        }
+        for (int i = 0; i < zones.length; i++) {
+            if (zones[i] == card) zones[i] = null;
+        }
+    }
+
+    /**
+     * The card a message points at. A material is addressed as
+     * {@code {host controller, host location | LOCATION_OVERLAY, host sequence, material index}}
+     * (`card::get_info_location()`), so `0x84` means "material of the monster zone card".
+     */
+    private ClientCard resolveCard(LocInfo loc) {
+        if (loc.location() == 0) return null;
+        if ((loc.location() & LOCATION_OVERLAY) != 0) {
+            ClientCard host = cardAt(loc.controller(), loc.location() & ~LOCATION_OVERLAY, loc.sequence());
+            if (host == null) return null;
+            return loc.position() >= 0 && loc.position() < host.materials.size()
+                    ? host.materials.get(loc.position()) : null;
+        }
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card != null) return card;
+        // Out-of-range sequence into a pile: fall back to the tail so the count stays honest.
+        var list = pile(loc.controller(), loc.location());
+        if (list == null || list.isEmpty()) return null;
+        LOGGER.warn("[State] No card at p{} loc=0x{} seq={}; using the last one",
+                loc.controller(), Integer.toHexString(loc.location()), loc.sequence());
+        return list.getLast();
+    }
+
+    // ---- Move handling (edopro duelclient.cpp MSG_MOVE, :3044-3215) ----
 
     private void applyMove(DuelMessage.Move move) {
-        removeCard(move.from());
-        if (move.to().location() != 0) {
-            placeCard(move.to(), move.code());
+        LocInfo from = move.from();
+        LocInfo to = move.to();
+        ClientCard card = resolveCard(from);
+
+        if (card == null) {
+            // A token appearing, or a card this client never saw. Nowhere to go means nothing to do.
+            if (to.location() == 0) return;
+            place(new ClientCard(move.code(), to.controller(), to.location(), to.sequence(), to.position()), to);
+            return;
+        }
+        if (to.location() == 0) {
+            // Leaves play entirely (a token vanishing): drop every link this card was part of.
+            if (move.code() != 0) card.code = move.code();
+            clearTargets(card);
+            detachEquips(card);
+            removeFrom(card, from);
+            return;
+        }
+
+        boolean fromOverlay = (from.location() & LOCATION_OVERLAY) != 0;
+        boolean toOverlay = (to.location() & LOCATION_OVERLAY) != 0;
+
+        if (!fromOverlay && !toOverlay) {
+            if (move.code() != 0 || to.location() == LOCATION_EXTRA) card.code = move.code();
+            if ((from.location() & LOCATION_ONFIELD) != 0 && to.location() != from.location()) {
+                card.counters.clear();
+            }
+            if (to.location() != from.location()) {
+                clearTargets(card);
+                detachEquipTarget(card);
+            }
+            removeFrom(card, from);
+            place(card, to);
+        } else if (!fromOverlay) {
+            // Attach: the card becomes an XYZ material of the host named by `to`.
+            if (move.code() != 0) card.code = move.code();
+            card.counters.clear();
+            clearTargets(card);
+            removeFrom(card, from);
+            attachMaterial(card, to);
+        } else if (!toOverlay) {
+            detachMaterial(card, from);
+            place(card, to);
+        } else {
+            detachMaterial(card, from);
+            attachMaterial(card, to);
         }
     }
 
-    private void removeCard(LocInfo loc) {
-        switch (loc.location()) {
-            case LOCATION_HAND -> {
-                if (loc.sequence() < hand[loc.controller()].size()) {
-                    hand[loc.controller()].remove(loc.sequence());
-                } else if (!hand[loc.controller()].isEmpty()) {
-                    hand[loc.controller()].removeLast();
-                }
-            }
-            case LOCATION_MZONE -> {
-                mzone[loc.controller()][loc.sequence()] = 0;
-                mzonePos[loc.controller()][loc.sequence()] = 0;
-                overlay[loc.controller()][loc.sequence()].clear();
-                // Clear stats for source zone
-                if (loc.sequence() < mzoneStats[loc.controller()].length) {
-                    mzoneStats[loc.controller()][loc.sequence()] = null;
-                }
-            }
-            case LOCATION_SZONE -> {
-                szone[loc.controller()][loc.sequence()] = 0;
-                szonePos[loc.controller()][loc.sequence()] = 0;
-                // Clear stats for source zone
-                if (loc.sequence() < szoneStats[loc.controller()].length) {
-                    szoneStats[loc.controller()][loc.sequence()] = null;
-                }
-            }
-            case LOCATION_DECK -> deckCount[loc.controller()]--;
-            case LOCATION_EXTRA -> {
-                int seq = loc.sequence();
-                int p = loc.controller();
-                if (seq < extra[p].size()) {
-                    extra[p].remove(seq);
-                    if (seq < extraPos[p].size()) extraPos[p].remove(seq);
-                } else if (!extra[p].isEmpty()) {
-                    extra[p].removeLast();
-                    if (!extraPos[p].isEmpty()) extraPos[p].removeLast();
-                }
-            }
-            case LOCATION_GRAVE -> {
-                int seq = loc.sequence();
-                if (seq < grave[loc.controller()].size()) {
-                    grave[loc.controller()].remove(seq);
-                } else if (!grave[loc.controller()].isEmpty()) {
-                    grave[loc.controller()].removeLast();
-                }
-            }
-            case LOCATION_REMOVED -> {
-                int seq = loc.sequence();
-                if (seq < banished[loc.controller()].size()) {
-                    banished[loc.controller()].remove(seq);
-                } else if (!banished[loc.controller()].isEmpty()) {
-                    banished[loc.controller()].removeLast();
-                }
-            }
-            case LOCATION_OVERLAY -> {
-                // XYZ material detach — remove from the monster's overlay list
-                // The sequence in the from-loc refers to the monster's zone sequence
-                // The overlay card is identified by position in the overlay list
-                var materials = overlay[loc.controller()][loc.sequence()];
-                if (!materials.isEmpty()) {
-                    materials.removeLast();
-                }
-            }
-            default -> { }
+    private void attachMaterial(ClientCard card, LocInfo to) {
+        ClientCard host = cardAt(to.controller(), to.location() & ~LOCATION_OVERLAY, to.sequence());
+        if (host == null) {
+            LOGGER.warn("[State] Overlay attach with no host at p{} loc=0x{} seq={}",
+                    to.controller(), Integer.toHexString(to.location()), to.sequence());
+            return;
         }
+        host.materials.add(card);
+        card.controller = to.controller();
+        card.location = LOCATION_OVERLAY;
+        card.sequence = host.materials.size() - 1;
     }
 
-    private void placeCard(LocInfo loc, int code) {
-        switch (loc.location()) {
-            case LOCATION_HAND -> hand[loc.controller()].add(code);
-            case LOCATION_MZONE -> {
-                mzone[loc.controller()][loc.sequence()] = code;
-                mzonePos[loc.controller()][loc.sequence()] = loc.position();
-            }
-            case LOCATION_SZONE -> {
-                szone[loc.controller()][loc.sequence()] = code;
-                szonePos[loc.controller()][loc.sequence()] = loc.position();
-            }
-            case LOCATION_DECK -> deckCount[loc.controller()]++;
-            case LOCATION_EXTRA -> {
-                extra[loc.controller()].add(code);
-                extraPos[loc.controller()].add(loc.position());
-            }
-            case LOCATION_GRAVE -> grave[loc.controller()].add(code);
-            case LOCATION_REMOVED -> banished[loc.controller()].add(code);
-            case LOCATION_OVERLAY -> {
-                // XYZ material attach — add to the monster's overlay list
-                overlay[loc.controller()][loc.sequence()].add(code);
-            }
-            default -> { }
-        }
+    private void detachMaterial(ClientCard card, LocInfo from) {
+        ClientCard host = cardAt(from.controller(), from.location() & ~LOCATION_OVERLAY, from.sequence());
+        if (host == null) return;
+        if (host.materials.remove(card)) renumber(host.materials);
     }
 
     private void swapCards(LocInfo loc1, LocInfo loc2) {
-        if (loc1.location() == LOCATION_MZONE && loc2.location() == LOCATION_MZONE) {
-            int tempCode = mzone[loc1.controller()][loc1.sequence()];
-            int tempPos = mzonePos[loc1.controller()][loc1.sequence()];
-            mzone[loc1.controller()][loc1.sequence()] = mzone[loc2.controller()][loc2.sequence()];
-            mzonePos[loc1.controller()][loc1.sequence()] = mzonePos[loc2.controller()][loc2.sequence()];
-            mzone[loc2.controller()][loc2.sequence()] = tempCode;
-            mzonePos[loc2.controller()][loc2.sequence()] = tempPos;
+        ClientCard card1 = resolveCard(loc1);
+        ClientCard card2 = resolveCard(loc2);
+        if (card1 != null) removeFrom(card1, loc1);
+        if (card2 != null) removeFrom(card2, loc2);
+        if (card1 != null) putAt(card1, loc2.controller(), loc2.location(), loc2.sequence());
+        if (card2 != null) putAt(card2, loc1.controller(), loc1.location(), loc1.sequence());
+    }
+
+    // ---- Links, highlights, queries ----
+
+    /** edopro's {@code ClientCard::ClearTarget()}: drops this card from both ends of every link. */
+    private static void clearTargets(ClientCard card) {
+        for (var target : card.targets) target.targetedBy.remove(card);
+        for (var source : card.targetedBy) source.targets.remove(card);
+        card.targets.clear();
+        card.targetedBy.clear();
+    }
+
+    private static void detachEquipTarget(ClientCard card) {
+        if (card.equipTarget == null) return;
+        card.equipTarget.equippedBy.remove(card);
+        card.equipTarget = null;
+    }
+
+    /** Detaches both directions, for a card that leaves play altogether. */
+    private static void detachEquips(ClientCard card) {
+        detachEquipTarget(card);
+        for (var equipped : card.equippedBy) equipped.equipTarget = null;
+        card.equippedBy.clear();
+    }
+
+    private void highlight(List<LocInfo> locations) {
+        for (var loc : locations) {
+            ClientCard card = resolveCard(loc);
+            if (card == null) continue;
+            highlighted.add(card);
+            markZoneDirty(loc.controller(), loc.location());
+        }
+    }
+
+    private void clearHighlights() {
+        if (highlighted.isEmpty()) return;
+        highlighted.clear();
+        dirtyFlags.addAll(EnumSet.of(DirtyFlag.MZONE_0, DirtyFlag.MZONE_1,
+                DirtyFlag.SZONE_0, DirtyFlag.SZONE_1));
+    }
+
+    /** Writes a query result onto a card, self-healing code and position when they are carried. */
+    private static void applyQuery(ClientCard card, QueriedCard query) {
+        if (card == null || query == null) return;
+        card.stats = query;
+        if (query.code != 0) card.code = query.code;
+        if (query.position != 0) card.position = query.position;
+        if ((query.flags & QUERY_OVERLAY_CARD) != 0) {
+            for (int i = 0; i < Math.min(query.overlayCards.size(), card.materials.size()); i++) {
+                card.materials.get(i).code = query.overlayCards.get(i);
+            }
+        }
+        if ((query.flags & QUERY_COUNTERS) != 0) {
+            // The engine packs each counter as type in the low 16 bits, count in the high 16.
+            card.counters.clear();
+            for (int packed : query.counters) {
+                card.counters.put(packed & 0xFFFF, (packed >>> 16) & 0xFFFF);
+            }
         }
     }
 
