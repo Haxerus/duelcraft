@@ -474,6 +474,15 @@ public class ClientDuelState {
                 dirtyFlags.add(handFlag(sh.player()));
             }
             case DuelMessage.ShuffleExtra ignored -> { }
+            case DuelMessage.SwapGraveDeck swap -> {
+                applySwapGraveDeck(swap);
+                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                LOGGER.debug("[State] SwapGraveDeck: player={}, deck={}, grave={}, extra={}",
+                        swap.player(), deckCount(swap.player()), graveCount(swap.player()),
+                        extraCount(swap.player()));
+            }
+            case DuelMessage.ShuffleSetCard set -> applyShuffleSetCard(set);
+            case DuelMessage.RemoveCards remove -> applyRemoveCards(remove.cards());
 
             // ---- Battle (no state change, UI can animate from lastAction) ----
             case DuelMessage.Attack ignored -> { }
@@ -850,6 +859,88 @@ public class ClientDuelState {
         ClientCard host = cardAt(from.controller(), from.location() & ~LOCATION_OVERLAY, from.sequence());
         if (host == null) return;
         if (host.materials.remove(card)) renumber(host.materials);
+    }
+
+    // ---- Pile restructuring (edopro duelclient.cpp :2811, :2881, :4017) ----
+
+    /**
+     * The graveyard and the deck trade places, then every card the bitmask flags leaves the new
+     * deck for the extra deck, face-down ({@code duelclient.cpp:2811}).
+     */
+    private void applySwapGraveDeck(DuelMessage.SwapGraveDeck swap) {
+        int p = swap.player();
+        var wasGrave = List.copyOf(grave[p]);
+        grave[p].clear();
+        grave[p].addAll(deck[p]);
+        deck[p].clear();
+        deck[p].addAll(wasGrave);
+
+        for (var card : grave[p]) card.location = LOCATION_GRAVE;
+        renumber(grave[p]);
+
+        int index = 0;
+        for (var it = deck[p].iterator(); it.hasNext(); index++) {
+            ClientCard card = it.next();
+            if (maskBit(swap.extraMask(), index)) {
+                it.remove();
+                card.position = POS_FACEDOWN_DEFENSE;
+                putAt(card, p, LOCATION_EXTRA, extra[p].size());
+            } else {
+                card.location = LOCATION_DECK;
+            }
+        }
+        renumber(deck[p]);
+    }
+
+    /** Bit {@code index} of the engine's {@code ProgressiveBuffer}: byte {@code index/8}, bit {@code index%8}. */
+    private static boolean maskBit(byte[] mask, int index) {
+        int b = index / 8;
+        return b < mask.length && (mask[b] & (1 << (index % 8))) != 0;
+    }
+
+    /**
+     * Every named card loses its code; the second block re-places the ones carrying XYZ materials,
+     * swapping each with whatever sits in its new zone ({@code duelclient.cpp:2881}).
+     */
+    private void applyShuffleSetCard(DuelMessage.ShuffleSetCard set) {
+        ClientCard[][] zones = set.location() == LOCATION_MZONE ? mzone : szone;
+        var shuffled = new ArrayList<ClientCard>(set.from().size());
+        for (var from : set.from()) {
+            ClientCard card = cardAt(from.controller(), set.location(), from.sequence());
+            shuffled.add(card);
+            if (card != null) card.code = 0;
+            markZoneDirty(from.controller(), set.location());
+        }
+        for (int i = 0; i < set.follow().size() && i < shuffled.size(); i++) {
+            LocInfo to = set.follow().get(i);
+            ClientCard card = shuffled.get(i);
+            if (card == null || to.location() == 0) continue;
+            ClientCard[] zone = zones[to.controller()];
+            if (to.sequence() < 0 || to.sequence() >= zone.length) continue;
+            int previous = card.sequence;
+            ClientCard displaced = zone[to.sequence()];
+            zone[previous] = displaced;
+            zone[to.sequence()] = card;
+            card.sequence = to.sequence();
+            if (displaced != null) displaced.sequence = previous;
+            markZoneDirty(to.controller(), set.location());
+        }
+    }
+
+    /** Every named card is resolved before any is deleted, so removals do not shift the sequences. */
+    private void applyRemoveCards(List<LocInfo> locations) {
+        var doomed = new ArrayList<ClientCard>(locations.size());
+        for (var loc : locations) doomed.add(resolveCard(loc));
+        for (int i = 0; i < doomed.size(); i++) {
+            ClientCard card = doomed.get(i);
+            if (card == null) continue;
+            LocInfo loc = locations.get(i);
+            clearTargets(card);
+            detachEquips(card);
+            removeFrom(card, loc);
+            highlighted.remove(card);
+            markZoneDirty(loc.controller(), loc.location());
+        }
     }
 
     private void swapCards(LocInfo loc1, LocInfo loc2) {

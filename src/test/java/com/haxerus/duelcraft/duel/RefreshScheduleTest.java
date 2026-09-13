@@ -52,6 +52,7 @@ class RefreshScheduleTest {
         assertEquals(0x3781fff, HAND_FLAGS);
         assertEquals(0x381fff, PILE_FLAGS);
         assertEquals(0x3f81fff, SINGLE_FLAGS);
+        assertEquals(0x3181fff, SET_CARD_FLAGS);
     }
 
     @Test
@@ -125,6 +126,20 @@ class RefreshScheduleTest {
     @Test
     void shuffleExtraRefreshesThatPlayersExtraDeck() {
         assertEquals(List.of(loc(1, LOCATION_EXTRA, PILE_FLAGS)), after(new DuelMessage.ShuffleExtra(1)));
+    }
+
+    @Test
+    void swapGraveDeckRefreshesThatPlayersGraveyard() {
+        assertEquals(List.of(loc(1, LOCATION_GRAVE, PILE_FLAGS)),
+                after(new DuelMessage.SwapGraveDeck(1, 15, new byte[]{1})));
+    }
+
+    @Test
+    void shuffleSetCardRefreshesTheNamedLocationForBothPlayers() {
+        assertEquals(List.of(loc(0, LOCATION_SZONE, SET_CARD_FLAGS), loc(1, LOCATION_SZONE, SET_CARD_FLAGS)),
+                after(new DuelMessage.ShuffleSetCard(LOCATION_SZONE, List.of(), List.of())));
+        assertEquals(List.of(loc(0, LOCATION_MZONE, SET_CARD_FLAGS), loc(1, LOCATION_MZONE, SET_CARD_FLAGS)),
+                after(new DuelMessage.ShuffleSetCard(LOCATION_MZONE, List.of(), List.of())));
     }
 
     @Test

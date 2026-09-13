@@ -32,6 +32,9 @@ public final class RefreshSchedule {
     public static final int PILE_FLAGS   = BASE_STATS | QUERY_STATUS | QUERY_IS_PUBLIC | QUERY_LSCALE;
     public static final int SINGLE_FLAGS = BASE_STATS | QUERY_STATUS | QUERY_IS_PUBLIC | QUERY_LSCALE
             | QUERY_RSCALE | QUERY_LINK | QUERY_IS_HIDDEN | QUERY_COVER;
+    /** The one mask edopro spells out inline, after {@code MSG_SHUFFLE_SET_CARD} ({@code :1169-1174}). */
+    public static final int SET_CARD_FLAGS = BASE_STATS | QUERY_STATUS | QUERY_IS_PUBLIC
+            | QUERY_IS_HIDDEN | QUERY_COVER;
 
     /** One query to run. {@code sequence} is -1 for a whole location, otherwise a single slot. */
     public record Refresh(int player, int location, int sequence, int flags) {
@@ -63,6 +66,9 @@ public final class RefreshSchedule {
             case DuelMessage.Draw draw -> List.of(location(draw.player(), LOCATION_HAND, HAND_FLAGS));
             case DuelMessage.ShuffleHand sh -> List.of(location(sh.player(), LOCATION_HAND, HAND_FLAGS));
             case DuelMessage.ShuffleExtra se -> List.of(location(se.player(), LOCATION_EXTRA, PILE_FLAGS));
+            case DuelMessage.SwapGraveDeck sgd -> List.of(location(sgd.player(), LOCATION_GRAVE, PILE_FLAGS));
+            case DuelMessage.ShuffleSetCard ssc -> List.of(location(0, ssc.location(), SET_CARD_FLAGS),
+                    location(1, ssc.location(), SET_CARD_FLAGS));
 
             case DuelMessage.NewPhase ignored -> fieldAndHand();
             case DuelMessage.Chained ignored -> fieldAndHand();

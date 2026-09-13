@@ -189,6 +189,31 @@ public sealed interface DuelMessage {
         public int type() { return MSG_CONFIRM_DECKTOP; }
     }
 
+    /**
+     * A player's graveyard and deck traded places ({@code field.cpp:1048}). Bit {@code i} of
+     * {@code extraMask} (byte {@code i/8}, bit {@code i%8}) flags the {@code i}-th card of the new
+     * deck as an extra-deck monster, which goes to the extra deck face-down instead.
+     * {@code extraCount} is the extra deck's size before those cards were inserted; edopro
+     * discards it and so do we.
+     */
+    record SwapGraveDeck(int player, int extraCount, byte[] extraMask) implements DuelMessage {
+        public int type() { return MSG_SWAP_GRAVE_DECK; }
+    }
+
+    /**
+     * Face-down cards of one location were shuffled among their zones ({@code libduel.cpp:1404},
+     * {@code operations.cpp:2958}). {@code from} names each card's old zone; {@code follow} names
+     * the new zone, but only for cards carrying XYZ materials — the rest are zeroed {@link LocInfo}s.
+     */
+    record ShuffleSetCard(int location, List<LocInfo> from, List<LocInfo> follow) implements DuelMessage {
+        public int type() { return MSG_SHUFFLE_SET_CARD; }
+    }
+
+    /** Cards deleted from the duel outright ({@code libduel.cpp:536}); batched at 255 per message. */
+    record RemoveCards(List<LocInfo> cards) implements DuelMessage {
+        public int type() { return MSG_REMOVE_CARDS; }
+    }
+
     /** Same body as {@link ConfirmDeckTop}, over the extra deck ({@code libduel.cpp:854}). */
     record ConfirmExtraTop(int player, List<ConfirmCard> cards) implements DuelMessage {
         public int type() { return MSG_CONFIRM_EXTRATOP; }

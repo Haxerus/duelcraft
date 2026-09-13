@@ -76,6 +76,9 @@ public class MessageParser {
                 case MSG_SHUFFLE_DECK  -> new DuelMessage.ShuffleDeck(reader.readUint8());
                 case MSG_SHUFFLE_HAND  -> parseShuffleHand(reader);
                 case MSG_SHUFFLE_EXTRA -> parseShuffleExtra(reader);
+                case MSG_SWAP_GRAVE_DECK -> parseSwapGraveDeck(reader);
+                case MSG_SHUFFLE_SET_CARD -> parseShuffleSetCard(reader);
+                case MSG_REMOVE_CARDS  -> new DuelMessage.RemoveCards(readLocInfoList(reader));
                 case MSG_REVERSE_DECK  -> new DuelMessage.ReverseDeck();
                 case MSG_DECK_TOP      -> parseDeckTop(reader);
 
@@ -311,6 +314,26 @@ public class MessageParser {
         return new DuelMessage.ShuffleExtra(player);
     }
 
+    /** [u8 player][u32 extraCount][u32 maskBytes][mask bytes] (field.cpp:1048). */
+    private static DuelMessage.SwapGraveDeck parseSwapGraveDeck(BufferReader r) {
+        int player = r.readUint8();
+        int extraCount = r.readInt32();
+        byte[] mask = new byte[r.readInt32()];
+        for (int i = 0; i < mask.length; i++) mask[i] = (byte) r.readUint8();
+        return new DuelMessage.SwapGraveDeck(player, extraCount, mask);
+    }
+
+    /** [u8 loc][u8 n][n×loc_info old][n×loc_info material-follow] (libduel.cpp:1404). */
+    private static DuelMessage.ShuffleSetCard parseShuffleSetCard(BufferReader r) {
+        int location = r.readUint8();
+        int count = r.readUint8();
+        List<LocInfo> from = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) from.add(LocInfo.read(r));
+        List<LocInfo> follow = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) follow.add(LocInfo.read(r));
+        return new DuelMessage.ShuffleSetCard(location, from, follow);
+    }
+
     /** [u8 player][u32 offsetFromTop][u32 code][u32 position] (processor.cpp:4929 and 13 more sites). */
     private static DuelMessage.DeckTop parseDeckTop(BufferReader r) {
         int player = r.readUint8();
@@ -337,12 +360,17 @@ public class MessageParser {
     }
 
     private static DuelMessage.BecomeTarget parseBecomeTarget(BufferReader r) {
+        return new DuelMessage.BecomeTarget(readLocInfoList(r));
+    }
+
+    /** Read a count-prefixed list of LocInfo entries. */
+    private static List<LocInfo> readLocInfoList(BufferReader r) {
         int count = r.readInt32();
-        List<LocInfo> targets = new ArrayList<>(count);
+        List<LocInfo> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            targets.add(LocInfo.read(r));
+            list.add(LocInfo.read(r));
         }
-        return new DuelMessage.BecomeTarget(targets);
+        return list;
     }
 
     // ---- Selection messages ----

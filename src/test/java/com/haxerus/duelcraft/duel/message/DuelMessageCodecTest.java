@@ -128,6 +128,12 @@ class DuelMessageCodecTest {
                 List.of(new DuelMessage.ConfirmCard(444, 1, 0x40, 14))));
         SAMPLES.put(DuelMessage.ReverseDeck.class, new DuelMessage.ReverseDeck());
         SAMPLES.put(DuelMessage.DeckTop.class, new DuelMessage.DeckTop(1, 2, 89631139, 0x4));
+        SAMPLES.put(DuelMessage.SwapGraveDeck.class,
+                new DuelMessage.SwapGraveDeck(1, 15, new byte[]{0b0000_1001, 0b0000_0010}));
+        SAMPLES.put(DuelMessage.ShuffleSetCard.class, new DuelMessage.ShuffleSetCard(0x08,
+                List.of(LOC_PLAIN, LOC_OVERLAY_SZONE), List.of(LOC_PLAIN, new LocInfo(0, 0, 0, 0))));
+        SAMPLES.put(DuelMessage.RemoveCards.class,
+                new DuelMessage.RemoveCards(List.of(LOC_OVERLAY_MZONE, LOC_PLAIN)));
         SAMPLES.put(DuelMessage.CardSelected.class, new DuelMessage.CardSelected(List.of(LOC_OVERLAY_MZONE, LOC_OVERLAY_SZONE)));
         SAMPLES.put(DuelMessage.Hint.class, new DuelMessage.Hint(3, 0, U64_ABOVE_32BIT));
         SAMPLES.put(DuelMessage.CardHint.class, new DuelMessage.CardHint(LOC_PLAIN, 2, U64_ABOVE_32BIT));
@@ -217,6 +223,11 @@ class DuelMessageCodecTest {
             DuelMessage.Raw actual = (DuelMessage.Raw) decoded;
             assertEquals(expected.type(), actual.type());
             assertArrayEquals(expected.body(), actual.body());
+        } else if (sample instanceof DuelMessage.SwapGraveDeck expected) {
+            DuelMessage.SwapGraveDeck actual = (DuelMessage.SwapGraveDeck) decoded;
+            assertEquals(expected.player(), actual.player());
+            assertEquals(expected.extraCount(), actual.extraCount());
+            assertArrayEquals(expected.extraMask(), actual.extraMask());
         } else if (sample instanceof DuelMessage.UpdateData expected) {
             DuelMessage.UpdateData actual = (DuelMessage.UpdateData) decoded;
             assertEquals(expected.player(), actual.player());

@@ -383,6 +383,95 @@ class ClientDuelStateTest {
         assertEquals("Opponent's Revealed Cards", state.confirmTitle);
     }
 
+    // ---- Pile restructuring (Task 14) ----
+
+    /** duelclient.cpp:2811: the two piles trade places, then flagged cards leave for the extra deck. */
+    @Test
+    void swapGraveDeckExchangesThePilesAndRoutesFlaggedCardsToTheExtraDeck() {
+        var state = newState();
+        draw(state, 0, 11111, 22222, 33333);
+        for (int code : new int[]{11111, 22222, 33333}) {
+            move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_GRAVE, state.graveCount(0), POS_FACEUP_ATTACK));
+        }
+
+        // Bit 1: the second card of the new deck is an extra-deck monster.
+        state.applyMessage(new DuelMessage.SwapGraveDeck(0, 15, new byte[]{0b0000_0010}));
+
+        assertEquals(37, state.graveCount(0), "the old deck became the graveyard");
+        assertEquals(List.of(11111, 33333), codesOf(state.deck[0]));
+        assertEquals(16, state.extraCount(0));
+        assertEquals(22222, state.extra[0].getLast().code);
+        assertTrue(state.extra[0].getLast().isFaceDown());
+        assertEquals(LOCATION_EXTRA, state.extra[0].getLast().location);
+        assertEquals(LOCATION_GRAVE, state.grave[0].getFirst().location);
+        assertEquals(LOCATION_DECK, state.deck[0].getFirst().location);
+        assertEquals(List.of(0, 1), state.deck[0].stream().map(card -> card.sequence).toList());
+    }
+
+    /** duelclient.cpp:4017 resolves every named card before deleting any of them. */
+    @Test
+    void removeCardsResolvesEverySequenceBeforeDeleting() {
+        var state = newState();
+        draw(state, 0, 11111, 22222, 33333);
+
+        state.applyMessage(new DuelMessage.RemoveCards(List.of(
+                new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_HAND, 1, 0))));
+
+        assertEquals(List.of(33333), codesOf(state.hand[0]));
+        assertEquals(0, state.hand[0].getFirst().sequence);
+    }
+
+    @Test
+    void removeCardsRenumbersTheSurvivingMaterials() {
+        var state = newState();
+        draw(state, 0, 11111, 22222, 33333, 44444);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        for (int code : new int[]{22222, 33333, 44444}) {
+            move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+        }
+
+        state.applyMessage(new DuelMessage.RemoveCards(List.of(
+                new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 1))));
+
+        var host = state.mzone[0][0];
+        assertEquals(List.of(22222, 44444), codesOf(host.materials));
+        assertEquals(List.of(0, 1), host.materials.stream().map(card -> card.sequence).toList());
+    }
+
+    /** duelclient.cpp:2881: every named card loses its code; only the second block re-places any. */
+    @Test
+    void shuffleSetCardZeroesTheCodesAndRePlacesTheNamedCards() {
+        var state = newState();
+        draw(state, 0, 11111, 22222, 33333);
+        for (int seq = 0; seq < 3; seq++) {
+            move(state, 11111 * (seq + 1), new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_SZONE, seq, POS_FACEDOWN_DEFENSE));
+        }
+        var first = state.szone[0][0];
+        var second = state.szone[0][1];
+        var third = state.szone[0][2];
+
+        state.applyMessage(new DuelMessage.ShuffleSetCard(LOCATION_SZONE,
+                List.of(new LocInfo(0, LOCATION_SZONE, 0, POS_FACEDOWN_DEFENSE),
+                        new LocInfo(0, LOCATION_SZONE, 1, POS_FACEDOWN_DEFENSE)),
+                // Only the first card carries materials, so only it names a new zone.
+                List.of(new LocInfo(0, LOCATION_SZONE, 1, POS_FACEDOWN_DEFENSE),
+                        new LocInfo(0, 0, 0, 0))));
+
+        assertEquals(0, first.code);
+        assertEquals(0, second.code);
+        assertEquals(33333, third.code, "a card the message did not name keeps its code");
+        assertSame(first, state.szone[0][1]);
+        assertEquals(1, first.sequence);
+        assertSame(second, state.szone[0][0]);
+        assertEquals(0, second.sequence);
+        assertSame(third, state.szone[0][2]);
+    }
+
     @Test
     void moveToHandAppendsACardCarryingTheMessageCode() {
         var state = newState();

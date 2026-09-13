@@ -395,6 +395,66 @@ class MessageParserTest {
         assertEquals(1, ((DuelMessage.ShuffleExtra) msgs.getFirst()).player());
     }
 
+    /** field.cpp:1048: [u8 player][u32 extraCount][u32 maskBytes][mask bytes]. */
+    @Test
+    void parseSwapGraveDeck() {
+        ByteBuffer b = body(1 + 4 + 4 + 2);
+        b.put((byte) 1);
+        b.putInt(15);       // extra deck size before the swapped-in monsters were inserted
+        b.putInt(2);        // mask byte count
+        b.put((byte) 0b0000_1001);
+        b.put((byte) 0b0000_0010);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SWAP_GRAVE_DECK, b.array()));
+        assertEquals(1, msgs.size());
+        var swap = assertInstanceOf(DuelMessage.SwapGraveDeck.class, msgs.getFirst());
+        assertEquals(1, swap.player());
+        assertEquals(15, swap.extraCount());
+        assertArrayEquals(new byte[]{0b0000_1001, 0b0000_0010}, swap.extraMask());
+    }
+
+    /**
+     * libduel.cpp:1404: [u8 loc][u8 n][n×loc_info old][n×loc_info]. The second block names the new
+     * position only for cards carrying XYZ materials; the rest are zeroed loc_infos.
+     */
+    @Test
+    void parseShuffleSetCard() {
+        ByteBuffer b = body(1 + 1 + 2 * 10 + 2 * 10);
+        b.put((byte) LOCATION_SZONE);
+        b.put((byte) 2);
+        putLocInfo(b, 0, LOCATION_SZONE, 0, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 0, LOCATION_SZONE, 3, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 0, LOCATION_SZONE, 3, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 0, 0, 0, 0);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SHUFFLE_SET_CARD, b.array()));
+        assertEquals(1, msgs.size());
+        var shuffle = assertInstanceOf(DuelMessage.ShuffleSetCard.class, msgs.getFirst());
+        assertEquals(LOCATION_SZONE, shuffle.location());
+        assertEquals(2, shuffle.from().size());
+        assertEquals(0, shuffle.from().get(0).sequence());
+        assertEquals(3, shuffle.from().get(1).sequence());
+        assertEquals(2, shuffle.follow().size());
+        assertEquals(3, shuffle.follow().get(0).sequence());
+        assertEquals(0, shuffle.follow().get(1).location());
+    }
+
+    /** libduel.cpp:536: [u32 n][n×loc_info], batched at 255 cards per message. */
+    @Test
+    void parseRemoveCards() {
+        ByteBuffer b = body(4 + 2 * 10);
+        b.putInt(2);
+        putLocInfo(b, 0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK);
+        putLocInfo(b, 1, LOCATION_MZONE | LOCATION_OVERLAY, 2, 1);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_REMOVE_CARDS, b.array()));
+        assertEquals(1, msgs.size());
+        var remove = assertInstanceOf(DuelMessage.RemoveCards.class, msgs.getFirst());
+        assertEquals(2, remove.cards().size());
+        assertEquals(new LocInfo(0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK), remove.cards().get(0));
+        assertEquals(new LocInfo(1, LOCATION_MZONE | LOCATION_OVERLAY, 2, 1), remove.cards().get(1));
+    }
+
     // ---- Selection Messages ----
 
     @Test
