@@ -81,6 +81,10 @@ class OcgCoreTest {
 
     @BeforeAll
     static void setUp() {
+        engine = newEngine();
+    }
+
+    static long newEngine() {
         String dbPath = System.getProperty("duelcraft.test.dbPath");
         String scriptPathsStr = System.getProperty("duelcraft.test.scriptPaths");
         assertNotNull(dbPath, "duelcraft.test.dbPath system property must be set");
@@ -89,8 +93,9 @@ class OcgCoreTest {
         String[] dbPaths = new String[]{ dbPath };
         String[] scriptPaths = scriptPathsStr.split(";");
 
-        engine = OcgCore.nCreateEngine(dbPaths, scriptPaths);
-        assertNotEquals(0, engine, "Engine creation failed — check that cards.cdb and script paths are correct");
+        long handle = OcgCore.nCreateEngine(dbPaths, scriptPaths);
+        assertNotEquals(0, handle, "Engine creation failed — check that cards.cdb and script paths are correct");
+        return handle;
     }
 
     @AfterAll
@@ -414,35 +419,59 @@ class OcgCoreTest {
         System.out.println("Destroy/recreate test passed");
     }
 
-    /** The data reader reports a code it cannot find, once, through the Java log hook. */
+    /** The data reader reports a code it cannot find once per engine, not once per duel. */
     @Test
     @Order(11)
-    void testUnknownCardCodeIsReportedOnce() {
+    void testUnknownCardCodeIsReportedOncePerEngine() {
         List<String> lines = Collections.synchronizedList(new ArrayList<>());
-        long[] seed = { 7, 7, 7, 7 };
-        long logDuel = OcgCore.nCreateDuel(engine, seed, DUEL_MODE_MR5, 8000, 5, 1, 8000, 5, 1);
-        assertNotEquals(0, logDuel, "Duel creation failed");
         try {
             OcgCore.setLogListener(lines::add);
             OcgCore.setCurrentDuel("duel@test");
-            // 1 is not a real card code, so the engine's data reader finds nothing. Added twice
-            // to prove the warning is not repeated (the engine caches per duel, the bridge per engine).
-            OcgCore.nDuelNewCard(engine, logDuel, 0, 0, 1, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
-            OcgCore.nDuelNewCard(engine, logDuel, 0, 0, 1, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
-            OcgCore.nDuelProcess(engine, logDuel);
+
+            // The engine caches card data per duel (duel.cpp:148-155), so only a second duel
+            // re-enters CardDatabase::cardReader; the bridge's own set is what stops the
+            // second warning.
+            addUnknownCardToANewDuel(engine);
+            addUnknownCardToANewDuel(engine);
+
+            List<String> warnings = unknownCodeWarnings(lines);
+            assertEquals(1, warnings.size(),
+                    "Expected one warning for code 1 across both duels, captured: " + lines);
+            assertTrue(warnings.getFirst().startsWith("[duel@test] "),
+                    "Native log lines should carry the duel tag: " + warnings.getFirst());
+
+            // Negative control: the set lives on the engine, so a second engine warns again.
+            lines.clear();
+            long otherEngine = newEngine();
+            try {
+                addUnknownCardToANewDuel(otherEngine);
+            } finally {
+                OcgCore.nDestroyEngine(otherEngine);
+            }
+            assertEquals(1, unknownCodeWarnings(lines).size(),
+                    "A fresh engine has its own warned-code set, captured: " + lines);
         } finally {
             OcgCore.setCurrentDuel(null);
             OcgCore.setLogListener(null);
-            OcgCore.nDestroyDuel(engine, logDuel);
         }
+    }
 
-        List<String> unknownCode = lines.stream()
+    /** Adds card code 1 — not a real card — to a throwaway duel, so the data reader misses. */
+    private static void addUnknownCardToANewDuel(long eng) {
+        long[] seed = { 7, 7, 7, 7 };
+        long unknownDuel = OcgCore.nCreateDuel(eng, seed, DUEL_MODE_MR5, 8000, 5, 1, 8000, 5, 1);
+        assertNotEquals(0, unknownDuel, "Duel creation failed");
+        try {
+            OcgCore.nDuelNewCard(eng, unknownDuel, 0, 0, 1, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
+        } finally {
+            OcgCore.nDestroyDuel(eng, unknownDuel);
+        }
+    }
+
+    private static List<String> unknownCodeWarnings(List<String> lines) {
+        return lines.stream()
                 .filter(line -> line.contains("card code 1 is not in the card database"))
                 .toList();
-        assertEquals(1, unknownCode.size(),
-                "Expected exactly one warning naming code 1, captured: " + lines);
-        assertTrue(unknownCode.getFirst().startsWith("[duel@test] "),
-                "Native log lines should carry the duel tag: " + unknownCode.getFirst());
     }
 
     /** A card database that cannot be opened fails loudly instead of returning a null handle. */
