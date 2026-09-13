@@ -41,7 +41,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | --- | ------------------ | -------------------------------------- | ------------------------------------------------------------------- | ------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | `MSG_RETRY`        | ✅ 32 sites (`playerop.cpp`)            | ✅ empty body                                                        | ✅     | ✅    | Client nulls `pendingPrompt` on send; `Retry` only re-renders, so the prompt disappears and the engine waits forever. The engine does **not** re-send the `SELECT_*` after a retry.                                                                                                                                                              |
 | 2   | `MSG_HINT`         | ✅ 75 sites                             | ✅ `u8 type, u8 player, u64 data`                                    | ✅      | ✅    | `HINT_SELECTMSG` captions the next prompt; `OPSELECTED`/`RACE`/`ATTRIB`/`CODE`/`NUMBER` toast; `MESSAGE` opens a modal; `CARD` fills the info banner; `ZONE` flashes the zones. `HINT_EVENT` and `HINT_EFFECT` are still dropped. Core emits EVENT/SELECTMSG/OPSELECTED/RACE/ATTRIB/CODE/NUMBER/CARD; MESSAGE/ZONE/SKILL arrive only via `Duel.Hint` from scripts. `HINT_CARD` sites hardcode `player = 0`. |
-| 3   | `MSG_WAITING`      | ➖ host-only                            | ➖                                                                   |        |      | edopro's server synthesises it.                                                                                                                                                                                                                                                                                                                  |
+| 3   | `MSG_WAITING`      | ✅ host-synthesised                     | ✅ host-synthesised                                                  | ✅     | ✅    | Never from the engine: the duel handlers send `DuelMessage.Waiting` to the duellist who was not prompted.                                                                                                                                                                                                                                                                                                                  |
 | 4   | `MSG_START`        | ➖ host-only                            | ➖                                                                   | ➖      | ✅    | `parseStart`, `DuelMessage.Start`, the codec arm and `ClientDuelState`'s `Start` branch are all dead. Duelcraft uses `DuelStartPayload`.                                                                                                                                                                                                         |
 | 5   | `MSG_WIN`          | ✅ `processor.cpp:4420-4427, 4712-4719` | ✅ `u8 winner (2 = draw), u8 reason (1 LP, 2 deck-out, else script)` | ➖      | ✅    | Both server handlers convert it to `DuelEndPayload`, so the client's `Win` branch and `PromptController.showWinOverlay` are unreachable.                                                                                                                                                                                                         |
 | 6   | `MSG_UPDATE_DATA`  | ➖ synthesised by `DuelSession`         | n/a                                                                 | ⚠️     | n/a  | Only ATK/DEF/level labels consume it; see §5.                                                                                                                                                                                                                                                                                                    |
@@ -350,8 +350,8 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] All 37 `DUEL_*` flags, 8 `DUEL_MODE_*` presets and 5 `_FORB` sets mirrored with correct values (`DUEL_6_STEP_BATLLE_STEP` renamed to fix the engine typo).
 - [x] Card reader fills every `OCG_CardData` field: setcodes unpacked to `u16[]` with terminator, `race` as u64, level/lscale/rscale unpacked, `def` used as `link_marker` for `TYPE_LINK`.
 - [ ] Only the 8 presets are selectable (`/duel … [rule]`); individual flags (`DUEL_TEST_MODE`, `DUEL_ATTACK_FIRST_TURN`, `DUEL_PSEUDO_SHUFFLE`, …) cannot be composed. Client reads 4 flags for layout.
-- [ ] Starting LP 8000, hand 5, draw 1 hardcoded in `PlayerOptions.standard()`; no asymmetric team options; LP bars hardcode `max-value="8000"`.
-- [ ] No banlist, no deck legality (size, copies, rule-set forbidden types); `DUEL_MODE_MR*_FORB` declared and unused.
+- [x] Starting LP, hand size and draw count come from `/duel challenge`/`/duel test` (defaults 8000/5/1) and the LP bars take their maximum from the duel's starting LP; team options are still symmetric.
+- [x] `DeckValidator` checks main and extra sizes and the three-copy limit at challenge, accept and test time (no banlist, no alias collapsing and no rule-set forbidden types, all of which need the card database the server never opens; `DUEL_MODE_MR*_FORB` stays declared and unused).
 - [ ] No match / best-of-3.
 - [ ] Card database `open()` failure and unknown card codes are silent (blank card, no log). Missing `constant.lua`/`utility.lua` or a missing `cXXXX.lua` is silent; the card becomes effect-less.
 - [ ] `ScriptProvider` caches nothing; lookup is a flat string join over the search paths.
@@ -384,8 +384,9 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [ ] Solo AI: `handleSoloAutoResponse` → `process()` → `routePrompt` → … is directly recursive; a long AI chain grows the stack. The `activeDuels` loop and "need a way to get the handler" comments are scaffolding.
 - [ ] A prompt with no `routePrompt`/`onMessage` case returns 0, so `process()` exits with `AWAITING` and waits forever (same class as §3.7).
 - [ ] No threading guards anywhere in `duel/`, `server/`, `core/`; `ServerPayloadHandler` does not `enqueueWork`. Everything assumes the server thread.
-- [ ] **First-turn choice.** edopro runs rock-paper-scissors between the players before creating the duel and lets the winner choose who goes first, swapping teams so the first player is engine player 0 (§12.3). Duelcraft: the challenger always goes first; the engine's own `ROCK_PAPER_SCISSORS` prompt is script-driven and unrelated.
-- [ ] **`MSG_WAITING` and time limit.** edopro's host tells the non-prompted player it is waiting and runs a per-turn clock that ends the duel on expiry (§12.3). Duelcraft has neither; its "Waiting…" label is driven by a dirty flag that only fires on chain events.
+- [x] **First-turn choice.** Accepting a challenge opens a chat-button rock-paper-scissors (`/duel hand`), ties replayed; the winner answers `/duel first yes|no` and whoever goes first becomes engine player 0 (§12.3). Solo `/duel test` skips the roll and keeps the human as player 0.
+- [x] **`MSG_WAITING`.** Forwarding a prompt also sends `DuelMessage.Waiting` to the other duellist, and the client holds "Waiting for opponent..." on the status label until its own next prompt.
+- [ ] **Per-turn time limit.** edopro runs a per-turn clock that ends the duel on expiry (§12.3); Duelcraft has none.
 
 ---
 
@@ -608,14 +609,14 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] Adopt the `MSG_MOVE` hide predicate (`:1032-1033`); §3.6.
 - [x] Keep face-up draws visible to the opponent (`:1080-1084`).
 - [x] Send `MSG_MISSED_EFFECT` to the controller only once parsed (`:1094-1098`).
-- [ ] Synthesise `MSG_WAITING` for the non-prompted player (`:1326-1343`).
+- [x] Synthesise `MSG_WAITING` for the non-prompted player (`:1326-1343`).
 - [x] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
 - [x] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
 - [ ] Take the full-information copy before sanitising and keep it for a future replay.
 - [x] Response gate: per-player pending-response state plus the responder-equals-prompted check edopro lacks (`:1284-1297`).
-- [ ] Rock-paper-scissors before the duel and let the winner choose who goes first; make the first player engine player 0 (`:444-565`).
+- [x] Rock-paper-scissors before the duel and let the winner choose who goes first; make the first player engine player 0 (`:444-565`).
 - [ ] Synthesised start packet with both players' deck and extra counts from `OCG_DuelQueryCount` (`:696-721`).
-- [ ] Deck legality at ready time per `CheckDeckSize`/`CheckDeckContent` (sizes, copies, banlist, extra-deck types).
+- [x] Deck legality at ready time per `CheckDeckSize`/`CheckDeckContent` (main and extra sizes and the copy limit only; banlist, alias collapsing, forbidden and extra-deck types need a server-side card database).
 - [x] Surrender and disconnect end with a synthesised `MSG_WIN` (reasons 0 and 4) so both clients learn the result (`:777-793`, `:284-309`).
 - [ ] Optional: per-turn time limit ending in `MSG_WIN` reason 3 (`:1439-1460`).
 - [x] Treat `MSG_RETRY` as a bug signal (edopro ends the duel) and prevent it by validating before sending; §3.3.
