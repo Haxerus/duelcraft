@@ -108,6 +108,8 @@ public class SoloDuelHandler implements DuelEventListener {
             if (response != null) {
                 LOGGER.debug("[Solo AI] Auto-responding to {} with {} bytes",
                         msg.getClass().getSimpleName(), response.length);
+                // generic_duel.cpp:1326-1343: the duellist who was not prompted is told to wait.
+                sendToPlayer(new DuelMessage.Waiting());
                 // Schedule the response to be applied after this message batch completes
                 pendingAutoResponse = () -> DuelManager.get().handleSoloAutoResponse(duelId, response);
                 // Still pause processing; DuelManager will apply the answer and resume.

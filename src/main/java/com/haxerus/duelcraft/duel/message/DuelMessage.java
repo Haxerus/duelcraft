@@ -22,6 +22,14 @@ public sealed interface DuelMessage {
         public int type() { return MSG_RETRY; }
     }
 
+    /**
+     * The other duellist is being prompted. Host-synthesised, never parsed from the engine
+     * ({@code generic_duel.cpp:1326-1343}).
+     */
+    record Waiting() implements DuelMessage {
+        public int type() { return MSG_WAITING; }
+    }
+
     // ---- Lifecycle ----
 
     record Win(int winner, int reason) implements DuelMessage {

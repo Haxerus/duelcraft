@@ -80,6 +80,8 @@ public class ServerDuelHandler implements DuelEventListener {
     private void sendToPlayer(int playerIndex, DuelMessage msg) {
         pendingPlayer = playerIndex;
         send(playerIndex, msg);
+        // generic_duel.cpp:1326-1343: every duellist but the prompted one is told to wait.
+        send(1 - playerIndex, new DuelMessage.Waiting());
     }
 
     private void send(int playerIndex, DuelMessage msg) {

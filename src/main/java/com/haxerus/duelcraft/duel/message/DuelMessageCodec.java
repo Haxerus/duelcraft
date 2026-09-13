@@ -32,6 +32,7 @@ public class DuelMessageCodec {
         switch (msg) {
             // System
             case DuelMessage.Retry ignored -> {}
+            case DuelMessage.Waiting ignored -> {}
 
             // Lifecycle
             case DuelMessage.Win m -> { buf.writeByte(m.winner()); buf.writeByte(m.reason()); }
@@ -271,6 +272,7 @@ public class DuelMessageCodec {
         return switch (type) {
             // Lifecycle
             case MSG_RETRY -> new DuelMessage.Retry();
+            case MSG_WAITING -> new DuelMessage.Waiting();
             case MSG_WIN -> new DuelMessage.Win(buf.readByte(), buf.readByte());
             case MSG_UPDATE_DATA -> new DuelMessage.UpdateData(buf.readByte(), buf.readUnsignedByte(), readQueriedCardList(buf));
             case MSG_UPDATE_CARD -> new DuelMessage.UpdateCard(buf.readByte(), buf.readUnsignedByte(), buf.readInt(), readQueriedCard(buf));

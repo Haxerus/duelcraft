@@ -79,6 +79,7 @@ class DuelMessageCodecTest {
     static {
         SAMPLES.put(DuelMessage.Raw.class, new DuelMessage.Raw(99, new byte[]{9, 8, 7, 6, 5}));
         SAMPLES.put(DuelMessage.Retry.class, new DuelMessage.Retry());
+        SAMPLES.put(DuelMessage.Waiting.class, new DuelMessage.Waiting());
         SAMPLES.put(DuelMessage.Win.class, new DuelMessage.Win(1, 2));
         SAMPLES.put(DuelMessage.UpdateData.class,
                 new DuelMessage.UpdateData(1, 0x84, List.of(queriedCard(1001, true), queriedCard(1002, false))));
