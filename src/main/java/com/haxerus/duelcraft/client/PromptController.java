@@ -653,8 +653,25 @@ public class PromptController {
         String text = disfield
                 ? "Select " + remaining + " zone(s) to become unusable"
                 : (remaining <= 1 ? "Select a zone" : "Select " + remaining + " more zone(s)");
-        lbl.setText(Component.literal(hintCaption(text, "")));
+        lbl.setText(Component.literal(placeCaption(text, disfield, remaining)));
         statusLabel.removeClass("hidden");
+    }
+
+    /**
+     * {@code MSG_SELECT_PLACE}'s {@code HINT_SELECTMSG} carries a raw card code, not a description
+     * ({@code operations.cpp:1273, 1288, 2878, 4538, 4934}), so edopro formats system string 569
+     * with that card's name ({@code duelclient.cpp:2244}) and only reads the hint as a desc for
+     * {@code SELECT_DISFIELD} ({@code :2248}).
+     */
+    private String placeCaption(String fallback, boolean disfield, int remaining) {
+        if (state.promptCaptionDesc == 0) return fallback;
+        if (disfield) return hintCaption(fallback, "");
+        String name = callbacks.cardDisplayName((int) state.promptCaptionDesc);
+        String template = callbacks.systemString(569);
+        String text = template != null
+                ? template.replace("%ls", name)
+                : "Select the zone to place \"" + name + "\"";
+        return remaining > 1 ? text + " (" + remaining + ")" : text;
     }
 
     /** Toggle a clicked field zone for the active SelectPlace/SelectDisfield prompt; submit at count. */

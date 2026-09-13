@@ -69,6 +69,16 @@ public final class DuelHintsScenario implements UIScenario {
          })
          .frames(2)
          .checkHidden("#hint-modal")
+         // SELECT_PLACE's hint is a raw card code, so the caption is system string 569 with that
+         // card's name — never a desc lookup, which would render it as "Effect <code>#<offset>".
+         .step("hint the card a zone is being chosen for",
+                 ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.Hint(HINT_SELECTMSG, 0, 89631139L)))
+         .step("choose a monster zone",
+                 ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.SelectPlace(0, 1, ~0x1F)))
+         .ticks(2)
+         .checkTextContains("#status-label", "zone")
+         .check("the place caption is not a desc lookup",
+                 ctx -> !ctx.el("#status-label").text().contains("Effect"))
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();
              ctx.mc().setScreen(null);
