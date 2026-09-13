@@ -182,6 +182,17 @@
         opacity: 0;
         }
 
+        /* Shuffle hand (SELECT_IDLECMD, canShuffle). Hidden with display:none so the
+           center row keeps its usual width whenever the engine does not offer it. */
+        #shuffle-btn {
+        width: 40;
+        height: 14;
+        }
+
+        #shuffle-btn.hidden {
+        display: none;
+        }
+
         /* ── Status Label (centered overlay) ── */
         #status-label {
         position: absolute;
@@ -196,6 +207,20 @@
         }
 
         #status-label.hidden {
+        display: none;
+        }
+
+        /* ── Shared Cancel/Finish button (edopro's btnCancelOrFinish) ── */
+        #prompt-action-bar {
+        position: absolute;
+        bottom: 32;
+        left: 0;
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
+        }
+
+        .prompt-btn.hidden {
         display: none;
         }
 
@@ -699,6 +724,32 @@
         font-size: 7;
         }
 
+        /* ── Battle position choices (SELECT_POSITION card-image buttons) ── */
+        .position-row {
+        flex-direction: row;
+        gap-all: 2;
+        }
+
+        .position-choice {
+        flex-direction: column;
+        align-items: center;
+        width: 42;
+        gap-all: 1;
+        }
+
+        /* A defense choice is the same card rotated 90°, so the column has to be wide
+           enough for the card's long edge. */
+        .position-choice .card {
+        min-width: 26;
+        min-height: 35;
+        }
+
+        .position-label {
+        font-size: 6;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
         /* ── Sort ordinal badge (SortCard/SortChain) ── */
         .card-ordinal {
         position: absolute;
@@ -877,6 +928,7 @@
                     <button id="phase-btn-center" class="phase-btn" text="BP" />
                     <element id="emz-right" class="square-slot emz-slot" />
                     <button id="phase-btn-right" class="phase-btn" text="EP" />
+                    <button id="shuffle-btn" class="hidden" text="Shuffle" />
                 </element>
                 <element id="plr-piles-banished" class="pile-column">
                     <element id="plr-banished" class="card-slot pile-slot">
@@ -965,6 +1017,11 @@
 
         <!-- Status Label (chain / waiting overlay) -->
         <label id="status-label" class="hidden">Waiting...</label>
+
+        <!-- Shared Cancel/Finish button for field selections, also bound to right-click -->
+        <element id="prompt-action-bar">
+            <button id="prompt-action-btn" class="prompt-btn hidden" text="Finish" />
+        </element>
 
         <!-- Card Info Banner (left, shown on hover) -->
         <element id="card-info-banner" class="hidden">
