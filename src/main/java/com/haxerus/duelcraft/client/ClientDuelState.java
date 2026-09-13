@@ -1031,10 +1031,7 @@ public class ClientDuelState {
      * when the next prompt arrives.
      */
     public void highlightPromptCard(LocInfo loc) {
-        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
-        if (card == null) return;
-        highlighted.add(card);
-        markZoneDirty(loc.controller(), loc.location());
+        highlight(List.of(loc));
     }
 
     private void clearHighlights() {
