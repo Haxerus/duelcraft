@@ -72,3 +72,13 @@ For the final matrix, also pass `-PldTestGuiScale=2` at 1280 × 720, `=3` at 102
 Final reports and screenshots are in `build/ui-review/verified-<width>x<height>/`; `build/ui-review/index.html` indexes all 210 captures. These generated artifacts are local, gitignored evidence. All final captures were inspected with contact sheets and full-size detail checks. A follow-up code review found no remaining actionable issues after the two regression fixes above.
 
 Limits: this validates implemented duel surfaces using synthetic harness interactions, not a live multiplayer match or future home/deck/collection screens. The HTML file is a component design reference; acceptance is based on the Minecraft captures. Native libraries were reused, not rebuilt. LDLib2 emits transient layout-dirty warnings during some updates; the final runs have no failed assertions.
+
+## Follow-up: reveal spacing and Shuffle
+
+User review identified two gaps in the original visual acceptance: fixed card gaps left spare width on the reveal panel's right edge, and offering Shuffle widened the center controls and shifted zones. Added regression checks reproduced both before the fixes.
+
+- Reveal/pile scrollers now distribute spare width between cards. The 60-card scenario checks balanced outer insets, equal horizontal gaps and scrolling.
+- Shuffle is anchored just outside the hand's lower-right corner, outside normal layout flow. Its scenario toggles availability in MR3, MR5 and Speed, checks unchanged field/hand/center/zone bounds, verifies the button fits the canvas beside the hand, and presses it to confirm it remains usable.
+- The production change is limited to XML/LSS. The response handler is unchanged.
+- Updated captures and reports are saved under `build/ui-review/followup-<width>x<height>/`; `build/ui-review/followup.html` shows the corrected surfaces. The original gallery links to this follow-up so its old captures are not mistaken for the latest layouts.
+- Verification: full group at 1280 × 720 passed 25/25 scenarios and 4,376/4,376 checks (72 captures). Focused `duel_idle_shuffle,duel_panel_layout` runs at 1920 × 1080 and 1024 × 768 each passed 2/2 scenarios and 501/501 checks (13 captures each). Reviewed all 98 captures. Shuffle's scenario retains GUI scale 3; the panel scenario uses launch scales 2, 4 and 3 respectively. XML parsing and `git diff --check` also passed. Independent review found no production defect; its click-test finding was fixed using the existing press helper before these final runs.

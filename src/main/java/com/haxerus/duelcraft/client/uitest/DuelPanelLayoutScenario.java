@@ -9,6 +9,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.ScenarioBuilder;
+import com.lowdragmc.lowdraglib2.uitest.ElementBounds;
 import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import net.minecraft.network.chat.Component;
@@ -49,6 +50,22 @@ public final class DuelPanelLayoutScenario implements UIScenario {
                 IntStream.range(0, 60).mapToObj(i -> new DuelMessage.ConfirmCard(0, 0, LOCATION_DECK, i)).toList())));
         capture(s, "large-reveal");
         s.checkCount("#zone-inspector-list .card", 60)
+         .step("reveal grid uses its full width evenly", ctx -> {
+             var cards = ctx.all("#zone-inspector-list .card");
+             var first = cards.getFirst().bounds();
+             var row = cards.stream().map(ref -> ref.bounds())
+                     .filter(b -> Math.abs(b.y() - first.y()) <= 1).toList();
+             var content = ElementBounds.of(
+                     ctx.el("#zone-inspector-list").as(ScrollerView.class).viewContainer);
+             float left = first.x() - content.x();
+             float right = content.right() - row.getLast().right();
+             ctx.check("reveal row has balanced edge space", Math.abs(left - right) <= 1, left, right);
+             float gap = row.get(1).x() - first.right();
+             for (int i = 2; i < row.size(); i++) {
+                 float nextGap = row.get(i).x() - row.get(i - 1).right();
+                 ctx.check("reveal card gaps are equal", Math.abs(gap - nextGap) <= 1, gap, nextGap);
+             }
+         })
          .step("remember inspector offset", ctx -> ctx.put("pileY", ctx.all("#zone-inspector-list .card").getFirst().bounds().y()))
          .scroll("#zone-inspector-list", -20).ticks(2)
          .check("large inspector scrolls", ctx -> ctx.all("#zone-inspector-list .card").getFirst().bounds().y() < (float) ctx.get("pileY"));
