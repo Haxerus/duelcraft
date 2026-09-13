@@ -76,20 +76,20 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 
 | # | Message | Core | Parse | Client | Test | Notes |
 |---|---|---|---|---|---|---|
-| 50 | `MSG_MOVE` | ✅ 17 sites | ✅ `u32 code, loc_info from, loc_info to, u32 reason` | ⚠️ | ✅ | Overlay moves never apply: the engine writes the host zone `\| 0x80` (`0x84` for a monster-zone material), the codec narrows it to a negative byte, and the client `switch` matches `0x80` exactly (see §3.4). `reason` ignored. Hand removal falls back to `removeLast()` on an out-of-range sequence. Tokens leaving play arrive with a zeroed `to`. |
+| 50 | `MSG_MOVE` | ✅ 17 sites | ✅ `u32 code, loc_info from, loc_info to, u32 reason` | ✅ | ✅ | Card objects move between containers; overlay attach/detach renumbers materials, counters and links follow edopro's rules. `reason` ignored. Hand removal falls back to the tail on an out-of-range sequence. Tokens leaving play arrive with a zeroed `to`. |
 | 53 | `MSG_POS_CHANGE` | ✅ `operations.cpp:5278` | ✅ `u32 code, u8 con, u8 loc, u8 seq, u8 prev, u8 cur` | ✅ | ✅ | `prevPosition` unused (no flip animation). |
 | 54 | `MSG_SET` | ✅ 3 sites | ✅ `u32 code + loc_info` | ✅ | ✅ | Code zeroed for the opponent. |
-| 55 | `MSG_SWAP` | ✅ `field.cpp:461` | ✅ `u32, loc_info, u32, loc_info` | ⚠️ | ❌ | Only MZONE↔MZONE handled; SZONE swaps dropped; `mzoneStats` and overlay lists not swapped. |
-| 56 | `MSG_FIELD_DISABLED` | ✅ `processor.cpp:4476, 4641` | ✅ `u32` (low 16 = p0, high 16 = p1) | ❌ | ❌ | Disabled zones not greyed out and still clickable. |
+| 55 | `MSG_SWAP` | ✅ `field.cpp:461` | ✅ `u32, loc_info, u32, loc_info` | ✅ | ✅ | Swaps the two card objects wherever they sit, so stats, counters and materials travel with them. |
+| 56 | `MSG_FIELD_DISABLED` | ✅ `processor.cpp:4476, 4641` | ✅ `u32` (low 16 = p0, high 16 = p1) | ✅ | ✅ | Mask stored per player; disabled zones get a grey overlay. They are still clickable. |
 | 60 | `MSG_SUMMONING` | ✅ `operations.cpp:2239` | ✅ `u32 code + loc_info` | ⚠️ no-op | ✅ | No summon announcement or animation. |
 | 61 | `MSG_SUMMONED` | ✅ | ✅ empty | ✅ no-op | ✅ | |
 | 62 | `MSG_SPSUMMONING` | ✅ 3 sites | ✅ (`code` is 0 for face-down summons) | ⚠️ no-op | ❌ | |
 | 63 | `MSG_SPSUMMONED` | ✅ 3 sites | ✅ empty | ✅ no-op | ❌ | |
 | 64 | `MSG_FLIPSUMMONING` | ✅ `operations.cpp:2373` | ✅ | ✅ | ❌ | |
 | 65 | `MSG_FLIPSUMMONED` | ✅ | ✅ empty | ✅ no-op | ❌ | |
-| 80 | `MSG_CARD_SELECTED` | ✅ `processor.cpp:2031` | ✅ `u32 n, n×loc_info` (no player byte) | ❌ no-op | ❌ | Attack-target flow only. |
+| 80 | `MSG_CARD_SELECTED` | ✅ `processor.cpp:2031` | ✅ `u32 n, n×loc_info` (no player byte) | ✅ | ❌ | Attack-target flow only. Highlights the named cards until the next prompt. |
 | 81 | `MSG_RANDOM_SELECTED` | ✅ `libgroup.cpp:326` | ❌ | ❌ | ❌ | `u8 p, u32 n, n×loc_info`. Random discards and targets get no reveal. |
-| 83 | `MSG_BECOME_TARGET` | ✅ 3 sites | ✅ `u32 n, n×loc_info` | ❌ | ❌ | Targeted cards never highlighted. |
+| 83 | `MSG_BECOME_TARGET` | ✅ 3 sites | ✅ `u32 n, n×loc_info` | ✅ | ✅ | Highlights the targeted cards until the next prompt. |
 
 ### 1.4 Chains
 
@@ -125,12 +125,12 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 
 | # | Message | Core | Parse | Client | Test | Notes |
 |---|---|---|---|---|---|---|
-| 93 | `MSG_EQUIP` | ✅ `card.cpp:1551` | ✅ `loc_info card, loc_info target` | ❌ | ✅ | No equip link shown. |
+| 93 | `MSG_EQUIP` | ✅ `card.cpp:1551` | ✅ `loc_info card, loc_info target` | ✅ | ✅ | Bidirectional link tracked on the card objects; not drawn yet. |
 | 95 | `MSG_UNEQUIP` | ➖ constant only | ➖ | | | `card::unequip()` emits nothing; hosts learn from `MSG_MOVE`. Parser case, record and codec arm are dead. |
-| 96 | `MSG_CARD_TARGET` | ✅ `card.cpp:2345` | ✅ | ❌ | ❌ | |
-| 97 | `MSG_CANCEL_TARGET` | ✅ `card.cpp:2358` | ✅ | ❌ | ❌ | |
-| 101 | `MSG_ADD_COUNTER` | ✅ `card.cpp:2241` | ✅ `u16 type, u8 con, u8 loc, u8 seq, u16 n` | ❌ | ❌ | No counter state exists on the client. |
-| 102 | `MSG_REMOVE_COUNTER` | ✅ 4 sites | ✅ same | ❌ | ❌ | |
+| 96 | `MSG_CARD_TARGET` | ✅ `card.cpp:2345` | ✅ | ✅ | ❌ | Bidirectional link; the target gets the highlight. |
+| 97 | `MSG_CANCEL_TARGET` | ✅ `card.cpp:2358` | ✅ | ✅ | ❌ | |
+| 101 | `MSG_ADD_COUNTER` | ✅ `card.cpp:2241` | ✅ `u16 type, u8 con, u8 loc, u8 seq, u16 n` | ✅ | ✅ | Per-card counter map; the total is badged on the card. |
+| 102 | `MSG_REMOVE_COUNTER` | ✅ 4 sites | ✅ same | ✅ | ❌ | |
 | 160 | `MSG_CARD_HINT` | ✅ 5 sites | ✅ `loc_info, u8 type, u64 value` | ❌ | ❌ | `CHINT_TURN` counters, `CHINT_DESC_ADD/REMOVE` never shown. Scripts can emit types 0 to 5; 6 and 7 are engine-only. |
 | 165 | `MSG_PLAYER_HINT` | ✅ `field.cpp:1332-1402` | ❌ deliberately `Raw` | | ✅ asserts Raw | `u8 player, u8 type (PHINT_DESC_ADD 6 / REMOVE 7), u64 desc`. Emitted only as a side effect of `EFFECT_FLAG_PLAYER_TARGET \| EFFECT_FLAG_CLIENT_HINT` effects. |
 | 161 | `MSG_TAG_SWAP` | ➖ unreachable | | | | `field::tag_swap` returns early unless `OCG_NewCardInfo.duelist > 0`; Duelcraft always passes 0. |
@@ -237,9 +237,9 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] Server broadcasts `Retry` to both players; only the responder needs it.
 
 ### 3.4 XYZ overlay moves never apply on the client
-- [ ] `card::get_info_location()` reports a material as `{host con, host loc | LOCATION_OVERLAY, host seq, material seq}` (`card.cpp:216-222`), so `location` is `0x84`/`0x88`, never `0x80`. `ClientDuelState.markLocationDirty/removeCard/placeCard` switch on `case LOCATION_OVERLAY` (exact `0x80`) and fall to `default`.
+- [x] `card::get_info_location()` reports a material as `{host con, host loc | LOCATION_OVERLAY, host seq, material seq}` (`card.cpp:216-222`), so `location` is `0x84`/`0x88`, never `0x80`. `ClientDuelState.markLocationDirty/removeCard/placeCard` switch on `case LOCATION_OVERLAY` (exact `0x80`) and fall to `default`.
 - [x] `DuelMessageCodec.writeLocInfo/readLocInfo` (and every card-list writer except `SortableCard`) store `location` with `writeByte`/`readByte`; values `≥ 0x80` decode negative. Use `readUnsignedByte` throughout.
-- [ ] `FieldRenderer` never reads `state.overlay`, so materials would be invisible even once tracked. Detach removes the last material regardless of which one left.
+- [x] `FieldRenderer` never reads `state.overlay`, so materials would be invisible even once tracked. Detach removes the last material regardless of which one left.
 
 ### 3.5 `SELECT_DISFIELD` with `count > 1` deadlocks
 - [x] `ResponseBuilder.selectPlace` emits one triple and `PromptController` never reads `sel.count()`. `processor.cpp:4579` passes `dis_count` (up to 5) and `libduel.cpp:3206, 3247` pass Lua-supplied counts. Short responses read as zeros, `location == 0` fails validation, `MSG_RETRY` forever.
@@ -393,22 +393,22 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 
 Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structural gaps beyond the per-message rows:
 
-- [ ] **Card object model.** edopro moves one card object between containers, so counters, equip links, targets and materials travel with it (§12.4). Duelcraft's parallel code/position arrays are the root cause of the `Swap`, overlay and counter gaps below.
+- [x] **Card object model.** edopro moves one card object between containers, so counters, equip links, targets and materials travel with it (§12.4). Duelcraft's parallel code/position arrays are the root cause of the `Swap`, overlay and counter gaps below.
 - [x] **Win/lose.** `DuelEndPayload` closes the screen at once; the win overlay code path is unreachable. Wanted: a result overlay with winner and reason, a concede button, and `LDLibDuelScreen.close()` on every exit so statics do not linger.
 - [x] **ESC** closes the screen with no way back (`shouldCloseOnEsc` inherited); incoming messages accumulate into an unrendered state. Needs `shouldCloseOnEsc = false` or `/duel show` rebuilding from `ClientDuelState` (or a `QueryField` resync).
 - [ ] **No duel log.** Attacks, coin flips, negations, targets, equips, LP reasons and every hint vanish once processed.
-- [ ] **Overlay materials** tracked (badly, §3.4) and never drawn.
-- [ ] **Counters** have no client state.
-- [ ] **Equip and target links** not tracked or drawn.
-- [ ] **Targeting highlight** (`BecomeTarget`, `CardSelected`, `RandomSelected`) absent.
-- [ ] **Disabled zones** (`FieldDisabled`, `HINT_ZONE`) not greyed out.
+- [x] **Overlay materials** tracked (badly, §3.4) and never drawn. Now stored on the host card and badged with the material count.
+- [x] **Counters** have no client state. Now a per-card map, badged with the total.
+- [x] **Equip and target links** not tracked or drawn. Both are tracked bidirectionally now; only the target highlight is drawn, equip links still are not.
+- [x] **Targeting highlight** (`BecomeTarget`, `CardSelected`) drawn until the next prompt; `RandomSelected` is still unparsed.
+- [x] **Disabled zones**: `FieldDisabled` greys the zone out; `HINT_ZONE` still does nothing.
 - [ ] **Chain visualisation**: count text only; no link numbers on cards, no resolve/negate feedback.
 - [ ] **Battle feedback**: no attack arrow, no damage-calculation display, no LP change animation or damage numbers.
 - [ ] **Pendulum scales** never shown (`LSCALE`/`RSCALE` not requested).
 - [ ] **Card hints** (`CHINT_TURN` counters, `CHINT_DESC_ADD`) not shown.
 - [ ] **Hint captions**: prompt titles are hard-coded ("Select 1-1 card(s)") instead of `HINT_SELECTMSG`.
 - [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong. `extraPos[]` is filled only in the dead `Start` branch.
-- [ ] `Swap` handles MZONE↔MZONE only and does not move stats or overlays.
+- [x] `Swap` handles MZONE↔MZONE only and does not move stats or overlays.
 - [ ] `Move.reason` ignored (no destroy/banish/return distinction).
 - [ ] Battle sub-phases collapse to "Battle"; no phase-track widget.
 - [ ] Status label is written by both `updateStatusLabel()` (on `CHAIN` only) and the prompt controller; they overwrite each other.
@@ -622,16 +622,18 @@ Items already tracked in §3 are referenced, not repeated.
 - [ ] Treat `MSG_RETRY` as a bug signal (edopro ends the duel) and prevent it by validating before sending; §3.3.
 
 **Client model**
-- [ ] One card object per card, moved between containers (§12.4).
-- [ ] Materials stored on the host card plus a flat set, renumbered on detach; §3.4.
-- [ ] `ClearTarget()` and equip detach on every location change and face-down flip; `counters.clear()` on leaving the field or turning face-down.
-- [ ] Decks and extra decks as card lists so `CONFIRM_DECKTOP`, `DECK_TOP`, `REVERSE_DECK`, `SWAP_GRAVE_DECK` and `SHUFFLE_DECK` code-zeroing can work.
-- [ ] Bidirectional equip and target links; counters map; refcounted card and player hints; `cHint/chValue`.
+- [x] One card object per card, moved between containers (§12.4).
+- [x] Materials stored on the host card, renumbered on detach; §3.4. (No flat set: nothing needs to iterate every material.)
+- [x] `ClearTarget()` and equip detach on every location change and face-down flip; `counters.clear()` on leaving the field or turning face-down.
+- [x] Decks and extra decks as card lists so `CONFIRM_DECKTOP`, `DECK_TOP`, `REVERSE_DECK`, `SWAP_GRAVE_DECK` and `SHUFFLE_DECK` code-zeroing can work.
+- [x] Bidirectional equip and target links; counters map.
+- [ ] Refcounted card and player hints; `cHint/chValue`.
 - [ ] Query application rules: negative ATK renders "?"; `COUNTERS` assign; `IS_HIDDEN` stays server-side.
 - [ ] Rendering rules: ATK/DEF colour against base; link arrows only on hover as shaded zones; `STATUS_DISABLED | STATUS_FORBIDDEN` stamp; graveyard and overlay cards always face-up; hand cards face-down when `code == 0`.
 - [ ] Surfaces: scrollable log with click-to-view codes, toast, blocking modal for `HINT_MESSAGE`, turn/phase/result banners.
 - [ ] Hint handling per type (§12.4 row `MSG_HINT`), `HINT_SELECTMSG` as the caption of the next prompt.
-- [ ] Highlights for `BECOME_TARGET`, `CARD_SELECTED`, `RANDOM_SELECTED`; grey X for `FIELD_DISABLED`; negated stamp for `CHAIN_NEGATED`/`DISABLED`; chain markers at the trigger location.
+- [x] Highlights for `BECOME_TARGET` and `CARD_SELECTED`; grey overlay for `FIELD_DISABLED`.
+- [ ] Highlight for `RANDOM_SELECTED`; negated stamp for `CHAIN_NEGATED`/`DISABLED`; chain markers at the trigger location.
 - [ ] LP feedback: signed floating number in red (damage), green (recover), blue (cost); `LPUPDATE` silent.
 - [ ] Coin and dice results as log plus toast.
 
