@@ -267,7 +267,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] `FieldRenderer.highlightValidPlaces` reads EMZ bits only from the viewer block (5/6); a prompt whose only legal zones are the opponent-side EMZ bits (21/22) shows nothing.
 - [x] `ConfirmDeckTop`/`ConfirmCards` reveal is overwritten by the next `PILE_COUNTS` refresh because `showConfirmCards` does not reset the inspected pile.
 - [ ] `OcgCoreTest` reads `MSG_WIN` as `u8 + u32`; the body is `u8 + u8`. Latent `BufferUnderflowException` if a test duel ends.
-- [ ] `card_database.cpp:49` comment describes the lscale/rscale bit ranges backwards; the code is right (lscale bits 24-31, rscale 16-23).
+- [x] `card_database.cpp:49` comment describes the lscale/rscale bit ranges backwards; the code is right (lscale bits 24-31, rscale 16-23).
 
 ---
 
@@ -338,7 +338,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 | `OCG_DuelNewCard` | ✅ | ✅ | ✅ deck + extra, `duelist = 0`, `seq = 0`, main deck added in reverse so index 0 is drawn first |
 | `OCG_StartDuel` | ✅ | ✅ | ✅ |
 | `OCG_DuelProcess` / `OCG_DuelGetMessage` / `OCG_DuelSetResponse` | ✅ | ✅ | ✅ |
-| `OCG_LoadScript` | ✅ internal to `ScriptProvider` | ➖ | `constant.lua`, `utility.lua` at creation; result ignored |
+| `OCG_LoadScript` | ✅ internal to `ScriptProvider` | ➖ | `constant.lua`, `utility.lua` at creation; a failed load is logged as an error |
 | `OCG_DuelQueryCount` | ✅ | ✅ | ⚠️ extra deck slot count only |
 | `OCG_DuelQuery` | ✅ | ✅ | ✅ single-slot refreshes |
 | `OCG_DuelQueryLocation` | ✅ | ✅ | ✅ whole-location refreshes |
@@ -353,10 +353,10 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] Starting LP, hand size and draw count come from `/duel challenge`/`/duel test` (defaults 8000/5/1) and the LP bars take their maximum from the duel's starting LP; team options are still symmetric.
 - [x] `DeckValidator` checks main and extra sizes and the three-copy limit at challenge, accept and test time (no banlist, no alias collapsing and no rule-set forbidden types, all of which need the card database the server never opens; `DUEL_MODE_MR*_FORB` stays declared and unused).
 - [ ] No match / best-of-3.
-- [ ] Card database `open()` failure and unknown card codes are silent (blank card, no log). Missing `constant.lua`/`utility.lua` or a missing `cXXXX.lua` is silent; the card becomes effect-less.
-- [ ] `ScriptProvider` caches nothing; lookup is a flat string join over the search paths.
-- [ ] `OCG_LogHandler` prints to `stderr` with the `type` ignored; `nSetLogHandler` is commented out. Script errors never reach the Java logger or carry a duel id.
-- [ ] `TYPE_LINK` literal in `card_database.cpp` duplicates `OcgConstants`.
+- [x] Card database `open()` failure and unknown card codes are silent (blank card, no log). Missing `constant.lua`/`utility.lua` or a missing `cXXXX.lua` is silent; the card becomes effect-less. Decided: `nCreateEngine` throws `IllegalStateException` with the sqlite message; an unknown code and a missing `cXXXX.lua` warn once each (with the paths searched), a missing bootstrap script logs an error.
+- [x] `ScriptProvider` caches nothing; lookup is a flat string join over the search paths. Resolved names (hits and misses) are now cached in an `unordered_map`.
+- [x] `OCG_LogHandler` prints to `stderr` with the `type` ignored; `nSetLogHandler` is commented out. Script errors never reach the Java logger or carry a duel id. The handler now calls `OcgCore.onNativeLog(type, message)`, which maps the type to a slf4j level and prefixes the duel tag `DuelSession` sets around its engine calls.
+- [x] `TYPE_LINK` literal in `card_database.cpp` duplicates `OcgConstants`. It now comes from ygopro-core's `ocgapi_constants.h`.
 
 ---
 
