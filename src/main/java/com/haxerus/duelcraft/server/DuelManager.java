@@ -444,8 +444,9 @@ public class DuelManager {
         }
     }
 
+    /** Only drops mappings that still point at {@code roll}, so a stale roll cannot unseat a live one. */
     private void removeRoll(FirstTurnRoll roll) {
-        for (ServerPlayer duellist : roll.players) firstTurnRolls.remove(duellist.getUUID());
+        for (ServerPlayer duellist : roll.players) firstTurnRolls.remove(duellist.getUUID(), roll);
     }
 
     private static String name(FirstTurnLobby.Hand hand) {

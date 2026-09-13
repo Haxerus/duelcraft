@@ -178,6 +178,11 @@ public class DuelCommand {
             DuelManager.get().duelInvites.remove(player.getUUID());
             return 0;
         }
+        // Either of them may have started something else since the invite was sent.
+        if (DuelManager.get().isBusy(player) || DuelManager.get().isBusy(challenger)) {
+            player.sendSystemMessage(Component.literal("A player is already in a duel!"));
+            return 0;
+        }
 
         Deck challengerDeck;
         try {
@@ -197,7 +202,15 @@ public class DuelCommand {
             return 0;
         }
         // Both decks are re-read on every use, so they are re-checked here as edopro checks at ready time.
-        if (!reportDeckProblems(challengerDeck, pending.rule(), challenger, player)) return 0;
+        var challengerProblems = DeckValidator.problems(challengerDeck, pending.rule());
+        if (!challengerProblems.isEmpty()) {
+            String joined = String.join("; ", challengerProblems);
+            player.sendSystemMessage(Component.literal(
+                    challenger.getName().getString() + "'s deck is not legal: " + joined));
+            challenger.sendSystemMessage(Component.literal("Your deck is not legal, so "
+                    + player.getName().getString() + " could not accept: " + joined));
+            return 0;
+        }
         if (!reportDeckProblems(accepterDeck, pending.rule(), player, player)) return 0;
 
         String challengerName = DuelManager.get().getPlayerCurrentDeck(challenger.getUUID()).orElse(null);
