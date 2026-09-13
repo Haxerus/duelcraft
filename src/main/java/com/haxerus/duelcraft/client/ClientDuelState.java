@@ -1,12 +1,15 @@
 package com.haxerus.duelcraft.client;
 
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -188,6 +191,10 @@ public class ClientDuelState {
         pendingPrompt = msg;
         lastPrompt = msg;
         responseSent = false;
+        // edopro spends select_hint on the prompt it captions (duelclient.cpp:2016); a prompt that
+        // arrives without one falls back to its own text. Retry keeps the caption it was given.
+        promptCaptionDesc = selectHint;
+        selectHint = 0;
         clearHighlights();
     }
 
@@ -227,6 +234,45 @@ public class ClientDuelState {
     // Last hint (provides context for next selection, e.g., "Select a monster")
     public int lastHintType;
     public long lastHintData;
+
+    // ── Hint surfaces (MSG_HINT, edopro duelclient.cpp:1390-1522) ──
+
+    /** A HINT_SELECTMSG waiting for the prompt it captions ({@code select_hint}). */
+    private long selectHint;
+    /** The caption HINT_SELECTMSG gave the active prompt, 0 when it arrived without one. */
+    public long promptCaptionDesc;
+    /** HINT_MESSAGE text waiting on its blocking modal; the modal's OK clears it. */
+    public String pendingModal;
+    /** Toast lines from HINT_OPSELECTED/RACE/ATTRIB/CODE/NUMBER, shown one at a time. */
+    public final Deque<String> toasts = new ArrayDeque<>();
+    /** HINT_CARD: the card to drop into the info banner, 0 once the screen has shown it. */
+    public int revealCardCode;
+    /**
+     * HINT_ZONE: the zones to flash and when they were named. The bit layout is SELECT_PLACE's,
+     * but a <b>set</b> bit marks a zone to flash — the opposite of SELECT_PLACE's blocked bits.
+     */
+    public int zoneFlashMask;
+    public long zoneFlashAt;
+
+    /** Card-data lookups hint text needs; the screen swaps in the card-database backed one. */
+    public HintText hintText = HintText.CODES_ONLY;
+
+    /** The three lookups {@link #applyHint} needs, so this class stays free of the client's card data. */
+    public interface HintText {
+        /** An engine description code as text ({@code OptionTextResolver}). */
+        String desc(long desc);
+        /** A card code as its printed name. */
+        String cardName(int code);
+        /** A {@code strings.conf} {@code !system} entry, or null when it is unknown. */
+        String systemString(int code);
+
+        /** The fallback before the screen injects its own: codes, unresolved. */
+        HintText CODES_ONLY = new HintText() {
+            @Override public String desc(long desc) { return "#" + desc; }
+            @Override public String cardName(int code) { return String.valueOf(code); }
+            @Override public String systemString(int code) { return null; }
+        };
+    }
 
     // Confirm/reveal card display
     public String confirmTitle;
@@ -283,11 +329,8 @@ public class ClientDuelState {
             }
 
             // ---- UI/Info ----
-            case DuelMessage.Hint hint -> {
-                lastHintType = hint.hintType();
-                lastHintData = hint.data();
-                LOGGER.debug("[State] Hint: type={}, player={}, data={}", hint.hintType(), hint.player(), hint.data());
-            }
+            case DuelMessage.Hint hint -> applyHint(hint);
+            case DuelMessage.CardHint hint -> applyCardHint(hint);
 
             // ---- Lifecycle ----
             case DuelMessage.Start start -> {
@@ -698,6 +741,78 @@ public class ClientDuelState {
                     dirtyFlags.add(DirtyFlag.PILE_COUNTS);
             default -> { }
         }
+    }
+
+    // ---- Hints (edopro duelclient.cpp MSG_HINT :1390, MSG_CARD_HINT :3964) ----
+
+    private void applyHint(DuelMessage.Hint hint) {
+        lastHintType = hint.hintType();
+        lastHintData = hint.data();
+        switch (hint.hintType()) {
+            case HINT_SELECTMSG -> selectHint = hint.data();
+            case HINT_MESSAGE -> pendingModal = hintText.desc(hint.data());
+            case HINT_OPSELECTED, HINT_RACE, HINT_ATTRIB, HINT_CODE, HINT_NUMBER ->
+                    toasts.add(toastText(hint));
+            case HINT_CARD -> revealCardCode = (int) hint.data();
+            case HINT_ZONE -> {
+                zoneFlashMask = viewerZoneMask((int) hint.data(), hint.player());
+                zoneFlashAt = System.currentTimeMillis();
+            }
+            // HINT_EVENT and HINT_EFFECT drive edopro's log and card-reveal animation; HINT_SKILL
+            // and above belong to Speed Duel skills, which this mod does not run.
+            default -> LOGGER.debug("[State] Hint: type={}, player={}, data={}",
+                    hint.hintType(), hint.player(), hint.data());
+        }
+    }
+
+    /** The toast line for a declaration hint, in edopro's system-string templates (`:1419-1462`). */
+    private String toastText(DuelMessage.Hint hint) {
+        return switch (hint.hintType()) {
+            case HINT_OPSELECTED ->
+                    template(hint.player() == localPlayer ? 1510 : 1512, hintText.desc(hint.data()));
+            case HINT_RACE -> template(1511, CardStringHelper.raceName(hint.data()));
+            case HINT_ATTRIB -> template(1511, CardStringHelper.attributeName((int) hint.data()));
+            case HINT_CODE -> template(1511, hintText.cardName((int) hint.data()));
+            default -> template(1512, String.valueOf(hint.data()));   // HINT_NUMBER
+        };
+    }
+
+    /** A {@code strings.conf} template with its single {@code {}} filled in, or a built-in copy. */
+    private String template(int systemString, String value) {
+        String text = hintText.systemString(systemString);
+        if (text == null) {
+            text = switch (systemString) {
+                case 1510 -> "Your choice: [{}]";
+                case 1511 -> "Opponent declared: [{}]";
+                default -> "Your opponent's choice: [{}]";
+            };
+        }
+        return text.replace("{}", value);
+    }
+
+    /**
+     * HINT_ZONE masks name zones from the hinted player's side, so a hint about the other side has
+     * its two halves swapped to land in the viewer's own layout ({@code duelclient.cpp:1481}).
+     */
+    private int viewerZoneMask(int field, int player) {
+        return player == localPlayer ? field : (field >>> 16) | (field << 16);
+    }
+
+    private void applyCardHint(DuelMessage.CardHint hint) {
+        var loc = hint.location();
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card == null) return;   // edopro drops a hint whose card it cannot find (`:3969`)
+        if (hint.chintType() == CHINT_DESC_ADD) {
+            card.descHints.merge(hint.value(), 1, Integer::sum);
+        } else if (hint.chintType() == CHINT_DESC_REMOVE) {
+            int left = card.descHints.getOrDefault(hint.value(), 0) - 1;
+            if (left > 0) card.descHints.put(hint.value(), left);
+            else card.descHints.remove(hint.value());
+        } else {
+            card.hintType = hint.chintType();
+            card.hintValue = hint.value();
+        }
+        markZoneDirty(loc.controller(), loc.location());
     }
 
     // ---- Reveals ----

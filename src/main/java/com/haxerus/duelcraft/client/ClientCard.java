@@ -45,6 +45,16 @@ public class ClientCard {
     public final Set<ClientCard> targets = new LinkedHashSet<>();
     public final Set<ClientCard> targetedBy = new LinkedHashSet<>();
 
+    /**
+     * MSG_CARD_HINT's single {@code cHint/chValue} slot (edopro's {@code duelclient.cpp:3977}):
+     * the last non-desc {@code CHINT_*} type and its value, 0 when the card carries none.
+     */
+    public int hintType;
+    public long hintValue;
+
+    /** Refcounted {@code CHINT_DESC_ADD}/{@code CHINT_DESC_REMOVE} hints, desc → count. */
+    public final Map<Long, Integer> descHints = new LinkedHashMap<>();
+
     public ClientCard(int code, int controller, int location, int sequence, int position) {
         this.code = code;
         this.controller = controller;

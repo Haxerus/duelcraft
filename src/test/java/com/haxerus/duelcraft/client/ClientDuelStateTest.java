@@ -527,6 +527,90 @@ class ClientDuelStateTest {
         assertEquals(89631139, state.matchKillCode);
     }
 
+    // ---- Hint surfaces (Task 16) ----
+
+    /** duelclient.cpp:1412: HINT_SELECTMSG is held until the next prompt captions itself with it. */
+    @Test
+    void selectMsgHintCaptionsTheNextPromptAndIsThenSpent() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Hint(HINT_SELECTMSG, 0, 501L));
+        assertEquals(0L, state.promptCaptionDesc, "the hint waits for a prompt to caption");
+
+        state.applyMessage(new DuelMessage.SelectCard(0, false, 1, 1, List.of(
+                new DuelMessage.CardInfo(11111, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK))));
+        assertEquals(501L, state.promptCaptionDesc);
+
+        state.applyMessage(new DuelMessage.SelectYesNo(0, 42L));
+        assertEquals(0L, state.promptCaptionDesc, "one hint captions one prompt");
+    }
+
+    /** duelclient.cpp:3971: CHINT_DESC_ADD/REMOVE refcount per card, dropping the desc at zero. */
+    @Test
+    void cardDescHintsAreRefcountedPerCard() {
+        var state = newState();
+        draw(state, 0, 11111);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK));
+        var loc = new LocInfo(0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK);
+
+        state.applyMessage(new DuelMessage.CardHint(loc, CHINT_DESC_ADD, 1160L));
+        state.applyMessage(new DuelMessage.CardHint(loc, CHINT_DESC_ADD, 1160L));
+        assertEquals(2, state.mzone[0][1].descHints.get(1160L));
+
+        state.applyMessage(new DuelMessage.CardHint(loc, CHINT_DESC_REMOVE, 1160L));
+        assertEquals(1, state.mzone[0][1].descHints.get(1160L));
+
+        state.applyMessage(new DuelMessage.CardHint(loc, CHINT_DESC_REMOVE, 1160L));
+        assertTrue(state.mzone[0][1].descHints.isEmpty());
+    }
+
+    /** duelclient.cpp:3977: every other CHINT_* type lands in the single cHint/chValue slot. */
+    @Test
+    void cardTurnHintFillsTheSingleHintSlot() {
+        var state = newState();
+        draw(state, 0, 11111);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+
+        state.applyMessage(new DuelMessage.CardHint(
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK), CHINT_TURN, 2L));
+
+        assertEquals(CHINT_TURN, state.mzone[0][0].hintType);
+        assertEquals(2L, state.mzone[0][0].hintValue);
+    }
+
+    @Test
+    void opponentSelectionHintQueuesAToast() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Hint(HINT_OPSELECTED, 1, 42L));
+
+        assertEquals(1, state.toasts.size());
+        assertTrue(state.toasts.peek().contains("#42"), state.toasts.peek());
+    }
+
+    @Test
+    void hintMessageWaitsAsAModal() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Hint(HINT_MESSAGE, 0, 7L));
+
+        assertEquals("#7", state.pendingModal);
+    }
+
+    /** duelclient.cpp:1481 swaps the two halves when the hint is about the other side of the field. */
+    @Test
+    void zoneHintKeepsTheMaskViewerRelative() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Hint(HINT_ZONE, 0, 0x1L));
+        assertEquals(0x1, state.zoneFlashMask);
+
+        state.applyMessage(new DuelMessage.Hint(HINT_ZONE, 1, 0x1L));
+        assertEquals(0x00010000, state.zoneFlashMask);
+    }
+
     @Test
     void moveToHandAppendsACardCarryingTheMessageCode() {
         var state = newState();
