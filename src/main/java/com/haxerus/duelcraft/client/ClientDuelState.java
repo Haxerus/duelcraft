@@ -167,12 +167,15 @@ public class ClientDuelState {
     public AttackArrow attack;
 
     /** The floating LP number per absolute player, null when none is pending. */
-    public record LpDelta(String text, String styleClass, long at) {}
+    public record LpDelta(int amount, String styleClass, long at) {
+        public String text() {
+            return (amount > 0 ? "+" : "-") + Math.abs(amount);
+        }
+    }
     public final LpDelta[] lpDelta = new LpDelta[2];
 
-    /** The turn/phase banner text and when it was raised; the screen times it out. */
-    public String bannerText;
-    public long bannerAt;
+    /** Turn and phase banners waiting their turn on screen, shown one at a time like {@link #toasts}. */
+    public final Deque<String> banners = new ArrayDeque<>();
 
     // Pending selection prompt (null = no prompt)
     public DuelMessage pendingPrompt;
@@ -275,7 +278,9 @@ public class ClientDuelState {
         this.winner = winner;
         this.winReason = reason;
         dirtyFlags.add(DirtyFlag.WINNER);
-        log(0, winner == localPlayer ? "You win" : winner == opponent() ? "You lose" : "Draw");
+        // MSG_WIN and the host's DuelEndPayload both land here, so the result can arrive twice.
+        String result = winner == localPlayer ? "You win" : winner == opponent() ? "You lose" : "Draw";
+        if (!result.equals(duelLog.lastText())) log(0, result);
         LOGGER.info("[State] Result: winner={}, reason={}", winner, reason);
     }
 
@@ -880,22 +885,36 @@ public class ClientDuelState {
         card.combatDefense = combatDefense;
     }
 
-    /** The damage step is over, so every card goes back to the stats the engine queries report. */
+    /**
+     * The damage step is over, so every monster still on the field goes back to the stats the
+     * engine queries report. One destroyed in battle has already left ({@code processor.cpp:2720}
+     * fires MSG_DAMAGE_STEP_END after the destruction), and {@link #applyMove} moves the very same
+     * card object, so {@link #clearCombat} drops its override on the way out instead.
+     */
     private void clearCombatStats() {
         for (int p = 0; p < 2; p++) {
             for (ClientCard card : mzone[p]) {
-                if (card == null) continue;
-                card.combatAttack = null;
-                card.combatDefense = null;
+                if (card != null) clearCombat(card);
             }
         }
         dirtyFlags.add(DirtyFlag.FIELD_STATS);
     }
 
+    private static void clearCombat(ClientCard card) {
+        card.combatAttack = null;
+        card.combatDefense = null;
+    }
+
+    /**
+     * Several LP messages can arrive in one batch. A number still on screen absorbs the new one
+     * rather than being replaced by it, so a pair of damage steps reads as one total instead of
+     * showing only the last. The screen clears the slot when the number times out.
+     */
     private void lpFeedback(int player, int delta, String styleClass, String reason) {
-        String text = (delta > 0 ? "+" : "-") + Math.abs(delta);
-        lpDelta[player] = new LpDelta(text, styleClass, System.currentTimeMillis());
-        log(0, who(player) + ": " + text + " LP (" + reason + ")");
+        LpDelta pending = lpDelta[player];
+        int amount = pending == null ? delta : pending.amount() + delta;
+        lpDelta[player] = new LpDelta(amount, styleClass, System.currentTimeMillis());
+        log(0, who(player) + ": " + (delta > 0 ? "+" : "-") + Math.abs(delta) + " LP (" + reason + ")");
     }
 
     private String who(int player) {
@@ -903,8 +922,7 @@ public class ClientDuelState {
     }
 
     private void banner(String text) {
-        bannerText = text;
-        bannerAt = System.currentTimeMillis();
+        banners.add(text);
         log(0, text);
     }
 
@@ -1066,6 +1084,7 @@ public class ClientDuelState {
             if (move.code() != 0) card.code = move.code();
             clearTargets(card);
             detachEquips(card);
+            clearCombat(card);
             removeFrom(card, from);
             return;
         }
@@ -1086,6 +1105,7 @@ public class ClientDuelState {
             if (to.location() != from.location()) {
                 clearTargets(card);
                 detachEquipTarget(card);
+                clearCombat(card);
             }
             removeFrom(card, from);
             place(card, to);
@@ -1094,6 +1114,7 @@ public class ClientDuelState {
             if (move.code() != 0) card.code = move.code();
             card.counters.clear();
             clearTargets(card);
+            clearCombat(card);
             removeFrom(card, from);
             attachMaterial(card, to);
         } else if (!toOverlay) {
@@ -1324,17 +1345,19 @@ public class ClientDuelState {
         return 1 - localPlayer;
     }
 
+    /**
+     * The engine announces only six phases. All ten {@code MSG_NEW_PHASE} sites
+     * ({@code processor.cpp:2787, 2793, 2832, 2858, 3365, 3414, 3450, 3469, 3562, 3580}) write
+     * either a hard-coded {@code PHASE_BATTLE_START} or {@code infos.phase} at a point where it is
+     * DRAW, STANDBY, MAIN1, BATTLE_START, MAIN2 or END: {@code BATTLE_STEP}, {@code DAMAGE},
+     * {@code DAMAGE_CAL} and {@code BATTLE} are set internally and never sent.
+     */
     public String phaseName() {
         return switch (currentPhase) {
             case PHASE_DRAW -> "Draw";
             case PHASE_STANDBY -> "Standby";
             case PHASE_MAIN1 -> "Main 1";
-            // edopro names each battle sub-phase in its own right (duelclient.cpp:3000-3060).
-            case PHASE_BATTLE_START -> "Battle Start";
-            case PHASE_BATTLE_STEP -> "Battle Step";
-            case PHASE_DAMAGE -> "Damage";
-            case PHASE_DAMAGE_CAL -> "Damage Calc";
-            case PHASE_BATTLE -> "Battle End";
+            case PHASE_BATTLE_START -> "Battle";
             case PHASE_MAIN2 -> "Main 2";
             case PHASE_END -> "End";
             default -> "---";

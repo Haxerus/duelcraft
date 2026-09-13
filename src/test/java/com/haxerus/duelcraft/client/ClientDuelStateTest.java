@@ -770,6 +770,30 @@ class ClientDuelStateTest {
         assertNull(state.cardAt(1, LOCATION_MZONE, 0).combatAttack);
     }
 
+    /**
+     * A monster destroyed in battle is already in the graveyard when MSG_DAMAGE_STEP_END arrives
+     * (processor.cpp:2720), and the same card object is what comes back on a revival, so the
+     * override has to go on the way out of the zone rather than in the field sweep.
+     */
+    @Test
+    void combatStatsLeaveWithACardDestroyedInBattle() {
+        var state = newState();
+        move(state, 200, new LocInfo(1, LOCATION_DECK, 0, 0),
+                new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+
+        state.applyMessage(new DuelMessage.Battle(
+                new LocInfo(0, 0, 0, 0), 0, 0, 0,
+                new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK), 1800, 1200, 1));
+        move(state, 200, new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK),
+                new LocInfo(1, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK));
+        state.applyMessage(new DuelMessage.DamageStepEnd());
+        move(state, 200, new LocInfo(1, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK),
+                new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+
+        assertNull(state.cardAt(1, LOCATION_MZONE, 0).combatAttack);
+        assertNull(state.cardAt(1, LOCATION_MZONE, 0).combatDefense);
+    }
+
     /** A direct attack carries a zeroed target, and only the attacker gets combat stats. */
     @Test
     void attackRecordsTheArrowEndsForTheUI() {
@@ -799,26 +823,34 @@ class ClientDuelStateTest {
         assertEquals("+300", state.lpDelta[1].text());
         assertEquals("lp-recover", state.lpDelta[1].styleClass());
 
+        // A number still on screen absorbs the next one, so a batch of LP messages reads as a total.
         state.applyMessage(new DuelMessage.PayLpCost(0, 800));
-        assertEquals("-800", state.lpDelta[0].text());
+        assertEquals("-1300", state.lpDelta[0].text());
         assertEquals("lp-cost", state.lpDelta[0].styleClass());
 
         // LPUPDATE is silent (duelclient.cpp:3708 shows no number).
         state.applyMessage(new DuelMessage.LpUpdate(0, 1000));
-        assertEquals("-800", state.lpDelta[0].text());
+        assertEquals("-1300", state.lpDelta[0].text());
+
+        // The screen clears the slot when the number times out; the next change starts afresh.
+        state.lpDelta[0] = null;
+        state.applyMessage(new DuelMessage.Damage(0, 200));
+        assertEquals("-200", state.lpDelta[0].text());
     }
 
     // ---- Turn and phase banners ----
 
+    /** A turn change and the phases that follow it arrive together, so the banners queue up. */
     @Test
-    void turnAndPhaseChangesRaiseABanner() {
+    void turnAndPhaseChangesQueueBanners() {
         var state = newState();
 
         state.applyMessage(new DuelMessage.NewTurn(1));
-        assertEquals("Turn 1 - Opponent's turn", state.bannerText);
+        state.applyMessage(new DuelMessage.NewPhase(PHASE_DRAW));
+        state.applyMessage(new DuelMessage.NewPhase(PHASE_BATTLE_START));
 
-        state.applyMessage(new DuelMessage.NewPhase(PHASE_BATTLE_STEP));
-        assertEquals("Battle Step", state.bannerText);
-        assertEquals("Battle Step", state.phaseName());
+        assertEquals(List.of("Turn 1 - Opponent's turn", "Draw", "Battle"),
+                List.copyOf(state.banners));
+        assertEquals("Battle", state.phaseName());
     }
 }
