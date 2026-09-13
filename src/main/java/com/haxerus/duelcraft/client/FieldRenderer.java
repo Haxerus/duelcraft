@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -43,7 +44,8 @@ public class FieldRenderer {
     public interface Callbacks {
         void setCardImageBackground(UIElement elem, int code);
         void onCardClicked(int player, int location, int sequence, UIEvent event);
-        void showCardInfo(int code);
+        /** Shows the card in the info banner; {@code card} carries its hints, null when unknown. */
+        void showCardInfo(int code, ClientCard card);
         void hideCardInfo();
         /** Clears async-retry tracking for a slot that's no longer displaying a card. */
         void clearPendingImage(UIElement elem);
@@ -162,7 +164,7 @@ public class FieldRenderer {
                 .filter(c -> c.hasClass("card") || c.hasClass("card-back")
                         || c.hasClass("stat-atk-def") || c.hasClass("stat-level")
                         || c.hasClass("card-materials") || c.hasClass("card-counters")
-                        || c.hasClass("card-scales"))
+                        || c.hasClass("card-scales") || c.hasClass("card-turns"))
                 .toList()
                 .forEach(slot::removeChild);
 
@@ -182,7 +184,7 @@ public class FieldRenderer {
 
                 if (player == state.localPlayer && code != 0) {
                     int hoverCode = code;
-                    cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode));
+                    cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode, card));
                     cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> callbacks.hideCardInfo());
                 }
             } else {
@@ -191,7 +193,7 @@ public class FieldRenderer {
                 callbacks.setCardImageBackground(cardVisual, code);
 
                 int hoverCode = code;
-                cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode));
+                cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode, card));
                 cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> callbacks.hideCardInfo());
             }
 
@@ -241,6 +243,13 @@ public class FieldRenderer {
             var badge = new Label();
             badge.addClass("card-counters");
             badge.setText(Component.literal(String.valueOf(counters)));
+            slot.addChild(badge);
+        }
+        // CHINT_TURN counts the turns a card has spent somewhere; edopro banners it (`:3980`).
+        if (card.hintType == CHINT_TURN && card.hintValue > 0) {
+            var badge = new Label();
+            badge.addClass("card-turns");
+            badge.setText(Component.literal("T" + card.hintValue));
             slot.addChild(badge);
         }
     }
@@ -438,16 +447,34 @@ public class FieldRenderer {
      */
     public void highlightValidPlaces(int field) {
         ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
+        eachZone(field, false, el -> el.addClass("target"));
+    }
+
+    /**
+     * Flash the zones a {@code HINT_ZONE} names. Same bit layout as {@link #highlightValidPlaces},
+     * but a <b>set</b> bit marks a zone to flash rather than one that is blocked
+     * ({@code duelclient.cpp:1519} assigns the mask straight to {@code selectable_field}).
+     */
+    public void flashZones(int field) {
+        eachZone(field, true, el -> el.addClass("flash"));
+    }
+
+    public void clearZoneFlash() {
+        ui.rootElement.select(".flash").forEach(e -> e.removeClass("flash"));
+    }
+
+    /** Runs {@code action} on every slot whose bit in {@code field} is {@code set}. */
+    private void eachZone(int field, boolean set, Consumer<UIElement> action) {
         for (Side side : Side.values()) {
             int base = side == Side.PLR ? 0 : 16;
             for (int seq = 0; seq <= 6; seq++) {
-                if ((field & (1 << (base + seq))) == 0) {
-                    slot(new Zone(side, LOCATION_MZONE, seq)).ifPresent(el -> el.addClass("target"));
+                if (((field & (1 << (base + seq))) != 0) == set) {
+                    slot(new Zone(side, LOCATION_MZONE, seq)).ifPresent(action);
                 }
             }
             for (int seq = 0; seq <= 7; seq++) {
-                if ((field & (1 << (base + 8 + seq))) == 0) {
-                    slot(new Zone(side, LOCATION_SZONE, seq)).ifPresent(el -> el.addClass("target"));
+                if (((field & (1 << (base + 8 + seq))) != 0) == set) {
+                    slot(new Zone(side, LOCATION_SZONE, seq)).ifPresent(action);
                 }
             }
         }

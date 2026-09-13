@@ -174,6 +174,18 @@ public class PromptController {
 
     public boolean isBattleCmd() { return isBattleCmd; }
 
+    // ── HINT_SELECTMSG captions ────────────────────────────────────────────
+
+    /**
+     * edopro's {@code select_hint} (`duelclient.cpp:2013`, `:2383`, `:3915`): a {@code HINT_SELECTMSG}
+     * that arrived before this prompt says why the player is choosing, and replaces the prompt's own
+     * caption. edopro appends the counts to the hint, so {@code suffix} comes along with it.
+     */
+    private String hintCaption(String fallback, String suffix) {
+        if (state.promptCaptionDesc == 0) return fallback;
+        return callbacks.resolveDesc(state.promptCaptionDesc) + suffix;
+    }
+
     // ── Rebuild dispatch (PROMPT dirty) ────────────────────────────────────
 
     public void rebuild() {
@@ -208,7 +220,7 @@ public class PromptController {
                         + "\n(" + callbacks.cardDisplayName(sel.code()) + ")");
             }
 
-            case DuelMessage.SelectOption sel -> buildOptionPrompt("Choose Option",
+            case DuelMessage.SelectOption sel -> buildOptionPrompt(hintCaption("Choose Option", ""),
                     sel.options().stream().map(callbacks::resolveDesc).toList(),
                     i -> callbacks.sendResponse(ResponseBuilder.selectOption(i)));
             case DuelMessage.RockPaperScissors ignored -> buildOptionPrompt("Rock Paper Scissors",
@@ -245,7 +257,7 @@ public class PromptController {
 
             case DuelMessage.AnnounceNumber sel -> {
                 String title = callbacks.systemString(565);
-                buildOptionPrompt(title != null ? title : "Declare a number",
+                buildOptionPrompt(hintCaption(title != null ? title : "Declare a number", ""),
                         sel.options().stream().map(String::valueOf).toList(),
                         i -> callbacks.sendResponse(ResponseBuilder.announceNumber(i)));
             }
@@ -331,7 +343,8 @@ public class PromptController {
     private void buildAnnounceCardPrompt(DuelMessage.AnnounceCard sel) {
         promptOverlay.removeClass("hidden");
         String title = callbacks.systemString(564);
-        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : "Declare a card name"));
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(hintCaption(title != null ? title : "Declare a card name", "")));
         clearPromptContent();
 
         if (!callbacks.cardSearchAvailable()) {
@@ -414,7 +427,8 @@ public class PromptController {
                                          IntFunction<String> labelFor, Runnable onComplete) {
         promptOverlay.removeClass("hidden");
         String title = callbacks.systemString(titleStringCode);
-        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : fallbackTitle));
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(hintCaption(title != null ? title : fallbackTitle, "")));
         clearPromptContent();
 
         bitSelectionCaption = new Label();
@@ -512,7 +526,8 @@ public class PromptController {
         selectedIndices.clear();
         promptOverlay.removeClass("hidden");
         if (promptTitle instanceof Label t)
-            t.setText(Component.literal("Select " + sel.min() + "-" + sel.max() + " card(s)"));
+            t.setText(Component.literal(hintCaption("Select " + sel.min() + "-" + sel.max() + " card(s)",
+                    "(" + sel.min() + "-" + sel.max() + ")")));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
@@ -638,7 +653,7 @@ public class PromptController {
         String text = disfield
                 ? "Select " + remaining + " zone(s) to become unusable"
                 : (remaining <= 1 ? "Select a zone" : "Select " + remaining + " more zone(s)");
-        lbl.setText(Component.literal(text));
+        lbl.setText(Component.literal(hintCaption(text, "")));
         statusLabel.removeClass("hidden");
     }
 
@@ -792,7 +807,7 @@ public class PromptController {
         } else {
             text = "Tribute " + sel.min() + "-" + sel.max() + " tributes (" + sum + ")";
         }
-        lbl.setText(Component.literal(text));
+        lbl.setText(Component.literal(hintCaption(text, "(" + sel.min() + "-" + sel.max() + ")")));
         statusLabel.removeClass("hidden");
     }
 
@@ -827,9 +842,10 @@ public class PromptController {
     }
 
     /** edopro's caption for a running per-click selection: how many are in, and the bounds. */
-    private static String unselectCardCaption(DuelMessage.SelectUnselectCard sel) {
-        return "Selected " + sel.unselectableCards().size()
-                + " (" + sel.min() + "-" + sel.max() + ")";
+    private String unselectCardCaption(DuelMessage.SelectUnselectCard sel) {
+        return hintCaption("Selected " + sel.unselectableCards().size()
+                        + " (" + sel.min() + "-" + sel.max() + ")",
+                "(" + sel.min() + "-" + sel.max() + ")");
     }
 
     /** The engine takes {@code -1} whenever either flag is set; the caption is all that differs. */
@@ -1000,7 +1016,8 @@ public class PromptController {
 
     private void updateSumCaption(DuelMessage.SelectSum sel, boolean fieldMode) {
         String target = (sel.selectMode() ? ">=" : "") + sel.targetSum();
-        String text = "Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")";
+        String text = hintCaption("Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")",
+                "(" + sumSelection.currentSum() + " / " + target + ")");
         if (fieldMode) {
             // A complete selection that can still be extended has no other way out — SELECT_SUM
             // has no cancel encoding, so the field prompt must offer the Finish gesture.
@@ -1044,9 +1061,10 @@ public class PromptController {
         }
 
         if (statusLabel instanceof Label lbl) {
-            lbl.setText(Component.literal(sel.min() == sel.max()
-                    ? "Select " + sel.min() + " card(s)"
-                    : "Select " + sel.min() + "-" + sel.max() + " card(s)"));
+            lbl.setText(Component.literal(hintCaption(sel.min() == sel.max()
+                            ? "Select " + sel.min() + " card(s)"
+                            : "Select " + sel.min() + "-" + sel.max() + " card(s)",
+                    "(" + sel.min() + "-" + sel.max() + ")")));
             statusLabel.removeClass("hidden");
         }
         setInitialSelectionButton(sel.cancelable(), sel.min() == 0, this::sendSelectedCards);

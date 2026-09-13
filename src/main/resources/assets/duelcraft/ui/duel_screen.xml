@@ -210,6 +210,42 @@
         display: none;
         }
 
+        /* ── Hint toast (edopro's stACMessage: one declaration hint at a time) ── */
+        #toast {
+        position: absolute;
+        top: 26;
+        left: 0;
+        width: 100%;
+        font-size: 8;
+        text-color: #FFDD55;
+        horizontal-align: center;
+        padding-vertical: 2;
+        background: rect(#aa000000);
+        }
+
+        #toast.hidden {
+        display: none;
+        }
+
+        /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
+        .player-hints {
+        position: absolute;
+        top: 20;
+        width: 30%;
+        font-size: 6;
+        text-color: #FFDD55;
+        }
+
+        #plr-hints {
+        left: 4;
+        horizontal-align: left;
+        }
+
+        #opp-hints {
+        right: 4;
+        horizontal-align: right;
+        }
+
         /* ── Shared Cancel/Finish button (edopro's btnCancelOrFinish) ── */
         #prompt-action-bar {
         position: absolute;
@@ -285,6 +321,17 @@
         left: 0;
         font-size: 5;
         background: rect(#CCCC7700);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        /* ── Turn-count badge (MSG_CARD_HINT CHINT_TURN) ── */
+        .card-turns {
+        position: absolute;
+        bottom: 7;
+        right: 0;
+        font-size: 5;
+        background: rect(#CC227755);
         text-color: #FFFFFF;
         padding-horizontal: 1;
         }
@@ -482,6 +529,16 @@
         horizontal-align: center;
         }
 
+        /* Card hints (MSG_CARD_HINT) below the stats, as edopro's tooltip lines */
+        #card-hints {
+        horizontal-align: center;
+        text-color: #FFDD55;
+        }
+
+        #card-hints.hidden {
+        display: none;
+        }
+
         #card-text-scroll {
         flex: 1;
         }
@@ -656,6 +713,43 @@
         horizontal-align: center;
         }
 
+        /* ── Hint Modal (HINT_MESSAGE; above the prompts, below the pause dialog) ── */
+        #hint-modal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background: rect(#96000000);
+        }
+
+        #hint-modal.hidden {
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #hint-modal-dialog {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 4;
+        padding-all: 8;
+        width: 200;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        #hint-modal-text {
+        width: 100%;
+        font-size: 8;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        text-wrap: wrap;
+        adaptive-height: true;
+        }
+
         /* ── Pause Overlay (ESC while the duel is live; drawn above every other overlay) ── */
         #pause-overlay {
         position: absolute;
@@ -781,6 +875,11 @@
         /* Zone the engine has disabled (MSG_FIELD_DISABLED) */
         .disabled {
         overlay: rect(#99202020);
+        }
+
+        /* Zone a HINT_ZONE is pointing at, for about a second */
+        .flash {
+        overlay: rect(#88FFFF00);
         }
 
         /* ── Card Action Context Menu ── */
@@ -1018,6 +1117,13 @@
         <!-- Status Label (chain / waiting overlay) -->
         <label id="status-label" class="hidden">Waiting...</label>
 
+        <!-- Hint toast (one declaration hint at a time, a couple of seconds each) -->
+        <label id="toast" class="hidden">Opponent declared: []</label>
+
+        <!-- Refcounted player hints (MSG_PLAYER_HINT), under each player's name -->
+        <label id="plr-hints" class="player-hints" />
+        <label id="opp-hints" class="player-hints" />
+
         <!-- Shared Cancel/Finish button for field selections, also bound to right-click -->
         <element id="prompt-action-bar">
             <button id="prompt-action-btn" class="prompt-btn hidden" text="Finish" />
@@ -1045,6 +1151,7 @@
                     by battle: You can add 1 Normal Spell from your Deck to your hand. </text>
             </scroller-view>
             <text id="card-atk-def-label" class="card-label">ATK 2600 / DEF 2000</text>
+            <text id="card-hints" class="card-label hidden" />
         </element>
 
         <!-- Zone Inspector (right, toggled by clicking a pile) -->
@@ -1075,6 +1182,14 @@
                 <label id="result-title">Duel over</label>
                 <label id="result-reason">Life points</label>
                 <button id="result-close" class="prompt-btn" text="Close" />
+            </element>
+        </element>
+
+        <!-- Hint Modal (HINT_MESSAGE: a message that blocks until acknowledged) -->
+        <element id="hint-modal" class="hidden">
+            <element id="hint-modal-dialog">
+                <label id="hint-modal-text">Message</label>
+                <button id="hint-modal-ok" class="prompt-btn" text="OK" />
             </element>
         </element>
 

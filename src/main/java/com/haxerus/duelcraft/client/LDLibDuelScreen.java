@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * XML-based duel screen using LDLib2.
@@ -58,6 +59,11 @@ public class LDLibDuelScreen {
     private static final int DECLARABLE_SEARCH_LIMIT = 50;
     /** How long the concede button stays armed after the first click. */
     private static final long CONCEDE_CONFIRM_MS = 3000L;
+    /** How long one hint toast stays up (edopro waits 40 frames, `duelclient.cpp:1427`). */
+    private static final long TOAST_MS = 2500L;
+    /** How long a HINT_ZONE flash and a HINT_CARD reveal stay up (edopro: 40 and 30 frames). */
+    private static final long ZONE_FLASH_MS = 1000L;
+    private static final long CARD_REVEAL_MS = 1500L;
 
     private static ClientDuelState activeState;
     private static ModularUI activeUI;
@@ -207,6 +213,15 @@ public class LDLibDuelScreen {
         private final Button concedeBtn;
         private long concedeArmedAt;
 
+        // Hint surfaces (MSG_HINT / MSG_CARD_HINT / MSG_PLAYER_HINT)
+        private final UIElement toastLabel;
+        private final UIElement hintModal;
+        private final UIElement hintModalText;
+        private final Button hintModalOk;
+        private long toastUntil;
+        private boolean zoneFlashOn;
+        private long cardRevealUntil;
+
         // Overlays
         private final UIElement cardInfoBanner;
         private final UIElement resultOverlay;
@@ -247,8 +262,8 @@ public class LDLibDuelScreen {
                 @Override public void onCardClicked(int player, int location, int sequence, UIEvent event) {
                     UIRefresher.this.onCardClicked(player, location, sequence, event);
                 }
-                @Override public void showCardInfo(int code) {
-                    UIRefresher.this.showCardInfo(code);
+                @Override public void showCardInfo(int code, ClientCard card) {
+                    UIRefresher.this.showCardInfo(code, card);
                 }
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
@@ -281,6 +296,10 @@ public class LDLibDuelScreen {
             concedeBtn = byId("concede-btn", Button.class);
 
             // ── Overlays ──
+            toastLabel = byId("toast");
+            hintModal = byId("hint-modal");
+            hintModalText = byId("hint-modal-text");
+            hintModalOk = byId("hint-modal-ok", Button.class);
             cardInfoBanner = byId("card-info-banner");
             resultOverlay = byId("result-overlay");
             resultTitle = byId("result-title");
@@ -306,6 +325,14 @@ public class LDLibDuelScreen {
             var descResolver = new OptionTextResolver(
                     DuelcraftClient.getCardDatabase(),
                     DuelcraftClient.getSystemStringTable());
+            state.hintText = new ClientDuelState.HintText() {
+                @Override public String desc(long desc) { return descResolver.resolve(desc); }
+                @Override public String cardName(int code) { return UIRefresher.this.cardDisplayName(code); }
+                @Override public String systemString(int code) {
+                    SystemStringTable table = DuelcraftClient.getSystemStringTable();
+                    return table != null ? table.getSystem(code) : null;
+                }
+            };
             prompt = new PromptController(ui, state, field, statusLabel, new PromptController.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
@@ -420,6 +447,17 @@ public class LDLibDuelScreen {
             bindPileCount(extraCountLabels[plr], () -> state.extraCount(plr));
             bindPileCount(banishedCountLabels[opp], () -> state.banishedCount(opp));
             bindPileCount(banishedCountLabels[plr], () -> state.banishedCount(plr));
+
+            // Refcounted MSG_PLAYER_HINT descs, under the name each LP bar carries.
+            bindLabel(byId("plr-hints"), () -> playerHintsText(plr));
+            bindLabel(byId("opp-hints"), () -> playerHintsText(opp));
+        }
+
+        /** The player's standing hints as one line, empty when the engine has named none. */
+        private String playerHintsText(int player) {
+            return state.playerHints[player].keySet().stream()
+                    .map(state.hintText::desc)
+                    .collect(Collectors.joining(", "));
         }
 
         private void bindLabel(UIElement element, java.util.function.Supplier<String> textSupplier) {
@@ -440,6 +478,7 @@ public class LDLibDuelScreen {
 
         private void onTick(UIEvent event) {
             disarmConcedeIfStale();
+            updateHintSurfaces();
             if (!state.isDirty()) return;
             var flags = state.consumeDirtyFlags();
 
@@ -616,6 +655,58 @@ public class LDLibDuelScreen {
             if (pauseStay != null) {
                 pauseStay.setOnClick(e -> hidePauseOverlay());
             }
+            if (hintModalOk != null) {
+                hintModalOk.setOnClick(e -> {
+                    state.pendingModal = null;
+                    if (hintModal != null) hintModal.addClass("hidden");
+                });
+            }
+        }
+
+        // ── Hint surfaces (MSG_HINT), polled like the concede timer ──
+
+        /**
+         * Drives the four timed hint surfaces from {@link ClientDuelState}: the toast queue, the
+         * HINT_ZONE flash, the HINT_CARD reveal and the HINT_MESSAGE modal. edopro blocks its
+         * message loop for each of these; we let the duel run on and time them out here instead.
+         */
+        private void updateHintSurfaces() {
+            long now = System.currentTimeMillis();
+
+            if (toastLabel != null) {
+                if (toastUntil != 0 && now >= toastUntil) {
+                    toastLabel.addClass("hidden");
+                    toastUntil = 0;
+                }
+                if (toastUntil == 0 && !state.toasts.isEmpty()) {
+                    setLabelText(toastLabel, state.toasts.poll());
+                    toastLabel.removeClass("hidden");
+                    toastUntil = now + TOAST_MS;
+                }
+            }
+
+            if (state.zoneFlashMask != 0 && !zoneFlashOn) {
+                field.flashZones(state.zoneFlashMask);
+                zoneFlashOn = true;
+            } else if (zoneFlashOn && now - state.zoneFlashAt > ZONE_FLASH_MS) {
+                field.clearZoneFlash();
+                state.zoneFlashMask = 0;
+                zoneFlashOn = false;
+            }
+
+            if (state.revealCardCode != 0) {
+                showCardInfo(state.revealCardCode);
+                state.revealCardCode = 0;
+                cardRevealUntil = now + CARD_REVEAL_MS;
+            } else if (cardRevealUntil != 0 && now >= cardRevealUntil) {
+                hideCardInfo();
+                cardRevealUntil = 0;
+            }
+
+            if (state.pendingModal != null && hintModal != null && hintModal.hasClass("hidden")) {
+                setLabelText(hintModalText, state.pendingModal);
+                hintModal.removeClass("hidden");
+            }
         }
 
         private static void sendConcede() {
@@ -730,7 +821,14 @@ public class LDLibDuelScreen {
         }
 
         private void showCardInfo(int code) {
+            showCardInfo(code, null);
+        }
+
+        /** {@code onField} is the card object whose hints to list, null when there is none. */
+        private void showCardInfo(int code, ClientCard onField) {
             if (code == 0 || cardInfoBanner == null) return;
+            cardRevealUntil = 0;   // whatever asks for the banner takes it over from a HINT_CARD reveal
+            setCardHints(onField);
             cardInfoBanner.removeClass("hidden");
 
             CardDatabase db = DuelcraftClient.getCardDatabase();
@@ -813,6 +911,36 @@ public class LDLibDuelScreen {
             var elem = byId(id);
             if (elem instanceof TextElement te) te.setText(Component.literal(text));
             else if (elem instanceof Label lbl) lbl.setText(Component.literal(text));
+        }
+
+        /**
+         * The card's own hints under its stats, as edopro's tooltip lines
+         * ({@code event_handler.cpp:1618-1632}): the single cHint slot, then every refcounted desc.
+         */
+        private void setCardHints(ClientCard card) {
+            var element = byId("card-hints");
+            if (element == null) return;
+            var lines = new ArrayList<String>();
+            if (card != null) {
+                if (card.hintType != 0 && card.hintValue != 0) lines.add(cardHintLine(card));
+                for (long desc : card.descHints.keySet()) lines.add("* " + state.hintText.desc(desc));
+            }
+            if (lines.isEmpty()) {
+                element.addClass("hidden");
+            } else {
+                setTextElement("card-hints", String.join("\n", lines));
+                element.removeClass("hidden");
+            }
+        }
+
+        private String cardHintLine(ClientCard card) {
+            return switch (card.hintType) {
+                case CHINT_TURN -> "Turns passed: " + card.hintValue;
+                case CHINT_CARD -> "Declared card: " + cardDisplayName((int) card.hintValue);
+                case CHINT_RACE -> "Declared Type: " + CardStringHelper.raceName(card.hintValue);
+                case CHINT_ATTRIBUTE -> "Declared Attribute: " + CardStringHelper.attributeName((int) card.hintValue);
+                default -> "Declared number: " + card.hintValue;   // CHINT_NUMBER
+            };
         }
 
         private void hideCardInfo() {
