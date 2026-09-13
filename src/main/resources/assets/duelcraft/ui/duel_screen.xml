@@ -722,12 +722,14 @@
         #zone-inspector-list {
         flex: 1;
         gap-all: 2;
+        scroller-vertical-display: always;
         }
 
         #zone-inspector-list .__scroller_view_view-container__ {
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
+        display: grid;
+        grid-template-columns: repeat(4, 36px);
+        grid-auto-rows: 48px;
+        align-content: flex_start;
         justify-content: space_between;
         gap-all: 2;
         padding-all: 2;

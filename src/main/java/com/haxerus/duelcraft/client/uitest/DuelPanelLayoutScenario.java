@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.client.uitest;
 import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
+import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
@@ -12,6 +13,7 @@ import com.lowdragmc.lowdraglib2.uitest.ScenarioBuilder;
 import com.lowdragmc.lowdraglib2.uitest.ElementBounds;
 import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
+import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -55,6 +57,7 @@ public final class DuelPanelLayoutScenario implements UIScenario {
              var first = cards.getFirst().bounds();
              var row = cards.stream().map(ref -> ref.bounds())
                      .filter(b -> Math.abs(b.y() - first.y()) <= 1).toList();
+             ctx.put("inspectorColumns", row.toArray(ElementBounds[]::new));
              var content = ElementBounds.of(
                      ctx.el("#zone-inspector-list").as(ScrollerView.class).viewContainer);
              float left = first.x() - content.x();
@@ -70,9 +73,25 @@ public final class DuelPanelLayoutScenario implements UIScenario {
          .scroll("#zone-inspector-list", -20).ticks(2)
          .check("large inspector scrolls", ctx -> ctx.all("#zone-inspector-list .card").getFirst().bounds().y() < (float) ctx.get("pileY"));
         capture(s, "reveal-scrolled");
+        for (int count : new int[]{1, 2, 3, 5, 6}) {
+            s.step("reveal " + count + " cards", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.ConfirmCards(0,
+                    IntStream.range(0, count).mapToObj(i -> new DuelMessage.ConfirmCard(0, 0, LOCATION_DECK, i)).toList())))
+             .ticks(2).checkCount("#zone-inspector-list .card", count)
+             .step("partial rows keep their columns", DuelPanelLayoutScenario::checkInspectorColumns);
+            capture(s, "reveal-" + count + "-cards");
+        }
         press(s, "#zone-inspector-close");
         s.checkHidden("#zone-inspector").click("#opp-graveyard").ticks(2);
         capture(s, "empty-graveyard");
+        s.step("two cards enter the open graveyard", ctx -> {
+            for (int i = 0; i < 2; i++) {
+                LDLibDuelScreen.applyMessage(new DuelMessage.Move(89631139,
+                        new LocInfo(1, LOCATION_HAND, 0, 0),
+                        new LocInfo(1, LOCATION_GRAVE, i, POS_FACEUP_ATTACK), 0));
+            }
+        }).ticks(2).checkCount("#zone-inspector-list .card", 2)
+         .step("sparse graveyard keeps its columns", DuelPanelLayoutScenario::checkInspectorColumns);
+        capture(s, "two-card-graveyard");
         press(s, "#zone-inspector-close");
         s.click("#log-toggle").ticks(2).step("long log", ctx -> {
             var list = ctx.el("#duel-log-list").as(ScrollerView.class);
@@ -99,6 +118,22 @@ public final class DuelPanelLayoutScenario implements UIScenario {
         s.step("loss result", ctx -> LDLibDuelScreen.showResult(1, 4));
         capture(s, "loss-result");
         s.teardown("close", ctx -> { LDLibDuelScreen.close(); ctx.mc().setScreen(null); });
+    }
+
+    private static void checkInspectorColumns(TestContext ctx) {
+        var columns = (ElementBounds[]) ctx.get("inspectorColumns");
+        var cards = ctx.all("#zone-inspector-list .card");
+        float firstY = cards.getFirst().bounds().y();
+        for (int i = 0; i < cards.size(); i++) {
+            var card = cards.get(i).bounds();
+            var column = columns[i % columns.length];
+            ctx.check("card " + i + " stays in its grid column", Math.abs(card.x() - column.x()) <= 1,
+                    column.x(), card.x());
+            ctx.check("card " + i + " preserves its size", Math.abs(card.width() - column.width()) <= 1
+                    && Math.abs(card.height() - column.height()) <= 1);
+            ctx.check("card " + i + " wraps to the expected row", i < columns.length
+                    ? Math.abs(card.y() - firstY) <= 1 : card.y() >= firstY + column.height());
+        }
     }
 
     static void press(ScenarioBuilder s, String selector) {
