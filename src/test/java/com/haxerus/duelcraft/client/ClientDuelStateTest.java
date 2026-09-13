@@ -580,6 +580,24 @@ class ClientDuelStateTest {
         assertEquals(2L, state.mzone[0][0].hintValue);
     }
 
+    /** duelclient.cpp:3105: the single hint slot is dropped by every non-overlay move. */
+    @Test
+    void cardHintSlotDoesNotFollowTheCardOutOfItsZone() {
+        var state = newState();
+        draw(state, 0, 11111);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        state.applyMessage(new DuelMessage.CardHint(
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK), CHINT_TURN, 2L));
+        var card = state.mzone[0][0];
+
+        move(state, 11111, new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK),
+                new LocInfo(0, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK));
+
+        assertEquals(0, card.hintType);
+        assertEquals(0L, card.hintValue);
+    }
+
     @Test
     void opponentSelectionHintQueuesAToast() {
         var state = newState();

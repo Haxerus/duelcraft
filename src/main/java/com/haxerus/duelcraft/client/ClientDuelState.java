@@ -969,6 +969,11 @@ public class ClientDuelState {
 
         if (!fromOverlay && !toOverlay) {
             if (move.code() != 0 || to.location() == LOCATION_EXTRA) card.code = move.code();
+            // edopro drops the single card hint on every move (duelclient.cpp:3105-3106). The
+            // refcounted descHints stay put; edopro clears those only on MSG_SHUFFLE_HAND (:2766),
+            // and a hand card here never carries one.
+            card.hintType = 0;
+            card.hintValue = 0;
             if ((from.location() & LOCATION_ONFIELD) != 0 && to.location() != from.location()) {
                 card.counters.clear();
             }
