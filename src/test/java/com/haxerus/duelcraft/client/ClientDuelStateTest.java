@@ -489,6 +489,20 @@ class ClientDuelStateTest {
     }
 
     @Test
+    void becomeTargetHighlightsTheTargetedCardsUntilTheNextPrompt() {
+        var state = newState();
+        draw(state, 0, 11111, 22222);
+
+        state.applyMessage(new DuelMessage.BecomeTarget(
+                List.of(new LocInfo(0, LOCATION_HAND, 1, POS_FACEDOWN_DEFENSE))));
+
+        assertEquals(List.of(22222), codesOf(List.copyOf(state.highlighted)));
+
+        state.applyMessage(new DuelMessage.SelectYesNo(0, 42L));
+        assertTrue(state.highlighted.isEmpty());
+    }
+
+    @Test
     void missedEffectHighlightsTheCardThatMissedItsTiming() {
         var state = newState();
         draw(state, 0, 11111);

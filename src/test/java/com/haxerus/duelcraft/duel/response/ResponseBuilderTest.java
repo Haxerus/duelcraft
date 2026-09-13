@@ -83,6 +83,13 @@ class ResponseBuilderTest {
         assertEquals(4, readInt32(resp, 16));
     }
 
+    @Test
+    void selectCardsCancel() {
+        byte[] resp = ResponseBuilder.selectCardsCancel();
+        assertEquals(4, resp.length);
+        assertEquals(-1, readInt32(resp, 0));
+    }
+
     // ---- selectChain ----
 
     @Test
@@ -187,6 +194,13 @@ class ResponseBuilderTest {
         assertEquals(2, resp[0] & 0xFF);
         assertEquals(0, resp[1] & 0xFF);
         assertEquals(1, resp[2] & 0xFF);
+    }
+
+    @Test
+    void sortCardsDefault() {
+        byte[] resp = ResponseBuilder.sortCardsDefault();
+        assertEquals(1, resp.length);
+        assertEquals(-1, resp[0]);
     }
 
     // ---- selectUnselectCard ----

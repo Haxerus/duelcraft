@@ -300,4 +300,36 @@ class DuelMessageCodecTest {
         buf.writeInt(2 * 1024 * 1024); // > 1 MiB bound
         assertThrows(DecoderException.class, () -> DuelMessageCodec.decode(buf));
     }
+
+    private static final int ONE_MIB = 1024 * 1024;
+
+    @Test
+    void readByteArrayAcceptsExactlyOneMebibyte() {
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        buf.writeBoolean(true);
+        buf.writeByte(1);
+        buf.writeInt(ONE_MIB);
+        buf.writeBytes(new byte[ONE_MIB]);
+
+        DuelMessage.Raw decoded = (DuelMessage.Raw) DuelMessageCodec.decode(buf);
+        assertEquals(ONE_MIB, decoded.body().length);
+    }
+
+    @Test
+    void readByteArrayRejectsOneMebibytePlusOne() {
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        buf.writeBoolean(true);
+        buf.writeByte(1);
+        buf.writeInt(ONE_MIB + 1);
+        assertThrows(DecoderException.class, () -> DuelMessageCodec.decode(buf));
+    }
+
+    @Test
+    void readByteArrayRejectsNegativeLength() {
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        buf.writeBoolean(true);
+        buf.writeByte(1);
+        buf.writeInt(-1);
+        assertThrows(DecoderException.class, () -> DuelMessageCodec.decode(buf));
+    }
 }

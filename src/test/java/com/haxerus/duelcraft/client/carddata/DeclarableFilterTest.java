@@ -172,4 +172,61 @@ class DeclarableFilterTest {
     void unbalancedStackIsRejected() {
         assertFalse(DeclarableFilter.matches(List.of(1L, 1L), monster(0, TYPE_MONSTER)));
     }
+
+    @Test
+    @DisplayName("OR is truthy if either operand is truthy")
+    void or() {
+        assertTrue(DeclarableFilter.matches(List.of(0L, 1L, OPCODE_OR), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(0L, 0L, OPCODE_OR), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
+    @DisplayName("NEG arithmetically negates the operand")
+    void neg() {
+        assertTrue(DeclarableFilter.matches(List.of(5L, OPCODE_NEG), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(0L, OPCODE_NEG), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
+    @DisplayName("BNOT flips every bit")
+    void bnot() {
+        assertTrue(DeclarableFilter.matches(List.of(0L, OPCODE_BNOT), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(-1L, OPCODE_BNOT), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
+    @DisplayName("BOR and BXOR combine bits")
+    void borAndBxor() {
+        assertTrue(DeclarableFilter.matches(List.of(0x1L, 0x2L, OPCODE_BOR), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(0L, 0L, OPCODE_BOR), monster(0, TYPE_MONSTER)));
+        assertTrue(DeclarableFilter.matches(List.of(0x3L, 0x1L, OPCODE_BXOR), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(0x3L, 0x3L, OPCODE_BXOR), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
+    @DisplayName("LSHIFT and RSHIFT shift the left operand by the right operand")
+    void lshiftAndRshift() {
+        assertTrue(DeclarableFilter.matches(List.of(2L, 1L, OPCODE_LSHIFT), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(0L, 1L, OPCODE_LSHIFT), monster(0, TYPE_MONSTER)));
+        assertTrue(DeclarableFilter.matches(List.of(8L, 2L, OPCODE_RSHIFT), monster(0, TYPE_MONSTER)));
+        assertFalse(DeclarableFilter.matches(List.of(1L, 1L, OPCODE_RSHIFT), monster(0, TYPE_MONSTER)));
+    }
+
+    @Test
+    @DisplayName("GETCODE/GETTYPE/GETRACE/GETATTRIBUTE push the card's raw fields")
+    void getters() {
+        CardFacts card = monster(0x5b, TYPE_MONSTER | TYPE_EFFECT);
+
+        assertTrue(DeclarableFilter.matches(List.of(OPCODE_GETCODE, 1234L, OPCODE_SUB, OPCODE_NOT), card));
+        assertFalse(DeclarableFilter.matches(List.of(OPCODE_GETCODE, 4321L, OPCODE_SUB, OPCODE_NOT), card));
+
+        assertTrue(DeclarableFilter.matches(List.of(OPCODE_GETTYPE, (long) TYPE_MONSTER, OPCODE_BAND), card));
+        assertFalse(DeclarableFilter.matches(List.of(OPCODE_GETTYPE, (long) TYPE_SPELL, OPCODE_BAND), card));
+
+        assertTrue(DeclarableFilter.matches(List.of(OPCODE_GETRACE, RACE_DRAGON, OPCODE_BAND), card));
+        assertFalse(DeclarableFilter.matches(List.of(OPCODE_GETRACE, RACE_WARRIOR, OPCODE_BAND), card));
+
+        assertTrue(DeclarableFilter.matches(List.of(OPCODE_GETATTRIBUTE, (long) ATTRIBUTE_LIGHT, OPCODE_BAND), card));
+        assertFalse(DeclarableFilter.matches(List.of(OPCODE_GETATTRIBUTE, (long) ATTRIBUTE_DARK, OPCODE_BAND), card));
+    }
 }

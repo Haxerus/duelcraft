@@ -798,6 +798,7 @@ class MessageParserTest {
         // Position and sumParam are separate fields: a face-down card with both values packed.
         var first = sum.selectable().getFirst();
         assertEquals(89631139, first.code());
+        assertEquals(0, first.controller());
         assertEquals(1, first.sequence());
         assertEquals(POS_FACEDOWN_DEFENSE, first.position());
         assertEquals((7 << 16) | 3, first.sumParam());

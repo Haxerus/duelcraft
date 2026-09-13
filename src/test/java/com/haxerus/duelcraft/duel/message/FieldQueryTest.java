@@ -91,14 +91,17 @@ class FieldQueryTest {
 
     @Test
     void unhandledFieldIsSkippedBySize() {
-        ByteBuffer b = buf(7 + 10 + 6);
-        u8Block(b, QUERY_COVER, 1);       // parsed too narrowly on purpose: one data byte
+        // A flag readField has no case for at all, so parseCard falls through to the default
+        // branch and must rely purely on the declared block size to find the next block.
+        int unknownFlag = 1 << 30;
+        ByteBuffer b = buf(10 + 10 + 6);
+        u32Block(b, unknownFlag, 0xDEAD);
         u32Block(b, QUERY_CODE, 46986414);
         endBlock(b);
 
         QueriedCard card = FieldQuery.parse(b.array());
         assertEquals(46986414, card.code);
-        assertTrue((card.flags & QUERY_COVER) != 0);
+        assertTrue((card.flags & unknownFlag) != 0);
     }
 
     @Test
