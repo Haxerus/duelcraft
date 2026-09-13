@@ -409,8 +409,8 @@ public class LDLibDuelScreen {
                             + (state.isLocalTurn() ? " (Your turn)" : ""));
 
             // Pile counts
-            bindPileCount(deckCountLabels[opp], () -> state.deckCount[opp]);
-            bindPileCount(deckCountLabels[plr], () -> state.deckCount[plr]);
+            bindPileCount(deckCountLabels[opp], () -> state.deckCount(opp));
+            bindPileCount(deckCountLabels[plr], () -> state.deckCount(plr));
             bindPileCount(graveCountLabels[opp], () -> state.graveCount(opp));
             bindPileCount(graveCountLabels[plr], () -> state.graveCount(plr));
             bindPileCount(extraCountLabels[opp], () -> state.extraCount(opp));
@@ -487,18 +487,18 @@ public class LDLibDuelScreen {
         }
 
         // ── Rebuilders ──
-        private void rebuildHand(UIElement _container, List<Integer> codes, int player, boolean isLocal) {
+        private void rebuildHand(UIElement _container, List<ClientCard> cards, int player, boolean isLocal) {
             if (_container == null) {
                 LOGGER.info("container is null");
                 return;
             }
             var container = (ScrollerView) _container;
-            LOGGER.debug("Rebuilding hand: player={}, cards={}", player, codes.size());
+            LOGGER.debug("Rebuilding hand: player={}, cards={}", player, cards.size());
 
             container.clearAllScrollViewChildren();
 
-            for (int i = 0; i < codes.size(); i++) {
-                int code = codes.get(i);
+            for (int i = 0; i < cards.size(); i++) {
+                int code = cards.get(i).code;
                 int seq = i;
                 var card = new UIElement();
                 card.addClass("card");

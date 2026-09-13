@@ -103,11 +103,7 @@ public class FieldRenderer {
     }
 
     private boolean occupied(Zone z) {
-        int p = player(z.side());
-        if (z.location() == LOCATION_MZONE) {
-            return state.mzone[p][z.sequence()] != 0 || state.mzonePos[p][z.sequence()] != 0;
-        }
-        return state.szone[p][z.sequence()] != 0 || state.szonePos[p][z.sequence()] != 0;
+        return state.cardAt(player(z.side()), z.location(), z.sequence()) != null;
     }
 
     /** The zone a slot shows: the occupied candidate, else the viewer's own zone (for placement). */
@@ -155,26 +151,28 @@ public class FieldRenderer {
             if (el == null) return;
             Zone shown = shownZone(layout.zonesOf(id));
             int p = player(shown.side());
-            boolean monster = shown.location() == LOCATION_MZONE;
-            int code = monster ? state.mzone[p][shown.sequence()] : state.szone[p][shown.sequence()];
-            int pos = monster ? state.mzonePos[p][shown.sequence()] : state.szonePos[p][shown.sequence()];
-            refreshZoneSlot(el, code, pos, p, shown.location(), shown.sequence());
+            refreshZoneSlot(el, state.cardAt(p, shown.location(), shown.sequence()),
+                    p, shown.location(), shown.sequence());
         });
     }
 
-    private void refreshZoneSlot(UIElement slot, int code, int position, int player, int locationType, int sequence) {
+    private void refreshZoneSlot(UIElement slot, ClientCard card, int player, int locationType, int sequence) {
         if (slot == null) return;
         slot.getChildren().stream()
                 .filter(c -> c.hasClass("card") || c.hasClass("card-back")
-                        || c.hasClass("stat-atk-def") || c.hasClass("stat-level"))
+                        || c.hasClass("stat-atk-def") || c.hasClass("stat-level")
+                        || c.hasClass("card-materials") || c.hasClass("card-counters"))
                 .toList()
                 .forEach(slot::removeChild);
 
-        // A card is present if we know the code OR if a non-zero position is set
-        // (opponent's face-down cards have code=0 but position is still set)
-        if (code != 0 || position != 0) {
-            boolean faceDown = code == 0
-                    || (position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
+        slot.removeClass("targeted");
+        slot.removeClass("disabled");
+        if (isZoneDisabled(player, locationType, sequence)) slot.addClass("disabled");
+
+        if (card != null) {
+            int code = card.code;
+            int position = card.position;
+            boolean faceDown = code == 0 || card.isFaceDown();
             boolean defense = (position & (POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE)) != 0;
 
             var cardVisual = new UIElement();
@@ -207,10 +205,35 @@ public class FieldRenderer {
             }
 
             slot.addChild(cardVisual);
+            addBadges(slot, card);
+            if (state.highlighted.contains(card) || !card.targetedBy.isEmpty()) slot.addClass("targeted");
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
         } else {
             slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
         }
+    }
+
+    /** Overlay material count (bottom-left) and total counters (top-left), when either is non-zero. */
+    private void addBadges(UIElement slot, ClientCard card) {
+        if (!card.materials.isEmpty()) {
+            var badge = new Label();
+            badge.addClass("card-materials");
+            badge.setText(Component.literal("x" + card.materials.size()));
+            slot.addChild(badge);
+        }
+        int counters = card.counterTotal();
+        if (counters > 0) {
+            var badge = new Label();
+            badge.addClass("card-counters");
+            badge.setText(Component.literal(String.valueOf(counters)));
+            slot.addChild(badge);
+        }
+    }
+
+    /** MSG_FIELD_DISABLED masks use the SelectPlace bit layout: monsters 0-6, spell/traps 8-15. */
+    private boolean isZoneDisabled(int player, int location, int sequence) {
+        int bit = sequence + (location == LOCATION_SZONE ? 8 : 0);
+        return (state.disabledZones[player] & (1 << bit)) != 0;
     }
 
     // ── Stat overlays ──────────────────────────────────────────────────────
@@ -223,13 +246,13 @@ public class FieldRenderer {
                     if (el == null) return;
                     Zone shown = shownZone(layout.zonesOf(id));
                     int p = player(shown.side());
-                    updateMonsterStats(el, state.mzoneStats[p][shown.sequence()], state.mzone[p][shown.sequence()], p);
+                    updateMonsterStats(el, state.cardAt(p, LOCATION_MZONE, shown.sequence()), p);
                 });
             }
         }
     }
 
-    private void updateMonsterStats(UIElement slot, QueriedCard stats, int code, int player) {
+    private void updateMonsterStats(UIElement slot, ClientCard card, int player) {
         if (slot == null) return;
 
         // Remove old stat labels
@@ -238,7 +261,9 @@ public class FieldRenderer {
                 .toList()
                 .forEach(slot::removeChild);
 
-        if (code == 0 || stats == null) return;
+        if (card == null || card.code == 0 || card.stats == null) return;
+        int code = card.code;
+        QueriedCard stats = card.stats;
 
         boolean faceDown = (stats.position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
         if (faceDown) return;
@@ -297,7 +322,7 @@ public class FieldRenderer {
             Side side = side(player);
             // Deck: always face-down card back when non-empty
             slot(new Zone(side, LOCATION_DECK, 0)).ifPresent(el ->
-                    setPileBackground(el, state.deckCount[player] > 0 ? CARD_BACK_SPRITE : null));
+                    setPileBackground(el, state.deckCount(player) > 0 ? CARD_BACK_SPRITE : null));
             // Extra deck: top face-up card if any, otherwise card back when non-empty
             slot(new Zone(side, LOCATION_EXTRA, 0)).ifPresent(el -> refreshExtraDeckPile(el, player));
             // Graveyard & Banished: top card image when non-empty
@@ -314,12 +339,10 @@ public class FieldRenderer {
 
         // Find the top-most face-up card (iterate from end)
         int topFaceUpCode = 0;
-        var codes = state.extra[player];
-        var positions = state.extraPos[player];
-        for (int i = codes.size() - 1; i >= 0; i--) {
-            int pos = i < positions.size() ? positions.get(i) : 0;
-            if ((pos & (POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE)) != 0) {
-                topFaceUpCode = codes.get(i);
+        var cards = state.extra[player];
+        for (int i = cards.size() - 1; i >= 0; i--) {
+            if ((cards.get(i).position & (POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE)) != 0) {
+                topFaceUpCode = cards.get(i).code;
                 break;
             }
         }
@@ -351,11 +374,11 @@ public class FieldRenderer {
         }
     }
 
-    private void setPileTopCard(UIElement slot, List<Integer> cards) {
+    private void setPileTopCard(UIElement slot, List<ClientCard> cards) {
         if (slot == null) return;
         if (!cards.isEmpty()) {
             // Use setCardImageBackground so the pile is registered for async image retry
-            callbacks.setCardImageBackground(slot, cards.getLast());
+            callbacks.setCardImageBackground(slot, cards.getLast().code);
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
             slot.addClass("has-card");
         } else {

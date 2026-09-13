@@ -74,11 +74,11 @@ public class ZoneInspectorController {
 
         int player = inspectedPlayer;
         int location = inspectedLocation;
-        List<Integer> cards = getPileCards(player, location);
+        List<ClientCard> cards = getPileCards(player, location);
 
         listElem.clearAllScrollViewChildren();
         for (int i = 0; i < cards.size(); i++) {
-            int code = cards.get(i);
+            int code = cards.get(i).code;
             int seq = i;
 
             var card = new UIElement();
@@ -145,7 +145,7 @@ public class ZoneInspectorController {
         }
     }
 
-    private List<Integer> getPileCards(int player, int location) {
+    private List<ClientCard> getPileCards(int player, int location) {
         return switch (location) {
             case LOCATION_GRAVE -> state.grave[player];
             case LOCATION_REMOVED -> state.banished[player];
