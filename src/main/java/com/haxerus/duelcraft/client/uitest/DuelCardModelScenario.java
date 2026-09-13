@@ -12,9 +12,10 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * The card object model on the field: an XYZ host carrying two materials, a monster with three
- * counters, a targeted monster and a disabled zone. Each one is a badge or class the renderer
- * can only draw because materials, counters, target links and the disabled mask live on
- * {@link com.haxerus.duelcraft.client.ClientCard} rather than in parallel arrays.
+ * counters, a targeted monster, a disabled zone and a pendulum card showing its scales. Each one
+ * is a badge or class the renderer can only draw because materials, counters, target links, the
+ * disabled mask and the latest query live on {@link com.haxerus.duelcraft.client.ClientCard}
+ * rather than in parallel arrays.
  */
 @OnlyIn(Dist.CLIENT)
 @LDLRegisterClient(name = "duel_card_model", group = "duelcraft", registry = UIScenario.REGISTRY,
@@ -39,6 +40,7 @@ public final class DuelCardModelScenario implements UIScenario {
          .checkText("#plr-mon-1 .card-counters", "3")
          .checkClass("#plr-mon-2", "targeted")
          .checkClass("#plr-mon-3", "disabled")
+         .checkText("#plr-st-0 .card-scales", "1/8")
          .screenshot("duel_card_model")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

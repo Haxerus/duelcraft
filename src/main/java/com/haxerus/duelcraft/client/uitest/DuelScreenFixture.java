@@ -6,6 +6,7 @@ import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -85,6 +86,11 @@ public final class DuelScreenFixture {
                     0));
         }
         LDLibDuelScreen.applyMessage(new DuelMessage.AddCounter(0x1, 0, LOCATION_MZONE, 1, 3));
+        // A pendulum card in MR5's left pendulum zone (the shared S/T zone 0). Its scales reach the
+        // client only as a query result, the way the spell-zone refresh mask delivers them
+        // (RefreshSchedule.SZONE_FLAGS).
+        moveFromHand(0, CODES.get(21), LOCATION_SZONE, 0, POS_FACEUP_ATTACK);
+        LDLibDuelScreen.applyMessage(new DuelMessage.UpdateCard(0, LOCATION_SZONE, 0, scales(1, 8)));
         LDLibDuelScreen.applyMessage(new DuelMessage.BecomeTarget(
                 List.of(new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_ATTACK))));
         // Low 16 bits are player 0's zones; bit 3 is their fourth monster zone.
@@ -103,6 +109,15 @@ public final class DuelScreenFixture {
                 List.of(new DuelMessage.ReposCard(code, player, LOCATION_MZONE, sequence)),
                 List.of(), List.of(), List.of(),
                 true, true, false));
+    }
+
+    /** A query result carrying nothing but a pair of pendulum scales. */
+    private static QueriedCard scales(int lscale, int rscale) {
+        var card = new QueriedCard();
+        card.flags = QUERY_LSCALE | QUERY_RSCALE;
+        card.lscale = lscale;
+        card.rscale = rscale;
+        return card;
     }
 
     /** Moves the first card of the player's hand to the given zone. */

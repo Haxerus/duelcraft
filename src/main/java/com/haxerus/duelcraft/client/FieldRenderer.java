@@ -161,7 +161,8 @@ public class FieldRenderer {
         slot.getChildren().stream()
                 .filter(c -> c.hasClass("card") || c.hasClass("card-back")
                         || c.hasClass("stat-atk-def") || c.hasClass("stat-level")
-                        || c.hasClass("card-materials") || c.hasClass("card-counters"))
+                        || c.hasClass("card-materials") || c.hasClass("card-counters")
+                        || c.hasClass("card-scales"))
                 .toList()
                 .forEach(slot::removeChild);
 
@@ -215,8 +216,20 @@ public class FieldRenderer {
         }
     }
 
-    /** Overlay material count (bottom-left) and total counters (top-left), when either is non-zero. */
+    /**
+     * Overlay material count (bottom-left), total counters (top-left) and pendulum scales
+     * (top-right), each drawn only when the card carries one. Scales come from the spell-zone
+     * refresh mask, so a non-pendulum card there reports 0/0 and gets no badge.
+     */
     private void addBadges(UIElement slot, ClientCard card) {
+        QueriedCard stats = card.stats;
+        if (stats != null && (stats.flags & (QUERY_LSCALE | QUERY_RSCALE)) != 0
+                && (stats.lscale != 0 || stats.rscale != 0)) {
+            var badge = new Label();
+            badge.addClass("card-scales");
+            badge.setText(Component.literal(stats.lscale + "/" + stats.rscale));
+            slot.addChild(badge);
+        }
         if (!card.materials.isEmpty()) {
             var badge = new Label();
             badge.addClass("card-materials");

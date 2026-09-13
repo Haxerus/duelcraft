@@ -264,6 +264,17 @@
         padding-horizontal: 1;
         }
 
+        /* ── Pendulum scale badge (left/right scale of a card in a pendulum zone) ── */
+        .card-scales {
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 5;
+        background: rect(#CC2266CC);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
         /* Opponent's stat labels — positions mirror the flipped card (text stays upright) */
         .stat-atk-def.opp {
         bottom: auto;

@@ -426,7 +426,7 @@ public class ClientDuelState {
                     if (list != null) {
                         resize(list, upd.player(), upd.location(), cards.size());
                         for (int i = 0; i < cards.size(); i++) applyQuery(list.get(i), cards.get(i));
-                        dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                        markZoneDirty(upd.player(), upd.location());
                     }
                 }
                 dirtyFlags.add(DirtyFlag.FIELD_STATS);
@@ -845,8 +845,13 @@ public class ClientDuelState {
     /** Writes a query result onto a card, self-healing code and position when they are carried. */
     private void applyQuery(ClientCard card, QueriedCard query) {
         if (card == null || query == null) return;
+        QueriedCard previous = card.stats;
         card.stats = query;
         boolean visualChanged = false;
+        if ((query.flags & (QUERY_LSCALE | QUERY_RSCALE)) != 0 && (previous == null
+                || previous.lscale != query.lscale || previous.rscale != query.rscale)) {
+            visualChanged = true;   // the pendulum scale badge
+        }
         if (query.code != 0 && query.code != card.code) {
             card.code = query.code;
             visualChanged = true;
@@ -857,7 +862,11 @@ public class ClientDuelState {
         }
         if ((query.flags & QUERY_OVERLAY_CARD) != 0) {
             for (int i = 0; i < Math.min(query.overlayCards.size(), card.materials.size()); i++) {
-                card.materials.get(i).code = query.overlayCards.get(i);
+                ClientCard material = card.materials.get(i);
+                if (material.code != query.overlayCards.get(i)) {
+                    material.code = query.overlayCards.get(i);
+                    visualChanged = true;
+                }
             }
         }
         if ((query.flags & QUERY_COUNTERS) != 0) {
