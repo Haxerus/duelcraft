@@ -26,6 +26,14 @@ class DeckValidatorTest {
     }
 
     @Test
+    void uploadedNonpositivePasscodesAreRejected() {
+        var main = distinct(1000, 40);
+        main.set(0, 0);
+        assertFalse(DeckValidator.problems(new Deck(main, List.of()), DuelRule.MR5).isEmpty());
+        assertFalse(DeckValidator.problems(new Deck(distinct(1000, 40), List.of(-1)), DuelRule.MR5).isEmpty());
+    }
+
+    @Test
     void mainDeckBelowMinimumIsReported() {
         var problems = DeckValidator.problems(deck(39, 0), DuelRule.MR5);
         assertEquals(1, problems.size());

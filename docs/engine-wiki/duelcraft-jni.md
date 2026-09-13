@@ -4,6 +4,8 @@ This page is a source guide for agents working on a host around ygopro-core. It 
 
 ## Boundary at a glance
 
+**Deck selection update (2026-09-13):** [`DuelClientCommand`](../../src/main/java/com/haxerus/duelcraft/client/DuelClientCommand.java) owns local `/duel deck list` and `set` commands. [`DuelDeckPayload`](../../src/main/java/com/haxerus/duelcraft/server/DuelDeckPayload.java) sends a bounded display name and main/extra card IDs, with no player identity or file to open. [`ServerPayloadHandler.handleDeck`](../../src/main/java/com/haxerus/duelcraft/server/ServerPayloadHandler.java) derives the player from the connection. [`DuelManager`](../../src/main/java/com/haxerus/duelcraft/server/DuelManager.java) validates and retains an immutable selection per player until cleared or disconnected, and resolves that snapshot at challenge/accept/test time. Player deck files are never loaded through the server registry; explicitly named AI decks still are. Protocol registration is version 2, requiring updated host and clients. See [multiplayer deck setup](../multiplayer-decks.md) for command semantics and validation limits.
+
 ```text
 Minecraft client UI
   -> typed response payload

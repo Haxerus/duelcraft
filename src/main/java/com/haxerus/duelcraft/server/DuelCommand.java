@@ -116,12 +116,6 @@ public class DuelCommand {
                                                 .suggests(DECK_NAMES),
                                         ctx -> test(ctx, StringArgumentType.getString(ctx, "aiDeck")))))
                         .then(Commands.literal("deck")
-                                .then(Commands.literal("list")
-                                        .executes(DuelCommand::deckList))
-                                .then(Commands.literal("set")
-                                        .then(Commands.argument("name", StringArgumentType.string())
-                                                .suggests(DECK_NAMES)
-                                                .executes(DuelCommand::deckSet)))
                                 .then(Commands.literal("get")
                                         .executes(DuelCommand::deckGet))
                                 .then(Commands.literal("clear")
@@ -201,7 +195,7 @@ public class DuelCommand {
             player.sendSystemMessage(Component.literal("Your deck could not be loaded: " + e.getMessage()));
             return 0;
         }
-        // Both decks are re-read on every use, so they are re-checked here as edopro checks at ready time.
+        // Selections may have changed since the challenge; recheck the uploaded snapshots at ready time.
         var challengerProblems = DeckValidator.problems(challengerDeck, pending.rule());
         if (!challengerProblems.isEmpty()) {
             String joined = String.join("; ", challengerProblems);
@@ -327,32 +321,6 @@ public class DuelCommand {
     }
 
     // --- deck subcommands ---
-
-    private static int deckList(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        var names = DuelManager.get().getDeckRegistry().listDeckNames();
-        if (names.isEmpty()) {
-            player.sendSystemMessage(Component.literal(
-                    "No decks. Drop .ydk files into <gameDir>/duelcraft/decks/."));
-        } else {
-            player.sendSystemMessage(Component.literal("Decks: " + String.join(", ", names)));
-        }
-        return 1;
-    }
-
-    private static int deckSet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        String name = StringArgumentType.getString(ctx, "name");
-        try {
-            DuelManager.get().getDeckRegistry().load(name); // validate at set-time
-        } catch (IOException | DeckLoader.DeckParseException e) {
-            player.sendSystemMessage(Component.literal("Cannot set deck '" + name + "': " + e.getMessage()));
-            return 0;
-        }
-        DuelManager.get().setPlayerCurrentDeck(player.getUUID(), name);
-        player.sendSystemMessage(Component.literal("Current deck set to '" + name + "'."));
-        return 1;
-    }
 
     private static int deckGet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();

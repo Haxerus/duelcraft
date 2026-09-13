@@ -2,7 +2,7 @@ package com.haxerus.duelcraft.server;
 
 import com.haxerus.duelcraft.Config;
 import com.haxerus.duelcraft.core.Deck;
-import com.haxerus.duelcraft.core.DeckLoader;
+import com.haxerus.duelcraft.core.DeckValidator;
 import com.haxerus.duelcraft.core.DeckRegistry;
 import com.haxerus.duelcraft.core.DuelEngine;
 import com.haxerus.duelcraft.core.DuelOptions;
@@ -42,7 +42,7 @@ public class DuelManager {
     /** Duellists of each active duel by engine index; index 1 is null in solo mode (the AI). */
     private Map<UUID, ServerPlayer[]> duelSeats;
     private DeckRegistry deckRegistry;
-    private final Map<UUID, String> playerCurrentDeck = new HashMap<>();
+    private final Map<UUID, DuelDeckPayload> playerCurrentDeck = new HashMap<>();
 
     /** Outstanding challenges, target -> pending; entries expire after {@link DuelCommand#INVITE_TIMEOUT_MS}. */
     public Map<UUID, DuelCommand.PendingChallenge> duelInvites;
@@ -101,6 +101,7 @@ public class DuelManager {
         }
 
         activeDuels.clear();
+        playerCurrentDeck.clear();
         playerToDuel.clear();
         duelSeats.clear();
         if (engine != null) {
@@ -271,6 +272,7 @@ public class DuelManager {
 
     private void handleLogout(ServerPlayer player) {
         UUID playerUUID = player.getUUID();
+        clearPlayerCurrentDeck(playerUUID);
         duelInvites.remove(playerUUID);
         duelInvites.values().removeIf(pending -> pending.challengerUUID().equals(playerUUID));
 
@@ -475,28 +477,31 @@ public class DuelManager {
 
     public DeckRegistry getDeckRegistry() { return deckRegistry; }
 
-    public void setPlayerCurrentDeck(UUID player, String deckName) {
-        playerCurrentDeck.put(player, deckName);
+    public void setPlayerCurrentDeck(UUID player, DuelDeckPayload selection) {
+        // The current structural/copy checks are shared by every rule; rechecked when a duel starts.
+        var problems = DeckValidator.problems(selection.deck(), DuelRule.MR5);
+        if (!problems.isEmpty()) throw new IllegalArgumentException(String.join("; ", problems));
+        playerCurrentDeck.put(player, selection);
     }
 
     public Optional<String> getPlayerCurrentDeck(UUID player) {
-        return Optional.ofNullable(playerCurrentDeck.get(player));
+        return Optional.ofNullable(playerCurrentDeck.get(player)).map(DuelDeckPayload::name);
     }
 
     public void clearPlayerCurrentDeck(UUID player) {
         playerCurrentDeck.remove(player);
     }
 
-    /**
-     * Resolves the deck a player should use right now.
-     * Throws IOException when no current deck is set.
-     * Throws when a current deck is set but its file is missing or malformed.
-     */
-    public Deck resolveDeck(ServerPlayer player) throws IOException, DeckLoader.DeckParseException {
-        String name = playerCurrentDeck.get(player.getUUID());
-        if (name == null) {
+    /** Resolves the uploaded snapshot; the server never opens a player's named deck file. */
+    public Deck resolveDeck(ServerPlayer player) throws IOException {
+        return resolveDeck(player.getUUID());
+    }
+
+    Deck resolveDeck(UUID player) throws IOException {
+        var selection = playerCurrentDeck.get(player);
+        if (selection == null) {
             throw new IOException("No deck set; run /duel deck set <name>");
         }
-        return deckRegistry.load(name);
+        return selection.deck();
     }
 }

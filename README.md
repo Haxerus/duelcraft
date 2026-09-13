@@ -1,4 +1,6 @@
 
+For local and multiplayer deck setup, see [Deck selection in multiplayer](docs/multiplayer-decks.md).
+
 Installation information
 =======
 

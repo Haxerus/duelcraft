@@ -6,7 +6,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public class DuelNetworking {
     public static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
+        PayloadRegistrar registrar = event.registrar("2");
 
         // Server → Client (handlers run on client only)
         registrar.playToClient(DuelStartPayload.TYPE, DuelStartPayload.STREAM_CODEC,
@@ -17,6 +17,8 @@ public class DuelNetworking {
                 ClientPayloadHandler::handleEnd);
 
         // Client → Server
+        registrar.playToServer(DuelDeckPayload.TYPE, DuelDeckPayload.STREAM_CODEC,
+                ServerPayloadHandler::handleDeck);
         registrar.playToServer(DuelResponsePayload.TYPE, DuelResponsePayload.STREAM_CODEC,
                 ServerPayloadHandler::handleResponse);
         registrar.playToServer(DuelConcedePayload.TYPE, DuelConcedePayload.STREAM_CODEC,
