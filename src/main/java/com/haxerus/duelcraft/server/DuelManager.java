@@ -185,12 +185,19 @@ public class DuelManager {
         }
     }
 
-    /** Team 1 shuffles with {@code seed}, team 2 with {@code seed + 1}; see {@link #startSoloDuel}. */
+    /**
+     * Each deck carries its own shuffle seed so the duel seed reproduces the same two hands whichever
+     * seat the first-turn roll gave each duellist: the challenger's deck always shuffles with
+     * {@code seed} and the accepter's with {@code seed + 1} (see {@link #beginFirstTurnRoll}).
+     */
     public void startDuel(ServerPlayer p1, ServerPlayer p2, long seed, DuelRule rule, PlayerOptions playerOptions,
-                          Deck team1Deck, Deck team2Deck,
+                          Deck team1Deck, long team1Seed, Deck team2Deck, long team2Seed,
                           String team1Name, String team2Name) {
         if (playerToDuel.containsKey(p1.getUUID()) || playerToDuel.containsKey(p2.getUUID())) {
             LOGGER.warn("Cannot start duel - a player is already in a duel!");
+            for (ServerPlayer duellist : new ServerPlayer[]{p1, p2}) {
+                duellist.sendSystemMessage(Component.literal("A player is already in a duel; the duel was cancelled."));
+            }
             return;
         }
 
@@ -204,11 +211,12 @@ public class DuelManager {
         playerToDuel.put(p2.getUUID(), duelId);
         duelSeats.put(duelId, new ServerPlayer[]{p1, p2});
 
-        LOGGER.info("Duel {}: seed={}, rule={}, options={}, first={}, decks=[{}, {}]",
-                duelId, seed, rule.id(), playerOptions, p1.getName().getString(), team1Name, team2Name);
+        LOGGER.info("Duel {}: seed={}, rule={}, options={}, first={}, decks=[{} (shuffle {}), {} (shuffle {})]",
+                duelId, seed, rule.id(), playerOptions, p1.getName().getString(),
+                team1Name, team1Seed, team2Name, team2Seed);
 
-        Deck shuffled1 = team1Deck.shuffled(seed);
-        Deck shuffled2 = team2Deck.shuffled(seed + 1);
+        Deck shuffled1 = team1Deck.shuffled(team1Seed);
+        Deck shuffled2 = team2Deck.shuffled(team2Seed);
 
         int lp0 = options.team1().lp();
         int lp1 = options.team2().lp();
@@ -310,6 +318,8 @@ public class DuelManager {
     private static final class FirstTurnRoll {
         final ServerPlayer[] players;
         final Deck[] decks;
+        /** Shuffle seed per deck, keyed to the challenge role, not to the seat the roll hands out. */
+        final long[] deckSeeds;
         final String[] deckNames;
         final long seed;
         final DuelRule rule;
@@ -323,6 +333,7 @@ public class DuelManager {
                       Deck deck0, Deck deck1, String deckName0, String deckName1) {
             this.players = new ServerPlayer[]{p0, p1};
             this.decks = new Deck[]{deck0, deck1};
+            this.deckSeeds = new long[]{seed, seed + 1};
             this.deckNames = new String[]{deckName0, deckName1};
             this.seed = seed;
             this.rule = rule;
@@ -400,7 +411,8 @@ public class DuelManager {
                     roll.players[first].getName().getString() + " goes first."));
         }
         startDuel(roll.players[first], roll.players[second], roll.seed, roll.rule, roll.playerOptions,
-                roll.decks[first], roll.decks[second], roll.deckNames[first], roll.deckNames[second]);
+                roll.decks[first], roll.deckSeeds[first], roll.decks[second], roll.deckSeeds[second],
+                roll.deckNames[first], roll.deckNames[second]);
     }
 
     private void promptHands(FirstTurnRoll roll) {
@@ -432,16 +444,17 @@ public class DuelManager {
         }
     }
 
-    /** Cancels the roll this player is in, if any, telling whoever is left why. */
-    private void cancelFirstTurnRoll(UUID playerUUID, String reason) {
+    /** Cancels the roll this player is in, telling whoever is left why; false when there was none. */
+    public boolean cancelFirstTurnRoll(UUID playerUUID, String reason) {
         var roll = firstTurnRolls.get(playerUUID);
-        if (roll == null) return;
+        if (roll == null) return false;
         removeRoll(roll);
         for (ServerPlayer duellist : roll.players) {
             if (!duellist.hasDisconnected()) {
                 duellist.sendSystemMessage(Component.literal(reason + " The duel was cancelled."));
             }
         }
+        return true;
     }
 
     /** Only drops mappings that still point at {@code roll}, so a stale roll cannot unseat a live one. */

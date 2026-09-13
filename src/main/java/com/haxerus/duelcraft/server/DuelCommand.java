@@ -248,6 +248,11 @@ public class DuelCommand {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         UUID duelID = DuelManager.get().getPlayerActiveDuel(player);
         if (duelID == null) {
+            // A first-turn roll is not a duel yet, but it holds both players busy: let forfeit out of it.
+            if (DuelManager.get().cancelFirstTurnRoll(player.getUUID(),
+                    player.getName().getString() + " cancelled the roll.")) {
+                return 1;
+            }
             player.sendSystemMessage(Component.literal("No active duel."));
             return 0;
         }
