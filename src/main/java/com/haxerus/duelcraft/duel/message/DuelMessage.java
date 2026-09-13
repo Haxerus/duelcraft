@@ -189,8 +189,23 @@ public sealed interface DuelMessage {
         public int type() { return MSG_CONFIRM_DECKTOP; }
     }
 
+    /** Same body as {@link ConfirmDeckTop}, over the extra deck ({@code libduel.cpp:854}). */
+    record ConfirmExtraTop(int player, List<ConfirmCard> cards) implements DuelMessage {
+        public int type() { return MSG_CONFIRM_EXTRATOP; }
+    }
+
     record ConfirmCards(int player, List<ConfirmCard> cards) implements DuelMessage {
         public int type() { return MSG_CONFIRM_CARDS; }
+    }
+
+    /** Both decks turned over or back ({@code processor.cpp:4926}); one global state, not per player. */
+    record ReverseDeck() implements DuelMessage {
+        public int type() { return MSG_REVERSE_DECK; }
+    }
+
+    /** The card {@code offsetFromTop} down from the top of a deck is now known to both players. */
+    record DeckTop(int player, int offsetFromTop, int code, int position) implements DuelMessage {
+        public int type() { return MSG_DECK_TOP; }
     }
 
     /** Informational: "the engine just selected these cards" — no action required. */

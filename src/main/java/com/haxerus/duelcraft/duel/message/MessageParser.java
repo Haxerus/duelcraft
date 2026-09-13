@@ -76,6 +76,8 @@ public class MessageParser {
                 case MSG_SHUFFLE_DECK  -> new DuelMessage.ShuffleDeck(reader.readUint8());
                 case MSG_SHUFFLE_HAND  -> parseShuffleHand(reader);
                 case MSG_SHUFFLE_EXTRA -> parseShuffleExtra(reader);
+                case MSG_REVERSE_DECK  -> new DuelMessage.ReverseDeck();
+                case MSG_DECK_TOP      -> parseDeckTop(reader);
 
                 // UI/Info
                 case MSG_HINT          -> parseHint(reader);
@@ -109,6 +111,7 @@ public class MessageParser {
                 case MSG_ANNOUNCE_CARD    -> parseAnnounceCard(reader);
                 case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(reader.readUint8());
                 case MSG_CONFIRM_DECKTOP -> parseConfirmDeckTop(reader);
+                case MSG_CONFIRM_EXTRATOP -> parseConfirmExtraTop(reader);
                 case MSG_CONFIRM_CARDS   -> parseConfirmCards(reader);
                 case MSG_HAND_RES        -> parseHandResult(reader);
 
@@ -306,6 +309,15 @@ public class MessageParser {
         int player = r.readUint8();
         r.skip(4 * r.readInt32());
         return new DuelMessage.ShuffleExtra(player);
+    }
+
+    /** [u8 player][u32 offsetFromTop][u32 code][u32 position] (processor.cpp:4929 and 13 more sites). */
+    private static DuelMessage.DeckTop parseDeckTop(BufferReader r) {
+        int player = r.readUint8();
+        int offsetFromTop = r.readInt32();
+        int code = r.readInt32();
+        int position = r.readInt32();
+        return new DuelMessage.DeckTop(player, offsetFromTop, code, position);
     }
 
     // ---- UI/Info ----
@@ -633,6 +645,16 @@ public class MessageParser {
             cards.add(DuelMessage.ConfirmCard.read(r));
         }
         return new DuelMessage.ConfirmDeckTop(player, cards);
+    }
+
+    private static DuelMessage.ConfirmExtraTop parseConfirmExtraTop(BufferReader r) {
+        int player = r.readUint8();
+        int count = r.readInt32();
+        var cards = new ArrayList<DuelMessage.ConfirmCard>(count);
+        for (int i = 0; i < count; i++) {
+            cards.add(DuelMessage.ConfirmCard.read(r));
+        }
+        return new DuelMessage.ConfirmExtraTop(player, cards);
     }
 
     private static DuelMessage.ConfirmCards parseConfirmCards(BufferReader r) {

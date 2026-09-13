@@ -113,6 +113,9 @@ public class ClientDuelState {
     // Cards the engine just targeted or selected; cleared when the next prompt arrives.
     public final Set<ClientCard> highlighted = new LinkedHashSet<>();
 
+    // Both decks turned over (MSG_REVERSE_DECK). One global flag, as edopro's deck_reversed.
+    public boolean deckReversed;
+
     // Convenience accessors for pile counts (derived from list size)
     public int deckCount(int player) { return deck[player].size(); }
     public int extraCount(int player) { return extra[player].size(); }
@@ -437,7 +440,32 @@ public class ClientDuelState {
             }
 
             // ---- Deck/Hand ----
-            case DuelMessage.ShuffleDeck ignored -> { }
+            case DuelMessage.ShuffleDeck sd -> {
+                // edopro takes back every reveal a shuffle invalidates (duelclient.cpp:2691).
+                for (var card : deck[sd.player()]) {
+                    card.code = 0;
+                    card.position = POS_FACEDOWN_DEFENSE;
+                }
+                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+            }
+            case DuelMessage.ReverseDeck ignored -> {
+                deckReversed = !deckReversed;
+                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                LOGGER.debug("[State] ReverseDeck: reversed={}", deckReversed);
+            }
+            case DuelMessage.DeckTop top -> {
+                // duelclient.cpp:2862 counts from the top of the pile, which is the end of the list.
+                int index = deck[top.player()].size() - 1 - top.offsetFromTop();
+                if (index < 0 || index >= deck[top.player()].size()) {
+                    LOGGER.warn("[State] DeckTop offset {} outside p{}'s deck of {}",
+                            top.offsetFromTop(), top.player(), deckCount(top.player()));
+                } else {
+                    ClientCard card = deck[top.player()].get(index);
+                    card.code = top.code();
+                    card.position = top.position();
+                    dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                }
+            }
             case DuelMessage.ShuffleHand sh -> {
                 // edopro re-codes the existing hand objects rather than replacing them.
                 var list = hand[sh.player()];
@@ -521,15 +549,18 @@ public class ClientDuelState {
 
             // ---- Confirm/reveal ----
             case DuelMessage.ConfirmDeckTop confirm -> {
-                confirmTitle = "Revealed Cards";
-                confirmCards = confirm.cards();
-                dirtyFlags.add(DirtyFlag.CONFIRM);
+                revealPileTop(deck[confirm.player()], confirm.cards());
+                reveal(owner(confirm.player()) + "Deck (top)", confirm.cards());
                 LOGGER.debug("[State] ConfirmDeckTop: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
+            case DuelMessage.ConfirmExtraTop confirm -> {
+                revealPileTop(extra[confirm.player()], confirm.cards());
+                reveal(owner(confirm.player()) + "Extra Deck (top)", confirm.cards());
+                LOGGER.debug("[State] ConfirmExtraTop: player={}, cards={}", confirm.player(), confirm.cards().size());
+            }
             case DuelMessage.ConfirmCards confirm -> {
-                confirmTitle = "Confirmed Cards";
-                confirmCards = confirm.cards();
-                dirtyFlags.add(DirtyFlag.CONFIRM);
+                int shown = confirm.cards().isEmpty() ? confirm.player() : confirm.cards().getFirst().controller();
+                reveal(owner(shown) + "Revealed Cards", confirm.cards());
                 LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
             case DuelMessage.CardSelected sel -> {
@@ -621,6 +652,33 @@ public class ClientDuelState {
                     dirtyFlags.add(DirtyFlag.PILE_COUNTS);
             default -> { }
         }
+    }
+
+    // ---- Reveals ----
+
+    /** "Your " or "Opponent's ", so a reveal panel says whose pile it is showing. */
+    private String owner(int player) {
+        return player == localPlayer ? "Your " : "Opponent's ";
+    }
+
+    private void reveal(String title, List<DuelMessage.ConfirmCard> cards) {
+        confirmTitle = title;
+        confirmCards = cards;
+        dirtyFlags.add(DirtyFlag.CONFIRM);
+    }
+
+    /**
+     * edopro writes a deck-top or extra-top reveal onto the pile's own card objects, so the codes
+     * survive until a shuffle takes them back (duelclient.cpp:2513, :2548). The reveal counts down
+     * from the top of the pile, which is the end of the list.
+     */
+    private void revealPileTop(List<ClientCard> pile, List<DuelMessage.ConfirmCard> cards) {
+        for (int i = 0; i < cards.size(); i++) {
+            int index = pile.size() - 1 - i;
+            if (index < 0) return;
+            if (cards.get(i).code() != 0) pile.get(index).code = cards.get(i).code();
+        }
+        dirtyFlags.add(DirtyFlag.PILE_COUNTS);
     }
 
     // ---- Card containers ----

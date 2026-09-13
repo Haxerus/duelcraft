@@ -100,6 +100,12 @@ public class ZoneInspectorController {
         if (state.confirmCards == null || state.confirmCards.isEmpty()) return;
         if (inspector == null) return;
 
+        // The reveal is not a pile, so drop the inspection target: a later PILE_COUNTS refresh
+        // would otherwise rebuild the list from whichever pile was open before.
+        inspectedPlayer = -1;
+        inspectedLocation = -1;
+        inspectedTitle = null;
+
         inspector.removeClass("hidden");
         var titleLabel = byId("zone-inspector-title");
         var listElem = byId("zone-inspector-list", ScrollerView.class);

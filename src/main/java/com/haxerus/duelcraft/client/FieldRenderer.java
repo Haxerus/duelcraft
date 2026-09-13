@@ -335,14 +335,36 @@ public class FieldRenderer {
         for (int p = 0; p < 2; p++) {
             final int player = p;
             Side side = side(player);
-            // Deck: always face-down card back when non-empty
-            slot(new Zone(side, LOCATION_DECK, 0)).ifPresent(el ->
-                    setPileBackground(el, state.deckCount(player) > 0 ? CARD_BACK_SPRITE : null));
+            // Deck: card back, unless the top card is turned over and its code is known
+            slot(new Zone(side, LOCATION_DECK, 0)).ifPresent(el -> refreshDeckPile(el, player));
             // Extra deck: top face-up card if any, otherwise card back when non-empty
             slot(new Zone(side, LOCATION_EXTRA, 0)).ifPresent(el -> refreshExtraDeckPile(el, player));
             // Graveyard & Banished: top card image when non-empty
             slot(new Zone(side, LOCATION_GRAVE, 0)).ifPresent(el -> setPileTopCard(el, state.grave[player]));
             slot(new Zone(side, LOCATION_REMOVED, 0)).ifPresent(el -> setPileTopCard(el, state.banished[player]));
+        }
+    }
+
+    /**
+     * edopro draws a deck card face-down when its own orientation matches the deck's
+     * ({@code client_field.cpp:843}): a reversed deck, or a single card turned face-up on top by
+     * {@code MSG_DECK_TOP}, shows its face instead of the card back.
+     */
+    private void refreshDeckPile(UIElement slot, int player) {
+        var cards = state.deck[player];
+        if (cards.isEmpty()) {
+            setPileBackground(slot, null);
+            return;
+        }
+        ClientCard top = cards.getLast();
+        boolean topTurnedOver = (top.position & POS_FACEUP_DEFENSE) != 0;
+        if (top.code != 0 && state.deckReversed != topTurnedOver) {
+            callbacks.setCardImageBackground(slot, top.code);
+            slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+            slot.addClass("has-card");
+        } else {
+            setPileBackground(slot, CARD_BACK_SPRITE);
+            callbacks.clearPendingImage(slot);
         }
     }
 

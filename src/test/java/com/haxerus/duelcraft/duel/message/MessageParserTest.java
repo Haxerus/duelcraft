@@ -768,6 +768,53 @@ class MessageParserTest {
         assertEquals(46986414, confirm.cards().get(1).code());
     }
 
+    /** libduel.cpp:854 writes the same body as ConfirmDecktop, over the extra deck. */
+    @Test
+    void parseConfirmExtraTop() {
+        ByteBuffer b = body(1 + 4 + 10);
+        b.put((byte) 1);       // player
+        b.putInt(1);            // count
+        b.putInt(89631139);
+        b.put((byte) 1);
+        b.put((byte) LOCATION_EXTRA);
+        b.putInt(14);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CONFIRM_EXTRATOP, b.array()));
+        assertEquals(1, msgs.size());
+        var confirm = assertInstanceOf(DuelMessage.ConfirmExtraTop.class, msgs.getFirst());
+        assertEquals(1, confirm.player());
+        assertEquals(1, confirm.cards().size());
+        assertEquals(89631139, confirm.cards().getFirst().code());
+        assertEquals(LOCATION_EXTRA, confirm.cards().getFirst().location());
+        assertEquals(14, confirm.cards().getFirst().sequence());
+    }
+
+    /** processor.cpp:4926 writes an empty body. */
+    @Test
+    void parseReverseDeck() {
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_REVERSE_DECK, new byte[0]));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.ReverseDeck.class, msgs.getFirst());
+    }
+
+    /** processor.cpp:4929: [u8 player][u32 offsetFromTop][u32 code][u32 position] = 13 bytes. */
+    @Test
+    void parseDeckTop() {
+        ByteBuffer b = body(13);
+        b.put((byte) 1);
+        b.putInt(2);
+        b.putInt(89631139);
+        b.putInt(POS_FACEUP_DEFENSE);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_DECK_TOP, b.array()));
+        assertEquals(1, msgs.size());
+        var top = assertInstanceOf(DuelMessage.DeckTop.class, msgs.getFirst());
+        assertEquals(1, top.player());
+        assertEquals(2, top.offsetFromTop());
+        assertEquals(89631139, top.code());
+        assertEquals(POS_FACEUP_DEFENSE, top.position());
+    }
+
     @Test
     void parseConfirmCards() {
         ByteBuffer b = body(16);

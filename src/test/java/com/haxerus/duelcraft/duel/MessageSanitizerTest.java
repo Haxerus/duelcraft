@@ -170,6 +170,22 @@ class MessageSanitizerTest {
         assertTrue(recipients.includes(1));
     }
 
+    /** §12.1: the deck-top reveals are public information, broadcast with their codes intact. */
+    @Test
+    void deckTopAndConfirmExtraTopReachBothPlayersWithTheirCodes() {
+        var deckTop = new DuelMessage.DeckTop(1, 0, BLUE_EYES, POS_FACEUP_DEFENSE);
+        var extraTop = new DuelMessage.ConfirmExtraTop(1,
+                List.of(new DuelMessage.ConfirmCard(BLUE_EYES, 1, LOCATION_EXTRA, 14)));
+
+        for (var msg : List.of(deckTop, extraTop)) {
+            var recipients = MessageSanitizer.recipientsOf(msg);
+            assertTrue(recipients.includes(0));
+            assertTrue(recipients.includes(1));
+            assertSame(msg, MessageSanitizer.forRecipient(msg, 0));
+            assertSame(msg, MessageSanitizer.forRecipient(msg, 1));
+        }
+    }
+
     // ---- MSG_HINT (generic_duel.cpp:843-880) ----
 
     @Test

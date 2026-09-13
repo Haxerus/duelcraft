@@ -124,6 +124,10 @@ class DuelMessageCodecTest {
                 List.of(new DuelMessage.ConfirmCard(111, 0, 0x01, 0), new DuelMessage.ConfirmCard(222, 1, 0x04, 1))));
         SAMPLES.put(DuelMessage.ConfirmCards.class, new DuelMessage.ConfirmCards(1,
                 List.of(new DuelMessage.ConfirmCard(333, 1, 0x84, 2))));
+        SAMPLES.put(DuelMessage.ConfirmExtraTop.class, new DuelMessage.ConfirmExtraTop(1,
+                List.of(new DuelMessage.ConfirmCard(444, 1, 0x40, 14))));
+        SAMPLES.put(DuelMessage.ReverseDeck.class, new DuelMessage.ReverseDeck());
+        SAMPLES.put(DuelMessage.DeckTop.class, new DuelMessage.DeckTop(1, 2, 89631139, 0x4));
         SAMPLES.put(DuelMessage.CardSelected.class, new DuelMessage.CardSelected(List.of(LOC_OVERLAY_MZONE, LOC_OVERLAY_SZONE)));
         SAMPLES.put(DuelMessage.Hint.class, new DuelMessage.Hint(3, 0, U64_ABOVE_32BIT));
         SAMPLES.put(DuelMessage.CardHint.class, new DuelMessage.CardHint(LOC_PLAIN, 2, U64_ABOVE_32BIT));

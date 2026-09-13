@@ -285,6 +285,104 @@ class ClientDuelStateTest {
         assertEquals(0x0108, state.disabledZones[1]);
     }
 
+    // ---- Deck reveals and orientation (Task 14) ----
+
+    /** duelclient.cpp:2862: the named card is at {@code size - 1 - offset}, counting from the top. */
+    @Test
+    void deckTopWritesTheCodeAtTheOffsetFromTheTop() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.DeckTop(0, 2, 89631139, POS_FACEUP_DEFENSE));
+
+        assertEquals(89631139, state.deck[0].get(37).code);
+        assertEquals(POS_FACEUP_DEFENSE, state.deck[0].get(37).position);
+        assertEquals(0, state.deck[0].get(39).code);
+        assertEquals(40, state.deckCount(0));
+    }
+
+    @Test
+    void deckTopOutsideTheDeckIsIgnored() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.DeckTop(0, 40, 89631139, POS_FACEUP_DEFENSE));
+
+        assertTrue(state.deck[0].stream().allMatch(card -> card.code == 0));
+    }
+
+    /** duelclient.cpp:2852: one global flag, not one per player. */
+    @Test
+    void reverseDeckTogglesTheGlobalFlag() {
+        var state = newState();
+        assertFalse(state.deckReversed);
+
+        state.applyMessage(new DuelMessage.ReverseDeck());
+        assertTrue(state.deckReversed);
+
+        state.applyMessage(new DuelMessage.ReverseDeck());
+        assertFalse(state.deckReversed);
+    }
+
+    /** duelclient.cpp:2691: a shuffle takes back every code and per-card reveal. */
+    @Test
+    void shuffleDeckZeroesEveryDeckCode() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.DeckTop(0, 0, 89631139, POS_FACEUP_DEFENSE));
+
+        state.applyMessage(new DuelMessage.ShuffleDeck(0));
+
+        assertTrue(state.deck[0].stream().allMatch(card -> card.code == 0));
+        assertEquals(POS_FACEDOWN_DEFENSE, state.deck[0].getLast().position);
+        assertEquals(40, state.deckCount(0));
+    }
+
+    @Test
+    void shuffleDeckLeavesTheOtherPlayersDeckAlone() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.DeckTop(1, 0, 89631139, POS_FACEUP_DEFENSE));
+
+        state.applyMessage(new DuelMessage.ShuffleDeck(0));
+
+        assertEquals(89631139, state.deck[1].getLast().code);
+    }
+
+    /** duelclient.cpp:2513: the revealed codes are written onto the deck objects from the top down. */
+    @Test
+    void confirmDeckTopNamesThePileAndWritesTheCodes() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.ConfirmDeckTop(0, List.of(
+                new DuelMessage.ConfirmCard(89631139, 0, LOCATION_DECK, 39),
+                new DuelMessage.ConfirmCard(46986414, 0, LOCATION_DECK, 38))));
+
+        assertEquals("Your Deck (top)", state.confirmTitle);
+        assertEquals(2, state.confirmCards.size());
+        assertEquals(89631139, state.deck[0].get(39).code);
+        assertEquals(46986414, state.deck[0].get(38).code);
+    }
+
+    /** duelclient.cpp:2548: same body, over the extra deck, counted from its back. */
+    @Test
+    void confirmExtraTopNamesTheExtraDeckAndWritesTheCodes() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.ConfirmExtraTop(1, List.of(
+                new DuelMessage.ConfirmCard(89631139, 1, LOCATION_EXTRA, 14))));
+
+        assertEquals("Opponent's Extra Deck (top)", state.confirmTitle);
+        assertEquals(1, state.confirmCards.size());
+        assertEquals(89631139, state.extra[1].get(14).code);
+    }
+
+    @Test
+    void confirmCardsNamesTheOwnerOfTheRevealedCards() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
+                new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0))));
+
+        assertEquals("Opponent's Revealed Cards", state.confirmTitle);
+    }
+
     @Test
     void moveToHandAppendsACardCarryingTheMessageCode() {
         var state = newState();

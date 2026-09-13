@@ -131,7 +131,15 @@ public class DuelMessageCodec {
             case DuelMessage.ShuffleHand m -> { buf.writeByte(m.player()); writeIntList(buf, m.codes()); }
             case DuelMessage.ShuffleExtra m -> buf.writeByte(m.player());
             case DuelMessage.ConfirmDeckTop m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
+            case DuelMessage.ConfirmExtraTop m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
             case DuelMessage.ConfirmCards m -> { buf.writeByte(m.player()); writeConfirmCardList(buf, m.cards()); }
+            case DuelMessage.ReverseDeck ignored -> {}
+            case DuelMessage.DeckTop m -> {
+                buf.writeByte(m.player());
+                buf.writeInt(m.offsetFromTop());
+                buf.writeInt(m.code());
+                buf.writeInt(m.position());
+            }
             case DuelMessage.CardSelected m -> {
                 buf.writeInt(m.cards().size());
                 for (var loc : m.cards()) writeLocInfo(buf, loc);
@@ -311,7 +319,10 @@ public class DuelMessageCodec {
             case MSG_SHUFFLE_HAND -> new DuelMessage.ShuffleHand(buf.readByte(), readIntList(buf));
             case MSG_SHUFFLE_EXTRA -> new DuelMessage.ShuffleExtra(buf.readByte());
             case MSG_CONFIRM_DECKTOP -> new DuelMessage.ConfirmDeckTop(buf.readByte(), readConfirmCardList(buf));
+            case MSG_CONFIRM_EXTRATOP -> new DuelMessage.ConfirmExtraTop(buf.readByte(), readConfirmCardList(buf));
             case MSG_CONFIRM_CARDS -> new DuelMessage.ConfirmCards(buf.readByte(), readConfirmCardList(buf));
+            case MSG_REVERSE_DECK -> new DuelMessage.ReverseDeck();
+            case MSG_DECK_TOP -> new DuelMessage.DeckTop(buf.readByte(), buf.readInt(), buf.readInt(), buf.readInt());
             case MSG_CARD_SELECTED -> {
                 int count = buf.readInt();
                 var list = new java.util.ArrayList<LocInfo>(count);
