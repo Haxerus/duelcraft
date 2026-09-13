@@ -533,6 +533,8 @@
         #card-hints {
         horizontal-align: center;
         text-color: #FFDD55;
+        text-wrap: wrap;
+        adaptive-height: true;
         }
 
         #card-hints.hidden {

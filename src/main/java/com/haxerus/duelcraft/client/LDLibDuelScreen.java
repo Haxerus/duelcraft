@@ -219,7 +219,8 @@ public class LDLibDuelScreen {
         private final UIElement hintModalText;
         private final Button hintModalOk;
         private long toastUntil;
-        private boolean zoneFlashOn;
+        /** {@code ClientDuelState.zoneFlashAt} of the flash on screen, 0 when none is. */
+        private long zoneFlashStartedAt;
         private long cardRevealUntil;
 
         // Overlays
@@ -395,7 +396,7 @@ public class LDLibDuelScreen {
 
             // Right-click to cancel/finish field selection
             ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
-                if (e.button != 1) return;
+                if (e.button != 1 || isBlockingOverlayUp()) return;
                 prompt.handleRightClick(e);
             });
 
@@ -685,13 +686,16 @@ public class LDLibDuelScreen {
                 }
             }
 
-            if (state.zoneFlashMask != 0 && !zoneFlashOn) {
+            // Keyed on the hint's own timestamp, so a second HINT_ZONE restarts the flash instead
+            // of being swallowed by the one already up — even when it names the same zones.
+            if (state.zoneFlashMask != 0 && state.zoneFlashAt != zoneFlashStartedAt) {
+                field.clearZoneFlash();
                 field.flashZones(state.zoneFlashMask);
-                zoneFlashOn = true;
-            } else if (zoneFlashOn && now - state.zoneFlashAt > ZONE_FLASH_MS) {
+                zoneFlashStartedAt = state.zoneFlashAt;
+            } else if (zoneFlashStartedAt != 0 && now - zoneFlashStartedAt > ZONE_FLASH_MS) {
                 field.clearZoneFlash();
                 state.zoneFlashMask = 0;
-                zoneFlashOn = false;
+                zoneFlashStartedAt = 0;
             }
 
             if (state.revealCardCode != 0) {
@@ -711,6 +715,12 @@ public class LDLibDuelScreen {
 
         private static void sendConcede() {
             PacketDistributor.sendToServer(new DuelConcedePayload());
+        }
+
+        /** True while the hint modal or the pause dialog owns the screen and clicks must stop there. */
+        private boolean isBlockingOverlayUp() {
+            return (hintModal != null && !hintModal.hasClass("hidden"))
+                    || (pauseOverlay != null && !pauseOverlay.hasClass("hidden"));
         }
 
         void togglePauseOverlay() {
