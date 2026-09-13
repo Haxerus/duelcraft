@@ -115,16 +115,14 @@ public class DuelSession implements AutoCloseable {
 
     /** Runs each scheduled query and hands the result to the listener as UpdateData / UpdateCard. */
     private void emitRefreshes(List<RefreshSchedule.Refresh> refreshes) {
-        long eng = engine.getHandle();
         for (RefreshSchedule.Refresh refresh : refreshes) {
-            if (refresh.isWholeLocation()) emitLocation(eng, refresh);
-            else emitSingle(eng, refresh);
+            if (refresh.isWholeLocation()) emitLocation(refresh);
+            else emitSingle(refresh);
         }
     }
 
-    private void emitLocation(long eng, RefreshSchedule.Refresh refresh) {
-        byte[] data = OcgCore.nDuelQueryLocation(eng, duelHandle,
-                refresh.flags(), refresh.player(), refresh.location());
+    private void emitLocation(RefreshSchedule.Refresh refresh) {
+        byte[] data = queryLocation(refresh.flags(), refresh.player(), refresh.location());
         if (data == null || data.length == 0) return;
         List<QueriedCard> cards;
         try {
@@ -137,9 +135,8 @@ public class DuelSession implements AutoCloseable {
         listener.onMessage(new DuelMessage.UpdateData(refresh.player(), refresh.location(), cards));
     }
 
-    private void emitSingle(long eng, RefreshSchedule.Refresh refresh) {
-        byte[] data = OcgCore.nDuelQuery(eng, duelHandle, refresh.flags(),
-                refresh.player(), refresh.location(), refresh.sequence(), 0);
+    private void emitSingle(RefreshSchedule.Refresh refresh) {
+        byte[] data = query(refresh.flags(), refresh.player(), refresh.location(), refresh.sequence(), 0);
         if (data == null || data.length == 0) return;
         QueriedCard card;
         try {
@@ -178,10 +175,6 @@ public class DuelSession implements AutoCloseable {
     public byte[] queryLocation(int flags, int controller, int location) {
         return OcgCore.nDuelQueryLocation(engine.getHandle(), duelHandle,
                 flags, controller, location);
-    }
-
-    public byte[] queryField() {
-        return OcgCore.nDuelQueryField(engine.getHandle(), duelHandle);
     }
 
     public boolean isEnded() {

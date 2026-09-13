@@ -24,12 +24,6 @@ public sealed interface DuelMessage {
 
     // ---- Lifecycle ----
 
-    record Start(int playerType, int lp0, int lp1,
-                 int deckCount0, int extraCount0,
-                 int deckCount1, int extraCount1) implements DuelMessage {
-        public int type() { return MSG_START; }
-    }
-
     record Win(int winner, int reason) implements DuelMessage {
         public int type() { return MSG_WIN; }
     }
@@ -399,10 +393,6 @@ public sealed interface DuelMessage {
 
     record Equip(LocInfo card, LocInfo target) implements DuelMessage {
         public int type() { return MSG_EQUIP; }
-    }
-
-    record Unequip(LocInfo card) implements DuelMessage {
-        public int type() { return MSG_UNEQUIP; }
     }
 
     record CardTarget(LocInfo card, LocInfo target) implements DuelMessage {

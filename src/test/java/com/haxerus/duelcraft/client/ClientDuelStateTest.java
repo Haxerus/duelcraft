@@ -51,7 +51,7 @@ class ClientDuelStateTest {
         var actions = state.cardActions.get(loc);
         assertNotNull(actions);
         var activate = actions.stream()
-                .filter(a -> a.label().equals("Activate"))
+                .filter(a -> a.actionType() == ClientDuelState.BattleAction.ACTIVATE)
                 .findFirst()
                 .orElseThrow();
         assertEquals(0, activate.actionType());

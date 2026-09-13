@@ -60,31 +60,6 @@ class MessageParserTest {
     // ---- Lifecycle Messages ----
 
     @Test
-    void parseStart() {
-        // [uint8 playerType][int32 lp0][int32 lp1][uint16 deck0][uint16 extra0][uint16 deck1][uint16 extra1]
-        ByteBuffer b = body(17);
-        b.put((byte) 0);       // playerType
-        b.putInt(8000);         // lp0
-        b.putInt(8000);         // lp1
-        b.putShort((short) 40); // deck0
-        b.putShort((short) 15); // extra0
-        b.putShort((short) 40); // deck1
-        b.putShort((short) 15); // extra1
-
-        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_START, b.array()));
-        assertEquals(1, msgs.size());
-        assertInstanceOf(DuelMessage.Start.class, msgs.getFirst());
-        var start = (DuelMessage.Start) msgs.getFirst();
-        assertEquals(0, start.playerType());
-        assertEquals(8000, start.lp0());
-        assertEquals(8000, start.lp1());
-        assertEquals(40, start.deckCount0());
-        assertEquals(15, start.extraCount0());
-        assertEquals(40, start.deckCount1());
-        assertEquals(15, start.extraCount1());
-    }
-
-    @Test
     void parseWin() {
         // [uint8 winner][uint8 reason]
         ByteBuffer b = body(2);

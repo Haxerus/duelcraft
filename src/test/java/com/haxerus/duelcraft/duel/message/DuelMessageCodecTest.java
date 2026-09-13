@@ -79,7 +79,6 @@ class DuelMessageCodecTest {
     static {
         SAMPLES.put(DuelMessage.Raw.class, new DuelMessage.Raw(99, new byte[]{9, 8, 7, 6, 5}));
         SAMPLES.put(DuelMessage.Retry.class, new DuelMessage.Retry());
-        SAMPLES.put(DuelMessage.Start.class, new DuelMessage.Start(0, 8000, 8000, 40, 15, 40, 15));
         SAMPLES.put(DuelMessage.Win.class, new DuelMessage.Win(1, 2));
         SAMPLES.put(DuelMessage.UpdateData.class,
                 new DuelMessage.UpdateData(1, 0x84, List.of(queriedCard(1001, true), queriedCard(1002, false))));
@@ -186,7 +185,6 @@ class DuelMessageCodecTest {
         SAMPLES.put(DuelMessage.RockPaperScissors.class, new DuelMessage.RockPaperScissors(0));
         SAMPLES.put(DuelMessage.HandResult.class, new DuelMessage.HandResult(1, 2));
         SAMPLES.put(DuelMessage.Equip.class, new DuelMessage.Equip(LOC_OVERLAY_MZONE, LOC_OVERLAY_SZONE));
-        SAMPLES.put(DuelMessage.Unequip.class, new DuelMessage.Unequip(LOC_PLAIN));
         SAMPLES.put(DuelMessage.CardTarget.class, new DuelMessage.CardTarget(LOC_OVERLAY_MZONE, LOC_OVERLAY_SZONE));
         SAMPLES.put(DuelMessage.CancelTarget.class, new DuelMessage.CancelTarget(LOC_OVERLAY_MZONE, LOC_OVERLAY_SZONE));
         SAMPLES.put(DuelMessage.AddCounter.class, new DuelMessage.AddCounter(2000, 1, 0x84, 3, 5));

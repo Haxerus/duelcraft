@@ -29,7 +29,7 @@ public class ClientDuelState {
 
     // ── Dirty flags for efficient UI refresh ──
     public enum DirtyFlag {
-        LP, TURN_PHASE,
+        TURN_PHASE,
         HAND_0, HAND_1,
         MZONE_0, MZONE_1,
         SZONE_0, SZONE_1,
@@ -82,7 +82,6 @@ public class ClientDuelState {
 
     // Life points per player
     public final int[] lp = new int[2];
-    public int startingLP;
 
     // Turn / phase
     public int currentTurn;
@@ -224,16 +223,9 @@ public class ClientDuelState {
     // Card actions: maps card location → available actions (for click-on-card UI).
     // `desc` is the activating effect's description (0 for everything but Activate), so two
     // effects on one card can be told apart in the option dialog.
-    public record CardAction(int actionType, int listIndex, String label, long desc) {}
+    public record CardAction(int actionType, int listIndex, long desc) {}
     public record CardLocation(int controller, int location, int sequence) {}
     public final Map<CardLocation, List<CardAction>> cardActions = new HashMap<>();
-
-    // Last game action message (for UI display)
-    public DuelMessage lastAction;
-
-    // Last hint (provides context for next selection, e.g., "Select a monster")
-    public int lastHintType;
-    public long lastHintData;
 
     // ── Hint surfaces (MSG_HINT, edopro duelclient.cpp:1390-1522) ──
 
@@ -314,8 +306,6 @@ public class ClientDuelState {
      * Apply a duel message to update state.
      */
     public void applyMessage(DuelMessage msg) {
-        lastAction = msg;
-
         switch (msg) {
             // ---- System ----
             case DuelMessage.Retry ignored -> {
@@ -333,21 +323,6 @@ public class ClientDuelState {
             case DuelMessage.CardHint hint -> applyCardHint(hint);
 
             // ---- Lifecycle ----
-            case DuelMessage.Start start -> {
-                lp[0] = start.lp0();
-                lp[1] = start.lp1();
-                startingLP = Math.max(lp[0], lp[1]);
-                // Reset the deck and extra deck lists to the announced sizes (codes still unknown).
-                deck[0].clear(); deck[1].clear();
-                extra[0].clear(); extra[1].clear();
-                fillBlanks(deck[0], 0, LOCATION_DECK, start.deckCount0());
-                fillBlanks(deck[1], 1, LOCATION_DECK, start.deckCount1());
-                fillBlanks(extra[0], 0, LOCATION_EXTRA, start.extraCount0());
-                fillBlanks(extra[1], 1, LOCATION_EXTRA, start.extraCount1());
-                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
-                LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
-                        lp[0], lp[1], deckCount(0), deckCount(1), extraCount(0), extraCount(1));
-            }
             case DuelMessage.Win win -> applyResult(win.winner(), win.reason());
             case DuelMessage.NewTurn nt -> {
                 currentTurn = nt.player();
@@ -538,7 +513,7 @@ public class ClientDuelState {
             case DuelMessage.ShuffleSetCard set -> applyShuffleSetCard(set);
             case DuelMessage.RemoveCards remove -> applyRemoveCards(remove.cards());
 
-            // ---- Battle (no state change, UI can animate from lastAction) ----
+            // ---- Battle (no state change) ----
             case DuelMessage.Attack ignored -> { }
             case DuelMessage.Battle ignored -> { }
             case DuelMessage.AttackDisabled ignored -> { }
@@ -590,9 +565,8 @@ public class ClientDuelState {
             case DuelMessage.SelectUnselectCard sel -> {
                 setPrompt(msg);
                 dirtyFlags.add(DirtyFlag.PROMPT);
-                LOGGER.info("[State] Prompt: SelectUnselectCard player={} hint=0x{} selectable={} alreadySelected={}",
-                        sel.player(), Integer.toHexString(lastHintType),
-                        sel.selectableCards().size(), sel.unselectableCards().size());
+                LOGGER.info("[State] Prompt: SelectUnselectCard player={} selectable={} alreadySelected={}",
+                        sel.player(), sel.selectableCards().size(), sel.unselectableCards().size());
                 for (var c : sel.selectableCards()) {
                     LOGGER.info("[State]   selectable: code={} ctrl={} loc=0x{} seq={}",
                             c.code(), c.controller(), Integer.toHexString(c.location()), c.sequence());
@@ -679,10 +653,6 @@ public class ClientDuelState {
                     target.equippedBy.add(card);
                 }
             }
-            case DuelMessage.Unequip uneq -> {
-                ClientCard card = resolveCard(uneq.card());
-                if (card != null) detachEquipTarget(card);
-            }
             case DuelMessage.CardTarget ct -> {
                 ClientCard card = resolveCard(ct.card());
                 ClientCard target = resolveCard(ct.target());
@@ -746,8 +716,6 @@ public class ClientDuelState {
     // ---- Hints (edopro duelclient.cpp MSG_HINT :1390, MSG_CARD_HINT :3964) ----
 
     private void applyHint(DuelMessage.Hint hint) {
-        lastHintType = hint.hintType();
-        lastHintData = hint.data();
         switch (hint.hintType()) {
             case HINT_SELECTMSG -> selectHint = hint.data();
             case HINT_MESSAGE -> pendingModal = hintText.desc(hint.data());
@@ -1228,42 +1196,42 @@ public class ClientDuelState {
     }
 
     private void addAction(int controller, int location, int sequence,
-                           int actionType, int listIndex, String label) {
-        addAction(controller, location, sequence, actionType, listIndex, label, 0L);
+                           int actionType, int listIndex) {
+        addAction(controller, location, sequence, actionType, listIndex, 0L);
     }
 
     private void addAction(int controller, int location, int sequence,
-                           int actionType, int listIndex, String label, long desc) {
+                           int actionType, int listIndex, long desc) {
         var key = new CardLocation(controller, location, sequence);
         cardActions.computeIfAbsent(key, k -> new ArrayList<>())
-                .add(new CardAction(actionType, listIndex, label, desc));
+                .add(new CardAction(actionType, listIndex, desc));
     }
 
     private void buildIdleCmdActions(DuelMessage.SelectIdleCmd sel) {
         cardActions.clear();
         for (int i = 0; i < sel.summonable().size(); i++) {
             var c = sel.summonable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SUMMON, i, "Summon");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SUMMON, i);
         }
         for (int i = 0; i < sel.specialSummonable().size(); i++) {
             var c = sel.specialSummonable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SPECIAL_SUMMON, i, "Sp. Summon");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SPECIAL_SUMMON, i);
         }
         for (int i = 0; i < sel.repositionable().size(); i++) {
             var c = sel.repositionable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.REPOSITION, i, "Reposition");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.REPOSITION, i);
         }
         for (int i = 0; i < sel.settableMonsters().size(); i++) {
             var c = sel.settableMonsters().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SET_MONSTER, i, "Set");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SET_MONSTER, i);
         }
         for (int i = 0; i < sel.settableSpells().size(); i++) {
             var c = sel.settableSpells().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SET_SPELL_TRAP, i, "Set S/T");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SET_SPELL_TRAP, i);
         }
         for (int i = 0; i < sel.activatable().size(); i++) {
             var c = sel.activatable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.ACTIVATE, i, "Activate", c.desc());
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.ACTIVATE, i, c.desc());
         }
     }
 
@@ -1271,11 +1239,11 @@ public class ClientDuelState {
         cardActions.clear();
         for (int i = 0; i < sel.attackable().size(); i++) {
             var c = sel.attackable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ATTACK, i, "Attack");
+            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ATTACK, i);
         }
         for (int i = 0; i < sel.activatable().size(); i++) {
             var c = sel.activatable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ACTIVATE, i, "Activate", c.desc());
+            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ACTIVATE, i, c.desc());
         }
     }
 

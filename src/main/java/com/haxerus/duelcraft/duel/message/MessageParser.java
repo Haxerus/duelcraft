@@ -30,7 +30,6 @@ public class MessageParser {
                 case MSG_RETRY         -> new DuelMessage.Retry();
 
                 // Lifecycle
-                case MSG_START         -> parseStart(reader);
                 case MSG_WIN           -> parseWin(reader, bodyLength);
                 case MSG_NEW_TURN      -> parseNewTurn(reader);
                 case MSG_NEW_PHASE     -> parseNewPhase(reader);
@@ -122,7 +121,6 @@ public class MessageParser {
 
                 // Misc action
                 case MSG_EQUIP         -> new DuelMessage.Equip(LocInfo.read(reader), LocInfo.read(reader));
-                case MSG_UNEQUIP       -> new DuelMessage.Unequip(LocInfo.read(reader));
                 case MSG_CARD_TARGET   -> new DuelMessage.CardTarget(LocInfo.read(reader), LocInfo.read(reader));
                 case MSG_CANCEL_TARGET -> new DuelMessage.CancelTarget(LocInfo.read(reader), LocInfo.read(reader));
                 case MSG_ADD_COUNTER   -> parseAddCounter(reader);
@@ -163,17 +161,6 @@ public class MessageParser {
     }
 
     // ---- Lifecycle ----
-
-    private static DuelMessage.Start parseStart(BufferReader r) {
-        int playerType = r.readUint8();
-        int lp0 = r.readInt32();
-        int lp1 = r.readInt32();
-        int deck0 = r.readUint16();
-        int extra0 = r.readUint16();
-        int deck1 = r.readUint16();
-        int extra1 = r.readUint16();
-        return new DuelMessage.Start(playerType, lp0, lp1, deck0, extra0, deck1, extra1);
-    }
 
     private static DuelMessage.Win parseWin(BufferReader r, int bodyLength) {
         int winner = r.readUint8();
@@ -454,16 +441,6 @@ public class MessageParser {
         List<DuelMessage.CardInfo> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             list.add(DuelMessage.CardInfo.read(r));
-        }
-        return list;
-    }
-
-    /** Read a count-prefixed list of ActivatableCard entries (CardInfo + int64 desc). */
-    private static List<DuelMessage.ActivatableCard> readActivatableList(BufferReader r) {
-        int count = r.readInt32();
-        List<DuelMessage.ActivatableCard> list = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            list.add(DuelMessage.ActivatableCard.read(r));
         }
         return list;
     }

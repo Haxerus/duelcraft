@@ -34,15 +34,6 @@ public class DuelMessageCodec {
             case DuelMessage.Retry ignored -> {}
 
             // Lifecycle
-            case DuelMessage.Start m -> {
-                buf.writeInt(m.playerType());
-                buf.writeInt(m.lp0());
-                buf.writeInt(m.lp1());
-                buf.writeShort(m.deckCount0());
-                buf.writeShort(m.extraCount0());
-                buf.writeShort(m.deckCount1());
-                buf.writeShort(m.extraCount1());
-            }
             case DuelMessage.Win m -> { buf.writeByte(m.winner()); buf.writeByte(m.reason()); }
             case DuelMessage.UpdateData m -> {
                 buf.writeByte(m.player());
@@ -254,7 +245,6 @@ public class DuelMessageCodec {
 
             // Misc
             case DuelMessage.Equip m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
-            case DuelMessage.Unequip m -> writeLocInfo(buf, m.card());
             case DuelMessage.CardTarget m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
             case DuelMessage.CancelTarget m -> { writeLocInfo(buf, m.card()); writeLocInfo(buf, m.target()); }
             case DuelMessage.AddCounter m -> { buf.writeShort(m.counterType()); buf.writeByte(m.controller()); buf.writeByte(m.location()); buf.writeByte(m.sequence()); buf.writeShort(m.count()); }
@@ -281,8 +271,6 @@ public class DuelMessageCodec {
         return switch (type) {
             // Lifecycle
             case MSG_RETRY -> new DuelMessage.Retry();
-            case MSG_START -> new DuelMessage.Start(buf.readInt(), buf.readInt(), buf.readInt(),
-                    buf.readShort(), buf.readShort(), buf.readShort(), buf.readShort());
             case MSG_WIN -> new DuelMessage.Win(buf.readByte(), buf.readByte());
             case MSG_UPDATE_DATA -> new DuelMessage.UpdateData(buf.readByte(), buf.readUnsignedByte(), readQueriedCardList(buf));
             case MSG_UPDATE_CARD -> new DuelMessage.UpdateCard(buf.readByte(), buf.readUnsignedByte(), buf.readInt(), readQueriedCard(buf));
@@ -398,7 +386,6 @@ public class DuelMessageCodec {
 
             // Misc
             case MSG_EQUIP -> new DuelMessage.Equip(readLocInfo(buf), readLocInfo(buf));
-            case MSG_UNEQUIP -> new DuelMessage.Unequip(readLocInfo(buf));
             case MSG_CARD_TARGET -> new DuelMessage.CardTarget(readLocInfo(buf), readLocInfo(buf));
             case MSG_CANCEL_TARGET -> new DuelMessage.CancelTarget(readLocInfo(buf), readLocInfo(buf));
             case MSG_ADD_COUNTER -> new DuelMessage.AddCounter(buf.readUnsignedShort(), buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readByte(), buf.readUnsignedShort());
