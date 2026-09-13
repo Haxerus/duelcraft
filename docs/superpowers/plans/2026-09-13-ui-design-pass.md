@@ -82,3 +82,13 @@ User review identified two gaps in the original visual acceptance: fixed card ga
 - The production change is limited to XML/LSS. The response handler is unchanged.
 - Updated captures and reports are saved under `build/ui-review/followup-<width>x<height>/`; `build/ui-review/followup.html` shows the corrected surfaces. The original gallery links to this follow-up so its old captures are not mistaken for the latest layouts.
 - Verification: full group at 1280 × 720 passed 25/25 scenarios and 4,376/4,376 checks (72 captures). Focused `duel_idle_shuffle,duel_panel_layout` runs at 1920 × 1080 and 1024 × 768 each passed 2/2 scenarios and 501/501 checks (13 captures each). Reviewed all 98 captures. Shuffle's scenario retains GUI scale 3; the panel scenario uses launch scales 2, 4 and 3 respectively. XML parsing and `git diff --check` also passed. Independent review found no production defect; its click-test finding was fixed using the existing press helper before these final runs.
+
+## Follow-up: centered hands
+
+Both hands now use automatic outer margins on the first and last cards. Spare width is split evenly; overflowing hands keep zero outer margins and their complete scroll range. Card order, size and click handlers are unchanged.
+
+`DuelHandLayoutScenario` covers both players in MR3, MR5 and Speed: one card, five cards, 20 cards, scrolling to each end, and shrinking an end-scrolled hand back to one card. It also checks that long hands preserve card size and field dimensions. The baseline failed all centering checks while scrolling passed.
+
+The pinned LDLib2 2.2.39.a treats per-edge `AUTO` margins as unspecified in `TaffyLayoutStyle.LPARectData.onChanged`, falling back to zero. Live diagnostics confirmed this. The full `margin` shorthand preserves actual automatic edges, so the renderer uses that form. No library change or manual scroll-offset logic is needed.
+
+Verification: the complete 1280 × 720 suite passed 26/26 scenarios and 4,469/4,469 checks. Focused hand runs at 1920 × 1080 and 1024 × 768 each passed 93/93 checks. The new scenario inherits GUI scales 2, 4 and 3 respectively. Reviewed 117 final captures (87 full-suite captures plus 15 per focused run). Reports are in `build/ui-review/hands-<width>x<height>/`; `build/ui-review/hands.html` shows all 45 hand-specific captures. The earlier galleries link to this latest update. Code review and `git diff --check` completed without remaining actionable findings.

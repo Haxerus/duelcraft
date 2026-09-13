@@ -612,6 +612,13 @@ public class LDLibDuelScreen {
                 var card = new UIElement();
                 card.addClass("card");
 
+                // Center short hands without hiding overflow; LDLib2 needs the full margin shorthand for auto.
+                if (i == 0 || i == cards.size() - 1) {
+                    String left = i == 0 ? "auto" : "0";
+                    String right = i == cards.size() - 1 ? "auto" : "0";
+                    card.lss("margin", "0 " + right + " 0 " + left);
+                }
+
                 if (isLocal && code != 0) {
                     setCardImageBackground(card, code);
                 } else {
