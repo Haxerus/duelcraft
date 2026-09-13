@@ -40,7 +40,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | #   | Message            | Core                                   | Parse                                                               | Client | Test | Notes                                                                                                                                                                                                                                                                                                                                            |
 | --- | ------------------ | -------------------------------------- | ------------------------------------------------------------------- | ------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | `MSG_RETRY`        | ✅ 32 sites (`playerop.cpp`)            | ✅ empty body                                                        | ✅     | ❌    | Client nulls `pendingPrompt` on send; `Retry` only re-renders, so the prompt disappears and the engine waits forever. The engine does **not** re-send the `SELECT_*` after a retry.                                                                                                                                                              |
-| 2   | `MSG_HINT`         | ✅ 75 sites                             | ✅ `u8 type, u8 player, u64 data`                                    | ❌      | ✅    | Stored in `lastHintType/Data`, read only by a log line. `HINT_SELECTMSG` (the "why am I selecting" caption), `HINT_EVENT`, `HINT_OPSELECTED`, `HINT_CARD` never shown. Core emits EVENT/SELECTMSG/OPSELECTED/RACE/ATTRIB/CODE/NUMBER/CARD; MESSAGE/ZONE/SKILL arrive only via `Duel.Hint` from scripts. `HINT_CARD` sites hardcode `player = 0`. |
+| 2   | `MSG_HINT`         | ✅ 75 sites                             | ✅ `u8 type, u8 player, u64 data`                                    | ✅      | ✅    | `HINT_SELECTMSG` captions the next prompt; `OPSELECTED`/`RACE`/`ATTRIB`/`CODE`/`NUMBER` toast; `MESSAGE` opens a modal; `CARD` fills the info banner; `ZONE` flashes the zones. `HINT_EVENT` and `HINT_EFFECT` are still dropped. Core emits EVENT/SELECTMSG/OPSELECTED/RACE/ATTRIB/CODE/NUMBER/CARD; MESSAGE/ZONE/SKILL arrive only via `Duel.Hint` from scripts. `HINT_CARD` sites hardcode `player = 0`. |
 | 3   | `MSG_WAITING`      | ➖ host-only                            | ➖                                                                   |        |      | edopro's server synthesises it.                                                                                                                                                                                                                                                                                                                  |
 | 4   | `MSG_START`        | ➖ host-only                            | ➖                                                                   | ➖      | ✅    | `parseStart`, `DuelMessage.Start`, the codec arm and `ClientDuelState`'s `Start` branch are all dead. Duelcraft uses `DuelStartPayload`.                                                                                                                                                                                                         |
 | 5   | `MSG_WIN`          | ✅ `processor.cpp:4420-4427, 4712-4719` | ✅ `u8 winner (2 = draw), u8 reason (1 LP, 2 deck-out, else script)` | ➖      | ✅    | Both server handlers convert it to `DuelEndPayload`, so the client's `Win` branch and `PromptController.showWinOverlay` are unreachable.                                                                                                                                                                                                         |
@@ -131,8 +131,8 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 97 | `MSG_CANCEL_TARGET` | ✅ `card.cpp:2358` | ✅ | ✅ | ❌ | |
 | 101 | `MSG_ADD_COUNTER` | ✅ `card.cpp:2241` | ✅ `u16 type, u8 con, u8 loc, u8 seq, u16 n` | ✅ | ✅ | Per-card counter map; the total is badged on the card. |
 | 102 | `MSG_REMOVE_COUNTER` | ✅ 4 sites | ✅ same | ✅ | ❌ | |
-| 160 | `MSG_CARD_HINT` | ✅ 5 sites | ✅ `loc_info, u8 type, u64 value` | ❌ | ❌ | `CHINT_TURN` counters, `CHINT_DESC_ADD/REMOVE` never shown. Scripts can emit types 0 to 5; 6 and 7 are engine-only. |
-| 165 | `MSG_PLAYER_HINT` | ✅ `field.cpp:1332-1402` | ✅ | ⚠️ refcounted, no UI | ✅ | `u8 player, u8 type (PHINT_DESC_ADD 6 / REMOVE 7), u64 desc`. Emitted only as a side effect of `EFFECT_FLAG_PLAYER_TARGET \| EFFECT_FLAG_CLIENT_HINT` effects. |
+| 160 | `MSG_CARD_HINT` | ✅ 5 sites | ✅ `loc_info, u8 type, u64 value` | ✅ | ✅ | `CHINT_TURN` badges the card; `CHINT_DESC_ADD/REMOVE` refcount per card and list in the info banner. Scripts can emit types 0 to 5; 6 and 7 are engine-only. |
+| 165 | `MSG_PLAYER_HINT` | ✅ `field.cpp:1332-1402` | ✅ | ✅ | ✅ | `u8 player, u8 type (PHINT_DESC_ADD 6 / REMOVE 7), u64 desc`. Emitted only as a side effect of `EFFECT_FLAG_PLAYER_TARGET \| EFFECT_FLAG_CLIENT_HINT` effects. |
 | 161 | `MSG_TAG_SWAP` | ➖ unreachable | | | | `field::tag_swap` returns early unless `OCG_NewCardInfo.duelist > 0`; Duelcraft always passes 0. |
 | 162 | `MSG_RELOAD_FIELD` | ➖ Debug only | | | | Only from `Debug.ReloadFieldEnd`. Same payload as `OCG_DuelQueryField` minus the id byte, so a resync could be synthesised from the query instead. |
 | 163 | `MSG_AI_NAME` | ➖ Debug only | | | | `u16 len, bytes, u8 0`. |
@@ -169,7 +169,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 | 12  | `SELECT_EFFECTYN`      | ✅                                                              | ✅                                                                                                        | ✅ desc resolved, prompt card highlighted on the field; card image and zone not shown                                                                                                                                             | ✅ yes                                              | ✅                                                                 | ✅ / ✅                            |
 | 13  | `SELECT_YESNO`         | ✅                                                              | ✅                                                                                                        | ✅                                                                                                                                                                                          | ✅ yes                                              | ✅                                                                 | ✅ / ✅                            |
 | 14  | `SELECT_OPTION`        | ✅ `u8` count                                                   | ✅                                                                                                        | ✅                                                                                                                                                                                          | ✅ index 0                                          | ✅                                                                 | ✅ / ✅                            |
-| 15  | `SELECT_CARD`          | ✅                                                              | ✅ type-0 list, `-1` cancel                                                                               | ⚠️ shared Cancel/Finish button, auto-submit at `max` or when every candidate is picked, field clicks blocked while the dialog is open; dialog mode has no names/stats; `HINT_SELECTMSG` unused | ⚠️ one card, ignores `min`                         | ✅                                                                 | ✅ / ✅                            |
+| 15  | `SELECT_CARD`          | ✅                                                              | ✅ type-0 list, `-1` cancel                                                                               | ⚠️ shared Cancel/Finish button, auto-submit at `max` or when every candidate is picked, field clicks blocked while the dialog is open; dialog mode has no names/stats | ⚠️ one card, ignores `min`                         | ✅                                                                 | ✅ / ✅                            |
 | 16  | `SELECT_CHAIN`         | ⚠️ `position` dropped                                          | ✅ `-1` decline                                                                                           | ✅ one image per card, several effects open the `desc` option dialog, hint 550/556; `speCount`/hint timings unused                                                      | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
 | 18  | `SELECT_PLACE`         | ✅                                                              | ✅ (engine always sends count 1)                                                                          | ✅ zone highlight; opponent EMZ bits never highlighted                                                                                                                                      | ✅                                                  | ⚠️ `zoneToBit` misses SZONE 6/7                                   | ✅ / ✅                            |
 | 19  | `SELECT_POSITION`      | ✅                                                              | ✅                                                                                                        | ✅ card-image buttons, turned sideways for defense, card back for the face-down variants                                                                                                        | ✅                                                  | ✅                                                                 | ✅ / ✅                            |
@@ -209,7 +209,7 @@ Every prompt's engine layout and response reader were checked in `playerop.cpp`.
 - [x] `ANNOUNCE_RACE` / `ANNOUNCE_ATTRIB` UI: checkbox grid limited to `available`, exactly `count` picks; names from `SystemStringTable`.
 - [x] `ANNOUNCE_NUMBER` UI: reuse `buildOptionPrompt` over the `List<Long>`.
 - [x] `ANNOUNCE_CARD`: parse opcodes, add `ResponseBuilder.announceCard(code)`, add the solo AI case, build a name-search UI with an opcode filter.
-- [x] `SELECT_CARD`: add Confirm in field mode when `min < max`; guard `handleFieldClick` while the dialog is open. (`HINT_SELECTMSG` as the caption stays open, tracked in §12.6.)
+- [x] `SELECT_CARD`: add Confirm in field mode when `min < max`; guard `handleFieldClick` while the dialog is open; caption it with `HINT_SELECTMSG`.
 - [x] `SELECT_TRIBUTE`: Confirm button instead of auto-submit at `min`.
 - [x] `SELECT_CHAIN`: label options with `desc` text; handle forced + empty list. (`speCount` carries no text worth showing: it is either a count of special summons or the 0x7f trigger marker.)
 - [x] `SELECT_IDLECMD`: offer shuffle-hand when `canShuffle`; label duplicate effects with `desc`.
@@ -401,12 +401,12 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [x] **Counters** have no client state. Now a per-card map, badged with the total.
 - [x] **Equip and target links** not tracked or drawn. Both are tracked bidirectionally now; only the target highlight is drawn, equip links still are not.
 - [x] **Targeting highlight** (`BecomeTarget`, `CardSelected`) drawn until the next prompt; `RandomSelected` is still unparsed.
-- [x] **Disabled zones**: `FieldDisabled` greys the zone out; `HINT_ZONE` still does nothing.
+- [x] **Disabled zones**: `FieldDisabled` greys the zone out; `HINT_ZONE` flashes the zones it names.
 - [ ] **Chain visualisation**: count text only; no link numbers on cards, no resolve/negate feedback.
 - [ ] **Battle feedback**: no attack arrow, no damage-calculation display, no LP change animation or damage numbers.
 - [x] **Pendulum scales** never shown (`LSCALE`/`RSCALE` not requested). Now requested for the spell zones and badged on the slot.
-- [ ] **Card hints** (`CHINT_TURN` counters, `CHINT_DESC_ADD`) not shown.
-- [ ] **Hint captions**: prompt titles are hard-coded ("Select 1-1 card(s)") instead of `HINT_SELECTMSG`.
+- [x] **Card hints** (`CHINT_TURN` counters, `CHINT_DESC_ADD`) not shown. Now a badge and info-banner lines.
+- [x] **Hint captions**: prompt titles are hard-coded ("Select 1-1 card(s)") instead of `HINT_SELECTMSG`. Now the hint wins wherever edopro uses `select_hint`.
 - [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong. `extraPos[]` is filled only in the dead `Start` branch.
 - [x] `Swap` handles MZONE↔MZONE only and does not move stats or overlays.
 - [ ] `Move.reason` ignored (no destroy/banish/return distinction).
@@ -539,7 +539,7 @@ edopro's client keeps one `ClientCard` object per card and moves the same object
 | Message | edopro client | Duelcraft | Gap |
 |---|---|---|---|
 | `MSG_RETRY` | Error modal (string 1434), nothing else (`duelclient.cpp:1348`). | Prompt hidden. | both wrong; §3.3 |
-| `MSG_HINT` | `SELECTMSG` → caption of the next prompt (`:1412`); `MESSAGE` → blocking modal; `OPSELECTED` → log + toast 1510/1512; `RACE`/`ATTRIB`/`CODE` → log + toast 1511; `NUMBER` → toast 1512; `CARD`/`EFFECT` → card reveal; `ZONE` → zone flash + log using the `SELECT_PLACE` bit layout; `EVENT` → nothing. | Stored, never shown. | ❌ |
+| `MSG_HINT` | `SELECTMSG` → caption of the next prompt (`:1412`); `MESSAGE` → blocking modal; `OPSELECTED` → log + toast 1510/1512; `RACE`/`ATTRIB`/`CODE` → log + toast 1511; `NUMBER` → toast 1512; `CARD`/`EFFECT` → card reveal; `ZONE` → zone flash + log using the `SELECT_PLACE` bit layout; `EVENT` → nothing. | Same, minus the log lines and the `EFFECT` reveal. | ✅ |
 | `MSG_WAITING` | "Waiting..." (1390) in the hint line (`:1631`). | n/a (not synthesised). | ❌ |
 | `MSG_START` | Creates blank face-down card objects for both decks and extras (`client_field.cpp:114-131`); "Duel Start" banner. | Counts only. | structural |
 | `MSG_CONFIRM_DECKTOP` / `EXTRATOP` | Writes the codes into the deck objects permanently (until a shuffle zeroes them); log 207 plus one line per card; slide-and-flip animation (`:2513`, `:2548`). | Zone inspector; `EXTRATOP` unparsed. | ⚠️ |
@@ -566,8 +566,8 @@ edopro's client keeps one `ClientCard` object per card and moves the same object
 | `MSG_MISSED_EFFECT` | Log 1622 "missed the timing" (`:3838`). | Unparsed. | ❌ |
 | `MSG_TOSS_COIN` / `TOSS_DICE` | Log + toast 1623/1624 with each result (`:3847`, `:3865`). | Dropped. | ❌ |
 | `MSG_HAND_RES` | Animated hands, 60 frames (`:3891`). | Status text. | ✅ |
-| `MSG_CARD_HINT` | `DESC_ADD/REMOVE` → refcounted `desc_hints` shown in the tooltip; other types → single `cHint/chValue` (tooltip strings 211-215); `CHINT_TURN` shows a numbered badge (`:3964`). | Dropped. | ❌ |
-| `MSG_PLAYER_HINT` | Per-player refcounted hints in the name tooltip (`:3999`). | Raw. | ⚠️ |
+| `MSG_CARD_HINT` | `DESC_ADD/REMOVE` → refcounted `desc_hints` shown in the tooltip; other types → single `cHint/chValue` (tooltip strings 211-215); `CHINT_TURN` shows a numbered badge (`:3964`). | Same, in the card-info banner instead of a tooltip. | ✅ |
+| `MSG_PLAYER_HINT` | Per-player refcounted hints in the name tooltip (`:3999`). | Refcounted, shown under the player's name. | ✅ |
 | `MSG_REMOVE_CARDS` | Resolve all, fade, delete, renumber surviving materials (`:4017`). | Unparsed. | ❌ |
 | `MSG_RELOAD_FIELD` | Wipes the field and rebuilds blank cards from the counts; codes arrive via the following `UPDATE_DATA`s (`:4136`). | Unparsed. | resync design |
 
@@ -626,11 +626,12 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] `ClearTarget()` and equip detach on every location change and face-down flip; `counters.clear()` on leaving the field or turning face-down.
 - [x] Decks and extra decks as card lists so `CONFIRM_DECKTOP`, `DECK_TOP`, `REVERSE_DECK`, `SWAP_GRAVE_DECK` and `SHUFFLE_DECK` code-zeroing can work.
 - [x] Bidirectional equip and target links; counters map.
-- [ ] Refcounted card and player hints; `cHint/chValue`.
+- [x] Refcounted card and player hints; `cHint/chValue`.
 - [ ] Query application rules: negative ATK renders "?"; `COUNTERS` assign; `IS_HIDDEN` stays server-side.
 - [ ] Rendering rules: ATK/DEF colour against base; link arrows only on hover as shaded zones; `STATUS_DISABLED | STATUS_FORBIDDEN` stamp; graveyard and overlay cards always face-up; hand cards face-down when `code == 0`.
-- [ ] Surfaces: scrollable log with click-to-view codes, toast, blocking modal for `HINT_MESSAGE`, turn/phase/result banners.
-- [ ] Hint handling per type (§12.4 row `MSG_HINT`), `HINT_SELECTMSG` as the caption of the next prompt.
+- [x] Surfaces: toast, blocking modal for `HINT_MESSAGE`.
+- [ ] Surfaces: scrollable log with click-to-view codes, turn/phase/result banners.
+- [x] Hint handling per type (§12.4 row `MSG_HINT`), `HINT_SELECTMSG` as the caption of the next prompt.
 - [x] Highlights for `BECOME_TARGET` and `CARD_SELECTED`; grey overlay for `FIELD_DISABLED`.
 - [ ] Highlight for `RANDOM_SELECTED`; negated stamp for `CHAIN_NEGATED`/`DISABLED`; chain markers at the trigger location.
 - [ ] LP feedback: signed floating number in red (damage), green (recover), blue (cost); `LPUPDATE` silent.
