@@ -472,6 +472,61 @@ class ClientDuelStateTest {
         assertSame(third, state.szone[0][2]);
     }
 
+    // ---- Highlights and hints (Task 14) ----
+
+    @Test
+    void randomSelectedHighlightsTheNamedCardsUntilTheNextPrompt() {
+        var state = newState();
+        draw(state, 0, 11111, 22222);
+
+        state.applyMessage(new DuelMessage.RandomSelected(0,
+                List.of(new LocInfo(0, LOCATION_HAND, 1, POS_FACEDOWN_DEFENSE))));
+
+        assertEquals(List.of(22222), codesOf(List.copyOf(state.highlighted)));
+
+        state.applyMessage(new DuelMessage.SelectYesNo(0, 42L));
+        assertTrue(state.highlighted.isEmpty());
+    }
+
+    @Test
+    void missedEffectHighlightsTheCardThatMissedItsTiming() {
+        var state = newState();
+        draw(state, 0, 11111);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_ATTACK));
+
+        state.applyMessage(new DuelMessage.MissedEffect(
+                new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_ATTACK), 11111));
+
+        assertEquals(List.of(state.mzone[0][2]), List.copyOf(state.highlighted));
+    }
+
+    /** duelclient.cpp:3999 refcounts the hints per player, dropping one at zero. */
+    @Test
+    void playerHintsAreRefcountedPerPlayer() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.PlayerHint(1, PHINT_DESC_ADD, 1160L));
+        state.applyMessage(new DuelMessage.PlayerHint(1, PHINT_DESC_ADD, 1160L));
+        assertEquals(2, state.playerHints[1].get(1160L));
+        assertTrue(state.playerHints[0].isEmpty());
+
+        state.applyMessage(new DuelMessage.PlayerHint(1, PHINT_DESC_REMOVE, 1160L));
+        assertEquals(1, state.playerHints[1].get(1160L));
+
+        state.applyMessage(new DuelMessage.PlayerHint(1, PHINT_DESC_REMOVE, 1160L));
+        assertTrue(state.playerHints[1].isEmpty());
+    }
+
+    @Test
+    void matchKillStoresTheCardThatEndedTheMatch() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.MatchKill(89631139));
+
+        assertEquals(89631139, state.matchKillCode);
+    }
+
     @Test
     void moveToHandAppendsACardCarryingTheMessageCode() {
         var state = newState();

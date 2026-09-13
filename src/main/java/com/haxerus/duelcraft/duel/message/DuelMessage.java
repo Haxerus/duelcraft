@@ -256,6 +256,29 @@ public sealed interface DuelMessage {
         public int type() { return MSG_BECOME_TARGET; }
     }
 
+    /** The cards a random pick landed on ({@code libgroup.cpp:326}). */
+    record RandomSelected(int player, List<LocInfo> cards) implements DuelMessage {
+        public int type() { return MSG_RANDOM_SELECTED; }
+    }
+
+    /** A card whose effect missed its timing ({@code processor.cpp:4374}); its controller only. */
+    record MissedEffect(LocInfo location, int code) implements DuelMessage {
+        public int type() { return MSG_MISSED_EFFECT; }
+    }
+
+    /**
+     * A refcounted hint on a player rather than a card ({@code field.cpp:1332-1402}):
+     * {@code hintType} is {@code PHINT_DESC_ADD} or {@code PHINT_DESC_REMOVE}.
+     */
+    record PlayerHint(int player, int hintType, long desc) implements DuelMessage {
+        public int type() { return MSG_PLAYER_HINT; }
+    }
+
+    /** The card that ended a match outright ({@code operations.cpp:609}); match play only. */
+    record MatchKill(int code) implements DuelMessage {
+        public int type() { return MSG_MATCH_KILL; }
+    }
+
     // ---- Selection (prompts that require a player response) ----
 
     /** Main phase action menu. */

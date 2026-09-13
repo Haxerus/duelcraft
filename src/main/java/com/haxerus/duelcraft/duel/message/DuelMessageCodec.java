@@ -162,8 +162,12 @@ public class DuelMessageCodec {
                 writeLocInfo(buf, m.location());
                 buf.writeByte(m.chintType()); buf.writeLong(m.value());
             }
+            case DuelMessage.PlayerHint m -> { buf.writeByte(m.player()); buf.writeByte(m.hintType()); buf.writeLong(m.desc()); }
+            case DuelMessage.MissedEffect m -> { writeLocInfo(buf, m.location()); buf.writeInt(m.code()); }
+            case DuelMessage.MatchKill m -> buf.writeInt(m.code());
             case DuelMessage.FieldDisabled m -> buf.writeInt(m.field());
             case DuelMessage.BecomeTarget m -> writeLocInfoList(buf, m.targets());
+            case DuelMessage.RandomSelected m -> { buf.writeByte(m.player()); writeLocInfoList(buf, m.cards()); }
 
             // Selection prompts
             case DuelMessage.SelectIdleCmd m -> {
@@ -348,7 +352,11 @@ public class DuelMessageCodec {
             case MSG_HINT -> new DuelMessage.Hint(buf.readByte(), buf.readByte(), buf.readLong());
             case MSG_CARD_HINT -> new DuelMessage.CardHint(readLocInfo(buf), buf.readByte(), buf.readLong());
             case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(buf.readInt());
+            case MSG_PLAYER_HINT -> new DuelMessage.PlayerHint(buf.readByte(), buf.readUnsignedByte(), buf.readLong());
+            case MSG_MISSED_EFFECT -> new DuelMessage.MissedEffect(readLocInfo(buf), buf.readInt());
+            case MSG_MATCH_KILL -> new DuelMessage.MatchKill(buf.readInt());
             case MSG_BECOME_TARGET -> new DuelMessage.BecomeTarget(readLocInfoList(buf));
+            case MSG_RANDOM_SELECTED -> new DuelMessage.RandomSelected(buf.readByte(), readLocInfoList(buf));
 
             // Selection prompts
             case MSG_SELECT_IDLECMD -> new DuelMessage.SelectIdleCmd(buf.readByte(),

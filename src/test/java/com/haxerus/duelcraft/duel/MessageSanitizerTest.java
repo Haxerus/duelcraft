@@ -186,6 +186,16 @@ class MessageSanitizerTest {
         }
     }
 
+    /** generic_duel.cpp:1094-1098 routes it by the first byte of the loc_info: the controller. */
+    @Test
+    void missedEffectReachesTheControllerOnly() {
+        var missed = new DuelMessage.MissedEffect(loc(1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK), BLUE_EYES);
+
+        var recipients = MessageSanitizer.recipientsOf(missed);
+        assertFalse(recipients.includes(0));
+        assertTrue(recipients.includes(1));
+    }
+
     // ---- MSG_HINT (generic_duel.cpp:843-880) ----
 
     @Test

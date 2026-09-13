@@ -345,17 +345,57 @@ class MessageParserTest {
     }
 
     @Test
-    void playerHintStaysRaw() {
-        // field.cpp: [u8 player][u8 type][u64 desc]; not MSG_HINT's [u8 type][u8 player][u64 desc]
+    void parsePlayerHint() {
+        // field.cpp:1332: [u8 player][u8 type][u64 desc]; not MSG_HINT's [u8 type][u8 player][u64 desc]
         ByteBuffer b = body(10);
-        b.put((byte) 0);
+        b.put((byte) 1);
         b.put((byte) PHINT_DESC_ADD);
         b.putLong(1160L);
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_PLAYER_HINT, b.array()));
-        var raw = (DuelMessage.Raw) msgs.getFirst();
-        assertEquals(MSG_PLAYER_HINT, raw.type());
-        assertEquals(10, raw.body().length);
+        var hint = assertInstanceOf(DuelMessage.PlayerHint.class, msgs.getFirst());
+        assertEquals(1, hint.player());
+        assertEquals(PHINT_DESC_ADD, hint.hintType());
+        assertEquals(1160L, hint.desc());
+    }
+
+    /** processor.cpp:4374: [loc_info][u32 code]. */
+    @Test
+    void parseMissedEffect() {
+        ByteBuffer b = body(10 + 4);
+        putLocInfo(b, 1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK);
+        b.putInt(89631139);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_MISSED_EFFECT, b.array()));
+        var missed = assertInstanceOf(DuelMessage.MissedEffect.class, msgs.getFirst());
+        assertEquals(new LocInfo(1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK), missed.location());
+        assertEquals(89631139, missed.code());
+    }
+
+    /** libgroup.cpp:326: [u8 player][u32 n][n×loc_info]. */
+    @Test
+    void parseRandomSelected() {
+        ByteBuffer b = body(1 + 4 + 2 * 10);
+        b.put((byte) 1);
+        b.putInt(2);
+        putLocInfo(b, 1, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 1, LOCATION_HAND, 3, POS_FACEDOWN_DEFENSE);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_RANDOM_SELECTED, b.array()));
+        var random = assertInstanceOf(DuelMessage.RandomSelected.class, msgs.getFirst());
+        assertEquals(1, random.player());
+        assertEquals(2, random.cards().size());
+        assertEquals(3, random.cards().get(1).sequence());
+    }
+
+    /** operations.cpp:609: [u32 code]. */
+    @Test
+    void parseMatchKill() {
+        ByteBuffer b = body(4);
+        b.putInt(89631139);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_MATCH_KILL, b.array()));
+        assertEquals(89631139, assertInstanceOf(DuelMessage.MatchKill.class, msgs.getFirst()).code());
     }
 
     // ---- Deck/Hand ----

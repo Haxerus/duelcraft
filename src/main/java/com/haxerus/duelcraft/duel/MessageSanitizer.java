@@ -60,6 +60,8 @@ public final class MessageSanitizer {
                         ? Recipients.only(confirm.player())
                         : Recipients.BOTH;
             }
+            // generic_duel.cpp:1094-1098 routes it by the loc_info's first byte, the controller.
+            case DuelMessage.MissedEffect missed -> Recipients.only(missed.location().controller());
             default -> Recipients.BOTH;
         };
     }

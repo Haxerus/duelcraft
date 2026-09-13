@@ -135,7 +135,13 @@ class DuelMessageCodecTest {
         SAMPLES.put(DuelMessage.RemoveCards.class,
                 new DuelMessage.RemoveCards(List.of(LOC_OVERLAY_MZONE, LOC_PLAIN)));
         SAMPLES.put(DuelMessage.CardSelected.class, new DuelMessage.CardSelected(List.of(LOC_OVERLAY_MZONE, LOC_OVERLAY_SZONE)));
+        SAMPLES.put(DuelMessage.RandomSelected.class,
+                new DuelMessage.RandomSelected(1, List.of(LOC_PLAIN, LOC_OVERLAY_MZONE)));
+        SAMPLES.put(DuelMessage.MissedEffect.class,
+                new DuelMessage.MissedEffect(LOC_OVERLAY_SZONE, 89631139));
+        SAMPLES.put(DuelMessage.MatchKill.class, new DuelMessage.MatchKill(89631139));
         SAMPLES.put(DuelMessage.Hint.class, new DuelMessage.Hint(3, 0, U64_ABOVE_32BIT));
+        SAMPLES.put(DuelMessage.PlayerHint.class, new DuelMessage.PlayerHint(1, 6, U64_ABOVE_32BIT));
         SAMPLES.put(DuelMessage.CardHint.class, new DuelMessage.CardHint(LOC_PLAIN, 2, U64_ABOVE_32BIT));
         SAMPLES.put(DuelMessage.FieldDisabled.class, new DuelMessage.FieldDisabled(INT_TOP_BIT));
         SAMPLES.put(DuelMessage.BecomeTarget.class, new DuelMessage.BecomeTarget(List.of(LOC_OVERLAY_MZONE)));

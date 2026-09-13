@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +113,13 @@ public class ClientDuelState {
 
     // Cards the engine just targeted or selected; cleared when the next prompt arrives.
     public final Set<ClientCard> highlighted = new LinkedHashSet<>();
+
+    // Refcounted per-player hints (MSG_PLAYER_HINT), desc -> count. No UI yet.
+    @SuppressWarnings("unchecked")
+    public final Map<Long, Integer>[] playerHints = new Map[]{ new LinkedHashMap<>(), new LinkedHashMap<>() };
+
+    // The card that ended a match outright (MSG_MATCH_KILL); match play only, no UI yet.
+    public int matchKillCode;
 
     // Both decks turned over (MSG_REVERSE_DECK). One global flag, as edopro's deck_reversed.
     public boolean deckReversed;
@@ -580,6 +588,16 @@ public class ClientDuelState {
                 LOGGER.debug("[State] BecomeTarget: count={}", bt.targets().size());
                 highlight(bt.targets());
             }
+            case DuelMessage.RandomSelected rs -> {
+                LOGGER.info("[State] RandomSelected: player={}, count={}", rs.player(), rs.cards().size());
+                highlight(rs.cards());
+            }
+            case DuelMessage.MissedEffect missed -> {
+                LOGGER.info("[State] MissedEffect: code={} at p{} loc=0x{} seq={}",
+                        missed.code(), missed.location().controller(),
+                        Integer.toHexString(missed.location().location()), missed.location().sequence());
+                highlight(List.of(missed.location()));
+            }
 
             // ---- Relationships, counters, disabled zones ----
             case DuelMessage.FieldDisabled fd -> {
@@ -637,6 +655,22 @@ public class ClientDuelState {
                     markZoneDirty(ct.target().controller(), ct.target().location());
                 }
             }
+            // ---- Player-level hints and match bookkeeping (no UI yet) ----
+            case DuelMessage.PlayerHint hint -> {
+                var hints = playerHints[hint.player()];
+                if (hint.hintType() == PHINT_DESC_ADD) {
+                    hints.merge(hint.desc(), 1, Integer::sum);
+                } else if (hint.hintType() == PHINT_DESC_REMOVE) {
+                    int left = hints.getOrDefault(hint.desc(), 0) - 1;
+                    if (left > 0) hints.put(hint.desc(), left);
+                    else hints.remove(hint.desc());
+                }
+            }
+            case DuelMessage.MatchKill mk -> {
+                matchKillCode = mk.code();
+                LOGGER.info("[State] MatchKill: code={}", mk.code());
+            }
+
             case DuelMessage.HandResult res -> {
                 rpsHand0 = res.hand0();
                 rpsHand1 = res.hand1();

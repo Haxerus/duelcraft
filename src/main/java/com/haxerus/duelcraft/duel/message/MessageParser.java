@@ -84,11 +84,13 @@ public class MessageParser {
 
                 // UI/Info
                 case MSG_HINT          -> parseHint(reader);
-                // MSG_PLAYER_HINT ([u8 player][u8 type][u64 desc], field.cpp) stays Raw: its layout is not
-                // MSG_HINT's and no UI consumes it yet.
+                case MSG_PLAYER_HINT   -> parsePlayerHint(reader);
                 case MSG_CARD_HINT     -> parseCardHint(reader);
+                case MSG_MISSED_EFFECT -> new DuelMessage.MissedEffect(LocInfo.read(reader), reader.readInt32());
+                case MSG_MATCH_KILL    -> new DuelMessage.MatchKill(reader.readInt32());
                 case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(reader.readInt32());
                 case MSG_BECOME_TARGET -> parseBecomeTarget(reader);
+                case MSG_RANDOM_SELECTED -> parseRandomSelected(reader);
 
                 // Selection messages
                 case MSG_SELECT_IDLECMD   -> parseSelectIdleCmd(reader);
@@ -350,6 +352,19 @@ public class MessageParser {
         int player = r.readUint8();
         long data = r.readInt64();
         return new DuelMessage.Hint(hintType, player, data);
+    }
+
+    /** [u8 player][u8 type][u64 desc] (field.cpp:1332); not MSG_HINT's field order. */
+    private static DuelMessage.PlayerHint parsePlayerHint(BufferReader r) {
+        int player = r.readUint8();
+        int hintType = r.readUint8();
+        long desc = r.readInt64();
+        return new DuelMessage.PlayerHint(player, hintType, desc);
+    }
+
+    private static DuelMessage.RandomSelected parseRandomSelected(BufferReader r) {
+        int player = r.readUint8();
+        return new DuelMessage.RandomSelected(player, readLocInfoList(r));
     }
 
     private static DuelMessage.CardHint parseCardHint(BufferReader r) {
