@@ -10,29 +10,36 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class DuelSession implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(DuelSession.class);
+    private static final AtomicLong NEXT_TAG = new AtomicLong(1);
     private final DuelEngine engine;
     private final long duelHandle;
     private final DuelEventListener listener;
     /** Tag native log lines carry while this session is inside the engine. */
-    private final String logTag;
+    private final String logTag = "duel#" + NEXT_TAG.getAndIncrement();
     private boolean ended;
 
     public DuelSession(DuelEngine engine, DuelOptions options, DuelEventListener listener) {
         this.engine = engine;
         this.listener = listener;
-        this.duelHandle = OcgCore.nCreateDuel(
-            engine.getHandle(),
-            options.seed(), options.flags(),
-            options.team1().lp(), options.team1().startHand(), options.team1().drawPerTurn(),
-            options.team2().lp(), options.team2().startHand(), options.team2().drawPerTurn()
-        );
+        // Under the tag already: creating the duel loads the bootstrap scripts, which log.
+        OcgCore.setCurrentDuel(logTag);
+        try {
+            this.duelHandle = OcgCore.nCreateDuel(
+                engine.getHandle(),
+                options.seed(), options.flags(),
+                options.team1().lp(), options.team1().startHand(), options.team1().drawPerTurn(),
+                options.team2().lp(), options.team2().startHand(), options.team2().drawPerTurn()
+            );
+        } finally {
+            OcgCore.setCurrentDuel(null);
+        }
         if (this.duelHandle == 0) {
             throw new IllegalStateException("Failed to create duel");
         }
-        this.logTag = "duel@" + Long.toHexString(duelHandle);
     }
 
     public void setupDuel(Deck team1Deck, Deck team2Deck) {
