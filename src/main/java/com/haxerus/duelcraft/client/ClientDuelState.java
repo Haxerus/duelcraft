@@ -34,7 +34,7 @@ public class ClientDuelState {
         MZONE_0, MZONE_1,
         SZONE_0, SZONE_1,
         PILE_COUNTS, CHAIN, PROMPT, WINNER,
-        FIELD_STATS, CONFIRM
+        FIELD_STATS, CONFIRM, LOG
     }
 
     private final EnumSet<DirtyFlag> dirtyFlags = EnumSet.noneOf(DirtyFlag.class);
@@ -159,6 +159,21 @@ public class ClientDuelState {
     // Current chain links
     public final List<ChainLink> chain = new ArrayList<>();
 
+    /** Every event worth a line, oldest first ({@link DuelLog}). */
+    public final DuelLog duelLog = new DuelLog();
+
+    /** The attack the UI is drawing, null once it has timed out. {@code target} is null for a direct attack. */
+    public record AttackArrow(LocInfo attacker, LocInfo target, long at) {}
+    public AttackArrow attack;
+
+    /** The floating LP number per absolute player, null when none is pending. */
+    public record LpDelta(String text, String styleClass, long at) {}
+    public final LpDelta[] lpDelta = new LpDelta[2];
+
+    /** The turn/phase banner text and when it was raised; the screen times it out. */
+    public String bannerText;
+    public long bannerAt;
+
     // Pending selection prompt (null = no prompt)
     public DuelMessage pendingPrompt;
 
@@ -260,6 +275,7 @@ public class ClientDuelState {
         this.winner = winner;
         this.winReason = reason;
         dirtyFlags.add(DirtyFlag.WINNER);
+        log(0, winner == localPlayer ? "You win" : winner == opponent() ? "You lose" : "Draw");
         LOGGER.info("[State] Result: winner={}, reason={}", winner, reason);
     }
 
@@ -305,11 +321,14 @@ public class ClientDuelState {
                 currentTurn = nt.player();
                 turnCount++;
                 dirtyFlags.add(DirtyFlag.TURN_PHASE);
+                banner("Turn " + turnCount + " - "
+                        + (isLocalTurn() ? "Your turn" : "Opponent's turn"));
                 LOGGER.debug("[State] NewTurn: player={}, turnCount={}", currentTurn, turnCount);
             }
             case DuelMessage.NewPhase np -> {
                 currentPhase = np.phase();
                 dirtyFlags.add(DirtyFlag.TURN_PHASE);
+                banner(phaseName());
                 LOGGER.debug("[State] NewPhase: {}", phaseName());
             }
 
@@ -375,8 +394,8 @@ public class ClientDuelState {
             }
 
             // ---- Summons ----
-            case DuelMessage.Summoning ignored -> { } // card appears via MSG_MOVE
-            case DuelMessage.SpSummoning ignored -> { }
+            case DuelMessage.Summoning s -> log(s.code(), "Summoning " + quoted(s.code()));  // card appears via MSG_MOVE
+            case DuelMessage.SpSummoning s -> log(s.code(), "Special Summoning " + quoted(s.code()));
             case DuelMessage.FlipSummoning fs -> {
                 var loc = fs.location();
                 ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
@@ -385,6 +404,7 @@ public class ClientDuelState {
                     card.position = loc.position();
                     markZoneDirty(loc.controller(), loc.location());
                 }
+                log(fs.code(), "Flip Summoning " + quoted(fs.code()));
             }
             case DuelMessage.Summoned ignored -> { }
             case DuelMessage.SpSummoned ignored -> { }
@@ -392,26 +412,37 @@ public class ClientDuelState {
 
             // ---- Chain ----
             case DuelMessage.Chaining c -> {
-                    chain.add(new ChainLink(c.code(), c.location(), c.chainCount()));
+                    chain.add(new ChainLink(c.code(), c.location(), c.chainCount(),
+                            c.trigController(), c.trigLocation(), c.trigSequence()));
                     dirtyFlags.add(DirtyFlag.CHAIN);
+                    log(c.code(), c.desc() == 0 ? quoted(c.code()) + " activated"
+                            : quoted(c.code()) + " activated: " + hintText.desc(c.desc()));
             }
             case DuelMessage.ChainEnd ignored -> {
                 chain.clear();
                 dirtyFlags.add(DirtyFlag.CHAIN);
             }
             case DuelMessage.Chained ignored -> { }
-            case DuelMessage.ChainSolving ignored -> { }
-            case DuelMessage.ChainSolved ignored -> { }
-            case DuelMessage.ChainNegated ignored -> { }
-            case DuelMessage.ChainDisabled ignored -> { }
+            case DuelMessage.ChainSolving cs -> {
+                for (var link : chain) link.solving = link.chainIndex == cs.chainIndex();
+                dirtyFlags.add(DirtyFlag.CHAIN);
+            }
+            case DuelMessage.ChainSolved cs -> {
+                chain.removeIf(link -> link.chainIndex == cs.chainIndex());
+                dirtyFlags.add(DirtyFlag.CHAIN);
+            }
+            case DuelMessage.ChainNegated cn -> stampNegated(cn.chainIndex(), "was negated");
+            case DuelMessage.ChainDisabled cd -> stampNegated(cd.chainIndex(), "was disabled");
 
             // ---- LP ----
             case DuelMessage.Damage dmg -> {
                 lp[dmg.player()] = Math.max(0, lp[dmg.player()] - dmg.amount());
+                lpFeedback(dmg.player(), -dmg.amount(), "lp-damage", "damage");
                 LOGGER.debug("[State] Damage: player={}, amount={}, lp now={}", dmg.player(), dmg.amount(), lp[dmg.player()]);
             }
             case DuelMessage.Recover rec -> {
                 lp[rec.player()] += rec.amount();
+                lpFeedback(rec.player(), rec.amount(), "lp-recover", "recover");
                 LOGGER.debug("[State] Recover: player={}, amount={}, lp now={}", rec.player(), rec.amount(), lp[rec.player()]);
             }
             case DuelMessage.LpUpdate upd -> {
@@ -420,6 +451,7 @@ public class ClientDuelState {
             }
             case DuelMessage.PayLpCost pay -> {
                 lp[pay.player()] = Math.max(0, lp[pay.player()] - pay.amount());
+                lpFeedback(pay.player(), -pay.amount(), "lp-cost", "cost");
                 LOGGER.debug("[State] PayLpCost: player={}, amount={}, lp now={}", pay.player(), pay.amount(), lp[pay.player()]);
             }
 
@@ -490,12 +522,16 @@ public class ClientDuelState {
             case DuelMessage.ShuffleSetCard set -> applyShuffleSetCard(set);
             case DuelMessage.RemoveCards remove -> applyRemoveCards(remove.cards());
 
-            // ---- Battle (no state change) ----
-            case DuelMessage.Attack ignored -> { }
-            case DuelMessage.Battle ignored -> { }
-            case DuelMessage.AttackDisabled ignored -> { }
+            // ---- Battle ----
+            case DuelMessage.Attack atk -> applyAttack(atk);
+            case DuelMessage.Battle battle -> {
+                applyCombatStats(battle.attacker(), battle.atkAtk(), battle.atkDef());
+                applyCombatStats(battle.defender(), battle.defAtk(), battle.defDef());
+                dirtyFlags.add(DirtyFlag.FIELD_STATS);
+            }
+            case DuelMessage.AttackDisabled ignored -> log(0, template(1621));
             case DuelMessage.DamageStepStart ignored -> { }
-            case DuelMessage.DamageStepEnd ignored -> { }
+            case DuelMessage.DamageStepEnd ignored -> clearCombatStats();
 
             // ---- Selection prompts — set pendingPrompt for the UI ----
             case DuelMessage.SelectIdleCmd sel -> {
@@ -580,20 +616,24 @@ public class ClientDuelState {
             case DuelMessage.CardSelected sel -> {
                 LOGGER.info("[State] CardSelected: count={}", sel.cards().size());
                 highlight(sel.cards());
+                logCards(sel.cards(), " selected");
             }
             case DuelMessage.BecomeTarget bt -> {
                 LOGGER.debug("[State] BecomeTarget: count={}", bt.targets().size());
                 highlight(bt.targets());
+                logCards(bt.targets(), " targeted");
             }
             case DuelMessage.RandomSelected rs -> {
                 LOGGER.info("[State] RandomSelected: player={}, count={}", rs.player(), rs.cards().size());
                 highlight(rs.cards());
+                logCards(rs.cards(), " selected at random");
             }
             case DuelMessage.MissedEffect missed -> {
                 LOGGER.info("[State] MissedEffect: code={} at p{} loc=0x{} seq={}",
                         missed.code(), missed.location().controller(),
                         Integer.toHexString(missed.location().location()), missed.location().sequence());
                 highlight(List.of(missed.location()));
+                log(missed.code(), quoted(missed.code()) + " missed the timing");
             }
 
             // ---- Relationships, counters, disabled zones ----
@@ -628,6 +668,7 @@ public class ClientDuelState {
                     detachEquipTarget(card);
                     card.equipTarget = target;
                     target.equippedBy.add(card);
+                    log(card.code, quoted(card.code) + " equipped to " + quoted(target.code));
                 }
             }
             case DuelMessage.CardTarget ct -> {
@@ -663,6 +704,13 @@ public class ClientDuelState {
                 matchKillCode = mk.code();
                 LOGGER.info("[State] MatchKill: code={}", mk.code());
             }
+
+            // ---- Coin and dice: one line in the log and one toast (duelclient.cpp:3847, :3865) ----
+            case DuelMessage.TossCoin toss -> tossResult(template(1623), toss.results().stream()
+                    .map(result -> result != 0 ? systemStringOr(60, "Heads") : systemStringOr(61, "Tails"))
+                    .toList());
+            case DuelMessage.TossDice toss -> tossResult(template(1624), toss.results().stream()
+                    .map(String::valueOf).toList());
 
             case DuelMessage.HandResult res -> {
                 rpsHand0 = res.hand0();
@@ -722,17 +770,36 @@ public class ClientDuelState {
         };
     }
 
-    /** A {@code strings.conf} template with its single {@code {}} filled in, or a built-in copy. */
-    private String template(int systemString, String value) {
+    /**
+     * A {@code strings.conf} template with its {@code {}} placeholders filled in order, or a
+     * built-in copy. Only ids whose entry uses {@code {}} belong here: the {@code %ls}/{@code %d}
+     * lines (1610, 1613-1616, 1622) cannot be filled this way and are written out in English.
+     */
+    private String template(int systemString, String... values) {
         String text = hintText.systemString(systemString);
         if (text == null) {
             text = switch (systemString) {
                 case 1510 -> "Your choice: [{}]";
                 case 1511 -> "Opponent declared: [{}]";
+                case 1619 -> "\"{}\" is attacking \"{}\"";
+                case 1620 -> "\"{}\" is attacking directly";
+                case 1621 -> "An attack was negated";
+                case 1623 -> "Coin landed on:";
+                case 1624 -> "Die landed on:";
                 default -> "Your opponent's choice: [{}]";
             };
         }
-        return text.replace("{}", value);
+        for (String value : values) {
+            int at = text.indexOf("{}");
+            if (at < 0) break;
+            text = text.substring(0, at) + value + text.substring(at + 2);
+        }
+        return text;
+    }
+
+    private String systemStringOr(int systemString, String fallback) {
+        String text = hintText.systemString(systemString);
+        return text != null ? text : fallback;
     }
 
     /**
@@ -758,6 +825,95 @@ public class ClientDuelState {
             card.hintValue = hint.value();
         }
         markZoneDirty(loc.controller(), loc.location());
+    }
+
+    // ---- Feedback surfaces: log lines, chain stamps, the attack arrow, LP numbers, banners ----
+
+    private void log(int code, String text) {
+        duelLog.add(code, text);
+        dirtyFlags.add(DirtyFlag.LOG);
+    }
+
+    private void logCards(List<LocInfo> locations, String suffix) {
+        for (var loc : locations) {
+            ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+            if (card != null) log(card.code, quoted(card.code) + suffix);
+        }
+    }
+
+    /** A card's printed name in quotes, falling back to its code when no database is loaded. */
+    private String quoted(int code) {
+        return "\"" + hintText.cardName(code) + "\"";
+    }
+
+    private void stampNegated(int chainIndex, String verb) {
+        for (var link : chain) {
+            if (link.chainIndex != chainIndex) continue;
+            link.negated = true;
+            log(link.code, quoted(link.code) + " " + verb);
+        }
+        dirtyFlags.add(DirtyFlag.CHAIN);
+    }
+
+    /** A zeroed target location means the attack goes at the player (duelclient.cpp:3762). */
+    private void applyAttack(DuelMessage.Attack atk) {
+        LocInfo target = atk.target().location() == 0 ? null : atk.target();
+        attack = new AttackArrow(atk.attacker(), target, System.currentTimeMillis());
+        var from = atk.attacker();
+        ClientCard attacker = cardAt(from.controller(), from.location(), from.sequence());
+        int code = attacker != null ? attacker.code : 0;
+        // 1619/1620 quote their own placeholders, so these take the bare name.
+        if (target == null) {
+            log(code, template(1620, hintText.cardName(code)));
+        } else {
+            ClientCard defender = cardAt(target.controller(), target.location(), target.sequence());
+            log(code, template(1619, hintText.cardName(code),
+                    hintText.cardName(defender != null ? defender.code : 0)));
+        }
+    }
+
+    private void applyCombatStats(LocInfo loc, int combatAttack, int combatDefense) {
+        if (loc.location() == 0) return;
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card == null) return;
+        card.combatAttack = combatAttack;
+        card.combatDefense = combatDefense;
+    }
+
+    /** The damage step is over, so every card goes back to the stats the engine queries report. */
+    private void clearCombatStats() {
+        for (int p = 0; p < 2; p++) {
+            for (ClientCard card : mzone[p]) {
+                if (card == null) continue;
+                card.combatAttack = null;
+                card.combatDefense = null;
+            }
+        }
+        dirtyFlags.add(DirtyFlag.FIELD_STATS);
+    }
+
+    private void lpFeedback(int player, int delta, String styleClass, String reason) {
+        String text = (delta > 0 ? "+" : "-") + Math.abs(delta);
+        lpDelta[player] = new LpDelta(text, styleClass, System.currentTimeMillis());
+        log(0, who(player) + ": " + text + " LP (" + reason + ")");
+    }
+
+    private String who(int player) {
+        return player == localPlayer ? "You" : "Opponent";
+    }
+
+    private void banner(String text) {
+        bannerText = text;
+        bannerAt = System.currentTimeMillis();
+        log(0, text);
+    }
+
+    /** edopro puts a coin or dice result in both the log and a toast ({@code duelclient.cpp:3857}). */
+    private void tossResult(String heading, List<String> results) {
+        var line = new StringBuilder(heading).append(' ');
+        for (String result : results) line.append('[').append(result).append(']');
+        log(0, line.toString());
+        toasts.add(line.toString());
     }
 
     // ---- Reveals ----
@@ -1173,8 +1329,12 @@ public class ClientDuelState {
             case PHASE_DRAW -> "Draw";
             case PHASE_STANDBY -> "Standby";
             case PHASE_MAIN1 -> "Main 1";
-            case PHASE_BATTLE_START, PHASE_BATTLE_STEP, PHASE_DAMAGE,
-                 PHASE_DAMAGE_CAL, PHASE_BATTLE -> "Battle";
+            // edopro names each battle sub-phase in its own right (duelclient.cpp:3000-3060).
+            case PHASE_BATTLE_START -> "Battle Start";
+            case PHASE_BATTLE_STEP -> "Battle Step";
+            case PHASE_DAMAGE -> "Damage";
+            case PHASE_DAMAGE_CAL -> "Damage Calc";
+            case PHASE_BATTLE -> "Battle End";
             case PHASE_MAIN2 -> "Main 2";
             case PHASE_END -> "End";
             default -> "---";
@@ -1237,5 +1397,31 @@ public class ClientDuelState {
         }
     }
 
-    public record ChainLink(int code, LocInfo location, int chainIndex) {}
+    /**
+     * One link of the current chain. edopro keeps the activating card plus the location the effect
+     * triggered from ({@code duelclient.cpp:3390-3397}); the marker is drawn at the trigger, which
+     * is often a different card from the one that activated.
+     */
+    public static final class ChainLink {
+        public final int code;
+        public final LocInfo location;
+        public final int chainIndex;
+        public final int trigController;
+        public final int trigLocation;
+        public final int trigSequence;
+        /** Set by MSG_CHAIN_NEGATED/MSG_CHAIN_DISABLED, cleared with the chain. */
+        public boolean negated;
+        /** Set while MSG_CHAIN_SOLVING names this link. */
+        public boolean solving;
+
+        ChainLink(int code, LocInfo location, int chainIndex,
+                  int trigController, int trigLocation, int trigSequence) {
+            this.code = code;
+            this.location = location;
+            this.chainIndex = chainIndex;
+            this.trigController = trigController;
+            this.trigLocation = trigLocation;
+            this.trigSequence = trigSequence;
+        }
+    }
 }

@@ -707,4 +707,118 @@ class ClientDuelStateTest {
         assertEquals(List.of(55555), codesOf(state.hand[0]));
         assertEquals(39, state.deckCount(0));
     }
+
+    // ---- Chain links carry their trigger location and resolve state ----
+
+    @Test
+    void chainLinkKeepsTheTriggerLocationAndIsPoppedWhenSolved() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Chaining(12345,
+                new LocInfo(0, LOCATION_HAND, 2, POS_FACEUP_ATTACK),
+                1, LOCATION_MZONE, 3, 501L, 1));
+
+        var link = state.chain.getFirst();
+        assertEquals(1, link.trigController);
+        assertEquals(LOCATION_MZONE, link.trigLocation);
+        assertEquals(3, link.trigSequence);
+        assertFalse(link.negated);
+        assertFalse(link.solving);
+
+        state.applyMessage(new DuelMessage.ChainSolving(1));
+        assertTrue(state.chain.getFirst().solving);
+
+        state.applyMessage(new DuelMessage.ChainSolved(1));
+        assertTrue(state.chain.isEmpty());
+    }
+
+    @Test
+    void chainNegationStampsTheLinkAndChainEndClearsThem() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.Chaining(12345,
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK),
+                0, LOCATION_MZONE, 0, 0L, 1));
+
+        state.applyMessage(new DuelMessage.ChainNegated(1));
+        assertTrue(state.chain.getFirst().negated);
+
+        state.applyMessage(new DuelMessage.ChainEnd());
+        assertTrue(state.chain.isEmpty());
+    }
+
+    // ---- MSG_BATTLE writes combat stats that last until the damage step ends ----
+
+    @Test
+    void battleStatsOverrideBothCardsUntilTheDamageStepEnds() {
+        var state = newState();
+        move(state, 100, new LocInfo(0, LOCATION_DECK, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        move(state, 200, new LocInfo(1, LOCATION_DECK, 0, 0),
+                new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+
+        state.applyMessage(new DuelMessage.Battle(
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK), 2500, 2100, 0,
+                new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK), 1800, 1200, 1));
+
+        assertEquals(2500, state.cardAt(0, LOCATION_MZONE, 0).combatAttack);
+        assertEquals(2100, state.cardAt(0, LOCATION_MZONE, 0).combatDefense);
+        assertEquals(1800, state.cardAt(1, LOCATION_MZONE, 0).combatAttack);
+
+        state.applyMessage(new DuelMessage.DamageStepEnd());
+
+        assertNull(state.cardAt(0, LOCATION_MZONE, 0).combatAttack);
+        assertNull(state.cardAt(1, LOCATION_MZONE, 0).combatAttack);
+    }
+
+    /** A direct attack carries a zeroed target, and only the attacker gets combat stats. */
+    @Test
+    void attackRecordsTheArrowEndsForTheUI() {
+        var state = newState();
+        move(state, 100, new LocInfo(0, LOCATION_DECK, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+
+        state.applyMessage(new DuelMessage.Attack(
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK), new LocInfo(0, 0, 0, 0)));
+
+        assertNotNull(state.attack);
+        assertEquals(0, state.attack.attacker().controller());
+        assertNull(state.attack.target());
+    }
+
+    // ---- LP feedback: a signed floating number with a colour class per reason ----
+
+    @Test
+    void lpChangesPushAFloatingNumber() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Damage(0, 500));
+        assertEquals("-500", state.lpDelta[0].text());
+        assertEquals("lp-damage", state.lpDelta[0].styleClass());
+
+        state.applyMessage(new DuelMessage.Recover(1, 300));
+        assertEquals("+300", state.lpDelta[1].text());
+        assertEquals("lp-recover", state.lpDelta[1].styleClass());
+
+        state.applyMessage(new DuelMessage.PayLpCost(0, 800));
+        assertEquals("-800", state.lpDelta[0].text());
+        assertEquals("lp-cost", state.lpDelta[0].styleClass());
+
+        // LPUPDATE is silent (duelclient.cpp:3708 shows no number).
+        state.applyMessage(new DuelMessage.LpUpdate(0, 1000));
+        assertEquals("-800", state.lpDelta[0].text());
+    }
+
+    // ---- Turn and phase banners ----
+
+    @Test
+    void turnAndPhaseChangesRaiseABanner() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.NewTurn(1));
+        assertEquals("Turn 1 - Opponent's turn", state.bannerText);
+
+        state.applyMessage(new DuelMessage.NewPhase(PHASE_BATTLE_STEP));
+        assertEquals("Battle Step", state.bannerText);
+        assertEquals("Battle Step", state.phaseName());
+    }
 }

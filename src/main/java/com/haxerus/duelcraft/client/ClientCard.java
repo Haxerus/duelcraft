@@ -31,6 +31,14 @@ public class ClientCard {
     /** Latest query result, or null until an UPDATE_DATA covers this slot. */
     public QueriedCard stats;
 
+    /**
+     * Combat ATK/DEF from {@code MSG_BATTLE}, shown in place of the queried stats until the damage
+     * step ends. edopro writes them straight onto the card ({@code duelclient.cpp:3805-3825});
+     * null means the card is not in a damage calculation.
+     */
+    public Integer combatAttack;
+    public Integer combatDefense;
+
     /** XYZ materials in engine order; a material's {@link #sequence} is its index here. */
     public final List<ClientCard> materials = new ArrayList<>();
 
