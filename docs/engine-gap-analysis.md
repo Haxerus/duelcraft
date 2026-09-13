@@ -154,7 +154,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 - [x] Keep `MSG_DRAW`'s per-card `position` in the record.
 - [x] Keep `position` in `SELECT_CHAIN` entries (needed for overlay-material chain options); `ActivatableCard` has no field for it.
 - [x] Rename `Battle.atkDamage/defDamage` to destroy flags (naming only; layout is correct).
-- [ ] Delete the dead `MSG_START` and `MSG_UNEQUIP` parser cases, records, codec arms and client branches; delete `DuelMessage.UpdateCard` and its arms.
+- [x] Delete the dead `MSG_START` and `MSG_UNEQUIP` parser cases, records, codec arms and client branches. (`DuelMessage.UpdateCard` stays: the per-slot refresh uses it.)
 
 ---
 
@@ -260,9 +260,9 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] Not parsed (raw body), no `ResponseBuilder` method, no UI, no solo AI case. Any card-declaring effect (e.g. "Prohibition", "Mind Crush") wedges the duel for both human and AI.
 
 ### 3.9 Smaller verified defects
-- [ ] `ResponseValidator.selectTribute` requires card count `≥ min`; the engine requires summed `release_param ≥ min` (`playerop.cpp:688-700`).
-- [ ] `ResponseValidator.selectUnselectCard` rejects indices in the unselect list and rejects `-1` when only `cancelable` is set.
-- [ ] `ResponseValidator.zoneToBit` returns `-1` for SZONE 6/7 (pendulum zones), skipping validation.
+- [x] `ResponseValidator.selectTribute` requires card count `≥ min`; the engine requires summed `release_param ≥ min` (`playerop.cpp:688-700`).
+- [x] `ResponseValidator.selectUnselectCard` rejects indices in the unselect list and rejects `-1` when only `cancelable` is set.
+- [x] `ResponseValidator.zoneToBit` returns `-1` for SZONE 6/7 (pendulum zones), skipping validation.
 - [ ] `FieldRenderer.getFieldBit` bases the `SELECT_PLACE` bitmask on `localPlayer` rather than `sel.player()`; equal today because prompts only reach their target.
 - [x] `FieldRenderer.highlightValidPlaces` reads EMZ bits only from the viewer block (5/6); a prompt whose only legal zones are the opponent-side EMZ bits (21/22) shows nothing.
 - [x] `ConfirmDeckTop`/`ConfirmCards` reveal is overwritten by the next `PILE_COUNTS` refresh because `showConfirmCards` does not reset the inspected pile.
@@ -319,7 +319,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 - [x] Only `MZONE` (7 slots, hardcoded), `SZONE` (8, hardcoded) and `EXTRA` are refreshed, for both players, after **every** engine pause (≥30 JNI calls and 2 to 3 payloads per player per pause). `HAND`, `GRAVE`, `REMOVED`, `DECK`, `OVERLAY` are never refreshed; those piles live on `MOVE`/`DRAW` deltas alone. edopro refreshes per event: hand after `DRAW`, a single slot after `MOVE`/`POS_CHANGE` face-up, extra after `SHUFFLE_EXTRA`.
 - [x] `UpdateData` updates `mzoneStats`/`szoneStats` only; it never writes `code`/`position` back into `mzone[]`/`szone[]`, so movement-tracked state cannot self-heal. `szoneStats` is populated and never read.
 - [x] `UpdateData` is sent **after** the prompt it should precede (early-return path in `process()`). Now `RefreshSchedule.before(msg)` runs ahead of the message.
-- [x] The empty-chain auto-pass `break`s out of the batch, discarding already-parsed trailing messages. Now `continue`s, so the rest of the batch is delivered.
+- [ ] The empty-chain auto-pass `break`s out of the batch, discarding already-parsed trailing messages. Left as `break`: `OCG_DuelProcess` returns as soon as a processor unit needs an answer (`ocgapi.cpp:115-118`, `processor_visit.cpp:14-21`), so the prompt is always the last record of its batch and nothing trails it.
 - [ ] `OCG_DuelQueryField` (full snapshot: `u32 flags`, per player `u32 lp`, 7 + 8 slot records, six pile counts, chain links) is exposed but unused. `QueryField` is the natural basis for reconnect/ESC-reopen resync. (`OCG_DuelQueryLocation` now backs every whole-location refresh.)
 - [x] `FieldQuery` stops silently on a truncated trailing block (`remaining() >= 6` guard) with no error for a missing `QUERY_END`. Now throws; the caller drops that one refresh.
 - [x] `FieldQuery.parse` is never run against real engine output; `OcgCoreTest` never calls `nDuelQuery`.
@@ -420,17 +420,17 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 
 ## 9. Dead code inventory
 
-- [ ] `MSG_START`: `parseStart`, `DuelMessage.Start`, codec arm, `ClientDuelState` branch (engine never emits it).
-- [ ] `MSG_UNEQUIP`: parser case, `DuelMessage.Unequip`, codec arm.
-- [ ] `MessageParser.readActivatableList` (no callers).
-- [ ] `ResponseValidator` (42 tests, zero production callers; several rules contradict the engine, §3.9). Decide: wire into `PromptController` or delete; the `MSG_RETRY` fix does not depend on it.
-- [ ] `DuelSession.queryLocation/queryField` wrappers (test-only).
-- [ ] `ClientDuelState`: `DirtyFlag.LP`, `startingLP`, `winReason`, `lastAction`, `CardAction.label`, `szoneStats`, `lastHintType/Data` (written, never rendered).
+- [x] `MSG_START`: `parseStart`, `DuelMessage.Start`, codec arm, `ClientDuelState` branch (engine never emits it).
+- [x] `MSG_UNEQUIP`: parser case, `DuelMessage.Unequip`, codec arm.
+- [x] `MessageParser.readActivatableList` (no callers).
+- [x] `ResponseValidator` (42 tests, zero production callers; several rules contradict the engine, §3.9). Decided: kept and wired into every client send path, so a response the engine would reject is reported on the status label instead of sent.
+- [x] `DuelSession.queryLocation/queryField` wrappers (test-only). `queryField` deleted; the refresh emitters now go through `queryLocation`/`query`.
+- [x] `ClientDuelState`: `DirtyFlag.LP`, `startingLP`, `lastAction`, `CardAction.label`, `szoneStats`, `lastHintType/Data` deleted. (`winReason` stays: the result overlay names the reason.)
 - [x] `PromptController.showWinOverlay` (unreachable until `Win` or `DuelEndPayload` triggers it).
-- [ ] `CardInfo.linkArrows/leftScale/rightScale` (no callers).
+- [x] `CardInfo.linkArrows/leftScale/rightScale` (no callers).
 - [ ] `FieldQuery` cases for `ALIAS`, `REASON`, `LSCALE`, `RSCALE`, `COVER` are exercised only by tests until requested.
-- [ ] `DuelMessageCodec.encode`'s `Raw` throw arm and `decode`'s `default` are unreachable.
-- [ ] Magic numbers instead of constants: `ResponseValidator.zoneToBit` (`0x04`/`0x08`), `SoloDuelHandler` (`0x04`, `0x08`, `POS_*` literals), unnamed idle/battle action ordinals in `LDLibDuelScreen` and `ClientDuelState`, `DuelEventListener.onMessage` return codes 0/1/2.
+- [ ] `DuelMessageCodec.encode`'s `Raw` throw arm is required for the sealed switch to be exhaustive; `decode`'s `default` now throws `DecoderException` deliberately. Neither is deletable.
+- [x] Magic numbers instead of constants: `ResponseValidator.zoneToBit` (`0x04`/`0x08`), `SoloDuelHandler` (`0x04`, `0x08`, `POS_*` literals), unnamed idle/battle action ordinals in `LDLibDuelScreen` and `ClientDuelState`, `DuelEventListener.onMessage` return codes 0/1/2. (`IdleAction`/`BattleAction` now live in `OcgConstants` so the server can name them too.)
 
 ---
 
@@ -618,7 +618,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [ ] Deck legality at ready time per `CheckDeckSize`/`CheckDeckContent` (sizes, copies, banlist, extra-deck types).
 - [x] Surrender and disconnect end with a synthesised `MSG_WIN` (reasons 0 and 4) so both clients learn the result (`:777-793`, `:284-309`).
 - [ ] Optional: per-turn time limit ending in `MSG_WIN` reason 3 (`:1439-1460`).
-- [ ] Treat `MSG_RETRY` as a bug signal (edopro ends the duel) and prevent it by validating before sending; §3.3.
+- [x] Treat `MSG_RETRY` as a bug signal (edopro ends the duel) and prevent it by validating before sending; §3.3.
 
 **Client model**
 - [x] One card object per card, moved between containers (§12.4).
