@@ -41,6 +41,7 @@ public final class DuelIdleShuffleScenario implements UIScenario {
                          true, true, true)))
          .ticks(2)
          .checkVisible("#shuffle-btn")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_idle_shuffle")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

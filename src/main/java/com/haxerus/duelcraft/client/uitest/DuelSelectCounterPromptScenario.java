@@ -48,6 +48,7 @@ public final class DuelSelectCounterPromptScenario implements UIScenario {
          .click("#plr-mon-0")
          .frames(2)
          .checkTextContains("#status-label", "Remove 2")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_select_counter")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

@@ -38,6 +38,7 @@ public final class DuelPauseMenuScenario implements UIScenario {
          .checkVisible("#pause-overlay")
          .checkVisible("#pause-concede")
          .checkVisible("#pause-stay")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_pause_menu")
          .key(GLFW.GLFW_KEY_ESCAPE)
          .ticks(2)

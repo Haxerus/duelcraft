@@ -38,6 +38,7 @@ public final class DuelAnnounceNumberPromptScenario implements UIScenario {
          .ticks(2)
          .checkVisible("#prompt-overlay")
          .checkCount("#prompt-buttons .prompt-btn", 4)
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_announce_number")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

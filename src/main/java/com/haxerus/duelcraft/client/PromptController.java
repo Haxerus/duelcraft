@@ -338,13 +338,25 @@ public class PromptController {
         if (promptTitle instanceof Label t) t.setText(Component.literal(title));
         clearPromptContent();
 
+        boolean descriptions = !(state.pendingPrompt instanceof DuelMessage.AnnounceNumber
+                || state.pendingPrompt instanceof DuelMessage.RockPaperScissors);
+        ScrollerView choices = null;
+        if (descriptions || options.size() > 8) {
+            choices = new ScrollerView();
+            choices.addClass("prompt-option-scroller");
+            if (!descriptions) choices.addClass("prompt-option-grid");
+            promptBody.addChild(choices);
+        }
+
         for (int i = 0; i < options.size(); i++) {
             int idx = i;
             var btn = new Button();
             btn.setText(Component.literal(options.get(i)));
             btn.addClass("prompt-btn");
+            if (descriptions) btn.addClass("prompt-option-btn");
             btn.setOnClick(e -> onSelect.accept(idx));
-            promptButtons.addChild(btn);
+            if (choices != null) choices.addScrollViewChild(btn);
+            else promptButtons.addChild(btn);
         }
     }
 
@@ -460,6 +472,7 @@ public class PromptController {
         clearPromptContent();
 
         bitSelectionCaption = new Label();
+        bitSelectionCaption.addClass("prompt-caption");
         promptBody.addChild(bitSelectionCaption);
 
         for (int bit : bitSelection.bits()) {

@@ -57,6 +57,7 @@ public final class DuelSelectCardFinishScenario implements UIScenario {
          .checkClass("#plr-mon-0", "selected")
          .checkVisible("#prompt-action-btn")
          .checkText("#prompt-action-btn", "Finish")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_select_card_finish")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

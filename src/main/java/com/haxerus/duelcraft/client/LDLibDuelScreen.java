@@ -265,6 +265,7 @@ public class LDLibDuelScreen {
 
         // Overlays
         private final UIElement cardInfoBanner;
+        private long cardInfoHideAt;
         private final UIElement resultOverlay;
         private final UIElement resultTitle;
         private final UIElement resultReason;
@@ -754,6 +755,7 @@ public class LDLibDuelScreen {
                 logToggle.setOnClick(e -> {
                     if (logPanel == null) return;
                     if (logPanel.hasClass("hidden")) {
+                        if (cardInfoBanner != null) cardInfoBanner.addClass("hidden");
                         logPanel.removeClass("hidden");
                         rebuildLog();
                     } else {
@@ -836,8 +838,14 @@ public class LDLibDuelScreen {
                 state.revealCardCode = 0;
                 cardRevealUntil = now + CARD_REVEAL_MS;
             } else if (cardRevealUntil != 0 && now >= cardRevealUntil) {
-                hideCardInfo();
+                if (cardInfoBanner != null) cardInfoBanner.addClass("hidden");
                 cardRevealUntil = 0;
+            }
+
+            if (cardInfoHideAt != 0 && now >= cardInfoHideAt
+                    && cardInfoBanner != null && !cardInfoBanner.isSelfOrChildHover()) {
+                cardInfoBanner.addClass("hidden");
+                cardInfoHideAt = 0;
             }
 
             if (state.pendingModal != null && hintModal != null && hintModal.hasClass("hidden")) {
@@ -1028,6 +1036,8 @@ public class LDLibDuelScreen {
         /** {@code onField} is the card object whose hints to list, null when there is none. */
         private void showCardInfo(int code, ClientCard onField) {
             if (code == 0 || cardInfoBanner == null) return;
+            if (logPanel != null && !logPanel.hasClass("hidden")) return;
+            cardInfoHideAt = 0;
             cardRevealUntil = 0;   // whatever asks for the banner takes it over from a HINT_CARD reveal
             setCardHints(onField);
             cardInfoBanner.removeClass("hidden");
@@ -1040,7 +1050,7 @@ public class LDLibDuelScreen {
             if (card != null) {
                 setTextElement("card-name-label", card.name());
                 setTextElement("card-stats-label", CardStringHelper.typeLine(card));
-                setTextElement("card-text", card.desc());
+                setTextElement("card-text", card.desc().replace("\r\n", "\n").replace('\r', '\n'));
                 setTextElement("card-atk-def-label", CardStringHelper.atkDefLine(card));
 
                 // Card art (cropped artwork)
@@ -1145,7 +1155,8 @@ public class LDLibDuelScreen {
         }
 
         private void hideCardInfo() {
-            if (cardInfoBanner != null) cardInfoBanner.addClass("hidden");
+            // Allow the pointer to cross the gap to the scrollable description panel.
+            cardInfoHideAt = System.currentTimeMillis() + 500;
         }
 
         private Label findCardCountLabel(String parentId) {

@@ -44,6 +44,7 @@ public final class DuelSelectPositionScenario implements UIScenario {
          .checkCount("#prompt-body .position-choice", 4)
          .checkCount("#prompt-body .card", 4)
          .checkCount("#prompt-body .card.defense", 2)
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_select_position")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

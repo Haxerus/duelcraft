@@ -36,6 +36,7 @@ public final class DuelWaitingScenario implements UIScenario {
          .ticks(2)
          .checkVisible("#status-label")
          .checkTextContains("#status-label", "Waiting")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_waiting")
          .step("our own prompt arrives",
                  ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.SelectYesNo(0, 30L)))

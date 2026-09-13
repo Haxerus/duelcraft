@@ -41,6 +41,7 @@ public final class DuelAnnounceRacePromptScenario implements UIScenario {
          .checkVisible("#announce-bit-0")
          .checkVisible("#announce-bit-1")
          .checkVisible("#announce-bit-2")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_announce_race")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();
