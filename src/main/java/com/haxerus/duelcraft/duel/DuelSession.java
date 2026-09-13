@@ -16,6 +16,8 @@ public class DuelSession implements AutoCloseable {
     private final DuelEngine engine;
     private final long duelHandle;
     private final DuelEventListener listener;
+    /** Tag native log lines carry while this session is inside the engine. */
+    private final String logTag;
     private boolean ended;
 
     public DuelSession(DuelEngine engine, DuelOptions options, DuelEventListener listener) {
@@ -30,9 +32,19 @@ public class DuelSession implements AutoCloseable {
         if (this.duelHandle == 0) {
             throw new IllegalStateException("Failed to create duel");
         }
+        this.logTag = "duel@" + Long.toHexString(duelHandle);
     }
 
     public void setupDuel(Deck team1Deck, Deck team2Deck) {
+        OcgCore.setCurrentDuel(logTag);
+        try {
+            addCardsAndStart(team1Deck, team2Deck);
+        } finally {
+            OcgCore.setCurrentDuel(null);
+        }
+    }
+
+    private void addCardsAndStart(Deck team1Deck, Deck team2Deck) {
         long eng = engine.getHandle();
 
         // Team 1 main deck (reverse order for stack behavior)
@@ -70,6 +82,15 @@ public class DuelSession implements AutoCloseable {
      * Call this after {@link #setupDuel} to start, and after {@link #setResponse} to resume.
      */
     public void process() {
+        OcgCore.setCurrentDuel(logTag);
+        try {
+            processUntilInput();
+        } finally {
+            OcgCore.setCurrentDuel(null);
+        }
+    }
+
+    private void processUntilInput() {
         if (ended) return;
 
         long eng = engine.getHandle();

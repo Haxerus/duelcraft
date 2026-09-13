@@ -31,6 +31,7 @@ add_library(duelcraft_jni SHARED
     src/duel_engine.cpp
     src/card_database.cpp
     src/script_provider.cpp
+    src/java_log.cpp
     src/jni_interface.cpp
 )
 target_include_directories(duelcraft_jni PRIVATE
