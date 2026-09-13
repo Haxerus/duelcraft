@@ -36,6 +36,14 @@ public final class DuelSelectCardFinishScenario implements UIScenario {
                         ctx -> LDLibDuelScreen.create(DuelScreenFixture.startPayload(DuelRule.MR5)))
          .awaitModularUI()
          .step("populate field", ctx -> DuelScreenFixture.populate(DuelRule.MR5))
+         // A dialog-mode selection first: its in-dialog Finish/Cancel twin must not outlive the
+         // prompt, or the next field selection shows no button at all.
+         .step("select one graveyard card in the dialog",
+                 ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.SelectCard(0, false, 1, 1, List.of(
+                         new DuelMessage.CardInfo(28406301, 0, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK)))))
+         .ticks(2)
+         .checkVisible("#prompt-overlay")
+         .checkExists("#prompt-dialog-action-btn")
          .step("select 1-2 of two on-field monsters",
                  ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.SelectCard(0, false, 1, 2, List.of(
                          new DuelMessage.CardInfo(89631139, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK),

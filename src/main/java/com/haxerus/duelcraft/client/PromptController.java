@@ -115,6 +115,9 @@ public class PromptController {
     // SelectPlace/SelectDisfield: {player, location, sequence} triples chosen so far, in click order.
     private final List<int[]> chosenPlaces = new ArrayList<>();
 
+    // SelectChain: true while the per-card effect chooser has replaced the chain card list.
+    private boolean chainEffectChooserOpen;
+
     public PromptController(UI ui, ClientDuelState state, FieldRenderer field,
                             UIElement statusLabel, Callbacks callbacks) {
         this.ui = ui;
@@ -175,6 +178,9 @@ public class PromptController {
 
     public void rebuild() {
         LOGGER.debug("Rebuilding prompt: {}", state.pendingPrompt != null ? state.pendingPrompt.getClass().getSimpleName() : "null");
+        // Drop the previous prompt's dialog twin first: a field-mode builder never clears the dialog
+        // content, so a stale reference would keep the field-level button suppressed.
+        dialogActionBtn = null;
         setActionButton(ActionButton.HIDDEN, null);
         if (state.pendingPrompt == null) {
             if (promptOverlay != null) promptOverlay.addClass("hidden");
@@ -445,6 +451,7 @@ public class PromptController {
             return;
         }
 
+        chainEffectChooserOpen = false;
         promptOverlay.removeClass("hidden");
         // edopro shows hint 556 once any candidate is a resolve-mode (continuous) effect, else 550.
         boolean resolveMode = sel.chains().stream()
@@ -498,6 +505,7 @@ public class PromptController {
         buildOptionPrompt("Choose Effect",
                 indices.stream().map(i -> callbacks.resolveDesc(sel.chains().get(i).desc())).toList(),
                 choice -> callbacks.sendResponse(ResponseBuilder.selectChain(indices.get(choice))));
+        chainEffectChooserOpen = true;
     }
 
     private void buildCardSelectionPrompt(DuelMessage.SelectCard sel) {
@@ -1204,9 +1212,12 @@ public class PromptController {
             promptOverlay.addClass("hidden");
             return true;
         }
-        if (state.pendingPrompt instanceof DuelMessage.SelectChain sel && !sel.forced()) {
+        if (state.pendingPrompt instanceof DuelMessage.SelectChain sel) {
             e.stopPropagation();
-            callbacks.sendResponse(ResponseBuilder.selectChain(-1));
+            // Inside the per-card effect chooser, backing out means the chain card list again —
+            // only a right-click on the list itself declines the chain.
+            if (chainEffectChooserOpen) buildChainPrompt(sel);
+            else if (!sel.forced()) callbacks.sendResponse(ResponseBuilder.selectChain(-1));
             return true;
         }
         if (state.pendingPrompt instanceof DuelMessage.SortCard || state.pendingPrompt instanceof DuelMessage.SortChain) {
@@ -1221,6 +1232,7 @@ public class PromptController {
 
     public void onResponseSent() {
         if (promptOverlay != null) promptOverlay.addClass("hidden");
+        dialogActionBtn = null;
         setActionButton(ActionButton.HIDDEN, null);
         exitFieldSelectionMode();
         chosenPlaces.clear();
