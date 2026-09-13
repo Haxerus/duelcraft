@@ -1,12 +1,19 @@
 package com.haxerus.duelcraft.core;
 
+import com.haxerus.duelcraft.duel.RefreshSchedule;
+import com.haxerus.duelcraft.duel.message.FieldQuery;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import org.junit.jupiter.api.*;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
+import static com.haxerus.duelcraft.core.OcgConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -18,51 +25,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class OcgCoreTest {
-
-    // --- OCG Constants ---
-
-    // Locations
-    static final int LOCATION_DECK  = 0x01;
-    static final int LOCATION_HAND  = 0x02;
-    static final int LOCATION_EXTRA = 0x40;
-
-    // Positions
-    static final int POS_FACEDOWN_DEFENSE = 0x08;
-
-    // Duel rule flags (MR5 = modern rules)
-    static final long DUEL_PZONE                       = 0x800L;
-    static final long DUEL_EMZONE                      = 0x2000L;
-    static final long DUEL_FSX_MMZONE                  = 0x4000L;
-    static final long DUEL_TRAP_MONSTERS_NOT_USE_ZONE  = 0x8000L;
-    static final long DUEL_TRIGGER_ONLY_IN_LOCATION    = 0x20000L;
-    static final long DUEL_MODE_MR5 = DUEL_PZONE | DUEL_EMZONE | DUEL_FSX_MMZONE
-            | DUEL_TRAP_MONSTERS_NOT_USE_ZONE | DUEL_TRIGGER_ONLY_IN_LOCATION;
-
-    // Duel status
-    static final int OCG_DUEL_STATUS_END       = 0;
-    static final int OCG_DUEL_STATUS_AWAITING  = 1;
-    static final int OCG_DUEL_STATUS_CONTINUE  = 2;
-
-    // Message types (subset needed for testing)
-    static final int MSG_RETRY             = 1;
-    static final int MSG_HINT              = 2;
-    static final int MSG_START             = 4;
-    static final int MSG_WIN               = 5;
-    static final int MSG_SELECT_BATTLECMD  = 10;
-    static final int MSG_SELECT_IDLECMD    = 11;
-    static final int MSG_SELECT_EFFECTYN   = 12;
-    static final int MSG_SELECT_YESNO      = 13;
-    static final int MSG_SELECT_OPTION     = 14;
-    static final int MSG_SELECT_CARD       = 15;
-    static final int MSG_SELECT_CHAIN      = 16;
-    static final int MSG_SELECT_PLACE      = 18;
-    static final int MSG_SELECT_POSITION   = 19;
-    static final int MSG_SELECT_TRIBUTE    = 20;
-    static final int MSG_SELECT_SUM        = 23;
-    static final int MSG_SELECT_UNSELECT_CARD = 26;
-    static final int MSG_NEW_TURN          = 40;
-    static final int MSG_NEW_PHASE         = 41;
-    static final int MSG_DRAW              = 90;
 
     /**
      * Sample deck: 40-card main deck of Normal and simple Effect Monsters
@@ -119,6 +81,10 @@ class OcgCoreTest {
 
     @BeforeAll
     static void setUp() {
+        engine = newEngine();
+    }
+
+    static long newEngine() {
         String dbPath = System.getProperty("duelcraft.test.dbPath");
         String scriptPathsStr = System.getProperty("duelcraft.test.scriptPaths");
         assertNotNull(dbPath, "duelcraft.test.dbPath system property must be set");
@@ -127,8 +93,9 @@ class OcgCoreTest {
         String[] dbPaths = new String[]{ dbPath };
         String[] scriptPaths = scriptPathsStr.split(";");
 
-        engine = OcgCore.nCreateEngine(dbPaths, scriptPaths);
-        assertNotEquals(0, engine, "Engine creation failed — check that cards.cdb and script paths are correct");
+        long handle = OcgCore.nCreateEngine(dbPaths, scriptPaths);
+        assertNotEquals(0, handle, "Engine creation failed — check that cards.cdb and script paths are correct");
+        return handle;
     }
 
     @AfterAll
@@ -234,7 +201,7 @@ class OcgCoreTest {
                 allMessages.addAll(parseMessages(msgBuf));
             }
             cycles++;
-        } while (status == OCG_DUEL_STATUS_CONTINUE && cycles < 50);
+        } while (status == DUEL_STATUS_CONTINUE && cycles < 50);
 
         assertFalse(allMessages.isEmpty(), "Should have parsed at least one message");
 
@@ -254,7 +221,7 @@ class OcgCoreTest {
 
         // If the engine is AWAITING, there should be a selection message in the batch.
         // Stash it so the duel loop test can respond to it first.
-        if (status == OCG_DUEL_STATUS_AWAITING) {
+        if (status == DUEL_STATUS_AWAITING) {
             for (int i = allMessages.size() - 1; i >= 0; i--) {
                 if (isSelectionMessage(allMessages.get(i).type)) {
                     pendingSelection = allMessages.get(i);
@@ -269,6 +236,71 @@ class OcgCoreTest {
 
     @Test
     @Order(6)
+    void testFieldQueryParsesRealEngineOutput() {
+        assertNotEquals(0, duel, "Duel must be started first");
+
+        // One hand card, with the mask the host uses for a hand refresh.
+        byte[] slot = OcgCore.nDuelQuery(engine, duel, RefreshSchedule.HAND_FLAGS,
+                0, LOCATION_HAND, 0, 0);
+        assertNotNull(slot, "Player 0 should hold cards after the opening draw");
+        assertTrue(slot.length > 0, "Query for an occupied hand slot should return bytes");
+
+        QueriedCard card = FieldQuery.parse(slot);
+        // The core emits exactly the requested fields, so landing on QUERY_END with every one of
+        // them recorded proves each width in FieldQuery matches card::get_infos.
+        assertEquals(RefreshSchedule.HAND_FLAGS, card.flags,
+                "Parsed flags should be exactly the requested mask");
+        assertTrue(Arrays.stream(MAIN_DECK).anyMatch(code -> code == card.code),
+                "Hand card " + card.code + " should come from the deck");
+        assertNotEquals(0, card.position & (POS_FACEUP | POS_FACEDOWN),
+                "Position should carry a face-up or face-down bit");
+        assertFalse(card.isPublic, "A plain hand card is not public");
+        System.out.println("Hand slot 0: code=" + card.code + ", pos=0x"
+                + Integer.toHexString(card.position) + ", atk=" + card.attack);
+
+        // The bulk form: one object per slot, a bare u16 0 for each empty monster zone.
+        List<QueriedCard> mzone = FieldQuery.parseLocation(OcgCore.nDuelQueryLocation(
+                engine, duel, RefreshSchedule.MZONE_FLAGS, 0, LOCATION_MZONE));
+        assertEquals(7, mzone.size(), "The core always allocates seven monster zones");
+        assertTrue(mzone.stream().allMatch(Objects::isNull), "No monster is on the field yet");
+
+        List<QueriedCard> hand = FieldQuery.parseLocation(OcgCore.nDuelQueryLocation(
+                engine, duel, RefreshSchedule.HAND_FLAGS, 0, LOCATION_HAND));
+        assertEquals(OcgCore.nDuelQueryCount(engine, duel, 0, LOCATION_HAND), hand.size());
+        assertEquals(card.code, hand.getFirst().code, "Bulk and per-slot queries agree on slot 0");
+    }
+
+    /**
+     * Runs {@link com.haxerus.duelcraft.duel.MessageSanitizer} against a real engine query so
+     * {@link FieldQuery} is exercised on live bytes, not just hand-built test buffers.
+     */
+    @Test
+    @Order(7)
+    void testMessageSanitizerStripsHiddenCodeFromALiveQuery() {
+        assertNotEquals(0, duel, "Duel must be started first");
+
+        byte[] slot = OcgCore.nDuelQuery(engine, duel,
+                QUERY_CODE | QUERY_POSITION | QUERY_IS_PUBLIC,
+                0, LOCATION_DECK, 0, 0);
+        assertNotNull(slot, "Player 0's deck should still hold a card at seq 0");
+        QueriedCard card = FieldQuery.parse(slot);
+        assertFalse(card.isPublic, "A plain deck card is not public");
+
+        var update = new com.haxerus.duelcraft.duel.message.DuelMessage.UpdateData(0, LOCATION_DECK, List.of(card));
+
+        var forOpponent = (com.haxerus.duelcraft.duel.message.DuelMessage.UpdateData)
+                com.haxerus.duelcraft.duel.MessageSanitizer.forRecipient(update, 1);
+        QueriedCard opponentView = forOpponent.cards().getFirst();
+        assertEquals(0, opponentView.code, "The opponent must not see the deck card's code");
+        assertEquals(0, opponentView.flags & QUERY_CODE, "CODE flag must be cleared, not just the value zeroed");
+
+        var forOwner = (com.haxerus.duelcraft.duel.message.DuelMessage.UpdateData)
+                com.haxerus.duelcraft.duel.MessageSanitizer.forRecipient(update, 0);
+        assertEquals(card.code, forOwner.cards().getFirst().code, "The owner keeps their own card's code");
+    }
+
+    @Test
+    @Order(8)
     void testDuelLoopWithResponses() {
         assertNotEquals(0, duel, "Duel must be started first");
 
@@ -294,7 +326,7 @@ class OcgCoreTest {
             byte[] msgBuf = OcgCore.nDuelGetMessage(engine, duel);
 
             if (msgBuf == null || msgBuf.length == 0) {
-                if (status == OCG_DUEL_STATUS_END) {
+                if (status == DUEL_STATUS_END) {
                     duelEnded = true;
                     break;
                 }
@@ -309,7 +341,7 @@ class OcgCoreTest {
                     duelEnded = true;
                     ByteBuffer bb = ByteBuffer.wrap(msg.body).order(ByteOrder.LITTLE_ENDIAN);
                     int winner = Byte.toUnsignedInt(bb.get());
-                    int reason = bb.getInt();
+                    int reason = Byte.toUnsignedInt(bb.get());
                     System.out.println("Duel ended! Winner: Player " + winner + ", Reason: " + reason);
                     break;
                 }
@@ -320,7 +352,7 @@ class OcgCoreTest {
 
             if (duelEnded) break;
 
-            if (status == OCG_DUEL_STATUS_AWAITING) {
+            if (status == DUEL_STATUS_AWAITING) {
                 // Find the last selection message and auto-respond
                 ParsedMessage lastSelect = null;
                 for (ParsedMessage msg : messages) {
@@ -337,7 +369,7 @@ class OcgCoreTest {
                 }
             }
 
-            if (status == OCG_DUEL_STATUS_END) {
+            if (status == DUEL_STATUS_END) {
                 duelEnded = true;
             }
         }
@@ -351,7 +383,7 @@ class OcgCoreTest {
     }
 
     @Test
-    @Order(7)
+    @Order(9)
     void testQueryField() {
         assertNotEquals(0, duel, "Duel must exist");
         // Query the full field — just verify it returns response without crashing
@@ -362,7 +394,7 @@ class OcgCoreTest {
     }
 
     @Test
-    @Order(8)
+    @Order(10)
     void testDestroyAndRecreate() {
         // Verify we can cleanly destroy and recreate a duel on the same engine
         OcgCore.nDestroyDuel(engine, duel);
@@ -380,11 +412,77 @@ class OcgCoreTest {
         OcgCore.nStartDuel(engine, duel2);
 
         int status = OcgCore.nDuelProcess(engine, duel2);
-        assertTrue(status != OCG_DUEL_STATUS_END, "New duel should not immediately end");
+        assertTrue(status != DUEL_STATUS_END, "New duel should not immediately end");
 
         OcgCore.nDestroyDuel(engine, duel2);
         duel = 0; // prevent AfterAll from double-destroying
         System.out.println("Destroy/recreate test passed");
+    }
+
+    /** The data reader reports a code it cannot find once per engine, not once per duel. */
+    @Test
+    @Order(11)
+    void testUnknownCardCodeIsReportedOncePerEngine() {
+        List<String> lines = Collections.synchronizedList(new ArrayList<>());
+        try {
+            OcgCore.setLogListener(lines::add);
+            OcgCore.setCurrentDuel("duel@test");
+
+            // The engine caches card data per duel (duel.cpp:148-155), so only a second duel
+            // re-enters CardDatabase::cardReader; the bridge's own set is what stops the
+            // second warning.
+            addUnknownCardToANewDuel(engine);
+            addUnknownCardToANewDuel(engine);
+
+            List<String> warnings = unknownCodeWarnings(lines);
+            assertEquals(1, warnings.size(),
+                    "Expected one warning for code 1 across both duels, captured: " + lines);
+            assertTrue(warnings.getFirst().startsWith("[duel@test] "),
+                    "Native log lines should carry the duel tag: " + warnings.getFirst());
+
+            // Negative control: the set lives on the engine, so a second engine warns again.
+            lines.clear();
+            long otherEngine = newEngine();
+            try {
+                addUnknownCardToANewDuel(otherEngine);
+            } finally {
+                OcgCore.nDestroyEngine(otherEngine);
+            }
+            assertEquals(1, unknownCodeWarnings(lines).size(),
+                    "A fresh engine has its own warned-code set, captured: " + lines);
+        } finally {
+            OcgCore.setCurrentDuel(null);
+            OcgCore.setLogListener(null);
+        }
+    }
+
+    /** Adds card code 1 — not a real card — to a throwaway duel, so the data reader misses. */
+    private static void addUnknownCardToANewDuel(long eng) {
+        long[] seed = { 7, 7, 7, 7 };
+        long unknownDuel = OcgCore.nCreateDuel(eng, seed, DUEL_MODE_MR5, 8000, 5, 1, 8000, 5, 1);
+        assertNotEquals(0, unknownDuel, "Duel creation failed");
+        try {
+            OcgCore.nDuelNewCard(eng, unknownDuel, 0, 0, 1, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
+        } finally {
+            OcgCore.nDestroyDuel(eng, unknownDuel);
+        }
+    }
+
+    private static List<String> unknownCodeWarnings(List<String> lines) {
+        return lines.stream()
+                .filter(line -> line.contains("card code 1 is not in the card database"))
+                .toList();
+    }
+
+    /** A card database that cannot be opened fails loudly instead of returning a null handle. */
+    @Test
+    @Order(12)
+    void testCreateEngineWithUnreadableDatabaseThrows() {
+        String missing = "C:/duelcraft-no-such-card-database.cdb";
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> OcgCore.nCreateEngine(new String[]{ missing }, new String[0]));
+        assertTrue(thrown.getMessage().contains(missing),
+                "The exception should name the database that failed: " + thrown.getMessage());
     }
 
     // --- Helpers ---
@@ -632,9 +730,9 @@ class OcgCoreTest {
 
     static String statusName(int status) {
         return switch (status) {
-            case OCG_DUEL_STATUS_END -> "END";
-            case OCG_DUEL_STATUS_AWAITING -> "AWAITING";
-            case OCG_DUEL_STATUS_CONTINUE -> "CONTINUE";
+            case DUEL_STATUS_END -> "END";
+            case DUEL_STATUS_AWAITING -> "AWAITING";
+            case DUEL_STATUS_CONTINUE -> "CONTINUE";
             default -> "UNKNOWN(" + status + ")";
         };
     }

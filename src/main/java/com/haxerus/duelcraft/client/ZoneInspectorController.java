@@ -74,11 +74,11 @@ public class ZoneInspectorController {
 
         int player = inspectedPlayer;
         int location = inspectedLocation;
-        List<Integer> cards = getPileCards(player, location);
+        List<ClientCard> cards = getPileCards(player, location);
 
         listElem.clearAllScrollViewChildren();
         for (int i = 0; i < cards.size(); i++) {
-            int code = cards.get(i);
+            int code = cards.get(i).code;
             int seq = i;
 
             var card = new UIElement();
@@ -99,6 +99,12 @@ public class ZoneInspectorController {
     public void showConfirmCards() {
         if (state.confirmCards == null || state.confirmCards.isEmpty()) return;
         if (inspector == null) return;
+
+        // The reveal is not a pile, so drop the inspection target: a later PILE_COUNTS refresh
+        // would otherwise rebuild the list from whichever pile was open before.
+        inspectedPlayer = -1;
+        inspectedLocation = -1;
+        inspectedTitle = null;
 
         inspector.removeClass("hidden");
         var titleLabel = byId("zone-inspector-title");
@@ -145,7 +151,7 @@ public class ZoneInspectorController {
         }
     }
 
-    private List<Integer> getPileCards(int player, int location) {
+    private List<ClientCard> getPileCards(int player, int location) {
         return switch (location) {
             case LOCATION_GRAVE -> state.grave[player];
             case LOCATION_REMOVED -> state.banished[player];

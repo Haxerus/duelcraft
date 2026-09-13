@@ -1,12 +1,17 @@
 package com.haxerus.duelcraft.client;
 
+import com.haxerus.duelcraft.client.carddata.CardInfo;
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.ResponseValidator;
+import com.haxerus.duelcraft.duel.response.SumSelection;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.mojang.logging.LogUtils;
@@ -14,8 +19,12 @@ import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -33,7 +42,7 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
  * <ul>
  *   <li>{@link #rebuild()} — called on PROMPT dirty flag
  *   <li>{@link #handleFieldClick} — dispatch field slot click to active prompt
- *   <li>{@link #handleRightClick} — cancel field selection / finish unselect-card
+ *   <li>{@link #handleRightClick} — fire the shared Cancel/Finish action
  *   <li>{@link #onResponseSent()} — clear prompt UI after a response is sent
  *   <li>{@link #isBattleCmd()} — context menu icon lookup needs to know if
  *       we're in the battle phase command menu
@@ -47,12 +56,23 @@ public class PromptController {
         void setCardImageBackground(UIElement elem, int code);
         void showCardInfo(int code);
         void hideCardInfo();
-        /** Send a response to the server (consumes current prompt, triggers onResponseSent). */
-        void sendResponse(byte[] response);
+        /**
+         * Build a response and send it (consumes the current prompt, triggers onResponseSent).
+         * A response {@link ResponseValidator} rejects is reported instead of sent.
+         */
+        void sendResponse(Supplier<byte[]> response);
         /** Resolve a card code to its display name (from the client's card DB). */
         String cardDisplayName(int code);
         /** Resolve a ygopro-core description code to human-readable text. */
         String resolveDesc(long desc);
+        /** Resolve a system string by code (strings.conf {@code !system}), or null if unknown. */
+        String systemString(int code);
+        /** Resolve a counter type's display name (strings.conf {@code !counter}), or null if unknown. */
+        String counterName(int counterType);
+        /** True when the client card database is loaded, so the ANNOUNCE_CARD search can run. */
+        boolean cardSearchAvailable();
+        /** Cards an ANNOUNCE_CARD prompt accepts, matching {@code query} by passcode or name. */
+        List<CardInfo> searchDeclarable(String query, List<Long> opcodes);
     }
 
     private final UI ui;
@@ -60,12 +80,22 @@ public class PromptController {
     private final FieldRenderer field;
     private final Callbacks callbacks;
 
+    /** The three states of edopro's shared Cancel/Finish button (`event_handler.cpp:2727-2745`). */
+    public enum ActionButton { HIDDEN, CANCEL, FINISH }
+
     // DOM references (resolved in constructor)
     private final UIElement promptOverlay;
     private final UIElement promptTitle;
     private final UIElement promptBody;
     private final UIElement promptButtons;
     private final UIElement statusLabel;
+    private final Button promptActionBtn;
+
+    // The shared Cancel/Finish action: what the button — and a right-click — does right now.
+    // Null while the button is hidden.
+    private Runnable actionButtonAction;
+    // Dialog-mode twin of promptActionBtn, rebuilt with the dialog's buttons.
+    private Button dialogActionBtn;
 
     // Shared prompt state — only one prompt is active at a time, so sharing is safe
     // as long as each prompt clears at start. The existing shared-state bugs were
@@ -73,8 +103,25 @@ public class PromptController {
     // handlers that don't rebuild).
     private final List<Integer> selectedIndices = new ArrayList<>();
     private final List<UIElement> sumSelectableCards = new ArrayList<>();
+    private SumSelection sumSelection;
     private boolean inFieldSelectionMode;
     private boolean isBattleCmd;
+
+    // SelectCounter: per-card removal tally for the active prompt.
+    private CounterSelection counterSelection;
+    // SortCard/SortChain: ordinal assignment for the active prompt, plus the labels drawn on each card.
+    private SortSelection sortSelection;
+    private final List<Label> sortOrdinalLabels = new ArrayList<>();
+
+    // AnnounceRace/AnnounceAttrib: checked bits for the active prompt, plus the "Select N" caption.
+    private BitSelection bitSelection;
+    private Label bitSelectionCaption;
+
+    // SelectPlace/SelectDisfield: {player, location, sequence} triples chosen so far, in click order.
+    private final List<int[]> chosenPlaces = new ArrayList<>();
+
+    // SelectChain: true while the per-card effect chooser has replaced the chain card list.
+    private boolean chainEffectChooserOpen;
 
     public PromptController(UI ui, ClientDuelState state, FieldRenderer field,
                             UIElement statusLabel, Callbacks callbacks) {
@@ -87,19 +134,78 @@ public class PromptController {
         this.promptBody = byId("prompt-body");
         this.promptButtons = byId("prompt-buttons");
         this.statusLabel = statusLabel;
+        this.promptActionBtn = ui.selectId("prompt-action-btn", Button.class).findFirst().orElse(null);
+        if (promptActionBtn != null) promptActionBtn.setOnClick(e -> {
+            e.stopPropagation();
+            runActionButton();
+        });
+    }
+
+    // ── Shared Cancel/Finish button ────────────────────────────────────────
+
+    /**
+     * Puts the shared button in one of its three states. A dialog-mode prompt carries its own copy
+     * inside the dialog, and then the one under the field stays down so only one is on screen.
+     */
+    private void setActionButton(ActionButton state, Runnable action) {
+        actionButtonAction = state == ActionButton.HIDDEN ? null : action;
+        applyActionButton(promptActionBtn, dialogActionBtn != null ? ActionButton.HIDDEN : state);
+        applyActionButton(dialogActionBtn, state);
+    }
+
+    private static void applyActionButton(Button button, ActionButton state) {
+        if (button == null) return;
+        if (state == ActionButton.HIDDEN) {
+            button.addClass("hidden");
+            return;
+        }
+        button.setText(Component.literal(state == ActionButton.CANCEL ? "Cancel" : "Finish"));
+        button.removeClass("hidden");
+    }
+
+    private void runActionButton() {
+        if (actionButtonAction != null) actionButtonAction.run();
+    }
+
+    /** A dialog-local Finish/Cancel button driven by the same state as the shared one. */
+    private Button addDialogActionButton() {
+        var button = new Button();
+        button.setId("prompt-dialog-action-btn");
+        button.addClasses("prompt-btn", "hidden");
+        button.setOnClick(e -> runActionButton());
+        promptButtons.addChild(button);
+        return button;
     }
 
     public boolean isBattleCmd() { return isBattleCmd; }
+
+    // ── HINT_SELECTMSG captions ────────────────────────────────────────────
+
+    /**
+     * edopro's {@code select_hint} (`duelclient.cpp:2013`, `:2383`, `:3915`): a {@code HINT_SELECTMSG}
+     * that arrived before this prompt says why the player is choosing, and replaces the prompt's own
+     * caption. edopro appends the counts to the hint, so {@code suffix} comes along with it.
+     */
+    private String hintCaption(String fallback, String suffix) {
+        if (state.promptCaptionDesc == 0) return fallback;
+        return callbacks.resolveDesc(state.promptCaptionDesc) + suffix;
+    }
 
     // ── Rebuild dispatch (PROMPT dirty) ────────────────────────────────────
 
     public void rebuild() {
         LOGGER.debug("Rebuilding prompt: {}", state.pendingPrompt != null ? state.pendingPrompt.getClass().getSimpleName() : "null");
+        // Drop the previous prompt's dialog twin first: a field-mode builder never clears the dialog
+        // content, so a stale reference would keep the field-level button suppressed.
+        dialogActionBtn = null;
+        setActionButton(ActionButton.HIDDEN, null);
         if (state.pendingPrompt == null) {
             if (promptOverlay != null) promptOverlay.addClass("hidden");
-            if (statusLabel != null) statusLabel.addClass("hidden");
+            showWaitingOrHide();
             return;
         }
+        // Our own prompt takes the label back from MSG_WAITING; the builders that use it re-show it.
+        if (statusLabel != null) statusLabel.addClass("hidden");
 
         switch (state.pendingPrompt) {
             case DuelMessage.SelectIdleCmd ignored -> {
@@ -115,16 +221,18 @@ public class PromptController {
 
             case DuelMessage.SelectYesNo sel ->
                 buildYesNoPrompt(callbacks.resolveDesc(sel.desc()));
-            case DuelMessage.SelectEffectYn sel ->
+            case DuelMessage.SelectEffectYn sel -> {
+                state.highlightPromptCard(sel.location());
                 buildYesNoPrompt(callbacks.resolveDesc(sel.desc())
                         + "\n(" + callbacks.cardDisplayName(sel.code()) + ")");
+            }
 
-            case DuelMessage.SelectOption sel -> buildOptionPrompt("Choose Option",
+            case DuelMessage.SelectOption sel -> buildOptionPrompt(hintCaption("Choose Option", ""),
                     sel.options().stream().map(callbacks::resolveDesc).toList(),
-                    i -> callbacks.sendResponse(ResponseBuilder.selectOption(i)));
+                    i -> callbacks.sendResponse(() -> ResponseValidator.selectOption(sel, i)));
             case DuelMessage.RockPaperScissors ignored -> buildOptionPrompt("Rock Paper Scissors",
                     List.of("Rock", "Paper", "Scissors"),
-                    i -> callbacks.sendResponse(ResponseBuilder.rockPaperScissors(i + 1)));
+                    i -> callbacks.sendResponse(() -> ResponseValidator.rockPaperScissors(i + 1)));
 
             case DuelMessage.SelectChain sel -> buildChainPrompt(sel);
 
@@ -146,10 +254,24 @@ public class PromptController {
 
             case DuelMessage.SelectPosition sel -> buildPositionPrompt(sel);
 
-            case DuelMessage.SelectPlace sel -> {
-                promptOverlay.addClass("hidden");
-                field.highlightValidPlaces(sel.field());
+            case DuelMessage.SelectPlace sel -> buildPlacePrompt(sel.count(), sel.field(), false);
+            case DuelMessage.SelectDisfield sel -> buildPlacePrompt(sel.count(), sel.field(), true);
+
+            case DuelMessage.SelectCounter sel -> buildCounterPrompt(sel);
+
+            case DuelMessage.SortCard sel -> buildSortPrompt(sel.cards(), 205, "Sort Cards");
+            case DuelMessage.SortChain sel -> buildSortPrompt(sel.cards(), 206, "Sort Chain");
+
+            case DuelMessage.AnnounceNumber sel -> {
+                String title = callbacks.systemString(565);
+                buildOptionPrompt(hintCaption(title != null ? title : "Declare a number", ""),
+                        sel.options().stream().map(String::valueOf).toList(),
+                        i -> callbacks.sendResponse(() -> ResponseValidator.announceNumber(sel, i)));
             }
+            case DuelMessage.AnnounceRace sel -> buildAnnounceRacePrompt(sel);
+            case DuelMessage.AnnounceAttrib sel -> buildAnnounceAttribPrompt(sel);
+
+            case DuelMessage.AnnounceCard sel -> buildAnnounceCardPrompt(sel);
 
             default -> {
                 promptOverlay.removeClass("hidden");
@@ -160,6 +282,25 @@ public class PromptController {
                 LOGGER.warn("Unhandled prompt type: {}", state.pendingPrompt.getClass().getSimpleName());
             }
         }
+
+        if (state.retryMessage != null) {
+            if (statusLabel != null) {
+                statusLabel.removeClass("hidden");
+                if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(state.retryMessage));
+            }
+            state.retryMessage = null;
+        }
+    }
+
+    /** With no prompt of our own, MSG_WAITING owns the status label. */
+    private void showWaitingOrHide() {
+        if (statusLabel == null) return;
+        if (!state.waitingForOpponent) {
+            statusLabel.addClass("hidden");
+            return;
+        }
+        statusLabel.removeClass("hidden");
+        if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(ClientDuelState.WAITING_TEXT));
     }
 
     // ── Prompt builders ────────────────────────────────────────────────────
@@ -172,15 +313,24 @@ public class PromptController {
         var yesBtn = new Button();
         yesBtn.setText(Component.literal("Yes"));
         yesBtn.addClass("prompt-btn");
-        yesBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectYesNo(true)));
+        yesBtn.setOnClick(e -> callbacks.sendResponse(() -> validatedYesNo(true)));
 
         var noBtn = new Button();
         noBtn.setText(Component.literal("No"));
         noBtn.addClass("prompt-btn");
-        noBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectYesNo(false)));
+        noBtn.setOnClick(e -> callbacks.sendResponse(() -> validatedYesNo(false)));
 
         promptButtons.addChild(yesBtn);
         promptButtons.addChild(noBtn);
+    }
+
+    /** Both yes/no prompts answer with the same int32; neither engine reader constrains it. */
+    private byte[] validatedYesNo(boolean yes) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SelectEffectYn sel -> ResponseValidator.selectEffectYn(sel, yes);
+            case DuelMessage.SelectYesNo sel -> ResponseValidator.selectYesNo(sel, yes);
+            default -> ResponseBuilder.selectYesNo(yes);
+        };
     }
 
     private void buildOptionPrompt(String title, List<String> options, IntConsumer onSelect) {
@@ -198,22 +348,165 @@ public class PromptController {
         }
     }
 
-    private void buildChainPrompt(DuelMessage.SelectChain sel) {
-        // Auto-pass if not forced and no chain options
-        if (!sel.forced() && sel.chains().isEmpty()) {
-            callbacks.sendResponse(ResponseBuilder.selectChain(-1));
+    /**
+     * edopro's effect disambiguation (`event_handler.cpp:351-382`): a card offering several
+     * activations opens the option dialog, one entry per effect description.
+     */
+    public void showActivateOptions(List<ClientDuelState.CardAction> activations) {
+        buildOptionPrompt("Choose Effect",
+                activations.stream().map(a -> callbacks.resolveDesc(a.desc())).toList(),
+                choice -> {
+                    var action = activations.get(choice);
+                    callbacks.sendResponse(() -> validatedCmd(action.actionType(), action.listIndex()));
+                });
+    }
+
+    /**
+     * edopro's declare-a-card dialog: a search box over the client card database, filtered by the
+     * prompt's {@code is_declarable} opcodes, and one button per hit. Clicking a hit answers with
+     * its passcode. Without a card database there is nothing to search, so this degrades to raw
+     * passcode entry.
+     */
+    private void buildAnnounceCardPrompt(DuelMessage.AnnounceCard sel) {
+        promptOverlay.removeClass("hidden");
+        String title = callbacks.systemString(564);
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(hintCaption(title != null ? title : "Declare a card name", "")));
+        clearPromptContent();
+
+        if (!callbacks.cardSearchAvailable()) {
+            buildPasscodeEntry();
             return;
         }
 
+        var results = new ScrollerView();
+        results.addClass("prompt-name-scroller");
+
+        var search = new TextField();
+        search.setId("announce-card-search");
+        search.getLayout().widthPercent(100);
+        search.textFieldStyle(style -> style.placeholder(Component.literal("Name or passcode")));
+        search.setTextResponder(text -> refreshDeclarableResults(results, text, sel.opcodes()));
+
+        promptBody.addChild(search);
+        promptBody.addChild(results);
+        refreshDeclarableResults(results, "", sel.opcodes());
+    }
+
+    private void refreshDeclarableResults(ScrollerView results, String query, List<Long> opcodes) {
+        results.clearAllScrollViewChildren();
+        for (CardInfo card : callbacks.searchDeclarable(query, opcodes)) {
+            int code = card.code();
+            var btn = new Button();
+            btn.setText(Component.literal(card.name()));
+            btn.addClass("prompt-name-btn");
+            btn.setOnClick(e -> callbacks.sendResponse(() -> validatedAnnounceCard(code)));
+            results.addScrollViewChild(btn);
+        }
+    }
+
+    /** ANNOUNCE_CARD fallback when no card database is available: type the passcode yourself. */
+    private void buildPasscodeEntry() {
+        var input = new TextField();
+        input.setId("announce-card-search");
+        input.getLayout().widthPercent(100);
+        promptBody.addChild(input);
+
+        var okBtn = new Button();
+        okBtn.setText(Component.literal("OK"));
+        okBtn.addClass("prompt-btn");
+        okBtn.setOnClick(e -> {
+            try {
+                int code = Integer.parseInt(input.getValue().trim());
+                callbacks.sendResponse(() -> validatedAnnounceCard(code));
+            } catch (NumberFormatException ignored) {
+                // Invalid/empty input: keep the dialog open.
+            }
+        });
+        promptButtons.addChild(okBtn);
+    }
+
+    // ── AnnounceRace / AnnounceAttrib (checkbox grid, no OK button) ─────────
+
+    private void buildAnnounceRacePrompt(DuelMessage.AnnounceRace sel) {
+        bitSelection = new BitSelection(sel.available(), sel.count());
+        // edopro shows these names via strings.conf system strings 1020-1044ish; CardStringHelper
+        // already has the same names hardcoded from OcgConstants RACE_* bits, so it's reused here.
+        buildBitSelectionPrompt(563, "Declare a race", sel.count(),
+                bit -> CardStringHelper.raceName(1L << bit),
+                () -> callbacks.sendResponse(() -> ResponseValidator.announceRace(sel, bitSelection.mask())));
+    }
+
+    private void buildAnnounceAttribPrompt(DuelMessage.AnnounceAttrib sel) {
+        bitSelection = new BitSelection(sel.available(), sel.count());
+        // edopro shows these names via strings.conf system strings 1010-1016; CardStringHelper
+        // already has the same names hardcoded from OcgConstants ATTRIBUTE_* bits, so it's reused here.
+        buildBitSelectionPrompt(562, "Declare an attribute", sel.count(),
+                bit -> CardStringHelper.attributeName(1 << bit),
+                () -> callbacks.sendResponse(
+                        () -> ResponseValidator.announceAttrib(sel, (int) bitSelection.mask())));
+    }
+
+    /**
+     * One toggle button per bit set in {@code bitSelection}'s available mask; submits as soon as
+     * exactly {@code count} are checked (edopro: no OK button for these two prompts).
+     */
+    private void buildBitSelectionPrompt(int titleStringCode, String fallbackTitle, int count,
+                                         IntFunction<String> labelFor, Runnable onComplete) {
         promptOverlay.removeClass("hidden");
-        if (promptTitle instanceof Label t) t.setText(Component.literal("Activate Chain?"));
+        String title = callbacks.systemString(titleStringCode);
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(hintCaption(title != null ? title : fallbackTitle, "")));
+        clearPromptContent();
+
+        bitSelectionCaption = new Label();
+        promptBody.addChild(bitSelectionCaption);
+
+        for (int bit : bitSelection.bits()) {
+            var btn = new Button();
+            btn.setId("announce-bit-" + bit);
+            btn.setText(Component.literal(labelFor.apply(bit)));
+            btn.addClass("prompt-btn");
+            btn.setOnClick(e -> {
+                bitSelection.toggle(bit);
+                toggleClass(btn, "selected", bitSelection.isChecked(bit));
+                updateBitSelectionCaption(count);
+                if (bitSelection.isComplete()) onComplete.run();
+            });
+            promptButtons.addChild(btn);
+        }
+        updateBitSelectionCaption(count);
+    }
+
+    private void updateBitSelectionCaption(int count) {
+        if (bitSelectionCaption == null || bitSelection == null) return;
+        int remaining = count - Long.bitCount(bitSelection.mask());
+        bitSelectionCaption.setText(Component.literal("Select " + remaining));
+    }
+
+    private void buildChainPrompt(DuelMessage.SelectChain sel) {
+        if (sel.chains().isEmpty()) {
+            // A forced prompt always carries candidates (`processor.cpp:943-958`, `:663-668`), so an
+            // empty forced list can only be a desync; answer 0 the way edopro's auto-chain-order
+            // does rather than leave the duel waiting for a pick that cannot be made. The validator
+            // would reject index 0 against an empty list, so this one path goes around it.
+            callbacks.sendResponse(() -> ResponseBuilder.selectChain(sel.forced() ? 0 : -1));
+            return;
+        }
+
+        chainEffectChooserOpen = false;
+        promptOverlay.removeClass("hidden");
+        // edopro shows hint 556 once any candidate is a resolve-mode (continuous) effect, else 550.
+        boolean resolveMode = sel.chains().stream()
+                .anyMatch(c -> c.flag() == EFFECT_CLIENT_MODE_RESOLVE);
+        String title = callbacks.systemString(resolveMode ? 556 : 550);
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(title != null ? title : "Activate Chain?"));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
-        for (int i = 0; i < sel.chains().size(); i++) {
-            int idx = i;
-            var chain = sel.chains().get(i);
-            int code = chain.code();
+        for (var entry : chainEntriesByCard(sel).values()) {
+            int code = sel.chains().get(entry.get(0)).code();
 
             var card = new UIElement();
             card.addClass("card");
@@ -222,7 +515,9 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                callbacks.sendResponse(ResponseBuilder.selectChain(idx));
+                if (entry.size() == 1)
+                    callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, entry.get(0)));
+                else buildChainEffectOptions(sel, entry);
             });
             scroller.addScrollViewChild(card);
         }
@@ -231,23 +526,46 @@ public class PromptController {
             var passBtn = new Button();
             passBtn.setText(Component.literal("Pass"));
             passBtn.addClasses("prompt-btn");
-            passBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectChain(-1)));
+            passBtn.setOnClick(e -> callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, -1)));
             promptButtons.addChild(passBtn);
         }
+    }
+
+    /** Chain entry indices grouped by the card that owns them, in message order. */
+    private static Map<ClientDuelState.CardLocation, List<Integer>> chainEntriesByCard(
+            DuelMessage.SelectChain sel) {
+        var byCard = new LinkedHashMap<ClientDuelState.CardLocation, List<Integer>>();
+        for (int i = 0; i < sel.chains().size(); i++) {
+            var chain = sel.chains().get(i);
+            var key = new ClientDuelState.CardLocation(
+                    chain.controller(), chain.location(), chain.sequence());
+            byCard.computeIfAbsent(key, k -> new ArrayList<>()).add(i);
+        }
+        return byCard;
+    }
+
+    /** One card with several activatable effects: edopro's option dialog over each entry's desc. */
+    private void buildChainEffectOptions(DuelMessage.SelectChain sel, List<Integer> indices) {
+        buildOptionPrompt("Choose Effect",
+                indices.stream().map(i -> callbacks.resolveDesc(sel.chains().get(i).desc())).toList(),
+                choice -> callbacks.sendResponse(
+                        () -> ResponseValidator.selectChain(sel, indices.get(choice))));
+        chainEffectChooserOpen = true;
     }
 
     private void buildCardSelectionPrompt(DuelMessage.SelectCard sel) {
         selectedIndices.clear();
         promptOverlay.removeClass("hidden");
         if (promptTitle instanceof Label t)
-            t.setText(Component.literal("Select " + sel.min() + "-" + sel.max() + " card(s)"));
+            t.setText(Component.literal(hintCaption("Select " + sel.min() + "-" + sel.max() + " card(s)",
+                    "(" + sel.min() + "-" + sel.max() + ")")));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
         for (int i = 0; i < sel.cards().size(); i++) {
             int idx = i;
             var cardInfo = sel.cards().get(i);
-            int code = cardInfo.code();
+            int code = state.candidateCode(cardInfo);
 
             var card = new UIElement();
             card.addClass("card");
@@ -263,47 +581,261 @@ public class PromptController {
                     selectedIndices.add(idx);
                     card.addClass("target");
                 }
+                applyCardSelectionGate(sel);
             });
             scroller.addScrollViewChild(card);
         }
 
-        var confirmBtn = new Button();
-        confirmBtn.setText(Component.literal("Confirm"));
-        confirmBtn.addClasses("prompt-btn");
-        confirmBtn.setOnClick(e -> {
-            if (selectedIndices.size() >= sel.min()) {
-                callbacks.sendResponse(ResponseBuilder.selectCards(
-                        selectedIndices.stream().mapToInt(Integer::intValue).toArray()));
-            }
-        });
-        promptButtons.addChild(confirmBtn);
+        dialogActionBtn = addDialogActionButton();
+        setInitialSelectionButton(sel.cancelable(), sel.min() == 0, this::sendSelectedCards);
+    }
 
-        if (sel.cancelable()) {
-            var cancelBtn = new Button();
-            cancelBtn.setText(Component.literal("Cancel"));
-            cancelBtn.addClasses("prompt-btn");
-            cancelBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectCardsCancel()));
-            promptButtons.addChild(cancelBtn);
+    /**
+     * edopro's state for the shared button when a card or tribute prompt opens
+     * (`duelclient.cpp:2022-2029`, `:2385-2387`): Cancel wins over Finish while nothing is picked.
+     */
+    private void setInitialSelectionButton(boolean cancelable, boolean ready, Runnable finish) {
+        if (cancelable) setActionButton(ActionButton.CANCEL, this::sendSelectCardsCancel);
+        else if (ready) setActionButton(ActionButton.FINISH, finish);
+        else setActionButton(ActionButton.HIDDEN, null);
+    }
+
+    /** Re-gate a {@code SELECT_CARD} selection after a pick: submit, or pick a button state. */
+    private void applyCardSelectionGate(DuelMessage.SelectCard sel) {
+        int picked = selectedIndices.size();
+        applyGate(SelectionGate.of(picked, picked, sel.min(), sel.max(),
+                sel.cards().size(), sel.cancelable()), this::sendSelectedCards);
+    }
+
+    private void applyGate(SelectionGate gate, Runnable finish) {
+        switch (gate) {
+            case SUBMIT -> finish.run();
+            case FINISH -> setActionButton(ActionButton.FINISH, finish);
+            case CANCEL -> setActionButton(ActionButton.CANCEL, this::sendSelectCardsCancel);
+            case HIDDEN -> setActionButton(ActionButton.HIDDEN, null);
         }
     }
 
-    private void buildPositionPrompt(DuelMessage.SelectPosition sel) {
-        promptOverlay.removeClass("hidden");
-        if (promptTitle instanceof Label t) t.setText(Component.literal("Choose Position"));
-        clearPromptContent();
-        // TODO: Replace with card images (face up attack and face up defense)
-        if ((sel.positions() & POS_FACEUP_ATTACK) != 0)   addPositionButton("Face-up ATK",   POS_FACEUP_ATTACK);
-        if ((sel.positions() & POS_FACEDOWN_ATTACK) != 0) addPositionButton("Face-down ATK", POS_FACEDOWN_ATTACK);
-        if ((sel.positions() & POS_FACEUP_DEFENSE) != 0)  addPositionButton("Face-up DEF",   POS_FACEUP_DEFENSE);
-        if ((sel.positions() & POS_FACEDOWN_DEFENSE) != 0) addPositionButton("Face-down DEF", POS_FACEDOWN_DEFENSE);
+    /** Shared by SELECT_CARD and SELECT_TRIBUTE, which answer with the same index list. */
+    private void sendSelectedCards() {
+        callbacks.sendResponse(() -> {
+            int[] indices = selectedIndices.stream().mapToInt(Integer::intValue).toArray();
+            return switch (state.pendingPrompt) {
+                case DuelMessage.SelectTribute sel -> ResponseValidator.selectTribute(sel, indices);
+                case DuelMessage.SelectCard sel -> ResponseValidator.selectCards(sel, indices);
+                default -> ResponseBuilder.selectCards(indices);
+            };
+        });
     }
 
-    private void addPositionButton(String label, int position) {
-        var btn = new Button();
-        btn.setText(Component.literal(label));
-        btn.addClasses("prompt-btn");
-        btn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectPosition(position)));
-        promptButtons.addChild(btn);
+    private void sendSelectCardsCancel() {
+        // parse_response_cards reads -1 before anything else, so there is nothing to validate.
+        callbacks.sendResponse(ResponseBuilder::selectCardsCancel);
+    }
+
+    /** edopro's battle-position window (title 561): one card-image button per offered position. */
+    private void buildPositionPrompt(DuelMessage.SelectPosition sel) {
+        promptOverlay.removeClass("hidden");
+        String title = callbacks.systemString(561);
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(title != null ? title : "Choose Position"));
+        clearPromptContent();
+
+        var row = new UIElement();
+        row.addClass("position-row");
+        promptBody.addChild(row);
+
+        addPositionChoice(row, sel, POS_FACEUP_ATTACK, "ATK");
+        addPositionChoice(row, sel, POS_FACEDOWN_ATTACK, "Set ATK");
+        addPositionChoice(row, sel, POS_FACEUP_DEFENSE, "DEF");
+        addPositionChoice(row, sel, POS_FACEDOWN_DEFENSE, "Set DEF");
+    }
+
+    /** The card as it would look in that position: face-up art or the card back, turned for defense. */
+    private void addPositionChoice(UIElement row, DuelMessage.SelectPosition sel, int position, String label) {
+        if ((sel.positions() & position) == 0) return;
+
+        var choice = new UIElement();
+        choice.addClass("position-choice");
+
+        var card = new UIElement();
+        card.addClass("card");
+        if ((position & POS_FACEUP) != 0) callbacks.setCardImageBackground(card, sel.code());
+        else card.lss("background", FieldRenderer.CARD_BACK_SPRITE);
+        if ((position & POS_DEFENSE) != 0) card.addClass("defense");
+        card.addEventListener(UIEvents.CLICK, ev -> {
+            ev.stopPropagation();
+            callbacks.sendResponse(() -> ResponseValidator.selectPosition(sel, position));
+        });
+
+        var caption = new Label();
+        caption.addClass("position-label");
+        caption.setText(Component.literal(label));
+
+        choice.addChild(card);
+        choice.addChild(caption);
+        row.addChild(choice);
+    }
+
+    // ── SelectPlace / SelectDisfield (field-only, count zones, no cancel) ──
+
+    private void buildPlacePrompt(int count, int placeField, boolean disfield) {
+        chosenPlaces.clear();
+        promptOverlay.addClass("hidden");
+        field.highlightValidPlaces(placeField);
+        updatePlaceStatus(count, disfield);
+    }
+
+    private void updatePlaceStatus(int count, boolean disfield) {
+        if (!(statusLabel instanceof Label lbl)) return;
+        int remaining = count - chosenPlaces.size();
+        String text = disfield
+                ? "Select " + remaining + " zone(s) to become unusable"
+                : (remaining <= 1 ? "Select a zone" : "Select " + remaining + " more zone(s)");
+        lbl.setText(Component.literal(placeCaption(text, disfield, remaining)));
+        statusLabel.removeClass("hidden");
+    }
+
+    /**
+     * {@code MSG_SELECT_PLACE}'s {@code HINT_SELECTMSG} carries a raw card code, not a description
+     * ({@code operations.cpp:1273, 1288, 2878, 4538, 4934}), so edopro formats system string 569
+     * with that card's name ({@code duelclient.cpp:2244}) and only reads the hint as a desc for
+     * {@code SELECT_DISFIELD} ({@code :2248}).
+     */
+    private String placeCaption(String fallback, boolean disfield, int remaining) {
+        if (state.promptCaptionDesc == 0) return fallback;
+        if (disfield) return hintCaption(fallback, "");
+        String name = callbacks.cardDisplayName((int) state.promptCaptionDesc);
+        String template = callbacks.systemString(569);
+        String text = template != null
+                ? template.replace("%ls", name)
+                : "Select the zone to place \"" + name + "\"";
+        return remaining > 1 ? text + " (" + remaining + ")" : text;
+    }
+
+    /** Toggle a clicked field zone for the active SelectPlace/SelectDisfield prompt; submit at count. */
+    private void handlePlaceClick(int player, int location, int sequence, int count, int placeField, boolean disfield) {
+        UIElement slot = field.findSlotForLocation(new ClientDuelState.CardLocation(player, location, sequence));
+        if (slot == null) return;
+
+        for (int i = 0; i < chosenPlaces.size(); i++) {
+            int[] chosen = chosenPlaces.get(i);
+            if (field.findSlotForLocation(new ClientDuelState.CardLocation(chosen[0], chosen[1], chosen[2])) == slot) {
+                chosenPlaces.remove(i);
+                slot.removeClass("selected");
+                updatePlaceStatus(count, disfield);
+                return;
+            }
+        }
+
+        int[] resolved = field.resolvePlaceZone(player, location, sequence, placeField);
+        if (resolved == null) return; // blocked
+
+        chosenPlaces.add(resolved);
+        slot.addClass("selected");
+        if (chosenPlaces.size() == count) {
+            var zones = List.copyOf(chosenPlaces);
+            callbacks.sendResponse(() -> validatedPlaces(zones));
+        } else {
+            updatePlaceStatus(count, disfield);
+        }
+    }
+
+    // ── SelectCounter (field-only, click removes one counter at a time) ────
+
+    private void buildCounterPrompt(DuelMessage.SelectCounter sel) {
+        counterSelection = new CounterSelection(sel);
+        promptOverlay.addClass("hidden");
+        refreshCounterHighlights(sel);
+        updateCounterStatus(sel);
+    }
+
+    private void refreshCounterHighlights(DuelMessage.SelectCounter sel) {
+        for (int i = 0; i < sel.cards().size(); i++) {
+            var c = sel.cards().get(i);
+            UIElement slot = field.findSlotForLocation(
+                    new ClientDuelState.CardLocation(c.controller(), c.location(), c.sequence()));
+            if (slot != null) toggleClass(slot, "target", counterSelection.canPick(i));
+        }
+    }
+
+    private void updateCounterStatus(DuelMessage.SelectCounter sel) {
+        if (!(statusLabel instanceof Label lbl)) return;
+        String name = callbacks.counterName(sel.counterType());
+        if (name == null) name = "counter type " + sel.counterType();
+        lbl.setText(Component.literal("Remove " + counterSelection.remaining() + " \"" + name + "\""));
+        statusLabel.removeClass("hidden");
+    }
+
+    private void handleSelectCounterClick(int player, int location, int sequence, DuelMessage.SelectCounter sel) {
+        if (counterSelection == null) return;
+        for (int i = 0; i < sel.cards().size(); i++) {
+            var c = sel.cards().get(i);
+            if (c.controller() != player || c.location() != location || c.sequence() != sequence) continue;
+            if (!counterSelection.canPick(i)) return;
+
+            counterSelection.pick(i);
+            refreshCounterHighlights(sel);
+            updateCounterStatus(sel);
+            if (counterSelection.isComplete()) {
+                callbacks.sendResponse(() -> ResponseValidator.selectCounter(sel, counterSelection.response()));
+            }
+            return;
+        }
+    }
+
+    // ── SortCard / SortChain (overlay card list, click assigns the next ordinal) ──
+
+    private void buildSortPrompt(List<DuelMessage.SortableCard> cards, int titleStringCode, String fallbackTitle) {
+        sortSelection = new SortSelection(cards.size());
+        sortOrdinalLabels.clear();
+        promptOverlay.removeClass("hidden");
+        String title = callbacks.systemString(titleStringCode);
+        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : fallbackTitle));
+        clearPromptContent();
+
+        var scroller = createPromptCardScroller();
+        for (int i = 0; i < cards.size(); i++) {
+            int idx = i;
+            int code = cards.get(i).code();
+
+            var card = new UIElement();
+            card.setId("sort-card-" + i);
+            card.addClass("card");
+            callbacks.setCardImageBackground(card, code);
+            card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
+            card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
+            card.addEventListener(UIEvents.CLICK, ev -> {
+                ev.stopPropagation();
+                sortSelection.assign(idx);
+                refreshSortOrdinals();
+                if (sortSelection.isComplete()) {
+                    callbacks.sendResponse(() -> validatedSort(sortSelection.response()));
+                }
+            });
+
+            var ordinalLabel = new Label();
+            ordinalLabel.addClass("card-ordinal");
+            card.addChild(ordinalLabel);
+            sortOrdinalLabels.add(ordinalLabel);
+
+            scroller.addScrollViewChild(card);
+        }
+        refreshSortOrdinals();
+
+        var keepOrderBtn = new Button();
+        keepOrderBtn.setText(Component.literal("Keep Order"));
+        keepOrderBtn.addClasses("prompt-btn");
+        // A leading -1 skips sorting; the engine takes it unconditionally, nothing to validate.
+        keepOrderBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder::sortCardsDefault));
+        promptButtons.addChild(keepOrderBtn);
+    }
+
+    private void refreshSortOrdinals() {
+        for (int i = 0; i < sortOrdinalLabels.size(); i++) {
+            int ordinal = sortSelection.ordinalOf(i);
+            sortOrdinalLabels.get(i).setText(Component.literal(ordinal == 0 ? "" : String.valueOf(ordinal)));
+        }
     }
 
     private void buildTributePrompt(DuelMessage.SelectTribute sel) {
@@ -320,6 +852,7 @@ public class PromptController {
         }
 
         updateTributeStatus(sel);
+        setInitialSelectionButton(sel.cancelable(), false, this::sendSelectedCards);
     }
 
     private void updateTributeStatus(DuelMessage.SelectTribute sel) {
@@ -332,8 +865,7 @@ public class PromptController {
         } else {
             text = "Tribute " + sel.min() + "-" + sel.max() + " tributes (" + sum + ")";
         }
-        if (sel.cancelable()) text += "  (Right-click to cancel)";
-        lbl.setText(Component.literal(text));
+        lbl.setText(Component.literal(hintCaption(text, "(" + sel.min() + "-" + sel.max() + ")")));
         statusLabel.removeClass("hidden");
     }
 
@@ -361,27 +893,52 @@ public class PromptController {
         }
 
         if (statusLabel instanceof Label lbl) {
-            int totalSelected = sel.unselectableCards().size();
-            String text = "Select Materials (" + totalSelected + " selected)";
-            if (sel.finishable() && !sel.unselectableCards().isEmpty())
-                text += "  (Right-click to finish)";
-            lbl.setText(Component.literal(text));
+            lbl.setText(Component.literal(unselectCardCaption(sel)));
             statusLabel.removeClass("hidden");
         }
+        setUnselectCardActionButton(sel);
+    }
+
+    /** edopro's caption for a running per-click selection: how many are in, and the bounds. */
+    private String unselectCardCaption(DuelMessage.SelectUnselectCard sel) {
+        return hintCaption("Selected " + sel.unselectableCards().size()
+                        + " (" + sel.min() + "-" + sel.max() + ")",
+                "(" + sel.min() + "-" + sel.max() + ")");
+    }
+
+    /** The engine takes {@code -1} whenever either flag is set; the caption is all that differs. */
+    private void setUnselectCardActionButton(DuelMessage.SelectUnselectCard sel) {
+        if (sel.finishable())
+            setActionButton(ActionButton.FINISH, this::sendUnselectCardFinish);
+        else if (sel.cancelable())
+            setActionButton(ActionButton.CANCEL, this::sendUnselectCardFinish);
+        else
+            setActionButton(ActionButton.HIDDEN, null);
+    }
+
+    private void sendUnselectCardFinish() {
+        sendUnselectCard(-1);
+    }
+
+    /** One card per round trip; {@code -1} finishes or cancels. */
+    private void sendUnselectCard(int index) {
+        callbacks.sendResponse(() ->
+                state.pendingPrompt instanceof DuelMessage.SelectUnselectCard sel
+                        ? ResponseValidator.selectUnselectCard(sel, index)
+                        : ResponseBuilder.selectUnselectCard(index));
     }
 
     private void buildUnselectCardPrompt(DuelMessage.SelectUnselectCard sel) {
         promptOverlay.removeClass("hidden");
-        int totalSelected = sel.unselectableCards().size();
         if (promptTitle instanceof Label t)
-            t.setText(Component.literal("Select Materials (" + totalSelected + " selected)"));
+            t.setText(Component.literal(unselectCardCaption(sel)));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
 
         for (int i = 0; i < sel.selectableCards().size(); i++) {
             var cardInfo = sel.selectableCards().get(i);
-            int code = cardInfo.code();
+            int code = state.candidateCode(cardInfo);
             int index = i;
 
             var card = new UIElement();
@@ -391,14 +948,14 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(index));
+                sendUnselectCard(index);
             });
             scroller.addScrollViewChild(card);
         }
 
         for (int i = 0; i < sel.unselectableCards().size(); i++) {
             var cardInfo = sel.unselectableCards().get(i);
-            int code = cardInfo.code();
+            int code = state.candidateCode(cardInfo);
             int index = i;
 
             var card = new UIElement();
@@ -408,25 +965,13 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(sel.selectableCards().size() + index));
+                sendUnselectCard(sel.selectableCards().size() + index);
             });
             scroller.addScrollViewChild(card);
         }
 
-        if ((sel.finishable() || sel.cancelable()) && !sel.unselectableCards().isEmpty()) {
-            var finishBtn = new Button();
-            finishBtn.setText(Component.literal("Finish"));
-            finishBtn.addClasses("prompt-btn");
-            finishBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectUnselectCardFinish()));
-            promptButtons.addChild(finishBtn);
-        }
-        if (sel.cancelable() && sel.unselectableCards().isEmpty()) {
-            var cancelBtn = new Button();
-            cancelBtn.setText(Component.literal("Cancel"));
-            cancelBtn.addClasses("prompt-btn");
-            cancelBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectUnselectCardFinish()));
-            promptButtons.addChild(cancelBtn);
-        }
+        dialogActionBtn = addDialogActionButton();
+        setUnselectCardActionButton(sel);
 
         for (var cardInfo : sel.selectableCards()) {
             var loc = new ClientDuelState.CardLocation(cardInfo.controller(), cardInfo.location(), cardInfo.sequence());
@@ -441,48 +986,25 @@ public class PromptController {
     }
 
     private void buildFieldSumPrompt(DuelMessage.SelectSum sel) {
-        selectedIndices.clear();
+        sumSelection = new SumSelection(sel);
         sumSelectableCards.clear();
         promptOverlay.addClass("hidden");
 
         for (var mustCard : sel.mustSelect()) {
-            var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
+            UIElement slot = slotOf(mustCard);
             if (slot != null) slot.addClass("selected");
         }
 
-        for (var sumCard : sel.selectable()) {
-            var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
-            if (slot != null) slot.addClass("selectable");
-        }
-
-        updateFieldSumStatus(sel);
-    }
-
-    private void updateFieldSumStatus(DuelMessage.SelectSum sel) {
-        if (!(statusLabel instanceof Label lbl)) return;
-        int sum = 0;
-        for (var c : sel.mustSelect()) sum += c.value1();
-        for (int idx : selectedIndices) sum += sel.selectable().get(idx).value1();
-        lbl.setText(Component.literal("Select Materials (Sum: " + sum + " / " + sel.targetSum() + ")"));
-        statusLabel.removeClass("hidden");
+        refreshSumHighlights(sel, "selectable");
+        updateSumCaption(sel, true);
+        maybeAutoSubmitSum();
     }
 
     private void buildSelectSumPrompt(DuelMessage.SelectSum sel) {
-        selectedIndices.clear();
+        sumSelection = new SumSelection(sel);
         promptOverlay.removeClass("hidden");
         clearPromptContent();
-
-        int mustSum = 0;
-        for (var c : sel.mustSelect()) mustSum += c.value1();
-        final int[] runningSum = { mustSum };
-
-        Runnable updateTitle = () -> {
-            if (promptTitle instanceof Label t)
-                t.setText(Component.literal("Select Materials (Sum: " + runningSum[0] + " / " + sel.targetSum() + ")"));
-        };
-        updateTitle.run();
+        updateSumCaption(sel, false);
 
         var scroller = createPromptCardScroller();
         sumSelectableCards.clear();
@@ -496,63 +1018,100 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             scroller.addScrollViewChild(card);
 
-            var loc = new ClientDuelState.CardLocation(mustCard.controller(), mustCard.location(), mustCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
+            UIElement slot = slotOf(mustCard);
             if (slot != null) slot.addClass("selected");
         }
 
         for (int i = 0; i < sel.selectable().size(); i++) {
-            var sumCard = sel.selectable().get(i);
-            int code = sumCard.code();
-            int value = sumCard.value1();
+            int code = sel.selectable().get(i).code();
             int index = i;
 
             var card = new UIElement();
             card.addClass("card");
             callbacks.setCardImageBackground(card, code);
 
-            var loc = new ClientDuelState.CardLocation(sumCard.controller(), sumCard.location(), sumCard.sequence());
-            UIElement slot = field.findSlotForLocation(loc);
-            if (slot != null) slot.addClass("target");
-
             card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                if (selectedIndices.contains(index)) {
-                    selectedIndices.remove(Integer.valueOf(index));
-                    card.removeClass("selected");
-                    if (slot != null) slot.removeClass("selected");
-                    runningSum[0] -= value;
-                } else {
-                    selectedIndices.add(index);
-                    card.addClass("selected");
-                    if (slot != null) slot.addClass("selected");
-                    runningSum[0] += value;
-                }
-                updateTitle.run();
+                toggleSumPick(sel, index, false);
             });
 
             sumSelectableCards.add(card);
             scroller.addScrollViewChild(card);
         }
 
+        refreshSumHighlights(sel, "target");
+
         var confirmBtn = new Button();
         confirmBtn.setText(Component.literal("Confirm"));
         confirmBtn.addClasses("prompt-btn");
         confirmBtn.setOnClick(e -> {
-            int totalSelected = sel.mustSelect().size() + selectedIndices.size();
-            if (runningSum[0] == sel.targetSum()
-                    && totalSelected >= sel.min() && totalSelected <= sel.max()) {
-                int mustCount = sel.mustSelect().size();
-                int[] allIndices = new int[totalSelected];
-                for (int i = 0; i < mustCount; i++) allIndices[i] = i;
-                int j = mustCount;
-                for (int idx : selectedIndices) allIndices[j++] = mustCount + idx;
-                callbacks.sendResponse(ResponseBuilder.selectSum(allIndices));
-            }
+            if (sumSelection.isComplete()) sendSumResponse();
         });
         promptButtons.addChild(confirmBtn);
+
+        maybeAutoSubmitSum();
+    }
+
+    /** Toggle one selectable card, then repaint, recaption and submit if nothing is left to pick. */
+    private void toggleSumPick(DuelMessage.SelectSum sel, int index, boolean fieldMode) {
+        if (!sumSelection.isSelected(index) && !sumSelection.canPick(index)) return;
+        sumSelection.toggle(index);
+        refreshSumHighlights(sel, fieldMode ? "selectable" : "target");
+        updateSumCaption(sel, fieldMode);
+        maybeAutoSubmitSum();
+    }
+
+    /** Mark picked cards and offer only those that can still complete a legal total. */
+    private void refreshSumHighlights(DuelMessage.SelectSum sel, String candidateClass) {
+        for (int i = 0; i < sel.selectable().size(); i++) {
+            boolean picked = sumSelection.isSelected(i);
+            boolean offered = picked || sumSelection.canPick(i);
+
+            UIElement slot = slotOf(sel.selectable().get(i));
+            if (slot != null) {
+                toggleClass(slot, "selected", picked);
+                toggleClass(slot, candidateClass, offered && !picked);
+            }
+            if (i < sumSelectableCards.size()) {
+                toggleClass(sumSelectableCards.get(i), "selected", picked);
+            }
+        }
+    }
+
+    private void updateSumCaption(DuelMessage.SelectSum sel, boolean fieldMode) {
+        String target = (sel.selectMode() ? ">=" : "") + sel.targetSum();
+        String text = hintCaption("Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")",
+                "(" + sumSelection.currentSum() + " / " + target + ")");
+        if (fieldMode) {
+            // A complete selection that can still be extended has no other way out — SELECT_SUM
+            // has no cancel encoding, so the field prompt must offer the Finish gesture.
+            setActionButton(sumSelection.isComplete() ? ActionButton.FINISH : ActionButton.HIDDEN,
+                    this::sendSumResponse);
+            if (statusLabel instanceof Label lbl) {
+                lbl.setText(Component.literal(text));
+                statusLabel.removeClass("hidden");
+            }
+        } else if (promptTitle instanceof Label t) {
+            t.setText(Component.literal(text));
+        }
+    }
+
+    /** Submit as soon as the selection is legal and no further pick could be legal. */
+    private void maybeAutoSubmitSum() {
+        if (sumSelection.isComplete() && !sumSelection.hasPickable()) sendSumResponse();
+    }
+
+    private void sendSumResponse() {
+        callbacks.sendResponse(() -> state.pendingPrompt instanceof DuelMessage.SelectSum sel
+                ? ResponseValidator.selectSum(sel, sumSelection.responseIndices())
+                : ResponseBuilder.selectSum(sumSelection.responseIndices()));
+    }
+
+    private UIElement slotOf(DuelMessage.SumCard card) {
+        return field.findSlotForLocation(new ClientDuelState.CardLocation(
+                card.controller(), card.location(), card.sequence()));
     }
 
     // ── Field selection mode (SelectCard with all-field candidates) ────────
@@ -570,13 +1129,13 @@ public class PromptController {
         }
 
         if (statusLabel instanceof Label lbl) {
-            String text = sel.min() == sel.max()
-                    ? "Select " + sel.min() + " card(s)"
-                    : "Select " + sel.min() + "-" + sel.max() + " card(s)";
-            if (sel.cancelable()) text += "  (Right-click to cancel)";
-            lbl.setText(Component.literal(text));
+            lbl.setText(Component.literal(hintCaption(sel.min() == sel.max()
+                            ? "Select " + sel.min() + " card(s)"
+                            : "Select " + sel.min() + "-" + sel.max() + " card(s)",
+                    "(" + sel.min() + "-" + sel.max() + ")")));
             statusLabel.removeClass("hidden");
         }
+        setInitialSelectionButton(sel.cancelable(), sel.min() == 0, this::sendSelectedCards);
     }
 
     private void exitFieldSelectionMode() {
@@ -594,6 +1153,17 @@ public class PromptController {
      * Returns true if the click was consumed by a prompt, false otherwise.
      */
     public boolean handleFieldClick(int player, int location, int sequence) {
+        // A selection being made in the overlay dialog owns the clicks: the same card would
+        // otherwise be toggled twice, once in the dialog and once on the field behind it.
+        if (isDialogSelectionOpen()) return true;
+        if (state.pendingPrompt instanceof DuelMessage.SelectPlace sel) {
+            handlePlaceClick(player, location, sequence, sel.count(), sel.field(), false);
+            return true;
+        }
+        if (state.pendingPrompt instanceof DuelMessage.SelectDisfield sel) {
+            handlePlaceClick(player, location, sequence, sel.count(), sel.field(), true);
+            return true;
+        }
         if (state.pendingPrompt instanceof DuelMessage.SelectCard) {
             handleSelectCardClick(player, location, sequence);
             return true;
@@ -610,25 +1180,39 @@ public class PromptController {
             handleSelectTributeClick(player, location, sequence, sel);
             return true;
         }
+        if (state.pendingPrompt instanceof DuelMessage.SelectCounter sel) {
+            handleSelectCounterClick(player, location, sequence, sel);
+            return true;
+        }
         return false;
+    }
+
+    /** True while a card-list prompt is being answered in the overlay dialog rather than on the field. */
+    private boolean isDialogSelectionOpen() {
+        if (promptOverlay == null || promptOverlay.hasClass("hidden")) return false;
+        return state.pendingPrompt instanceof DuelMessage.SelectCard
+                || state.pendingPrompt instanceof DuelMessage.SelectUnselectCard
+                || state.pendingPrompt instanceof DuelMessage.SelectSum;
     }
 
     private void handleSelectCardClick(int player, int location, int sequence) {
         if (!(state.pendingPrompt instanceof DuelMessage.SelectCard sel)) return;
         for (int i = 0; i < sel.cards().size(); i++) {
             var card = sel.cards().get(i);
-            if (card.controller() == player && card.location() == location && card.sequence() == sequence) {
-                if (selectedIndices.contains(i)) {
-                    selectedIndices.remove(Integer.valueOf(i));
-                } else if (selectedIndices.size() < sel.max()) {
-                    selectedIndices.add(i);
-                }
-                if (selectedIndices.size() == sel.max()) {
-                    callbacks.sendResponse(ResponseBuilder.selectCards(
-                            selectedIndices.stream().mapToInt(Integer::intValue).toArray()));
-                }
-                return;
+            if (card.controller() != player || card.location() != location || card.sequence() != sequence)
+                continue;
+
+            UIElement slot = field.findSlotForLocation(
+                    new ClientDuelState.CardLocation(player, location, sequence));
+            if (selectedIndices.contains(i)) {
+                selectedIndices.remove(Integer.valueOf(i));
+                if (slot != null) slot.removeClass("selected");
+            } else if (selectedIndices.size() < sel.max()) {
+                selectedIndices.add(i);
+                if (slot != null) slot.addClass("selected");
             }
+            applyCardSelectionGate(sel);
+            return;
         }
     }
 
@@ -637,57 +1221,25 @@ public class PromptController {
         for (int i = 0; i < sel.selectableCards().size(); i++) {
             var c = sel.selectableCards().get(i);
             if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(i));
+                sendUnselectCard(i);
                 return;
             }
         }
         for (int i = 0; i < sel.unselectableCards().size(); i++) {
             var c = sel.unselectableCards().get(i);
             if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(sel.selectableCards().size() + i));
+                sendUnselectCard(sel.selectableCards().size() + i);
                 return;
             }
         }
     }
 
     private void handleSelectSumClick(int player, int location, int sequence, DuelMessage.SelectSum sel) {
+        if (sumSelection == null) return;
         for (int i = 0; i < sel.selectable().size(); i++) {
             var c = sel.selectable().get(i);
             if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
-                var loc = new ClientDuelState.CardLocation(player, location, sequence);
-                UIElement slot = field.findSlotForLocation(loc);
-                UIElement scrollerCard = i < sumSelectableCards.size() ? sumSelectableCards.get(i) : null;
-
-                if (selectedIndices.contains(i)) {
-                    selectedIndices.remove(Integer.valueOf(i));
-                    if (slot != null) slot.removeClass("selected");
-                    if (scrollerCard != null) scrollerCard.removeClass("selected");
-                } else {
-                    selectedIndices.add(i);
-                    if (slot != null) slot.addClass("selected");
-                    if (scrollerCard != null) scrollerCard.addClass("selected");
-                }
-
-                int sum = 0;
-                for (var m : sel.mustSelect()) sum += m.value1();
-                for (int idx : selectedIndices) sum += sel.selectable().get(idx).value1();
-
-                if (isFieldOnlySum(sel)) {
-                    updateFieldSumStatus(sel);
-                    int totalSelected = sel.mustSelect().size() + selectedIndices.size();
-                    if (sum == sel.targetSum()
-                            && totalSelected >= sel.min() && totalSelected <= sel.max()) {
-                        int mustCount = sel.mustSelect().size();
-                        int[] allIndices = new int[totalSelected];
-                        for (int j = 0; j < mustCount; j++) allIndices[j] = j;
-                        int k = mustCount;
-                        for (int idx : selectedIndices) allIndices[k++] = mustCount + idx;
-                        callbacks.sendResponse(ResponseBuilder.selectSum(allIndices));
-                    }
-                } else {
-                    if (promptTitle instanceof Label t)
-                        t.setText(Component.literal("Select Materials (Sum: " + sum + " / " + sel.targetSum() + ")"));
-                }
+                toggleSumPick(sel, i, isFieldOnlySum(sel));
                 return;
             }
         }
@@ -714,13 +1266,12 @@ public class PromptController {
 
             updateTributeStatus(sel);
 
-            // Auto-submit once we've reached the minimum required tribute count.
-            // If the selection went OVER max via over-tribute, the engine accepts it.
-            int sum = currentTributeSum(sel);
-            if (sum >= sel.min()) {
-                callbacks.sendResponse(ResponseBuilder.selectCards(
-                        selectedIndices.stream().mapToInt(Integer::intValue).toArray()));
-            }
+            // The engine measures `min` against the summed tribute value and `max` against the card
+            // count, so only reaching `max` submits by itself; meeting `min` offers Finish and
+            // leaves room for one more over-tribute.
+            applyGate(SelectionGate.of(selectedIndices.size(), currentTributeSum(sel),
+                    sel.min(), sel.max(), sel.cards().size(), sel.cancelable()),
+                    this::sendSelectedCards);
             return;
         }
     }
@@ -732,55 +1283,45 @@ public class PromptController {
      * stop further processing).
      */
     public boolean handleRightClick(UIEvent e) {
-        if (inFieldSelectionMode
-                && state.pendingPrompt instanceof DuelMessage.SelectCard sel
-                && sel.cancelable()) {
+        // edopro binds right-click to the shared Cancel/Finish button (`event_handler.cpp:1498-1511`).
+        if (actionButtonAction != null) {
             e.stopPropagation();
-            exitFieldSelectionMode();
-            callbacks.sendResponse(ResponseBuilder.selectCardsCancel());
+            runActionButton();
             return true;
         }
-        if (state.pendingPrompt instanceof DuelMessage.SelectUnselectCard sel
-                && promptOverlay.hasClass("hidden")
-                && (sel.finishable() || sel.cancelable())
-                && !sel.unselectableCards().isEmpty()) {
+        // The effect-choice dialog is the only way out of a card with several activations, so
+        // right-click has to be able to back out of it (edopro's CancelOrFinish, `:2906-2926`).
+        if ((state.pendingPrompt instanceof DuelMessage.SelectIdleCmd
+                || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)
+                && promptOverlay != null && !promptOverlay.hasClass("hidden")) {
             e.stopPropagation();
-            callbacks.sendResponse(ResponseBuilder.selectUnselectCardFinish());
+            promptOverlay.addClass("hidden");
             return true;
         }
-        if (state.pendingPrompt instanceof DuelMessage.SelectTribute sel && sel.cancelable()) {
+        if (state.pendingPrompt instanceof DuelMessage.SelectChain sel) {
             e.stopPropagation();
-            callbacks.sendResponse(ResponseBuilder.selectCardsCancel());
+            // Inside the per-card effect chooser, backing out means the chain card list again —
+            // only a right-click on the list itself declines the chain.
+            if (chainEffectChooserOpen) buildChainPrompt(sel);
+            else if (!sel.forced()) callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, -1));
+            return true;
+        }
+        if (state.pendingPrompt instanceof DuelMessage.SortCard || state.pendingPrompt instanceof DuelMessage.SortChain) {
+            e.stopPropagation();
+            callbacks.sendResponse(ResponseBuilder::sortCardsDefault);
             return true;
         }
         return false;
-    }
-
-    // ── Win overlay (reuses the prompt overlay DOM) ────────────────────────
-
-    /** Show the game-over overlay with a "You Win!"/"You Lose!" message and a Close button. */
-    public void showWinOverlay(boolean localWon, Runnable onClose) {
-        if (promptOverlay == null) return;
-        promptOverlay.removeClass("hidden");
-        if (promptTitle instanceof Label title) {
-            title.setText(Component.literal(localWon ? "You Win!" : "You Lose!"));
-        }
-        if (promptBody != null) promptBody.clearAllChildren();
-        if (promptButtons != null) {
-            promptButtons.clearAllChildren();
-            var closeBtn = new Button();
-            closeBtn.setText(Component.literal("Close"));
-            closeBtn.addClass("prompt-btn");
-            closeBtn.setOnClick(e -> onClose.run());
-            promptButtons.addChild(closeBtn);
-        }
     }
 
     // ── Cleanup after a response is sent ───────────────────────────────────
 
     public void onResponseSent() {
         if (promptOverlay != null) promptOverlay.addClass("hidden");
+        dialogActionBtn = null;
+        setActionButton(ActionButton.HIDDEN, null);
         exitFieldSelectionMode();
+        chosenPlaces.clear();
         ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
         ui.rootElement.select(".selected").forEach(e -> e.removeClass("selected"));
         ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));
@@ -810,11 +1351,44 @@ public class PromptController {
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
     }
 
+    // -- Validated response helpers (prompt resolved from state.pendingPrompt) --
+
+    private byte[] validatedCmd(int actionType, int listIndex) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SelectIdleCmd sel -> ResponseValidator.selectCmd(sel, actionType, listIndex);
+            case DuelMessage.SelectBattleCmd sel -> ResponseValidator.selectCmd(sel, actionType, listIndex);
+            default -> ResponseBuilder.selectCmd(actionType, listIndex);
+        };
+    }
+
+    private byte[] validatedAnnounceCard(int code) {
+        return state.pendingPrompt instanceof DuelMessage.AnnounceCard sel
+                ? ResponseValidator.announceCard(sel, code)
+                : ResponseBuilder.announceCard(code);
+    }
+
+    private byte[] validatedSort(int[] order) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SortCard sel -> ResponseValidator.sortCard(sel, order);
+            case DuelMessage.SortChain sel -> ResponseValidator.sortChain(sel, order);
+            default -> ResponseBuilder.sortCards(order);
+        };
+    }
+
+    private byte[] validatedPlaces(List<int[]> zones) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SelectPlace sel -> ResponseValidator.selectPlaces(sel, zones);
+            case DuelMessage.SelectDisfield sel -> ResponseValidator.selectDisfield(sel, zones);
+            default -> ResponseBuilder.selectPlaces(zones);
+        };
+    }
+
     // ── DOM helpers ────────────────────────────────────────────────────────
 
     private void clearPromptContent() {
         if (promptBody != null) promptBody.clearAllChildren();
         if (promptButtons != null) promptButtons.clearAllChildren();
+        dialogActionBtn = null;
     }
 
     private ScrollerView createPromptCardScroller() {
@@ -822,6 +1396,11 @@ public class PromptController {
         scroller.addClass("prompt-card-scroller");
         promptBody.addChild(scroller);
         return scroller;
+    }
+
+    private static void toggleClass(UIElement element, String name, boolean on) {
+        if (on) element.addClass(name);
+        else element.removeClass(name);
     }
 
     private UIElement byId(String id) {

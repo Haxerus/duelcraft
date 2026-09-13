@@ -85,6 +85,8 @@ public class Duelcraft {
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.addListener(DuelManager::onServerStarting);
         NeoForge.EVENT_BUS.addListener(DuelManager::onServerStopped);
+        NeoForge.EVENT_BUS.addListener(DuelManager::onServerTick);
+        NeoForge.EVENT_BUS.addListener(DuelManager::onPlayerLoggedOut);
         NeoForge.EVENT_BUS.addListener(DuelCommand::register);
 
         // Register the item to a creative tab

@@ -22,13 +22,15 @@ public sealed interface DuelMessage {
         public int type() { return MSG_RETRY; }
     }
 
-    // ---- Lifecycle ----
-
-    record Start(int playerType, int lp0, int lp1,
-                 int deckCount0, int extraCount0,
-                 int deckCount1, int extraCount1) implements DuelMessage {
-        public int type() { return MSG_START; }
+    /**
+     * The other duellist is being prompted. Host-synthesised, never parsed from the engine
+     * ({@code generic_duel.cpp:1326-1343}).
+     */
+    record Waiting() implements DuelMessage {
+        public int type() { return MSG_WAITING; }
     }
+
+    // ---- Lifecycle ----
 
     record Win(int winner, int reason) implements DuelMessage {
         public int type() { return MSG_WIN; }
@@ -52,7 +54,7 @@ public sealed interface DuelMessage {
 
     // ---- Card Movement ----
 
-    record Draw(int player, List<Integer> codes) implements DuelMessage {
+    record Draw(int player, List<DrawnCard> cards) implements DuelMessage {
         public int type() { return MSG_DRAW; }
     }
 
@@ -154,8 +156,8 @@ public sealed interface DuelMessage {
         public int type() { return MSG_ATTACK; }
     }
 
-    record Battle(LocInfo attacker, int atkAtk, int atkDef, int atkDamage,
-                  LocInfo defender, int defAtk, int defDef, int defDamage) implements DuelMessage {
+    record Battle(LocInfo attacker, int atkAtk, int atkDef, int atkDestroyed,
+                  LocInfo defender, int defAtk, int defDef, int defDestroyed) implements DuelMessage {
         public int type() { return MSG_BATTLE; }
     }
 
@@ -189,8 +191,48 @@ public sealed interface DuelMessage {
         public int type() { return MSG_CONFIRM_DECKTOP; }
     }
 
+    /**
+     * A player's graveyard and deck traded places ({@code field.cpp:1048}). Bit {@code i} of
+     * {@code extraMask} (byte {@code i/8}, bit {@code i%8}) flags the {@code i}-th card of the new
+     * deck as an extra-deck monster, which goes to the extra deck face-down instead.
+     * {@code extraCount} is the extra deck's size before those cards were inserted; edopro
+     * discards it and so do we.
+     */
+    record SwapGraveDeck(int player, int extraCount, byte[] extraMask) implements DuelMessage {
+        public int type() { return MSG_SWAP_GRAVE_DECK; }
+    }
+
+    /**
+     * Face-down cards of one location were shuffled among their zones ({@code libduel.cpp:1404},
+     * {@code operations.cpp:2958}). {@code from} names each card's old zone; {@code follow} names
+     * the new zone, but only for cards carrying XYZ materials — the rest are zeroed {@link LocInfo}s.
+     */
+    record ShuffleSetCard(int location, List<LocInfo> from, List<LocInfo> follow) implements DuelMessage {
+        public int type() { return MSG_SHUFFLE_SET_CARD; }
+    }
+
+    /** Cards deleted from the duel outright ({@code libduel.cpp:536}); batched at 255 per message. */
+    record RemoveCards(List<LocInfo> cards) implements DuelMessage {
+        public int type() { return MSG_REMOVE_CARDS; }
+    }
+
+    /** Same body as {@link ConfirmDeckTop}, over the extra deck ({@code libduel.cpp:854}). */
+    record ConfirmExtraTop(int player, List<ConfirmCard> cards) implements DuelMessage {
+        public int type() { return MSG_CONFIRM_EXTRATOP; }
+    }
+
     record ConfirmCards(int player, List<ConfirmCard> cards) implements DuelMessage {
         public int type() { return MSG_CONFIRM_CARDS; }
+    }
+
+    /** Both decks turned over or back ({@code processor.cpp:4926}); one global state, not per player. */
+    record ReverseDeck() implements DuelMessage {
+        public int type() { return MSG_REVERSE_DECK; }
+    }
+
+    /** The card {@code offsetFromTop} down from the top of a deck is now known to both players. */
+    record DeckTop(int player, int offsetFromTop, int code, int position) implements DuelMessage {
+        public int type() { return MSG_DECK_TOP; }
     }
 
     /** Informational: "the engine just selected these cards" — no action required. */
@@ -214,6 +256,29 @@ public sealed interface DuelMessage {
 
     record BecomeTarget(List<LocInfo> targets) implements DuelMessage {
         public int type() { return MSG_BECOME_TARGET; }
+    }
+
+    /** The cards a random pick landed on ({@code libgroup.cpp:326}). */
+    record RandomSelected(int player, List<LocInfo> cards) implements DuelMessage {
+        public int type() { return MSG_RANDOM_SELECTED; }
+    }
+
+    /** A card whose effect missed its timing ({@code processor.cpp:4374}); its controller only. */
+    record MissedEffect(LocInfo location, int code) implements DuelMessage {
+        public int type() { return MSG_MISSED_EFFECT; }
+    }
+
+    /**
+     * A refcounted hint on a player rather than a card ({@code field.cpp:1332-1402}):
+     * {@code hintType} is {@code PHINT_DESC_ADD} or {@code PHINT_DESC_REMOVE}.
+     */
+    record PlayerHint(int player, int hintType, long desc) implements DuelMessage {
+        public int type() { return MSG_PLAYER_HINT; }
+    }
+
+    /** The card that ended a match outright ({@code operations.cpp:609}); match play only. */
+    record MatchKill(int code) implements DuelMessage {
+        public int type() { return MSG_MATCH_KILL; }
     }
 
     // ---- Selection (prompts that require a player response) ----
@@ -269,6 +334,11 @@ public sealed interface DuelMessage {
         public int type() { return MSG_SELECT_PLACE; }
     }
 
+    /** Same wire shape as SelectPlace, but the chosen zones become unusable rather than hosting a placement. */
+    record SelectDisfield(int player, int count, int field) implements DuelMessage {
+        public int type() { return MSG_SELECT_DISFIELD; }
+    }
+
     record SelectPosition(int player, int code, int positions) implements DuelMessage {
         public int type() { return MSG_SELECT_POSITION; }
     }
@@ -315,7 +385,7 @@ public sealed interface DuelMessage {
         public int type() { return MSG_ANNOUNCE_NUMBER; }
     }
 
-    record AnnounceCard(int player, byte[] rawBody) implements DuelMessage {
+    record AnnounceCard(int player, List<Long> opcodes) implements DuelMessage {
         public int type() { return MSG_ANNOUNCE_CARD; }
     }
 
@@ -331,10 +401,6 @@ public sealed interface DuelMessage {
 
     record Equip(LocInfo card, LocInfo target) implements DuelMessage {
         public int type() { return MSG_EQUIP; }
-    }
-
-    record Unequip(LocInfo card) implements DuelMessage {
-        public int type() { return MSG_UNEQUIP; }
     }
 
     record CardTarget(LocInfo card, LocInfo target) implements DuelMessage {
@@ -365,6 +431,13 @@ public sealed interface DuelMessage {
 
     // ---- Shared sub-records for cards within selection messages ----
 
+    /** Drawn card: code + position(uint32). The position is the only signal that a draw is public. */
+    record DrawnCard(int code, int position) {
+        public static DrawnCard read(BufferReader reader) {
+            return new DrawnCard(reader.readInt32(), reader.readInt32());
+        }
+    }
+
     record ConfirmCard(int code, int controller, int location, int sequence) {
         public static ConfirmCard read(BufferReader reader) {
             return new ConfirmCard(
@@ -388,18 +461,20 @@ public sealed interface DuelMessage {
         }
     }
 
-    record SumCard(int code, int controller, int location, int sequence, long opParam) {
+    /** Card entry in sum selection: code + con + loc + seq(uint32) + position(uint32) + sumParam(uint32). */
+    record SumCard(int code, int controller, int location, int sequence, int position, int sumParam) {
         public static SumCard read(BufferReader reader) {
             return new SumCard(
                 reader.readInt32(),
                 reader.readUint8(),
                 reader.readUint8(),
                 reader.readInt32(),
-                reader.readInt64()
+                reader.readInt32(),
+                reader.readInt32()
             );
         }
-        public int value1() { return (int)(opParam & 0xFFFF); }
-        public int value2() { return (int)((opParam >> 16) & 0xFFFF); }
+        public int value1() { return sumParam & 0xFFFF; }
+        public int value2() { return (sumParam >>> 16) & 0xFFFF; }
     }
 
     /** Card entry in tribute selection: code + con + loc + seq(uint32) + tributeCount(uint8). */
@@ -466,14 +541,20 @@ public sealed interface DuelMessage {
         }
     }
 
-    /** A card that can be activated: code + con + loc + seq(uint32) + desc(uint64) + flag(uint8). */
-    record ActivatableCard(int code, int controller, int location, int sequence, long desc, int flag) {
+    /**
+     * A card that can be activated: code + con + loc + seq(uint32) + desc(uint64) + flag(uint8).
+     * {@code position} only reaches the record from {@code MSG_SELECT_CHAIN}, whose entries carry a
+     * full {@code loc_info}; the idle and battle command lists write no position and leave it 0.
+     */
+    record ActivatableCard(int code, int controller, int location, int sequence, int position,
+                           long desc, int flag) {
         public static ActivatableCard read(BufferReader reader) {
             return new ActivatableCard(
                 reader.readInt32(),
                 reader.readUint8(),
                 reader.readUint8(),
                 reader.readInt32(),
+                0,
                 reader.readInt64(),
                 reader.readUint8()
             );

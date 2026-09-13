@@ -4,7 +4,6 @@ import com.haxerus.duelcraft.server.DuelEndPayload;
 import com.haxerus.duelcraft.server.DuelMessagePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.mojang.logging.LogUtils;
-import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.slf4j.Logger;
 
@@ -24,7 +23,7 @@ public class ClientPayloadHandler {
 
     public static void handleEnd(DuelEndPayload payload, IPayloadContext context) {
         LOGGER.info("Duel ended — winner: {}, reason: {}", payload.winner(), payload.reason());
-        LDLibDuelScreen.close();
-        Minecraft.getInstance().setScreen(null);
+        // The screen stays open on the result overlay; its Close button tears it down.
+        LDLibDuelScreen.showResult(payload.winner(), payload.reason());
     }
 }

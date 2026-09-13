@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.client;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -21,6 +22,31 @@ public final class DuelScreen extends ModularUIScreen {
     public DuelScreen(ModularUI modularUI, UIElement canvas, Component title) {
         super(modularUI, title);
         this.canvas = canvas;
+    }
+
+    /** ESC must not abandon a live duel; {@code /duel show} reopens the screen if it closes another way. */
+    @Override
+    public boolean shouldCloseOnEsc() {
+        return !LDLibDuelScreen.isDuelLive();
+    }
+
+    /**
+     * While the duel is live ESC toggles the leave-duel dialog instead of closing the screen; the
+     * dialog is drawn above every other overlay, so it works even under a modal prompt.
+     */
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == InputConstants.KEY_ESCAPE && LDLibDuelScreen.isDuelLive()) {
+            LDLibDuelScreen.togglePauseMenu();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        LDLibDuelScreen.onScreenRemoved(this);
     }
 
     @Override

@@ -1,15 +1,13 @@
 package com.haxerus.duelcraft.server;
 
-import com.haxerus.duelcraft.core.OcgConstants;
 import com.haxerus.duelcraft.duel.DuelEventListener;
+import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
-import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
 
-import java.util.List;
 import java.util.UUID;
 
 public class ServerDuelHandler implements DuelEventListener {
@@ -19,150 +17,94 @@ public class ServerDuelHandler implements DuelEventListener {
     private final ServerPlayer player1;
     private final UUID duelId;
 
+    // Player index of the last prompt forwarded via sendToPlayer; Retry only reaches this player.
+    private int pendingPlayer = -1;
+
+    // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
+    private boolean winSent;
+
     public ServerDuelHandler(ServerPlayer player0, ServerPlayer player1, UUID duelId) {
         this.player0 = player0;
         this.player1 = player1;
         this.duelId = duelId;
     }
 
+    /** Player index of the last prompt forwarded; the response ownership check compares against it. */
+    @Override
+    public int pendingPlayer() { return pendingPlayer; }
+
     @Override
     public int onMessage(DuelMessage msg) {
         switch (msg) {
             case DuelMessage.Retry ignored -> {
-                // Bad response — broadcast retry so the client re-prompts
-                broadcastToBoth(msg);
-                return 1; // stop processing, wait for corrected response
+                // Bad response — edopro ends the duel here, but Duelcraft continues, so only
+                // the player who owns the rejected prompt needs to see it.
+                if (pendingPlayer >= 0) sendToPlayer(pendingPlayer, msg);
+                return AWAIT_RESPONSE; // wait for a corrected response
             }
             case DuelMessage.Win win -> {
                 var payload = new DuelEndPayload(win.winner(), win.reason());
                 PacketDistributor.sendToPlayer(player0, payload);
                 PacketDistributor.sendToPlayer(player1, payload);
-                return 2;
+                winSent = true;
+                return DUEL_ENDED;
             }
-            case DuelMessage.SelectIdleCmd sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectBattleCmd sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectChain sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectEffectYn sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectYesNo sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectOption sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectPlace sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectPosition sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectTribute sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectCounter sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectSum sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectUnselectCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SortCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SortChain sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceRace sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceAttrib sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceNumber sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.RockPaperScissors sel -> { sendToPlayer(sel.player(), msg); return 1; }
+            case DuelMessage.SelectIdleCmd sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectBattleCmd sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectChain sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectEffectYn sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectYesNo sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectOption sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectPlace sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectDisfield sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectPosition sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectTribute sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectCounter sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectSum sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectUnselectCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SortCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SortChain sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceRace sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceAttrib sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceNumber sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.RockPaperScissors sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
             default -> {
-                broadcastToBoth(msg);
-                return 0;
+                broadcast(msg);
+                return CONTINUE;
             }
         }
     }
 
     private void sendToPlayer(int playerIndex, DuelMessage msg) {
+        pendingPlayer = playerIndex;
+        send(playerIndex, msg);
+        // generic_duel.cpp:1326-1343: every duellist but the prompted one is told to wait.
+        send(1 - playerIndex, new DuelMessage.Waiting());
+    }
+
+    private void send(int playerIndex, DuelMessage msg) {
         var player = playerIndex == 0 ? player0 : player1;
-        PacketDistributor.sendToPlayer(player, new DuelMessagePayload(msg));
+        PacketDistributor.sendToPlayer(player,
+                new DuelMessagePayload(MessageSanitizer.forRecipient(msg, playerIndex)));
     }
 
-    private void broadcastToBoth(DuelMessage msg) {
-        // Send each player a version with opponent's hidden info removed
-        PacketDistributor.sendToPlayer(player0, new DuelMessagePayload(hideInfo(msg, 0)));
-        PacketDistributor.sendToPlayer(player1, new DuelMessagePayload(hideInfo(msg, 1)));
-    }
-
-    /**
-     * Sanitize a message for a specific recipient by zeroing out card codes
-     * the player shouldn't see (opponent's hand cards, face-down cards).
-     */
-    private static DuelMessage hideInfo(DuelMessage msg, int recipient) {
-        return switch (msg) {
-            case DuelMessage.Draw draw -> {
-                if (draw.player() != recipient) {
-                    // Opponent drew — hide the codes
-                    yield new DuelMessage.Draw(draw.player(),
-                            draw.codes().stream().map(c -> 0).toList());
-                }
-                yield draw;
-            }
-            case DuelMessage.Move move -> {
-                // Hide code if the card is going face-down and we don't control it
-                if (move.to().controller() != recipient && isFaceDown(move.to().position())) {
-                    yield new DuelMessage.Move(0, move.from(), move.to(), move.reason());
-                }
-                // Hide code if it was in opponent's hand (source is hand, not ours)
-                if (move.from().controller() != recipient
-                        && move.from().location() == OcgConstants.LOCATION_HAND
-                        && isFaceDown(move.to().position())) {
-                    yield new DuelMessage.Move(0, move.from(), move.to(), move.reason());
-                }
-                yield move;
-            }
-            case DuelMessage.ShuffleHand sh -> {
-                if (sh.player() != recipient) {
-                    yield new DuelMessage.ShuffleHand(sh.player(),
-                            sh.codes().stream().map(c -> 0).toList());
-                }
-                yield sh;
-            }
-            case DuelMessage.Set set -> {
-                // Set cards are always face-down — hide code from opponent
-                if (set.location().controller() != recipient) {
-                    yield new DuelMessage.Set(0, set.location());
-                }
-                yield set;
-            }
-            case DuelMessage.UpdateData upd -> {
-                if (upd.player() != recipient) {
-                    var sanitized = upd.cards().stream()
-                            .map(ServerDuelHandler::sanitizeCard)
-                            .toList();
-                    yield new DuelMessage.UpdateData(upd.player(), upd.location(), sanitized);
-                }
-                yield upd;
-            }
-            case DuelMessage.UpdateCard upd -> {
-                if (upd.player() != recipient) {
-                    yield new DuelMessage.UpdateCard(upd.player(), upd.location(),
-                            upd.sequence(), sanitizeCard(upd.card()));
-                }
-                yield upd;
-            }
-            case DuelMessage.PosChange pc -> {
-                // Hide code from opponent when card transitions to face-down
-                if (pc.controller() != recipient && isFaceDown(pc.newPosition())) {
-                    yield new DuelMessage.PosChange(0, pc.controller(), pc.location(),
-                            pc.sequence(), pc.prevPosition(), pc.newPosition());
-                }
-                yield pc;
-            }
-            default -> msg;
-        };
-    }
-
-    private static QueriedCard sanitizeCard(QueriedCard card) {
-        if (card == null) return null;
-        boolean faceDown = (card.position & OcgConstants.POS_FACEDOWN) != 0;
-        if (!faceDown || card.isPublic) return card;
-
-        var sanitized = new QueriedCard();
-        sanitized.flags = card.flags;
-        sanitized.position = card.position;
-        return sanitized;
-    }
-
-    private static boolean isFaceDown(int position) {
-        return (position & OcgConstants.POS_FACEDOWN) != 0;
+    /** Sends each player the copy of {@code msg} they are allowed to see, if they may see it at all. */
+    private void broadcast(DuelMessage msg) {
+        var recipients = MessageSanitizer.recipientsOf(msg);
+        for (int playerIndex = 0; playerIndex < 2; playerIndex++) {
+            if (recipients.includes(playerIndex)) send(playerIndex, msg);
+        }
     }
 
     @Override
     public void onDuelEnd() {
-        DuelManager.get().endDuel(duelId);
+        if (winSent) {
+            DuelManager.get().endDuel(duelId);
+        } else {
+            // The engine stopped without MSG_WIN; nobody won, but both clients still need a result.
+            DuelManager.get().finishDuel(duelId, DuelEndPayload.WINNER_DRAW, 0);
+        }
     }
 }

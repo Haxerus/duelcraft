@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.duel.response;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 
 /**
  * Builds little-endian binary response buffers for OCG_DuelSetResponse.
@@ -107,11 +108,20 @@ public class ResponseBuilder {
      * @param sequence zone index (0-4 for main, 5-6 for EMZ)
      */
     public static byte[] selectPlace(int player, int location, int sequence) {
-        return new ResponseBuilder(3)
-                .putInt8(player)
-                .putInt8(location)
-                .putInt8(sequence)
-                .build();
+        return selectPlaces(List.of(new int[]{player, location, sequence}));
+    }
+
+    /**
+     * MSG_SELECT_PLACE / MSG_SELECT_DISFIELD response for multiple zones.
+     * Format: {@code count} x [int8 player][int8 location][int8 sequence]; a zone may not repeat.
+     * @param zones {player, location, sequence} triples, in submission order
+     */
+    public static byte[] selectPlaces(List<int[]> zones) {
+        var rb = new ResponseBuilder(3 * zones.size());
+        for (int[] zone : zones) {
+            rb.putInt8(zone[0]).putInt8(zone[1]).putInt8(zone[2]);
+        }
+        return rb.build();
     }
 
     /**
@@ -144,8 +154,10 @@ public class ResponseBuilder {
 
     /**
      * MSG_SORT_CARD / MSG_SORT_CHAIN response.
-     * @param order permutation of indices (e.g., {2, 0, 1} means card 2 first).
-     *              Must be a valid permutation (each index 0..n-1 appears exactly once).
+     * @param order destination rank per original card, i.e. {@code order[i]} is where card
+     *              {@code i} ends up (e.g., {2, 0, 1} sends card 0 to slot 2, card 1 to slot 0,
+     *              card 2 to slot 1). Must be a valid permutation (each index 0..n-1 appears
+     *              exactly once).
      */
     public static byte[] sortCards(int... order) {
         var rb = new ResponseBuilder(order.length);
@@ -214,5 +226,13 @@ public class ResponseBuilder {
      */
     public static byte[] announceNumber(int index) {
         return new ResponseBuilder(4).putInt32(index).build();
+    }
+
+    /**
+     * MSG_ANNOUNCE_CARD response.
+     * @param code the declared card's passcode
+     */
+    public static byte[] announceCard(int code) {
+        return new ResponseBuilder(4).putInt32(code).build();
     }
 }

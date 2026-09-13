@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -82,6 +83,13 @@ class ResponseBuilderTest {
         assertEquals(4, readInt32(resp, 16));
     }
 
+    @Test
+    void selectCardsCancel() {
+        byte[] resp = ResponseBuilder.selectCardsCancel();
+        assertEquals(4, resp.length);
+        assertEquals(-1, readInt32(resp, 0));
+    }
+
     // ---- selectChain ----
 
     @Test
@@ -138,6 +146,20 @@ class ResponseBuilderTest {
         assertEquals(0, resp[2] & 0xFF);
     }
 
+    @Test
+    void selectPlacesMultipleZones() {
+        byte[] resp = ResponseBuilder.selectPlaces(List.of(
+                new int[]{0, LOCATION_MZONE, 1},
+                new int[]{1, LOCATION_SZONE, 3}));
+        assertEquals(6, resp.length);
+        assertEquals(0, resp[0] & 0xFF);
+        assertEquals(LOCATION_MZONE, resp[1] & 0xFF);
+        assertEquals(1, resp[2] & 0xFF);
+        assertEquals(1, resp[3] & 0xFF);
+        assertEquals(LOCATION_SZONE, resp[4] & 0xFF);
+        assertEquals(3, resp[5] & 0xFF);
+    }
+
     // ---- selectPosition ----
 
     @Test
@@ -172,6 +194,13 @@ class ResponseBuilderTest {
         assertEquals(2, resp[0] & 0xFF);
         assertEquals(0, resp[1] & 0xFF);
         assertEquals(1, resp[2] & 0xFF);
+    }
+
+    @Test
+    void sortCardsDefault() {
+        byte[] resp = ResponseBuilder.sortCardsDefault();
+        assertEquals(1, resp.length);
+        assertEquals(-1, resp[0]);
     }
 
     // ---- selectUnselectCard ----
@@ -224,6 +253,15 @@ class ResponseBuilderTest {
     void announceNumber() {
         byte[] resp = ResponseBuilder.announceNumber(3);
         assertEquals(3, readInt32(resp, 0));
+    }
+
+    // ---- announceCard ----
+
+    @Test
+    void announceCard() {
+        byte[] resp = ResponseBuilder.announceCard(89631139);
+        assertEquals(4, resp.length);
+        assertEquals(89631139, readInt32(resp, 0));
     }
 
     // ---- selectSum (same format as selectCards) ----

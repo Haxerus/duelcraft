@@ -6,6 +6,7 @@ import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -48,7 +49,9 @@ public final class DuelScreenFixture {
         FieldLayout layout = FieldLayout.fromFlags(rule.flags());
 
         for (int p = 0; p < 2; p++) {
-            LDLibDuelScreen.applyMessage(new DuelMessage.Draw(p, CODES.subList(0, 10)));
+            LDLibDuelScreen.applyMessage(new DuelMessage.Draw(p, CODES.subList(0, 10).stream()
+                    .map(code -> new DuelMessage.DrawnCard(code, POS_FACEDOWN_DEFENSE))
+                    .toList()));
         }
 
         int first = layout.columns() == 3 ? 1 : 0;
@@ -69,6 +72,32 @@ public final class DuelScreenFixture {
     }
 
     /**
+     * Layers the card-object model onto a populated MR5 field: two XYZ materials under the monster
+     * in zone 0, three counters on the monster in zone 1, a targeting highlight on zone 2 and a
+     * disabled zone 3 — one of each thing {@code ClientCard} now tracks.
+     */
+    public static void populateCardModel() {
+        // Attach two hand cards as materials of the monster in zone 0. The engine addresses a
+        // material by its host zone | LOCATION_OVERLAY, so the destination location is 0x84.
+        for (int i = 0; i < 2; i++) {
+            LDLibDuelScreen.applyMessage(new DuelMessage.Move(CODES.get(22 + i),
+                    new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, i),
+                    0));
+        }
+        LDLibDuelScreen.applyMessage(new DuelMessage.AddCounter(0x1, 0, LOCATION_MZONE, 1, 3));
+        // A pendulum card in MR5's left pendulum zone (the shared S/T zone 0). Its scales reach the
+        // client only as a query result, the way the spell-zone refresh mask delivers them
+        // (RefreshSchedule.SZONE_FLAGS).
+        moveFromHand(0, CODES.get(21), LOCATION_SZONE, 0, POS_FACEUP_ATTACK);
+        LDLibDuelScreen.applyMessage(new DuelMessage.UpdateCard(0, LOCATION_SZONE, 0, scales(1, 8)));
+        LDLibDuelScreen.applyMessage(new DuelMessage.BecomeTarget(
+                List.of(new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_ATTACK))));
+        // Low 16 bits are player 0's zones; bit 3 is their fourth monster zone.
+        LDLibDuelScreen.applyMessage(new DuelMessage.FieldDisabled(1 << 3));
+    }
+
+    /**
      * Sends an idle command whose only entry makes the monster at {@code (player, MZONE, sequence)}
      * repositionable, so clicking that zone opens the context menu. Card codes follow
      * {@link #populate}'s five-column mapping, where monster zone N holds {@code CODES.get(N)}.
@@ -80,6 +109,15 @@ public final class DuelScreenFixture {
                 List.of(new DuelMessage.ReposCard(code, player, LOCATION_MZONE, sequence)),
                 List.of(), List.of(), List.of(),
                 true, true, false));
+    }
+
+    /** A query result carrying nothing but a pair of pendulum scales. */
+    private static QueriedCard scales(int lscale, int rscale) {
+        var card = new QueriedCard();
+        card.flags = QUERY_LSCALE | QUERY_RSCALE;
+        card.lscale = lscale;
+        card.rscale = rscale;
+        return card;
     }
 
     /** Moves the first card of the player's hand to the given zone. */

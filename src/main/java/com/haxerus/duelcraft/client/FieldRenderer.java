@@ -6,6 +6,7 @@ import com.haxerus.duelcraft.client.FieldLayout.Side;
 import com.haxerus.duelcraft.client.FieldLayout.Zone;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
+import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -43,7 +45,8 @@ public class FieldRenderer {
     public interface Callbacks {
         void setCardImageBackground(UIElement elem, int code);
         void onCardClicked(int player, int location, int sequence, UIEvent event);
-        void showCardInfo(int code);
+        /** Shows the card in the info banner; {@code card} carries its hints, null when unknown. */
+        void showCardInfo(int code, ClientCard card);
         void hideCardInfo();
         /** Clears async-retry tracking for a slot that's no longer displaying a card. */
         void clearPendingImage(UIElement elem);
@@ -103,11 +106,7 @@ public class FieldRenderer {
     }
 
     private boolean occupied(Zone z) {
-        int p = player(z.side());
-        if (z.location() == LOCATION_MZONE) {
-            return state.mzone[p][z.sequence()] != 0 || state.mzonePos[p][z.sequence()] != 0;
-        }
-        return state.szone[p][z.sequence()] != 0 || state.szonePos[p][z.sequence()] != 0;
+        return state.cardAt(player(z.side()), z.location(), z.sequence()) != null;
     }
 
     /** The zone a slot shows: the occupied candidate, else the viewer's own zone (for placement). */
@@ -155,26 +154,30 @@ public class FieldRenderer {
             if (el == null) return;
             Zone shown = shownZone(layout.zonesOf(id));
             int p = player(shown.side());
-            boolean monster = shown.location() == LOCATION_MZONE;
-            int code = monster ? state.mzone[p][shown.sequence()] : state.szone[p][shown.sequence()];
-            int pos = monster ? state.mzonePos[p][shown.sequence()] : state.szonePos[p][shown.sequence()];
-            refreshZoneSlot(el, code, pos, p, shown.location(), shown.sequence());
+            refreshZoneSlot(el, state.cardAt(p, shown.location(), shown.sequence()),
+                    p, shown.location(), shown.sequence());
         });
     }
 
-    private void refreshZoneSlot(UIElement slot, int code, int position, int player, int locationType, int sequence) {
+    private void refreshZoneSlot(UIElement slot, ClientCard card, int player, int locationType, int sequence) {
         if (slot == null) return;
         slot.getChildren().stream()
                 .filter(c -> c.hasClass("card") || c.hasClass("card-back")
-                        || c.hasClass("stat-atk-def") || c.hasClass("stat-level"))
+                        || c.hasClass("stat-atk-def") || c.hasClass("stat-level")
+                        || c.hasClass("card-materials") || c.hasClass("card-counters")
+                        || c.hasClass("card-scales") || c.hasClass("card-turns")
+                        || c.hasClass("chain-marker"))
                 .toList()
                 .forEach(slot::removeChild);
 
-        // A card is present if we know the code OR if a non-zero position is set
-        // (opponent's face-down cards have code=0 but position is still set)
-        if (code != 0 || position != 0) {
-            boolean faceDown = code == 0
-                    || (position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
+        slot.removeClass("targeted");
+        slot.removeClass("disabled");
+        if (isZoneDisabled(player, locationType, sequence)) slot.addClass("disabled");
+
+        if (card != null) {
+            int code = card.code;
+            int position = card.position;
+            boolean faceDown = code == 0 || card.isFaceDown();
             boolean defense = (position & (POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE)) != 0;
 
             var cardVisual = new UIElement();
@@ -183,7 +186,7 @@ public class FieldRenderer {
 
                 if (player == state.localPlayer && code != 0) {
                     int hoverCode = code;
-                    cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode));
+                    cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode, card));
                     cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> callbacks.hideCardInfo());
                 }
             } else {
@@ -192,7 +195,7 @@ public class FieldRenderer {
                 callbacks.setCardImageBackground(cardVisual, code);
 
                 int hoverCode = code;
-                cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode));
+                cardVisual.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(hoverCode, card));
                 cardVisual.addEventListener(UIEvents.MOUSE_LEAVE, e -> callbacks.hideCardInfo());
             }
 
@@ -207,10 +210,56 @@ public class FieldRenderer {
             }
 
             slot.addChild(cardVisual);
+            addBadges(slot, card);
+            // Only the transient highlight tints a slot. `targetedBy` is a persistent effect-target
+            // relation (card.cpp:2338-2347) that edopro reveals on hover, not as a standing tint.
+            if (state.highlighted.contains(card)) slot.addClass("targeted");
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
         } else {
             slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
         }
+    }
+
+    /**
+     * Overlay material count (bottom-left), total counters (top-left) and pendulum scales
+     * (top-right), each drawn only when the card carries one. Scales come from the spell-zone
+     * refresh mask, so a non-pendulum card there reports 0/0 and gets no badge.
+     */
+    private void addBadges(UIElement slot, ClientCard card) {
+        QueriedCard stats = card.stats;
+        if (stats != null && (stats.flags & (QUERY_LSCALE | QUERY_RSCALE)) != 0
+                && (stats.lscale != 0 || stats.rscale != 0)) {
+            var badge = new Label();
+            badge.addClass("card-scales");
+            badge.setText(Component.literal(stats.lscale + "/" + stats.rscale));
+            slot.addChild(badge);
+        }
+        if (!card.materials.isEmpty()) {
+            var badge = new Label();
+            badge.addClass("card-materials");
+            badge.setText(Component.literal("x" + card.materials.size()));
+            slot.addChild(badge);
+        }
+        int counters = card.counterTotal();
+        if (counters > 0) {
+            var badge = new Label();
+            badge.addClass("card-counters");
+            badge.setText(Component.literal(String.valueOf(counters)));
+            slot.addChild(badge);
+        }
+        // CHINT_TURN counts the turns a card has spent somewhere; edopro banners it (`:3980`).
+        if (card.hintType == CHINT_TURN && card.hintValue > 0) {
+            var badge = new Label();
+            badge.addClass("card-turns");
+            badge.setText(Component.literal("T" + card.hintValue));
+            slot.addChild(badge);
+        }
+    }
+
+    /** MSG_FIELD_DISABLED masks use the SelectPlace bit layout: monsters 0-6, spell/traps 8-15. */
+    private boolean isZoneDisabled(int player, int location, int sequence) {
+        int bit = sequence + (location == LOCATION_SZONE ? 8 : 0);
+        return (state.disabledZones[player] & (1 << bit)) != 0;
     }
 
     // ── Stat overlays ──────────────────────────────────────────────────────
@@ -223,13 +272,13 @@ public class FieldRenderer {
                     if (el == null) return;
                     Zone shown = shownZone(layout.zonesOf(id));
                     int p = player(shown.side());
-                    updateMonsterStats(el, state.mzoneStats[p][shown.sequence()], state.mzone[p][shown.sequence()], p);
+                    updateMonsterStats(el, state.cardAt(p, LOCATION_MZONE, shown.sequence()), p);
                 });
             }
         }
     }
 
-    private void updateMonsterStats(UIElement slot, QueriedCard stats, int code, int player) {
+    private void updateMonsterStats(UIElement slot, ClientCard card, int player) {
         if (slot == null) return;
 
         // Remove old stat labels
@@ -238,13 +287,19 @@ public class FieldRenderer {
                 .toList()
                 .forEach(slot::removeChild);
 
-        if (code == 0 || stats == null) return;
+        if (card == null || card.code == 0 || card.stats == null) return;
+        int code = card.code;
+        QueriedCard stats = card.stats;
 
         boolean faceDown = (stats.position & (POS_FACEDOWN_ATTACK | POS_FACEDOWN_DEFENSE)) != 0;
         if (faceDown) return;
 
         // Only show stats for monsters (check if QUERY_ATTACK was present in the flags)
         if ((stats.flags & QUERY_ATTACK) == 0) return;
+
+        // MSG_BATTLE's combat values win while the damage step lasts (duelclient.cpp:3805).
+        int attack = card.combatAttack != null ? card.combatAttack : stats.attack;
+        int defense = card.combatDefense != null ? card.combatDefense : stats.defense;
 
         boolean isOpp = player != state.localPlayer;
 
@@ -257,17 +312,17 @@ public class FieldRenderer {
         var atkDefLabel = new Label();
         atkDefLabel.addClass("stat-atk-def");
         if (isOpp) atkDefLabel.addClass("opp");
-        String atkText = stats.attack == -2 ? "?" : String.valueOf(stats.attack);
+        String atkText = attack == -2 ? "?" : String.valueOf(attack);
         if (isLink) {
             atkDefLabel.setText(Component.literal(atkText));
         } else {
-            String defText = stats.defense == -2 ? "?" : String.valueOf(stats.defense);
+            String defText = defense == -2 ? "?" : String.valueOf(defense);
             atkDefLabel.setText(Component.literal(atkText + "/" + defText));
         }
 
         // Color based on buff/debuff (ATK takes priority)
-        if (stats.baseAttack > 0 && stats.attack != stats.baseAttack) {
-            if (stats.attack > stats.baseAttack) atkDefLabel.addClass("stat-buffed");
+        if (stats.baseAttack > 0 && attack != stats.baseAttack) {
+            if (attack > stats.baseAttack) atkDefLabel.addClass("stat-buffed");
             else atkDefLabel.addClass("stat-debuffed");
         }
         slot.addChild(atkDefLabel);
@@ -295,14 +350,36 @@ public class FieldRenderer {
         for (int p = 0; p < 2; p++) {
             final int player = p;
             Side side = side(player);
-            // Deck: always face-down card back when non-empty
-            slot(new Zone(side, LOCATION_DECK, 0)).ifPresent(el ->
-                    setPileBackground(el, state.deckCount[player] > 0 ? CARD_BACK_SPRITE : null));
+            // Deck: card back, unless the top card is turned over and its code is known
+            slot(new Zone(side, LOCATION_DECK, 0)).ifPresent(el -> refreshDeckPile(el, player));
             // Extra deck: top face-up card if any, otherwise card back when non-empty
             slot(new Zone(side, LOCATION_EXTRA, 0)).ifPresent(el -> refreshExtraDeckPile(el, player));
             // Graveyard & Banished: top card image when non-empty
             slot(new Zone(side, LOCATION_GRAVE, 0)).ifPresent(el -> setPileTopCard(el, state.grave[player]));
             slot(new Zone(side, LOCATION_REMOVED, 0)).ifPresent(el -> setPileTopCard(el, state.banished[player]));
+        }
+    }
+
+    /**
+     * edopro draws a deck card face-down when its own orientation matches the deck's
+     * ({@code client_field.cpp:843}): a reversed deck, or a single card turned face-up on top by
+     * {@code MSG_DECK_TOP}, shows its face instead of the card back.
+     */
+    private void refreshDeckPile(UIElement slot, int player) {
+        var cards = state.deck[player];
+        if (cards.isEmpty()) {
+            setPileBackground(slot, null);
+            return;
+        }
+        ClientCard top = cards.getLast();
+        boolean topTurnedOver = (top.position & POS_FACEUP_DEFENSE) != 0;
+        if (top.code != 0 && state.deckReversed != topTurnedOver) {
+            callbacks.setCardImageBackground(slot, top.code);
+            slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
+            slot.addClass("has-card");
+        } else {
+            setPileBackground(slot, CARD_BACK_SPRITE);
+            callbacks.clearPendingImage(slot);
         }
     }
 
@@ -314,12 +391,10 @@ public class FieldRenderer {
 
         // Find the top-most face-up card (iterate from end)
         int topFaceUpCode = 0;
-        var codes = state.extra[player];
-        var positions = state.extraPos[player];
-        for (int i = codes.size() - 1; i >= 0; i--) {
-            int pos = i < positions.size() ? positions.get(i) : 0;
-            if ((pos & (POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE)) != 0) {
-                topFaceUpCode = codes.get(i);
+        var cards = state.extra[player];
+        for (int i = cards.size() - 1; i >= 0; i--) {
+            if ((cards.get(i).position & (POS_FACEUP_ATTACK | POS_FACEUP_DEFENSE)) != 0) {
+                topFaceUpCode = cards.get(i).code;
                 break;
             }
         }
@@ -351,11 +426,11 @@ public class FieldRenderer {
         }
     }
 
-    private void setPileTopCard(UIElement slot, List<Integer> cards) {
+    private void setPileTopCard(UIElement slot, List<ClientCard> cards) {
         if (slot == null) return;
         if (!cards.isEmpty()) {
             // Use setCardImageBackground so the pile is registered for async image retry
-            callbacks.setCardImageBackground(slot, cards.getLast());
+            callbacks.setCardImageBackground(slot, cards.getLast().code);
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
             slot.addClass("has-card");
         } else {
@@ -366,27 +441,90 @@ public class FieldRenderer {
         }
     }
 
+    // ── Chain markers and the attack pair ───────────────────────────────────
+
+    /**
+     * Draws one numbered badge per chain link on the slot the effect triggered from, falling back
+     * to the activating card's own slot ({@code duelclient.cpp:3390-3397} draws the marker at the
+     * trigger location). A link triggered from the hand has no slot and is left unmarked.
+     */
+    public void refreshChainMarkers() {
+        for (UIElement slot : slots.values()) {
+            slot.getChildren().stream()
+                    .filter(child -> child.hasClass("chain-marker"))
+                    .toList()
+                    .forEach(slot::removeChild);
+        }
+        for (var link : state.chain) {
+            UIElement slot = slot(new Zone(side(link.trigController), link.trigLocation, link.trigSequence))
+                    .or(() -> slot(new Zone(side(link.location.controller()),
+                            link.location.location(), link.location.sequence())))
+                    .orElse(null);
+            if (slot == null) continue;
+            var marker = new Label();
+            marker.addClass("chain-marker");
+            if (link.solving) marker.addClass("chain-solving");
+            if (link.negated) marker.addClass("negated");
+            marker.setText(Component.literal(String.valueOf(link.chainIndex)));
+            slot.addChild(marker);
+        }
+    }
+
+    /** Marks both ends of an attack; a null {@code target} means it is aimed at the player. */
+    public void showAttack(LocInfo attacker, LocInfo target) {
+        slotAt(attacker).ifPresent(el -> el.addClass("attacking"));
+        if (target != null) slotAt(target).ifPresent(el -> el.addClass("attacked"));
+    }
+
+    public void clearAttack() {
+        ui.rootElement.select(".attacking").forEach(e -> e.removeClass("attacking"));
+        ui.rootElement.select(".attacked").forEach(e -> e.removeClass("attacked"));
+    }
+
+    private Optional<UIElement> slotAt(LocInfo loc) {
+        return slot(new Zone(side(loc.controller()), loc.location(), loc.sequence()));
+    }
+
     // ── Highlighting ───────────────────────────────────────────────────────
 
     /**
-     * Highlight valid placement zones for a SelectPlace prompt.
+     * Highlight valid placement zones for a SelectPlace/SelectDisfield prompt.
      * Bitmask is relative to the asking player (set bit = blocked zone); the asking player is the viewer.
      * Monster bits 0-6 and spell bits 8-15 of the viewer's block; the opponent's block starts at bit 16.
-     * EMZ bits (5, 6) are read from the viewer's block only, because the two shared slots are covered there.
+     * The two physical EMZ slots are each addressable from either block (bit 5/6 of the viewer's own
+     * block, or the cross-mapped bit 21/22 of the opponent's block — see {@link FieldLayout#slotId}),
+     * so both blocks check sequences 5 and 6, not just the viewer's.
      */
     public void highlightValidPlaces(int field) {
         ui.rootElement.select(".target").forEach(e -> e.removeClass("target"));
+        eachZone(field, false, el -> el.addClass("target"));
+    }
+
+    /**
+     * Flash the zones a {@code HINT_ZONE} names. Same bit layout as {@link #highlightValidPlaces},
+     * but a <b>set</b> bit marks a zone to flash rather than one that is blocked
+     * ({@code duelclient.cpp:1519} assigns the mask straight to {@code selectable_field}).
+     */
+    public void flashZones(int field) {
+        eachZone(field, true, el -> el.addClass("flash"));
+    }
+
+    public void clearZoneFlash() {
+        ui.rootElement.select(".flash").forEach(e -> e.removeClass("flash"));
+    }
+
+    /** Runs {@code action} on every slot whose bit in {@code field} is {@code set}. */
+    private void eachZone(int field, boolean set, Consumer<UIElement> action) {
         for (Side side : Side.values()) {
             int base = side == Side.PLR ? 0 : 16;
-            int lastMonster = side == Side.PLR ? 6 : 4;
-            for (int seq = 0; seq <= lastMonster; seq++) {
-                if ((field & (1 << (base + seq))) == 0) {
-                    slot(new Zone(side, LOCATION_MZONE, seq)).ifPresent(el -> el.addClass("target"));
+            for (int seq = 0; seq <= 6; seq++) {
+                if (((field & (1 << (base + seq))) != 0) == set) {
+                    slot(new Zone(side, LOCATION_MZONE, seq)).ifPresent(action);
                 }
             }
             for (int seq = 0; seq <= 7; seq++) {
-                if ((field & (1 << (base + 8 + seq))) == 0) {
-                    slot(new Zone(side, LOCATION_SZONE, seq)).ifPresent(el -> el.addClass("target"));
+                if (((field & (1 << (base + 8 + seq))) != 0) == set) {
+                    slot(new Zone(side, LOCATION_SZONE, seq)).ifPresent(action);
                 }
             }
         }
@@ -408,12 +546,33 @@ public class FieldRenderer {
         return slot(new Zone(side(loc.controller()), loc.location(), loc.sequence())).orElse(null);
     }
 
-    /** Compute the bit position in the SelectPlace bitmask for a given zone. */
+    /** Compute the bit position in the SelectPlace/SelectDisfield bitmask for a given zone. */
     public int getFieldBit(int player, int location, int sequence) {
         // Bitmask is relative: self=0, opponent=1. Map absolute player to bitmask position.
         int bitmaskPlayer = (player == state.localPlayer) ? 0 : 1;
         int offset = bitmaskPlayer * 16;
         if (location == LOCATION_SZONE) offset += 8;
         return 1 << (offset + sequence);
+    }
+
+    /**
+     * Resolve a clicked field zone to the absolute (player, location, sequence) that should actually
+     * be submitted for a SelectPlace/SelectDisfield response, honouring the shared EMZ slots: if the
+     * clicked zone's own bit is blocked but it's an EMZ slot (MZONE 5/6), the same physical slot is
+     * also addressable via the other player's cross-mapped sequence (see {@link FieldLayout#slotId}).
+     * Returns null if the zone (and its EMZ alias, if any) is blocked.
+     */
+    public int[] resolvePlaceZone(int player, int location, int sequence, int field) {
+        if ((field & getFieldBit(player, location, sequence)) == 0) {
+            return new int[]{player, location, sequence};
+        }
+        if (location == LOCATION_MZONE && (sequence == 5 || sequence == 6)) {
+            int otherPlayer = (player == state.localPlayer) ? state.opponent() : state.localPlayer;
+            int otherSeq = sequence == 5 ? 6 : 5;
+            if ((field & getFieldBit(otherPlayer, location, otherSeq)) == 0) {
+                return new int[]{otherPlayer, location, otherSeq};
+            }
+        }
+        return null;
     }
 }

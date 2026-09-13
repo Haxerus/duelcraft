@@ -8,4 +8,9 @@ public class ServerPayloadHandler {
         ServerPlayer player = (ServerPlayer) context.player();
         DuelManager.get().handleResponse(player, payload.response());
     }
+
+    public static void handleConcede(DuelConcedePayload payload, IPayloadContext context) {
+        ServerPlayer player = (ServerPlayer) context.player();
+        DuelManager.get().forfeit(player);
+    }
 }

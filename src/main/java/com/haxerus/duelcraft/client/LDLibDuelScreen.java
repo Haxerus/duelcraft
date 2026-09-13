@@ -1,7 +1,9 @@
 package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
-import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.ResponseValidator;
+import com.haxerus.duelcraft.server.DuelConcedePayload;
+import com.haxerus.duelcraft.server.DuelEndPayload;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
 import com.lowdragmc.lowdraglib2.gui.sync.bindings.impl.DataBindingBuilder;
@@ -29,6 +31,7 @@ import com.haxerus.duelcraft.client.carddata.CardImageManager;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.client.carddata.OptionTextResolver;
+import com.haxerus.duelcraft.client.carddata.SystemStringTable;
 import org.slf4j.Logger;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -39,6 +42,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * XML-based duel screen using LDLib2.
@@ -51,10 +56,24 @@ public class LDLibDuelScreen {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ResourceLocation DUEL_UI =
             ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/duel_screen.xml");
+    /** How many hits the ANNOUNCE_CARD search dialog lists at once. */
+    private static final int DECLARABLE_SEARCH_LIMIT = 50;
+    /** How long the concede button stays armed after the first click. */
+    private static final long CONCEDE_CONFIRM_MS = 3000L;
+    /** How long one hint toast stays up (edopro waits 40 frames, `duelclient.cpp:1427`). */
+    private static final long TOAST_MS = 2500L;
+    /** How long a HINT_ZONE flash and a HINT_CARD reveal stay up (edopro: 40 and 30 frames). */
+    private static final long ZONE_FLASH_MS = 1000L;
+    private static final long CARD_REVEAL_MS = 1500L;
+    /** How long the attack pair, an LP number and a turn/phase banner stay up (edopro: 40, 30 and 40 frames). */
+    private static final long ATTACK_MS = 1500L;
+    private static final long LP_DELTA_MS = 1000L;
+    private static final long BANNER_MS = 1200L;
 
     private static ClientDuelState activeState;
     private static ModularUI activeUI;
     private static UIRefresher refresher;
+    private static DuelScreen activeScreen;
 
     /**
      * Load the XML UI and open the duel screen.
@@ -66,12 +85,54 @@ public class LDLibDuelScreen {
 
     /** Builds the screen without showing it. The UI test harness opens the result itself. */
     public static DuelScreen create(DuelStartPayload startInfo) {
-        activeState = new ClientDuelState(startInfo);
+        return build(new ClientDuelState(startInfo.localPlayer(), startInfo.opponentName(),
+                startInfo.lp0(), startInfo.lp1(), startInfo.deckSize(), startInfo.extraSize(), startInfo.duelFlags()));
+    }
+
+    /** Rebuilds the screen around the live duel state ({@code /duel show}); null when no duel is in progress. */
+    public static DuelScreen reopen() {
+        if (activeState == null) return null;
+        DuelScreen screen = build(activeState);
+        activeState.markAllDirty();
+        return screen;
+    }
+
+    private static DuelScreen build(ClientDuelState state) {
+        activeState = state;
         activeUI = loadFromXml();
-        refresher = new UIRefresher(activeUI, activeState);
+        refresher = new UIRefresher(activeUI, state);
         UIElement canvas = activeUI.ui.selectId("duel-canvas").findFirst()
                 .orElseThrow(() -> new IllegalStateException(DUEL_UI + " has no #duel-canvas"));
-        return new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + startInfo.opponentName()));
+        activeScreen = new DuelScreen(activeUI, canvas, Component.literal("Duel vs. " + state.opponentName));
+        return activeScreen;
+    }
+
+    /** True while a duel is in progress: a state exists and no result has arrived yet. */
+    public static boolean isDuelLive() {
+        return activeState != null && activeState.winner < 0;
+    }
+
+    /** ESC while the duel is live: opens the leave-duel dialog, or closes it again. */
+    public static void togglePauseMenu() {
+        if (refresher != null) {
+            refresher.togglePauseOverlay();
+        }
+    }
+
+    /**
+     * A duel screen went away. Drops the statics unless the screen was replaced by a rebuild
+     * ({@code /duel show}) or the duel is still live, so ESC after a result cannot leave them dangling.
+     */
+    static void onScreenRemoved(DuelScreen screen) {
+        if (screen != activeScreen || isDuelLive()) return;
+        close();
+    }
+
+    /** Records the duel result; the result overlay appears on the next tick. */
+    public static void showResult(int winner, int reason) {
+        if (activeState != null) {
+            activeState.applyResult(winner, reason);
+        }
     }
 
     /**
@@ -90,6 +151,7 @@ public class LDLibDuelScreen {
         activeState = null;
         activeUI = null;
         refresher = null;
+        activeScreen = null;
     }
 
     private static ModularUI loadFromXml() {
@@ -107,10 +169,32 @@ public class LDLibDuelScreen {
 
     // ─── Response Helper ─────────────────────────────────────
 
-    static void sendResponse(ClientDuelState state, byte[] response) {
+    /**
+     * Build a response through {@link ResponseValidator} and send it. edopro treats {@code MSG_RETRY}
+     * as a bug signal, so a response the engine would reject is reported on the status label and
+     * never reaches the server; the prompt stays open for another try.
+     */
+    static void sendResponse(ClientDuelState state, Supplier<byte[]> builder) {
+        byte[] response;
+        try {
+            response = builder.get();
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("[Duel] Rejected response for {}: {}",
+                    state.pendingPrompt == null ? "no prompt" : state.pendingPrompt.getClass().getSimpleName(),
+                    e.getMessage());
+            if (refresher != null) refresher.showStatus(e.getMessage());
+            return;
+        }
+        sendResponse(state, response);
+    }
+
+    private static void sendResponse(ClientDuelState state, byte[] response) {
+        if (!state.markResponseSent()) {
+            LOGGER.warn("Ignoring duplicate response for the current prompt");
+            return;
+        }
         PacketDistributor.sendToServer(new DuelResponsePayload(response));
-        state.pendingPrompt = null;
-        state.clearCardActions();
+        state.onResponseSent();
         if (refresher != null) {
             refresher.onResponseSent();
         }
@@ -128,6 +212,7 @@ public class LDLibDuelScreen {
         private final UIElement titleLabel;
         private final UIElement turnPhaseLabel;
         private final UIElement statusLabel;
+        private final UIElement chainCountLabel;
 
         // Zone slots: [player 0/1][sequence]
         private final FieldRenderer field;
@@ -146,9 +231,47 @@ public class LDLibDuelScreen {
         private final Button phaseBtnLeft;
         private final Button phaseBtnCenter;
         private final Button phaseBtnRight;
+        // Shuffle hand: shown only while the idle command offers it (engine action type 8).
+        private final Button shuffleBtn;
+
+        // Concede: the first click arms the button, a second one within CONCEDE_CONFIRM_MS sends it.
+        private final Button concedeBtn;
+        private long concedeArmedAt;
+
+        // Hint surfaces (MSG_HINT / MSG_CARD_HINT / MSG_PLAYER_HINT)
+        private final UIElement toastLabel;
+        private final UIElement hintModal;
+        private final UIElement hintModalText;
+        private final Button hintModalOk;
+        private long toastUntil;
+        /** {@code ClientDuelState.zoneFlashAt} of the flash on screen, 0 when none is. */
+        private long zoneFlashStartedAt;
+        private long cardRevealUntil;
+
+        // Feedback surfaces: the attack pair, the two floating LP numbers and the turn/phase banner.
+        // Each remembers the state timestamp it is showing, so a repeat restarts instead of being
+        // swallowed — the same trick the HINT_ZONE flash uses.
+        private final UIElement bannerLabel;
+        private final UIElement[] lpDeltaLabels = new UIElement[2];
+        private long attackShownAt;
+        private final long[] lpDeltaShownAt = new long[2];
+        private long bannerUntil;
+
+        // Duel log panel
+        private final UIElement logPanel;
+        private final ScrollerView logList;
+        private final Button logToggle;
+        private final Button logClose;
 
         // Overlays
         private final UIElement cardInfoBanner;
+        private final UIElement resultOverlay;
+        private final UIElement resultTitle;
+        private final UIElement resultReason;
+        private final Button resultClose;
+        private final UIElement pauseOverlay;
+        private final Button pauseConcede;
+        private final Button pauseStay;
         private final ZoneInspectorController zoneInspector;
         private final PromptController prompt;
         private final ClickDispatcher clicks;
@@ -171,6 +294,17 @@ public class LDLibDuelScreen {
             titleLabel = byId("duel-title-label");
             turnPhaseLabel = byId("hud-turn-phase");
             statusLabel = byId("status-label");
+            chainCountLabel = byId("chain-count");
+            bannerLabel = byId("banner");
+            // The local player's LP bar is always the left one, so its number sits on the left.
+            lpDeltaLabels[0] = byId("lp-delta-0");
+            lpDeltaLabels[1] = byId("lp-delta-1");
+            addClassTo(lpDeltaLabels[plr], "lp-left");
+            addClassTo(lpDeltaLabels[opp], "lp-right");
+            logPanel = byId("duel-log");
+            logList = byId("duel-log-list", ScrollerView.class);
+            logToggle = byId("log-toggle", Button.class);
+            logClose = byId("duel-log-close", Button.class);
 
             // ── Field slots (owned by FieldRenderer) ──
             field = new FieldRenderer(ui, state, FieldLayout.fromFlags(state.duelFlags), new FieldRenderer.Callbacks() {
@@ -180,8 +314,8 @@ public class LDLibDuelScreen {
                 @Override public void onCardClicked(int player, int location, int sequence, UIEvent event) {
                     UIRefresher.this.onCardClicked(player, location, sequence, event);
                 }
-                @Override public void showCardInfo(int code) {
-                    UIRefresher.this.showCardInfo(code);
+                @Override public void showCardInfo(int code, ClientCard card) {
+                    UIRefresher.this.showCardInfo(code, card);
                 }
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
@@ -209,9 +343,23 @@ public class LDLibDuelScreen {
             phaseBtnLeft = byId("phase-btn-left", Button.class);
             phaseBtnCenter = byId("phase-btn-center", Button.class);
             phaseBtnRight = byId("phase-btn-right", Button.class);
+            shuffleBtn = byId("shuffle-btn", Button.class);
+
+            concedeBtn = byId("concede-btn", Button.class);
 
             // ── Overlays ──
+            toastLabel = byId("toast");
+            hintModal = byId("hint-modal");
+            hintModalText = byId("hint-modal-text");
+            hintModalOk = byId("hint-modal-ok", Button.class);
             cardInfoBanner = byId("card-info-banner");
+            resultOverlay = byId("result-overlay");
+            resultTitle = byId("result-title");
+            resultReason = byId("result-reason");
+            resultClose = byId("result-close", Button.class);
+            pauseOverlay = byId("pause-overlay");
+            pauseConcede = byId("pause-concede", Button.class);
+            pauseStay = byId("pause-stay", Button.class);
             zoneInspector = new ZoneInspectorController(ui, state, new ZoneInspectorController.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
@@ -229,6 +377,14 @@ public class LDLibDuelScreen {
             var descResolver = new OptionTextResolver(
                     DuelcraftClient.getCardDatabase(),
                     DuelcraftClient.getSystemStringTable());
+            state.hintText = new ClientDuelState.HintText() {
+                @Override public String desc(long desc) { return descResolver.resolve(desc); }
+                @Override public String cardName(int code) { return UIRefresher.this.cardDisplayName(code); }
+                @Override public String systemString(int code) {
+                    SystemStringTable table = DuelcraftClient.getSystemStringTable();
+                    return table != null ? table.getSystem(code) : null;
+                }
+            };
             prompt = new PromptController(ui, state, field, statusLabel, new PromptController.Callbacks() {
                 @Override public void setCardImageBackground(UIElement elem, int code) {
                     UIRefresher.this.setCardImageBackground(elem, code);
@@ -239,7 +395,7 @@ public class LDLibDuelScreen {
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
                 }
-                @Override public void sendResponse(byte[] response) {
+                @Override public void sendResponse(Supplier<byte[]> response) {
                     LDLibDuelScreen.sendResponse(state, response);
                 }
                 @Override public String cardDisplayName(int code) {
@@ -248,9 +404,24 @@ public class LDLibDuelScreen {
                 @Override public String resolveDesc(long desc) {
                     return descResolver.resolve(desc);
                 }
+                @Override public String systemString(int code) {
+                    SystemStringTable table = DuelcraftClient.getSystemStringTable();
+                    return table != null ? table.getSystem(code) : null;
+                }
+                @Override public String counterName(int counterType) {
+                    SystemStringTable table = DuelcraftClient.getSystemStringTable();
+                    return table != null ? table.getCounter(counterType) : null;
+                }
+                @Override public boolean cardSearchAvailable() {
+                    return DuelcraftClient.getCardDatabase() != null;
+                }
+                @Override public List<CardInfo> searchDeclarable(String query, List<Long> opcodes) {
+                    CardDatabase cards = DuelcraftClient.getCardDatabase();
+                    return cards != null ? cards.searchDeclarable(query, opcodes, DECLARABLE_SEARCH_LIMIT) : List.of();
+                }
             });
             UIElement canvas = byId("duel-canvas");
-            clicks = new ClickDispatcher(ui, state, field, prompt, canvas,
+            clicks = new ClickDispatcher(ui, state, prompt, canvas,
                     response -> LDLibDuelScreen.sendResponse(state, response));
 
             // ── Bind reactive data ──
@@ -260,6 +431,7 @@ public class LDLibDuelScreen {
             ui.rootElement.addEventListener(UIEvents.TICK, this::onTick);
 
             wirePhaseButtons();
+            wireLifecycleButtons();
             field.wireFieldClicks();
             zoneInspector.wirePileClicks();
             clicks.wireOutsideDismiss();
@@ -275,7 +447,7 @@ public class LDLibDuelScreen {
 
             // Right-click to cancel/finish field selection
             ui.rootElement.addEventListener(UIEvents.CLICK, e -> {
-                if (e.button != 1) return;
+                if (e.button != 1 || isBlockingOverlayUp()) return;
                 prompt.handleRightClick(e);
             });
 
@@ -300,6 +472,10 @@ public class LDLibDuelScreen {
 
             String localName = Minecraft.getInstance().getUser().getName();
 
+            // The bars fill against the LP this duel started with, not the XML's 8000 default.
+            plrLpBar.setMaxValue(state.startingLp[plr]);
+            oppLpBar.setMaxValue(state.startingLp[opp]);
+
             plrLpBar.bindDataSource(SupplierDataSource.of(
                     () -> (float) state.lp[plr]
             )).label(label -> label.bindDataSource(SupplierDataSource.of(
@@ -319,14 +495,25 @@ public class LDLibDuelScreen {
                             + (state.isLocalTurn() ? " (Your turn)" : ""));
 
             // Pile counts
-            bindPileCount(deckCountLabels[opp], () -> state.deckCount[opp]);
-            bindPileCount(deckCountLabels[plr], () -> state.deckCount[plr]);
+            bindPileCount(deckCountLabels[opp], () -> state.deckCount(opp));
+            bindPileCount(deckCountLabels[plr], () -> state.deckCount(plr));
             bindPileCount(graveCountLabels[opp], () -> state.graveCount(opp));
             bindPileCount(graveCountLabels[plr], () -> state.graveCount(plr));
             bindPileCount(extraCountLabels[opp], () -> state.extraCount(opp));
             bindPileCount(extraCountLabels[plr], () -> state.extraCount(plr));
             bindPileCount(banishedCountLabels[opp], () -> state.banishedCount(opp));
             bindPileCount(banishedCountLabels[plr], () -> state.banishedCount(plr));
+
+            // Refcounted MSG_PLAYER_HINT descs, under the name each LP bar carries.
+            bindLabel(byId("plr-hints"), () -> playerHintsText(plr));
+            bindLabel(byId("opp-hints"), () -> playerHintsText(opp));
+        }
+
+        /** The player's standing hints as one line, empty when the engine has named none. */
+        private String playerHintsText(int player) {
+            return state.playerHints[player].keySet().stream()
+                    .map(state.hintText::desc)
+                    .collect(Collectors.joining(", "));
         }
 
         private void bindLabel(UIElement element, java.util.function.Supplier<String> textSupplier) {
@@ -346,6 +533,9 @@ public class LDLibDuelScreen {
         // ── Tick handler: process dirty flags ──
 
         private void onTick(UIEvent event) {
+            disarmConcedeIfStale();
+            updateHintSurfaces();
+            updateFeedbackSurfaces();
             if (!state.isDirty()) return;
             var flags = state.consumeDirtyFlags();
 
@@ -387,27 +577,36 @@ public class LDLibDuelScreen {
             if (flags.contains(DirtyFlag.TURN_PHASE))
                 updatePhaseButtons();
 
-            if (flags.contains(DirtyFlag.CHAIN))
+            if (flags.contains(DirtyFlag.CHAIN)) {
+                updateChainCount();
                 updateStatusLabel();
+            }
+            // Markers live on the zone slots, so a zone rebuild drops them: redraw whenever either
+            // the chain or a slot the chain could be sitting on has changed.
+            if (flags.contains(DirtyFlag.CHAIN) || (!state.chain.isEmpty() && flags.stream()
+                    .anyMatch(flag -> flag.name().startsWith("MZONE") || flag.name().startsWith("SZONE"))))
+                field.refreshChainMarkers();
+            if (flags.contains(DirtyFlag.LOG) && logPanel != null && !logPanel.hasClass("hidden"))
+                rebuildLog();
             if (flags.contains(DirtyFlag.WINNER))
-                showWinOverlay();
+                showResultOverlay();
             if (flags.contains(DirtyFlag.CONFIRM))
                 zoneInspector.showConfirmCards();
         }
 
         // ── Rebuilders ──
-        private void rebuildHand(UIElement _container, List<Integer> codes, int player, boolean isLocal) {
+        private void rebuildHand(UIElement _container, List<ClientCard> cards, int player, boolean isLocal) {
             if (_container == null) {
                 LOGGER.info("container is null");
                 return;
             }
             var container = (ScrollerView) _container;
-            LOGGER.debug("Rebuilding hand: player={}, cards={}", player, codes.size());
+            LOGGER.debug("Rebuilding hand: player={}, cards={}", player, cards.size());
 
             container.clearAllScrollViewChildren();
 
-            for (int i = 0; i < codes.size(); i++) {
-                int code = codes.get(i);
+            for (int i = 0; i < cards.size(); i++) {
+                int code = cards.get(i).code;
                 int seq = i;
                 var card = new UIElement();
                 card.addClass("card");
@@ -433,23 +632,53 @@ public class LDLibDuelScreen {
             if (phaseBtnLeft != null) {
                 phaseBtnLeft.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canBattle())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(6, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(idle, IdleAction.TO_BATTLE, 0));
                 });
             }
             if (phaseBtnCenter != null) {
                 phaseBtnCenter.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canMain2())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(2, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(battle, BattleAction.TO_MAIN2, 0));
                 });
             }
             if (phaseBtnRight != null) {
                 phaseBtnRight.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(7, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(idle, IdleAction.END_TURN, 0));
                     else if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(3, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(battle, BattleAction.END_BATTLE, 0));
                 });
             }
+            if (shuffleBtn != null) {
+                shuffleBtn.setOnClick(e -> {
+                    if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canShuffle())
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(idle, IdleAction.SHUFFLE_HAND, 0));
+                });
+            }
+        }
+
+        /** Shows a one-off message on the status label (a rejected response); the next state change replaces it. */
+        private void showStatus(String message) {
+            if (statusLabel == null) return;
+            statusLabel.removeClass("hidden");
+            if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(message));
+        }
+
+        /** Chain depth on its own element, so prompt captions and chain text stop overwriting each other. */
+        private void updateChainCount() {
+            if (chainCountLabel == null) return;
+            if (state.chain.isEmpty()) {
+                chainCountLabel.addClass("hidden");
+                return;
+            }
+            chainCountLabel.removeClass("hidden");
+            if (chainCountLabel instanceof Label lbl)
+                lbl.setText(Component.literal("Chain: " + state.chain.size()));
         }
 
         private void updateStatusLabel() {
@@ -464,14 +693,13 @@ public class LDLibDuelScreen {
                 state.rpsHand1 = 0;
                 return;
             }
-            if (!state.chain.isEmpty()) {
+            // A live prompt owns the label; PromptController wrote its caption there.
+            if (state.pendingPrompt != null) return;
+            if (state.waitingForOpponent || !state.isLocalTurn()) {
                 statusLabel.removeClass("hidden");
                 if (statusLabel instanceof Label lbl)
-                    lbl.setText(Component.literal("Chain: " + state.chain.size()));
-            } else if (state.pendingPrompt == null && !state.isLocalTurn()) {
-                statusLabel.removeClass("hidden");
-                if (statusLabel instanceof Label lbl)
-                    lbl.setText(Component.literal("Waiting..."));
+                    lbl.setText(Component.literal(state.waitingForOpponent
+                            ? ClientDuelState.WAITING_TEXT : "Waiting..."));
             } else {
                 statusLabel.addClass("hidden");
             }
@@ -486,13 +714,259 @@ public class LDLibDuelScreen {
             };
         }
 
-        private void showWinOverlay() {
-            prompt.showWinOverlay(state.winner == state.localPlayer,
-                    () -> Minecraft.getInstance().setScreen(null));
+        /** Concede sends nothing on the first click; the button says "Confirm?" until it goes stale. */
+        private void wireLifecycleButtons() {
+            if (concedeBtn != null) {
+                concedeBtn.setOnClick(e -> {
+                    long now = System.currentTimeMillis();
+                    if (concedeArmedAt != 0 && now - concedeArmedAt <= CONCEDE_CONFIRM_MS) {
+                        sendConcede();
+                        disarmConcede();
+                    } else {
+                        concedeArmedAt = now;
+                        concedeBtn.setText(Component.literal("Confirm?"));
+                    }
+                });
+            }
+            if (resultClose != null) {
+                resultClose.setOnClick(e -> {
+                    LDLibDuelScreen.close();
+                    Minecraft.getInstance().setScreen(null);
+                });
+            }
+            // The pause dialog is itself the confirmation, so its Concede sends straight away.
+            if (pauseConcede != null) {
+                pauseConcede.setOnClick(e -> {
+                    hidePauseOverlay();
+                    sendConcede();
+                });
+            }
+            if (pauseStay != null) {
+                pauseStay.setOnClick(e -> hidePauseOverlay());
+            }
+            if (hintModalOk != null) {
+                hintModalOk.setOnClick(e -> {
+                    state.pendingModal = null;
+                    if (hintModal != null) hintModal.addClass("hidden");
+                });
+            }
+            if (logToggle != null) {
+                logToggle.setOnClick(e -> {
+                    if (logPanel == null) return;
+                    if (logPanel.hasClass("hidden")) {
+                        logPanel.removeClass("hidden");
+                        rebuildLog();
+                    } else {
+                        logPanel.addClass("hidden");
+                    }
+                    e.stopPropagation();
+                });
+            }
+            if (logClose != null) {
+                logClose.setOnClick(e -> {
+                    if (logPanel != null) logPanel.addClass("hidden");
+                });
+            }
+        }
+
+        // ── Duel log panel ──
+
+        /** Rewrites the panel from {@link DuelLog}; only called while it is open. */
+        private void rebuildLog() {
+            if (logList == null) return;
+            logList.clearAllScrollViewChildren();
+            for (var entry : state.duelLog.entries()) {
+                var line = new Label();
+                line.addClass("log-line");
+                line.setText(Component.literal(entry.text()));
+                if (entry.code() != 0) {
+                    int code = entry.code();
+                    line.addEventListener(UIEvents.CLICK, e -> {
+                        // The panel and the info banner share the left column, so the panel has to
+                        // step aside for the card it just sent there.
+                        if (logPanel != null) logPanel.addClass("hidden");
+                        showCardInfo(code);
+                        e.stopPropagation();
+                    });
+                }
+                logList.addScrollViewChild(line);
+            }
+        }
+
+        private static void addClassTo(UIElement element, String styleClass) {
+            if (element != null) element.addClass(styleClass);
+        }
+
+        // ── Hint surfaces (MSG_HINT), polled like the concede timer ──
+
+        /**
+         * Drives the four timed hint surfaces from {@link ClientDuelState}: the toast queue, the
+         * HINT_ZONE flash, the HINT_CARD reveal and the HINT_MESSAGE modal. edopro blocks its
+         * message loop for each of these; we let the duel run on and time them out here instead.
+         */
+        private void updateHintSurfaces() {
+            long now = System.currentTimeMillis();
+
+            if (toastLabel != null) {
+                if (toastUntil != 0 && now >= toastUntil) {
+                    toastLabel.addClass("hidden");
+                    toastUntil = 0;
+                }
+                if (toastUntil == 0 && !state.toasts.isEmpty()) {
+                    setLabelText(toastLabel, state.toasts.poll());
+                    toastLabel.removeClass("hidden");
+                    toastUntil = now + TOAST_MS;
+                }
+            }
+
+            // Keyed on the hint's own timestamp, so a second HINT_ZONE restarts the flash instead
+            // of being swallowed by the one already up — even when it names the same zones.
+            if (state.zoneFlashMask != 0 && state.zoneFlashAt != zoneFlashStartedAt) {
+                field.clearZoneFlash();
+                field.flashZones(state.zoneFlashMask);
+                zoneFlashStartedAt = state.zoneFlashAt;
+            } else if (zoneFlashStartedAt != 0 && now - zoneFlashStartedAt > ZONE_FLASH_MS) {
+                field.clearZoneFlash();
+                state.zoneFlashMask = 0;
+                zoneFlashStartedAt = 0;
+            }
+
+            if (state.revealCardCode != 0) {
+                showCardInfo(state.revealCardCode);
+                state.revealCardCode = 0;
+                cardRevealUntil = now + CARD_REVEAL_MS;
+            } else if (cardRevealUntil != 0 && now >= cardRevealUntil) {
+                hideCardInfo();
+                cardRevealUntil = 0;
+            }
+
+            if (state.pendingModal != null && hintModal != null && hintModal.hasClass("hidden")) {
+                setLabelText(hintModalText, state.pendingModal);
+                hintModal.removeClass("hidden");
+            }
+        }
+
+        /**
+         * The three timed battle surfaces: the attack pair, the floating LP numbers and the
+         * turn/phase banner. Each is keyed on the timestamp the state recorded, so a repeated
+         * event restarts it rather than being swallowed by the one already up.
+         */
+        private void updateFeedbackSurfaces() {
+            long now = System.currentTimeMillis();
+
+            if (state.attack != null && state.attack.at() != attackShownAt) {
+                field.clearAttack();
+                field.showAttack(state.attack.attacker(), state.attack.target());
+                if (state.attack.target() == null) {
+                    // A direct attack is aimed at the player, so their LP bar takes the mark.
+                    int defender = 1 - state.attack.attacker().controller();
+                    (defender == state.localPlayer ? plrLpBar : oppLpBar).addClass("attacked");
+                }
+                attackShownAt = state.attack.at();
+            } else if (attackShownAt != 0 && now - attackShownAt > ATTACK_MS) {
+                field.clearAttack();
+                state.attack = null;
+                attackShownAt = 0;
+            }
+
+            for (int player = 0; player < 2; player++) {
+                UIElement label = lpDeltaLabels[player];
+                if (label == null) continue;
+                var delta = state.lpDelta[player];
+                if (delta != null && delta.at() != lpDeltaShownAt[player]) {
+                    label.removeClass("lp-damage");
+                    label.removeClass("lp-recover");
+                    label.removeClass("lp-cost");
+                    label.addClass(delta.styleClass());
+                    setLabelText(label, delta.text());
+                    label.removeClass("hidden");
+                    lpDeltaShownAt[player] = delta.at();
+                } else if (lpDeltaShownAt[player] != 0 && now - lpDeltaShownAt[player] > LP_DELTA_MS) {
+                    label.addClass("hidden");
+                    state.lpDelta[player] = null;
+                    lpDeltaShownAt[player] = 0;
+                }
+            }
+
+            // Banners queue like the toasts: a turn change and its draw phase arrive in one batch,
+            // and each deserves its moment rather than the last one winning.
+            if (bannerLabel != null) {
+                if (bannerUntil != 0 && now >= bannerUntil) {
+                    bannerLabel.addClass("hidden");
+                    bannerUntil = 0;
+                }
+                if (bannerUntil == 0 && !state.banners.isEmpty()) {
+                    setLabelText(bannerLabel, state.banners.poll());
+                    bannerLabel.removeClass("hidden");
+                    bannerUntil = now + BANNER_MS;
+                }
+            }
+        }
+
+        private static void sendConcede() {
+            PacketDistributor.sendToServer(new DuelConcedePayload());
+        }
+
+        /** True while a modal, the pause dialog or the result banner owns the screen and clicks must stop there. */
+        private boolean isBlockingOverlayUp() {
+            return (hintModal != null && !hintModal.hasClass("hidden"))
+                    || (pauseOverlay != null && !pauseOverlay.hasClass("hidden"))
+                    || (resultOverlay != null && !resultOverlay.hasClass("hidden"));
+        }
+
+        void togglePauseOverlay() {
+            if (pauseOverlay == null) return;
+            if (pauseOverlay.hasClass("hidden")) {
+                pauseOverlay.removeClass("hidden");
+            } else {
+                pauseOverlay.addClass("hidden");
+            }
+        }
+
+        private void hidePauseOverlay() {
+            if (pauseOverlay != null) pauseOverlay.addClass("hidden");
+        }
+
+        private void disarmConcedeIfStale() {
+            if (concedeArmedAt != 0 && System.currentTimeMillis() - concedeArmedAt > CONCEDE_CONFIRM_MS) {
+                disarmConcede();
+            }
+        }
+
+        private void disarmConcede() {
+            concedeArmedAt = 0;
+            if (concedeBtn != null) concedeBtn.setText(Component.literal("Concede"));
+        }
+
+        private void showResultOverlay() {
+            if (resultOverlay == null || state.winner < 0) return;
+            resultOverlay.removeClass("hidden");
+            setLabelText(resultTitle, state.winner == DuelEndPayload.WINNER_DRAW ? "Draw"
+                    : state.winner == state.localPlayer ? "You win" : "You lose");
+            setLabelText(resultReason, state.winner == DuelEndPayload.WINNER_DRAW
+                    ? "No winner" : winReasonText(state.winReason));
+        }
+
+        private static void setLabelText(UIElement element, String text) {
+            if (element instanceof Label label) label.setText(Component.literal(text));
+        }
+
+        /** Engine MSG_WIN reasons plus the host-synthesised ones carried by {@link DuelEndPayload}. */
+        private static String winReasonText(int reason) {
+            return switch (reason) {
+                case DuelEndPayload.REASON_SURRENDER -> "Surrender";
+                case 1 -> "Life points";
+                case 2 -> "Deck out";
+                case DuelEndPayload.REASON_TIMEOUT -> "Timeout";
+                case DuelEndPayload.REASON_DISCONNECT -> "Disconnect";
+                default -> "Card effect";
+            };
         }
 
         private void updatePhaseButtons() {
             boolean myTurn = state.isLocalTurn();
+            setShuffleVisible(myTurn && state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle
+                    && idle.canShuffle());
             if (myTurn && state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle) {
                 setButtonActive(phaseBtnLeft, idle.canBattle(), "BP");
                 setButtonActive(phaseBtnCenter, false, "");
@@ -506,6 +980,13 @@ public class LDLibDuelScreen {
                 setButtonActive(phaseBtnCenter, false, "");
                 setButtonActive(phaseBtnRight, false, "");
             }
+        }
+
+        private void setShuffleVisible(boolean visible) {
+            if (shuffleBtn == null) return;
+            shuffleBtn.setActive(visible);
+            if (visible) shuffleBtn.removeClass("hidden");
+            else shuffleBtn.addClass("hidden");
         }
 
         private void setButtonActive(Button btn, boolean active, String text) {
@@ -541,7 +1022,14 @@ public class LDLibDuelScreen {
         }
 
         private void showCardInfo(int code) {
+            showCardInfo(code, null);
+        }
+
+        /** {@code onField} is the card object whose hints to list, null when there is none. */
+        private void showCardInfo(int code, ClientCard onField) {
             if (code == 0 || cardInfoBanner == null) return;
+            cardRevealUntil = 0;   // whatever asks for the banner takes it over from a HINT_CARD reveal
+            setCardHints(onField);
             cardInfoBanner.removeClass("hidden");
 
             CardDatabase db = DuelcraftClient.getCardDatabase();
@@ -624,6 +1112,36 @@ public class LDLibDuelScreen {
             var elem = byId(id);
             if (elem instanceof TextElement te) te.setText(Component.literal(text));
             else if (elem instanceof Label lbl) lbl.setText(Component.literal(text));
+        }
+
+        /**
+         * The card's own hints under its stats, as edopro's tooltip lines
+         * ({@code event_handler.cpp:1618-1632}): the single cHint slot, then every refcounted desc.
+         */
+        private void setCardHints(ClientCard card) {
+            var element = byId("card-hints");
+            if (element == null) return;
+            var lines = new ArrayList<String>();
+            if (card != null) {
+                if (card.hintType != 0 && card.hintValue != 0) lines.add(cardHintLine(card));
+                for (long desc : card.descHints.keySet()) lines.add("* " + state.hintText.desc(desc));
+            }
+            if (lines.isEmpty()) {
+                element.addClass("hidden");
+            } else {
+                setTextElement("card-hints", String.join("\n", lines));
+                element.removeClass("hidden");
+            }
+        }
+
+        private String cardHintLine(ClientCard card) {
+            return switch (card.hintType) {
+                case CHINT_TURN -> "Turns passed: " + card.hintValue;
+                case CHINT_CARD -> "Declared card: " + cardDisplayName((int) card.hintValue);
+                case CHINT_RACE -> "Declared Type: " + CardStringHelper.raceName(card.hintValue);
+                case CHINT_ATTRIBUTE -> "Declared Attribute: " + CardStringHelper.attributeName((int) card.hintValue);
+                default -> "Declared number: " + card.hintValue;   // CHINT_NUMBER
+            };
         }
 
         private void hideCardInfo() {

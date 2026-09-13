@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include "ocgapi_types.h"
 
@@ -24,7 +25,8 @@ struct CardDataEntry {
 
 class CardDatabase {
 public:
-    bool open(const std::vector<std::string>& dbPaths);
+    // On failure, `error` carries the sqlite message for the path that could not be read.
+    bool open(const std::vector<std::string>& dbPaths, std::string& error);
     void close();
 
     // OCG_DataReader callback — looks up card data from the in-memory map
@@ -34,9 +36,10 @@ public:
     static void cardReaderDone(void* payload, OCG_CardData* data);
 
 private:
-    bool loadFromFile(const std::string& path);
+    bool loadFromFile(const std::string& path, std::string& error);
 
     std::unordered_map<uint32_t, CardDataEntry> cards_;
+    std::unordered_set<uint32_t> unknownCodes_; // codes already warned about, one line each
 };
 
 #endif // CARD_DATABASE_H

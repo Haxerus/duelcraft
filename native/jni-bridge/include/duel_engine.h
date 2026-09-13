@@ -13,9 +13,11 @@
 
 class DuelEngine {
 public:
-    // Initialize with paths to card databases and script directories
+    // Initialize with paths to card databases and script directories.
+    // On failure, `error` describes why the card database could not be read.
     bool init(const std::vector<std::string>& dbPaths,
-              const std::vector<std::string>& scriptPaths);
+              const std::vector<std::string>& scriptPaths,
+              std::string& error);
     void shutdown();
 
     // Create a new duel. Returns opaque handle (OCG_Duel cast to intptr_t), or 0 on failure.

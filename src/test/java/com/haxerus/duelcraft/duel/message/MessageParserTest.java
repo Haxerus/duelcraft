@@ -60,31 +60,6 @@ class MessageParserTest {
     // ---- Lifecycle Messages ----
 
     @Test
-    void parseStart() {
-        // [uint8 playerType][int32 lp0][int32 lp1][uint16 deck0][uint16 extra0][uint16 deck1][uint16 extra1]
-        ByteBuffer b = body(17);
-        b.put((byte) 0);       // playerType
-        b.putInt(8000);         // lp0
-        b.putInt(8000);         // lp1
-        b.putShort((short) 40); // deck0
-        b.putShort((short) 15); // extra0
-        b.putShort((short) 40); // deck1
-        b.putShort((short) 15); // extra1
-
-        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_START, b.array()));
-        assertEquals(1, msgs.size());
-        assertInstanceOf(DuelMessage.Start.class, msgs.getFirst());
-        var start = (DuelMessage.Start) msgs.getFirst();
-        assertEquals(0, start.playerType());
-        assertEquals(8000, start.lp0());
-        assertEquals(8000, start.lp1());
-        assertEquals(40, start.deckCount0());
-        assertEquals(15, start.extraCount0());
-        assertEquals(40, start.deckCount1());
-        assertEquals(15, start.extraCount1());
-    }
-
-    @Test
     void parseWin() {
         // [uint8 winner][uint8 reason]
         ByteBuffer b = body(2);
@@ -125,12 +100,15 @@ class MessageParserTest {
         b.putInt(3);          // count
         b.putInt(89631139); b.putInt(POS_FACEDOWN_DEFENSE);  // Blue-Eyes
         b.putInt(46986414); b.putInt(POS_FACEDOWN_DEFENSE);  // Dark Magician
-        b.putInt(55144522); b.putInt(POS_FACEDOWN_DEFENSE);  // Pot of Greed
+        b.putInt(55144522); b.putInt(POS_FACEUP_ATTACK);      // Pot of Greed, reversed deck
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_DRAW, b.array()));
         var draw = (DuelMessage.Draw) msgs.getFirst();
         assertEquals(0, draw.player());
-        assertEquals(List.of(89631139, 46986414, 55144522), draw.codes());
+        assertEquals(List.of(89631139, 46986414, 55144522),
+                draw.cards().stream().map(DuelMessage.DrawnCard::code).toList());
+        assertEquals(List.of(POS_FACEDOWN_DEFENSE, POS_FACEDOWN_DEFENSE, POS_FACEUP_ATTACK),
+                draw.cards().stream().map(DuelMessage.DrawnCard::position).toList());
     }
 
     @Test
@@ -300,16 +278,18 @@ class MessageParserTest {
         putLocInfo(b, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
         b.putInt(3000);  // attacker ATK
         b.putInt(2500);  // attacker DEF
-        b.put((byte) 0); // da (damage flag)
+        b.put((byte) 1); // attacker destroyed
         putLocInfo(b, 1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK);
         b.putInt(2500);  // defender ATK
         b.putInt(2100);  // defender DEF
-        b.put((byte) 0); // dd (damage flag)
+        b.put((byte) 0); // defender destroyed
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_BATTLE, b.array()));
         var battle = (DuelMessage.Battle) msgs.getFirst();
         assertEquals(3000, battle.atkAtk());
         assertEquals(2500, battle.defAtk());
+        assertEquals(1, battle.atkDestroyed());
+        assertEquals(0, battle.defDestroyed());
     }
 
     @Test
@@ -340,17 +320,57 @@ class MessageParserTest {
     }
 
     @Test
-    void playerHintStaysRaw() {
-        // field.cpp: [u8 player][u8 type][u64 desc]; not MSG_HINT's [u8 type][u8 player][u64 desc]
+    void parsePlayerHint() {
+        // field.cpp:1332: [u8 player][u8 type][u64 desc]; not MSG_HINT's [u8 type][u8 player][u64 desc]
         ByteBuffer b = body(10);
-        b.put((byte) 0);
+        b.put((byte) 1);
         b.put((byte) PHINT_DESC_ADD);
         b.putLong(1160L);
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_PLAYER_HINT, b.array()));
-        var raw = (DuelMessage.Raw) msgs.getFirst();
-        assertEquals(MSG_PLAYER_HINT, raw.type());
-        assertEquals(10, raw.body().length);
+        var hint = assertInstanceOf(DuelMessage.PlayerHint.class, msgs.getFirst());
+        assertEquals(1, hint.player());
+        assertEquals(PHINT_DESC_ADD, hint.hintType());
+        assertEquals(1160L, hint.desc());
+    }
+
+    /** processor.cpp:4374: [loc_info][u32 code]. */
+    @Test
+    void parseMissedEffect() {
+        ByteBuffer b = body(10 + 4);
+        putLocInfo(b, 1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK);
+        b.putInt(89631139);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_MISSED_EFFECT, b.array()));
+        var missed = assertInstanceOf(DuelMessage.MissedEffect.class, msgs.getFirst());
+        assertEquals(new LocInfo(1, LOCATION_MZONE, 2, POS_FACEUP_ATTACK), missed.location());
+        assertEquals(89631139, missed.code());
+    }
+
+    /** libgroup.cpp:326: [u8 player][u32 n][n×loc_info]. */
+    @Test
+    void parseRandomSelected() {
+        ByteBuffer b = body(1 + 4 + 2 * 10);
+        b.put((byte) 1);
+        b.putInt(2);
+        putLocInfo(b, 1, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 1, LOCATION_HAND, 3, POS_FACEDOWN_DEFENSE);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_RANDOM_SELECTED, b.array()));
+        var random = assertInstanceOf(DuelMessage.RandomSelected.class, msgs.getFirst());
+        assertEquals(1, random.player());
+        assertEquals(2, random.cards().size());
+        assertEquals(3, random.cards().get(1).sequence());
+    }
+
+    /** operations.cpp:609: [u32 code]. */
+    @Test
+    void parseMatchKill() {
+        ByteBuffer b = body(4);
+        b.putInt(89631139);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_MATCH_KILL, b.array()));
+        assertEquals(89631139, assertInstanceOf(DuelMessage.MatchKill.class, msgs.getFirst()).code());
     }
 
     // ---- Deck/Hand ----
@@ -388,6 +408,66 @@ class MessageParserTest {
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SHUFFLE_EXTRA, b.array()));
         assertEquals(1, msgs.size());
         assertEquals(1, ((DuelMessage.ShuffleExtra) msgs.getFirst()).player());
+    }
+
+    /** field.cpp:1048: [u8 player][u32 extraCount][u32 maskBytes][mask bytes]. */
+    @Test
+    void parseSwapGraveDeck() {
+        ByteBuffer b = body(1 + 4 + 4 + 2);
+        b.put((byte) 1);
+        b.putInt(15);       // extra deck size before the swapped-in monsters were inserted
+        b.putInt(2);        // mask byte count
+        b.put((byte) 0b0000_1001);
+        b.put((byte) 0b0000_0010);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SWAP_GRAVE_DECK, b.array()));
+        assertEquals(1, msgs.size());
+        var swap = assertInstanceOf(DuelMessage.SwapGraveDeck.class, msgs.getFirst());
+        assertEquals(1, swap.player());
+        assertEquals(15, swap.extraCount());
+        assertArrayEquals(new byte[]{0b0000_1001, 0b0000_0010}, swap.extraMask());
+    }
+
+    /**
+     * libduel.cpp:1404: [u8 loc][u8 n][n×loc_info old][n×loc_info]. The second block names the new
+     * position only for cards carrying XYZ materials; the rest are zeroed loc_infos.
+     */
+    @Test
+    void parseShuffleSetCard() {
+        ByteBuffer b = body(1 + 1 + 2 * 10 + 2 * 10);
+        b.put((byte) LOCATION_SZONE);
+        b.put((byte) 2);
+        putLocInfo(b, 0, LOCATION_SZONE, 0, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 0, LOCATION_SZONE, 3, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 0, LOCATION_SZONE, 3, POS_FACEDOWN_DEFENSE);
+        putLocInfo(b, 0, 0, 0, 0);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SHUFFLE_SET_CARD, b.array()));
+        assertEquals(1, msgs.size());
+        var shuffle = assertInstanceOf(DuelMessage.ShuffleSetCard.class, msgs.getFirst());
+        assertEquals(LOCATION_SZONE, shuffle.location());
+        assertEquals(2, shuffle.from().size());
+        assertEquals(0, shuffle.from().get(0).sequence());
+        assertEquals(3, shuffle.from().get(1).sequence());
+        assertEquals(2, shuffle.follow().size());
+        assertEquals(3, shuffle.follow().get(0).sequence());
+        assertEquals(0, shuffle.follow().get(1).location());
+    }
+
+    /** libduel.cpp:536: [u32 n][n×loc_info], batched at 255 cards per message. */
+    @Test
+    void parseRemoveCards() {
+        ByteBuffer b = body(4 + 2 * 10);
+        b.putInt(2);
+        putLocInfo(b, 0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK);
+        putLocInfo(b, 1, LOCATION_MZONE | LOCATION_OVERLAY, 2, 1);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_REMOVE_CARDS, b.array()));
+        assertEquals(1, msgs.size());
+        var remove = assertInstanceOf(DuelMessage.RemoveCards.class, msgs.getFirst());
+        assertEquals(2, remove.cards().size());
+        assertEquals(new LocInfo(0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK), remove.cards().get(0));
+        assertEquals(new LocInfo(1, LOCATION_MZONE | LOCATION_OVERLAY, 2, 1), remove.cards().get(1));
     }
 
     // ---- Selection Messages ----
@@ -471,6 +551,22 @@ class MessageParserTest {
     }
 
     @Test
+    void parseSelectDisfield() {
+        // Same wire shape as MSG_SELECT_PLACE, but must decode as SelectDisfield (id 24), not SelectPlace.
+        ByteBuffer b = body(6);
+        b.put((byte) 0);      // player
+        b.put((byte) 2);      // count
+        b.putInt(0x0000001F);  // field bitmask
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_DISFIELD, b.array()));
+        var sd = (DuelMessage.SelectDisfield) msgs.getFirst();
+        assertEquals(MSG_SELECT_DISFIELD, sd.type());
+        assertEquals(0, sd.player());
+        assertEquals(2, sd.count());
+        assertEquals(0x1F, sd.field());
+    }
+
+    @Test
     void parseSelectPosition() {
         ByteBuffer b = body(6);
         b.put((byte) 0);           // player
@@ -537,12 +633,37 @@ class MessageParserTest {
         assertEquals(1, sc.player());
         assertFalse(sc.forced());
         assertEquals(2, sc.count());
+        var first = sc.chains().getFirst();
+        assertEquals(POS_FACEUP_ATTACK, first.position());
         var second = sc.chains().get(1);
         assertEquals(46986414, second.code());
         assertEquals(LOCATION_SZONE, second.location());
         assertEquals(4, second.sequence());
+        assertEquals(POS_FACEDOWN_ATTACK, second.position());
         assertEquals((46986414L << 20) | 2, second.desc());
         assertEquals(1, second.flag());
+    }
+
+    /** The idle and battle command lists write no position; the record keeps 0 there. */
+    @Test
+    void parseSelectBattleCmd_activatableEntriesHaveNoPosition() {
+        // playerop.cpp select_battle_command: [u8 player][u32 n][ (u32 code, u8 con, u8 loc, u32 seq,
+        // u64 desc, u8 mode) * n ][u32 attackable=0][u8 canMain2][u8 canEnd]
+        ByteBuffer b = body(1 + 4 + 19 + 4 + 1 + 1);
+        b.put((byte) 0);
+        b.putInt(1);
+        b.putInt(89631139); b.put((byte) 0); b.put((byte) LOCATION_SZONE); b.putInt(3);
+        b.putLong(55L); b.put((byte) 0);
+        b.putInt(0);
+        b.put((byte) 1); b.put((byte) 1);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_BATTLECMD, b.array()));
+        var bc = (DuelMessage.SelectBattleCmd) msgs.getFirst();
+        var activatable = bc.activatable().getFirst();
+        assertEquals(89631139, activatable.code());
+        assertEquals(3, activatable.sequence());
+        assertEquals(55L, activatable.desc());
+        assertEquals(0, activatable.position());
     }
 
     @Test
@@ -583,51 +704,89 @@ class MessageParserTest {
     }
 
     @Test
+    void parseAnnounceCard() {
+        ByteBuffer b = body(2 + 8 + 8);
+        b.put((byte) 1);  // player
+        b.put((byte) 2);  // count
+        b.putLong(0x12L);
+        b.putLong(0x34L);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ANNOUNCE_CARD, b.array()));
+        var ac = (DuelMessage.AnnounceCard) msgs.getFirst();
+        assertEquals(1, ac.player());
+        assertEquals(List.of(0x12L, 0x34L), ac.opcodes());
+    }
+
+    @Test
     void parseRockPaperScissors() {
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_ROCK_PAPER_SCISSORS, new byte[]{0}));
         var rps = (DuelMessage.RockPaperScissors) msgs.getFirst();
         assertEquals(0, rps.player());
     }
 
+    /** Encode a SumCard: [int32 code][uint8 con][uint8 loc][int32 seq][int32 pos][int32 sumParam]. */
+    static void putSumCard(ByteBuffer buf, int code, int con, int loc, int seq, int pos, int sumParam) {
+        putCardInfo(buf, code, con, loc, seq, pos);
+        buf.putInt(sumParam);
+    }
+
     @Test
     void parseSelectSum() {
         ByteBuffer b = body(76);
         b.put((byte) 0);       // player
-        b.put((byte) 0);       // selectMode
+        b.put((byte) 0);       // selectMode (0 = exact sum)
         b.putInt(8);            // targetSum
         b.putInt(1);            // min
         b.putInt(3);            // max
 
         // 1 must-select card
         b.putInt(1);
-        b.putInt(56832966);     // code
-        b.put((byte) 0);       // controller
-        b.put((byte) LOCATION_MZONE);
-        b.putInt(0);            // sequence
-        b.putLong(4L);          // opParam
+        putSumCard(b, 56832966, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK, 4);
 
         // 2 selectable cards
         b.putInt(2);
-        b.putInt(89631139);
-        b.put((byte) 0);
-        b.put((byte) LOCATION_MZONE);
-        b.putInt(1);
-        b.putLong(8L);
-        b.putInt(46986414);
-        b.put((byte) 0);
-        b.put((byte) LOCATION_MZONE);
-        b.putInt(2);
-        b.putLong(7L);
+        putSumCard(b, 89631139, 0, LOCATION_MZONE, 1, POS_FACEDOWN_DEFENSE, (7 << 16) | 3);
+        putSumCard(b, 46986414, 1, LOCATION_MZONE, 2, POS_FACEUP_DEFENSE, 8);
 
         List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_SUM, b.array()));
         assertEquals(1, msgs.size());
         assertInstanceOf(DuelMessage.SelectSum.class, msgs.getFirst());
         var sum = (DuelMessage.SelectSum) msgs.getFirst();
         assertEquals(0, sum.player());
+        assertFalse(sum.selectMode());
         assertEquals(8, sum.targetSum());
+        assertEquals(1, sum.min());
+        assertEquals(3, sum.max());
+
         assertEquals(1, sum.mustSelect().size());
-        assertEquals(4, sum.mustSelect().getFirst().value1());
+        var must = sum.mustSelect().getFirst();
+        assertEquals(56832966, must.code());
+        assertEquals(0, must.controller());
+        assertEquals(LOCATION_MZONE, must.location());
+        assertEquals(0, must.sequence());
+        assertEquals(POS_FACEUP_ATTACK, must.position());
+        assertEquals(4, must.sumParam());
+        assertEquals(4, must.value1());
+        assertEquals(0, must.value2());
+
         assertEquals(2, sum.selectable().size());
+        // Position and sumParam are separate fields: a face-down card with both values packed.
+        var first = sum.selectable().getFirst();
+        assertEquals(89631139, first.code());
+        assertEquals(0, first.controller());
+        assertEquals(1, first.sequence());
+        assertEquals(POS_FACEDOWN_DEFENSE, first.position());
+        assertEquals((7 << 16) | 3, first.sumParam());
+        assertEquals(3, first.value1());
+        assertEquals(7, first.value2());
+
+        var second = sum.selectable().get(1);
+        assertEquals(46986414, second.code());
+        assertEquals(1, second.controller());
+        assertEquals(2, second.sequence());
+        assertEquals(POS_FACEUP_DEFENSE, second.position());
+        assertEquals(8, second.value1());
+        assertEquals(0, second.value2());
     }
 
     // ---- Misc ----
@@ -683,6 +842,53 @@ class MessageParserTest {
         assertEquals(2, confirm.cards().size());
         assertEquals(89631139, confirm.cards().get(0).code());
         assertEquals(46986414, confirm.cards().get(1).code());
+    }
+
+    /** libduel.cpp:854 writes the same body as ConfirmDecktop, over the extra deck. */
+    @Test
+    void parseConfirmExtraTop() {
+        ByteBuffer b = body(1 + 4 + 10);
+        b.put((byte) 1);       // player
+        b.putInt(1);            // count
+        b.putInt(89631139);
+        b.put((byte) 1);
+        b.put((byte) LOCATION_EXTRA);
+        b.putInt(14);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_CONFIRM_EXTRATOP, b.array()));
+        assertEquals(1, msgs.size());
+        var confirm = assertInstanceOf(DuelMessage.ConfirmExtraTop.class, msgs.getFirst());
+        assertEquals(1, confirm.player());
+        assertEquals(1, confirm.cards().size());
+        assertEquals(89631139, confirm.cards().getFirst().code());
+        assertEquals(LOCATION_EXTRA, confirm.cards().getFirst().location());
+        assertEquals(14, confirm.cards().getFirst().sequence());
+    }
+
+    /** processor.cpp:4926 writes an empty body. */
+    @Test
+    void parseReverseDeck() {
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_REVERSE_DECK, new byte[0]));
+        assertEquals(1, msgs.size());
+        assertInstanceOf(DuelMessage.ReverseDeck.class, msgs.getFirst());
+    }
+
+    /** processor.cpp:4929: [u8 player][u32 offsetFromTop][u32 code][u32 position] = 13 bytes. */
+    @Test
+    void parseDeckTop() {
+        ByteBuffer b = body(13);
+        b.put((byte) 1);
+        b.putInt(2);
+        b.putInt(89631139);
+        b.putInt(POS_FACEUP_DEFENSE);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_DECK_TOP, b.array()));
+        assertEquals(1, msgs.size());
+        var top = assertInstanceOf(DuelMessage.DeckTop.class, msgs.getFirst());
+        assertEquals(1, top.player());
+        assertEquals(2, top.offsetFromTop());
+        assertEquals(89631139, top.code());
+        assertEquals(POS_FACEUP_DEFENSE, top.position());
     }
 
     @Test

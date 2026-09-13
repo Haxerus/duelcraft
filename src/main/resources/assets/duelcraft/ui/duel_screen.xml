@@ -182,6 +182,17 @@
         opacity: 0;
         }
 
+        /* Shuffle hand (SELECT_IDLECMD, canShuffle). Hidden with display:none so the
+           center row keeps its usual width whenever the engine does not offer it. */
+        #shuffle-btn {
+        width: 40;
+        height: 14;
+        }
+
+        #shuffle-btn.hidden {
+        display: none;
+        }
+
         /* ── Status Label (centered overlay) ── */
         #status-label {
         position: absolute;
@@ -196,6 +207,172 @@
         }
 
         #status-label.hidden {
+        display: none;
+        }
+
+        /* ── Hint toast (edopro's stACMessage: one declaration hint at a time) ── */
+        #toast {
+        position: absolute;
+        top: 26;
+        left: 0;
+        width: 100%;
+        font-size: 8;
+        text-color: #FFDD55;
+        horizontal-align: center;
+        padding-vertical: 2;
+        background: rect(#aa000000);
+        }
+
+        #toast.hidden {
+        display: none;
+        }
+
+        /* ── Chain depth, on its own row so prompt captions keep the status label ── */
+        #chain-count {
+        position: absolute;
+        bottom: 62;
+        left: 0;
+        width: 100%;
+        font-size: 8;
+        text-color: #FF88FF;
+        horizontal-align: center;
+        }
+
+        #chain-count.hidden {
+        display: none;
+        }
+
+        /* ── Turn and phase banner (edopro's showcard 101 / phase card, about a second) ──
+           Below the field, above the chain count, so it covers no card and no button. */
+        #banner {
+        position: absolute;
+        bottom: 80;
+        left: 0;
+        width: 100%;
+        font-size: 14;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        padding-vertical: 3;
+        background: rect(#aa000000);
+        }
+
+        #banner.hidden {
+        display: none;
+        }
+
+        /* ── Floating LP number, under the LP bar of the player it belongs to.
+           Above the side panels, which both start at the same top edge. ── */
+        .lp-delta {
+        position: absolute;
+        top: 21;
+        width: 30%;
+        font-size: 12;
+        horizontal-align: center;
+        z-index: 5;
+        }
+
+        .lp-delta.lp-left {
+        left: 4;
+        }
+
+        .lp-delta.lp-right {
+        right: 4;
+        }
+
+        .lp-delta.lp-damage {
+        text-color: #FF4444;
+        }
+
+        .lp-delta.lp-recover {
+        text-color: #44FF44;
+        }
+
+        .lp-delta.lp-cost {
+        text-color: #6699FF;
+        }
+
+        .lp-delta.hidden {
+        display: none;
+        }
+
+        /* ── Duel log (over the card info banner, toggled from the HUD) ── */
+        #duel-log {
+        position: absolute;
+        left: 0;
+        top: 20;
+        bottom: 0;
+        width: 210;
+        flex-direction: column;
+        gap-all: 2;
+        padding-all: 4;
+        background: built-in(ui-gdp:RECT);
+        }
+
+        #duel-log.hidden {
+        width: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #duel-log-title {
+        height: 12;
+        font-size: 9;
+        text-color: #FFFFFF;
+        }
+
+        #duel-log-list {
+        flex: 1;
+        }
+
+        #duel-log-list .__scroller_view_view-container__ {
+        flex-direction: column;
+        gap-all: 1;
+        padding-all: 2;
+        }
+
+        .log-line {
+        width: 100%;
+        adaptive-height: true;
+        text-wrap: wrap;
+        font-size: 7;
+        text-color: #DDDDDD;
+        }
+
+        #log-toggle {
+        width: 28;
+        height: 14;
+        }
+
+        /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
+        .player-hints {
+        position: absolute;
+        top: 20;
+        width: 30%;
+        font-size: 6;
+        text-color: #FFDD55;
+        }
+
+        #plr-hints {
+        left: 4;
+        horizontal-align: left;
+        }
+
+        #opp-hints {
+        right: 4;
+        horizontal-align: right;
+        }
+
+        /* ── Shared Cancel/Finish button (edopro's btnCancelOrFinish) ── */
+        #prompt-action-bar {
+        position: absolute;
+        bottom: 32;
+        left: 0;
+        width: 100%;
+        flex-direction: row;
+        justify-content: center;
+        }
+
+        .prompt-btn.hidden {
         display: none;
         }
 
@@ -238,6 +415,50 @@
         right: 0;
         font-size: 5;
         background: rect(#cc000000);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        /* ── XYZ material count badge (sits just above the ATK/DEF bar) ── */
+        .card-materials {
+        position: absolute;
+        bottom: 7;
+        left: 0;
+        font-size: 5;
+        background: rect(#CC5522AA);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        /* ── Counter total badge ── */
+        .card-counters {
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-size: 5;
+        background: rect(#CCCC7700);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        /* ── Turn-count badge (MSG_CARD_HINT CHINT_TURN) ── */
+        .card-turns {
+        position: absolute;
+        bottom: 7;
+        right: 0;
+        font-size: 5;
+        background: rect(#CC227755);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        /* ── Pendulum scale badge (left/right scale of a card in a pendulum zone) ── */
+        .card-scales {
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 5;
+        background: rect(#CC2266CC);
         text-color: #FFFFFF;
         padding-horizontal: 1;
         }
@@ -369,6 +590,11 @@
         text-color: #AAAAAA;
         horizontal-align: center;
         }
+
+        #concede-btn {
+        width: 44;
+        height: 14;
+        }
         /* ── Card Info Banner (left overlay) ── */
         #card-info-banner {
         position: absolute;
@@ -417,6 +643,18 @@
 
         #card-atk-def-label {
         horizontal-align: center;
+        }
+
+        /* Card hints (MSG_CARD_HINT) below the stats, as edopro's tooltip lines */
+        #card-hints {
+        horizontal-align: center;
+        text-color: #FFDD55;
+        text-wrap: wrap;
+        adaptive-height: true;
+        }
+
+        #card-hints.hidden {
+        display: none;
         }
 
         #card-text-scroll {
@@ -551,6 +789,190 @@
         min-height: 48;
         }
 
+        /* ── Duel Result Overlay (shown when the duel ends) ── */
+        #result-overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background: rect(#96000000);
+        }
+
+        #result-overlay.hidden {
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #result-dialog {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 4;
+        padding-all: 8;
+        width: 200;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        #result-title {
+        height: 14;
+        font-size: 12;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        #result-reason {
+        height: 10;
+        font-size: 8;
+        text-color: #AAAAAA;
+        horizontal-align: center;
+        }
+
+        /* ── Hint Modal (HINT_MESSAGE; above the prompts, below the pause dialog) ── */
+        #hint-modal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background: rect(#96000000);
+        }
+
+        #hint-modal.hidden {
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #hint-modal-dialog {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 4;
+        padding-all: 8;
+        width: 200;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        #hint-modal-text {
+        width: 100%;
+        font-size: 8;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        text-wrap: wrap;
+        adaptive-height: true;
+        }
+
+        /* ── Pause Overlay (ESC while the duel is live; drawn above every other overlay) ── */
+        #pause-overlay {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        align-items: center;
+        justify-content: center;
+        background: rect(#96000000);
+        }
+
+        #pause-overlay.hidden {
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #pause-dialog {
+        flex-direction: column;
+        align-items: center;
+        gap-all: 4;
+        padding-all: 8;
+        width: 200;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
+        }
+
+        #pause-title {
+        height: 12;
+        font-size: 9;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        #pause-buttons {
+        flex-direction: row;
+        justify-content: center;
+        gap-all: 4;
+        }
+
+        /* ── Vertical name list inside prompt dialogs (ANNOUNCE_CARD search) ── */
+        .prompt-name-scroller {
+        scroller-view-mode: VERTICAL;
+        scroller-vertical-display: ALWAYS;
+        align-self: stretch;
+        }
+
+        .prompt-name-scroller .__scroller_view_view-container__ {
+        flex-direction: column;
+        gap-all: 1;
+        }
+
+        .prompt-name-scroller .__scroller_view_view-port__ {
+        background: built-in(ui-gdp:RECT_LIGHT);
+        height: 80;
+        }
+
+        .prompt-name-btn {
+        align-self: stretch;
+        height: 12;
+        padding-all: 1;
+        }
+
+        .prompt-name-btn .__button_text__ {
+        font-size: 7;
+        }
+
+        /* ── Battle position choices (SELECT_POSITION card-image buttons) ── */
+        .position-row {
+        flex-direction: row;
+        gap-all: 2;
+        }
+
+        .position-choice {
+        flex-direction: column;
+        align-items: center;
+        width: 42;
+        gap-all: 1;
+        }
+
+        /* A defense choice is the same card rotated 90°, so the column has to be wide
+           enough for the card's long edge. */
+        .position-choice .card {
+        min-width: 26;
+        min-height: 35;
+        }
+
+        .position-label {
+        font-size: 6;
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        /* ── Sort ordinal badge (SortCard/SortChain) ── */
+        .card-ordinal {
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-size: 8;
+        background: rect(#CC0000FF);
+        text-color: #FFFFFF;
+        padding-horizontal: 2;
+        }
+
         .target {
         overlay: rect(#6600FFFF);
         }
@@ -561,6 +983,51 @@
 
         .selected {
         overlay: rect(#6600FF00);
+        }
+
+        /* Targeted by an effect (MSG_BECOME_TARGET / MSG_CARD_SELECTED / MSG_CARD_TARGET) */
+        .targeted {
+        overlay: rect(#66FF00FF);
+        }
+
+        /* Zone the engine has disabled (MSG_FIELD_DISABLED) */
+        .disabled {
+        overlay: rect(#99202020);
+        }
+
+        /* Zone a HINT_ZONE is pointing at, for about a second */
+        .flash {
+        overlay: rect(#88FFFF00);
+        }
+
+        /* ── Battle: the two ends of an attack, for about a second and a half ── */
+        .attacking {
+        overlay: rect(#66FF8800);
+        }
+
+        .attacked {
+        overlay: rect(#66FF0000);
+        }
+
+        /* ── Chain link number, drawn on the slot the effect triggered from ── */
+        .chain-marker {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        font-size: 5;
+        background: rect(#CC7722AA);
+        text-color: #FFFFFF;
+        padding-horizontal: 1;
+        }
+
+        .chain-marker.chain-solving {
+        background: rect(#CCFFAA00);
+        text-color: #000000;
+        }
+
+        .chain-marker.negated {
+        background: rect(#CCCC0000);
+        text-color: #FFDDDD;
         }
 
         /* ── Card Action Context Menu ── */
@@ -612,6 +1079,8 @@
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
+            <button id="log-toggle" text="Log" />
+            <button id="concede-btn" text="Concede" />
             <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
         </element>
 
@@ -707,6 +1176,7 @@
                     <button id="phase-btn-center" class="phase-btn" text="BP" />
                     <element id="emz-right" class="square-slot emz-slot" />
                     <button id="phase-btn-right" class="phase-btn" text="EP" />
+                    <button id="shuffle-btn" class="hidden" text="Shuffle" />
                 </element>
                 <element id="plr-piles-banished" class="pile-column">
                     <element id="plr-banished" class="card-slot pile-slot">
@@ -796,6 +1266,28 @@
         <!-- Status Label (chain / waiting overlay) -->
         <label id="status-label" class="hidden">Waiting...</label>
 
+        <!-- Chain depth, kept off the status label so prompt captions are not overwritten -->
+        <label id="chain-count" class="hidden">Chain: 1</label>
+
+        <!-- Hint toast (one declaration hint at a time, a couple of seconds each) -->
+        <label id="toast" class="hidden">Opponent declared: []</label>
+
+        <!-- Turn and phase banner (MSG_NEW_TURN / MSG_NEW_PHASE) -->
+        <label id="banner" class="hidden">Battle Phase</label>
+
+        <!-- Floating LP numbers, one per absolute player index -->
+        <label id="lp-delta-0" class="lp-delta hidden">-500</label>
+        <label id="lp-delta-1" class="lp-delta hidden">-500</label>
+
+        <!-- Refcounted player hints (MSG_PLAYER_HINT), under each player's name -->
+        <label id="plr-hints" class="player-hints" />
+        <label id="opp-hints" class="player-hints" />
+
+        <!-- Shared Cancel/Finish button for field selections, also bound to right-click -->
+        <element id="prompt-action-bar">
+            <button id="prompt-action-btn" class="prompt-btn hidden" text="Finish" />
+        </element>
+
         <!-- Card Info Banner (left, shown on hover) -->
         <element id="card-info-banner" class="hidden">
             <element id="card-image-area" />
@@ -818,6 +1310,16 @@
                     by battle: You can add 1 Normal Spell from your Deck to your hand. </text>
             </scroller-view>
             <text id="card-atk-def-label" class="card-label">ATK 2600 / DEF 2000</text>
+            <text id="card-hints" class="card-label hidden" />
+        </element>
+
+        <!-- Duel log (left, toggled from the HUD; declared after the card info banner so it wins) -->
+        <element id="duel-log" class="hidden">
+            <label id="duel-log-title">Duel log</label>
+            <scroller-view id="duel-log-list">
+                <!-- Log lines added dynamically in Java -->
+            </scroller-view>
+            <button id="duel-log-close" text="Close" />
         </element>
 
         <!-- Zone Inspector (right, toggled by clicking a pile) -->
@@ -838,6 +1340,34 @@
                 </element>
                 <element id="prompt-buttons">
                     <!-- Confirm/Cancel buttons added dynamically -->
+                </element>
+            </element>
+        </element>
+
+        <!-- Duel Result Overlay (winner and reason, shown when the duel ends) -->
+        <element id="result-overlay" class="hidden">
+            <element id="result-dialog">
+                <label id="result-title">Duel over</label>
+                <label id="result-reason">Life points</label>
+                <button id="result-close" class="prompt-btn" text="Close" />
+            </element>
+        </element>
+
+        <!-- Hint Modal (HINT_MESSAGE: a message that blocks until acknowledged) -->
+        <element id="hint-modal" class="hidden">
+            <element id="hint-modal-dialog">
+                <label id="hint-modal-text">Message</label>
+                <button id="hint-modal-ok" class="prompt-btn" text="OK" />
+            </element>
+        </element>
+
+        <!-- Pause Overlay (ESC while the duel is live) -->
+        <element id="pause-overlay" class="hidden">
+            <element id="pause-dialog">
+                <label id="pause-title">Leave duel?</label>
+                <element id="pause-buttons">
+                    <button id="pause-concede" class="prompt-btn" text="Concede" />
+                    <button id="pause-stay" class="prompt-btn" text="Stay" />
                 </element>
             </element>
         </element>

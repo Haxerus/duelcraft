@@ -1,17 +1,22 @@
 package com.haxerus.duelcraft.client;
 
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
-import com.haxerus.duelcraft.server.DuelStartPayload;
-import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -20,16 +25,16 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
  * Owned by DuelScreen — lives only while the duel screen is open.
  */
 public class ClientDuelState {
-    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClientDuelState.class);
 
     // ── Dirty flags for efficient UI refresh ──
     public enum DirtyFlag {
-        LP, TURN_PHASE,
+        TURN_PHASE,
         HAND_0, HAND_1,
         MZONE_0, MZONE_1,
         SZONE_0, SZONE_1,
         PILE_COUNTS, CHAIN, PROMPT, WINNER,
-        FIELD_STATS, CONFIRM
+        FIELD_STATS, CONFIRM, LOG
     }
 
     private final EnumSet<DirtyFlag> dirtyFlags = EnumSet.noneOf(DirtyFlag.class);
@@ -42,6 +47,11 @@ public class ClientDuelState {
 
     public boolean isDirty() {
         return !dirtyFlags.isEmpty();
+    }
+
+    /** Mark everything dirty so a rebuilt UI renders the current state (used when reopening the screen). */
+    public void markAllDirty() {
+        dirtyFlags.addAll(EnumSet.allOf(DirtyFlag.class));
     }
 
     /** Mark all visual zones dirty (used when card images finish loading). */
@@ -72,70 +82,219 @@ public class ClientDuelState {
 
     // Life points per player
     public final int[] lp = new int[2];
-    public int startingLP;
+
+    // LP each player started with, from the start payload; the LP bars use it as their maximum.
+    public final int[] startingLp = new int[2];
 
     // Turn / phase
     public int currentTurn;
     public int currentPhase;
     public int turnCount;
 
-    // Hands — card codes per player (0 = unknown/face-down for opponent)
+    // Hands — one card object per held card (code 0 = hidden from this client)
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] hand = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] hand = new List[]{ new ArrayList<>(), new ArrayList<>() };
 
-    // Monster zones: [player][0-4 = main, 5-6 = EMZ] — card code, 0 = empty
-    public final int[][] mzone = new int[2][7];
-    public final int[][] mzonePos = new int[2][7];
+    // Monster zones: [player][0-4 = main, 5-6 = EMZ] — null = empty
+    public final ClientCard[][] mzone = new ClientCard[2][7];
 
-    // Spell/Trap zones: [player][0-4 = S/T, 5 = field zone] — card code, 0 = empty
-    public final int[][] szone = new int[2][8];     // 0-4: S/T, 5: field spell, 6-7: pendulum zones
-    public final int[][] szonePos = new int[2][8];
+    // Spell/Trap zones: [player][0-4 = S/T, 5 = field spell, 6-7 = pendulum] — null = empty
+    public final ClientCard[][] szone = new ClientCard[2][8];
 
-    // Per-zone card stats (updated by MSG_UPDATE_DATA/CARD)
-    public final QueriedCard[][] mzoneStats = new QueriedCard[2][7];
-    public final QueriedCard[][] szoneStats = new QueriedCard[2][8];
-
-    // Deck — count only (face-down, not browsable)
-    public final int[] deckCount = new int[2];
-
-    // Extra deck, graveyard, banished — full card lists (browsable in UI)
+    // Deck, extra deck, graveyard, banished — card lists; the deck holds blank face-down cards
+    // from the start payload so deck-top reveals have objects to write codes into.
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] extra = new List[]{ new ArrayList<>(), new ArrayList<>() };
-    // Parallel to extra[]: position bits per card. Face-up pendulums returning from field
-    // get POS_FACEUP_*; regular extra deck entries are face-down.
+    public final List<ClientCard>[] deck = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] extraPos = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] extra = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] grave = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] grave = new List[]{ new ArrayList<>(), new ArrayList<>() };
     @SuppressWarnings("unchecked")
-    public final List<Integer>[] banished = new List[]{ new ArrayList<>(), new ArrayList<>() };
+    public final List<ClientCard>[] banished = new List[]{ new ArrayList<>(), new ArrayList<>() };
 
-    // Overlay (XYZ material) cards — keyed by monster zone: [player][sequence] -> list of material codes
+    // Zones the engine has disabled, as a 16-bit mask per absolute player (MSG_FIELD_DISABLED).
+    // Bit layout matches SelectPlace: monster zones 0-6, spell/trap zones 8-15.
+    public final int[] disabledZones = new int[2];
+
+    // Cards the engine just targeted or selected; cleared when the next prompt arrives.
+    public final Set<ClientCard> highlighted = new LinkedHashSet<>();
+
+    // Refcounted per-player hints (MSG_PLAYER_HINT), desc -> count. No UI yet.
     @SuppressWarnings("unchecked")
-    public final List<Integer>[][] overlay = new List[2][7];
+    public final Map<Long, Integer>[] playerHints = new Map[]{ new LinkedHashMap<>(), new LinkedHashMap<>() };
+
+    // The card that ended a match outright (MSG_MATCH_KILL); match play only, no UI yet.
+    public int matchKillCode;
+
+    // Both decks turned over (MSG_REVERSE_DECK). One global flag, as edopro's deck_reversed.
+    public boolean deckReversed;
 
     // Convenience accessors for pile counts (derived from list size)
+    public int deckCount(int player) { return deck[player].size(); }
     public int extraCount(int player) { return extra[player].size(); }
     public int graveCount(int player) { return grave[player].size(); }
     public int banishedCount(int player) { return banished[player].size(); }
 
+    /** The card occupying a field zone or sitting at {@code sequence} of a pile, or null. */
+    public ClientCard cardAt(int player, int location, int sequence) {
+        if (location == LOCATION_MZONE) {
+            return sequence >= 0 && sequence < mzone[player].length ? mzone[player][sequence] : null;
+        }
+        if (location == LOCATION_SZONE) {
+            return sequence >= 0 && sequence < szone[player].length ? szone[player][sequence] : null;
+        }
+        var list = pile(player, location);
+        return list != null && sequence >= 0 && sequence < list.size() ? list.get(sequence) : null;
+    }
+
+    /**
+     * The card at a location, materials included: {@code LOCATION_OVERLAY} in {@code location} makes
+     * {@code position} the material index ({@code card::get_info_location()}). Null when the slot is
+     * empty; no pile-tail fallback, so callers get the exact slot or nothing.
+     */
+    public ClientCard cardAt(int player, int location, int sequence, int position) {
+        if ((location & LOCATION_OVERLAY) == 0) return cardAt(player, location, sequence);
+        ClientCard host = cardAt(player, location & ~LOCATION_OVERLAY, sequence);
+        if (host == null) return null;
+        return position >= 0 && position < host.materials.size() ? host.materials.get(position) : null;
+    }
+
+    /**
+     * The code to draw for a prompt candidate. The server zeroes the code of every SELECT_CARD and
+     * SELECT_UNSELECT_CARD candidate the prompted player does not control ({@code MessageSanitizer},
+     * `generic_duel.cpp:933-977`); edopro's client resolves each candidate from its own field state
+     * and overwrites the code only when the message carries one (`duelclient.cpp` MSG_SELECT_CARD:
+     * {@code pcard = GetCard(c,l,s); if(code) pcard->SetCode(code);}).
+     */
+    public int candidateCode(DuelMessage.CardInfo info) {
+        if (info.code() != 0) return info.code();
+        ClientCard card = cardAt(info.controller(), info.location(), info.sequence(), info.position());
+        return card != null ? card.code : 0;
+    }
+
+    /** The list backing a non-field location, or null for the field and unknown locations. */
+    public List<ClientCard> pile(int player, int location) {
+        return switch (location) {
+            case LOCATION_HAND -> hand[player];
+            case LOCATION_DECK -> deck[player];
+            case LOCATION_EXTRA -> extra[player];
+            case LOCATION_GRAVE -> grave[player];
+            case LOCATION_REMOVED -> banished[player];
+            default -> null;
+        };
+    }
+
     // Current chain links
     public final List<ChainLink> chain = new ArrayList<>();
+
+    /** Every event worth a line, oldest first ({@link DuelLog}). */
+    public final DuelLog duelLog = new DuelLog();
+
+    /** The attack the UI is drawing, null once it has timed out. {@code target} is null for a direct attack. */
+    public record AttackArrow(LocInfo attacker, LocInfo target, long at) {}
+    public AttackArrow attack;
+
+    /** The floating LP number per absolute player, null when none is pending. */
+    public record LpDelta(int amount, String styleClass, long at) {
+        public String text() {
+            return (amount > 0 ? "+" : "-") + Math.abs(amount);
+        }
+    }
+    public final LpDelta[] lpDelta = new LpDelta[2];
+
+    /** Turn and phase banners waiting their turn on screen, shown one at a time like {@link #toasts}. */
+    public final Deque<String> banners = new ArrayDeque<>();
 
     // Pending selection prompt (null = no prompt)
     public DuelMessage pendingPrompt;
 
-    // Card actions: maps card location → available actions (for click-on-card UI)
-    public record CardAction(int actionType, int listIndex, String label) {}
+    /** MSG_WAITING: the opponent is answering a prompt of their own. Cleared by our next prompt. */
+    public boolean waitingForOpponent;
+
+    /** Status text for {@link #waitingForOpponent}; our own wording, edopro's string 1390 is just "Waiting...". */
+    public static final String WAITING_TEXT = "Waiting for opponent...";
+
+    // Last prompt record received, kept after pendingPrompt is cleared so MSG_RETRY can restore it.
+    private DuelMessage lastPrompt;
+
+    // One-shot status text for the UI after MSG_RETRY; PromptController shows it and clears it.
+    public String retryMessage;
+
+    // Answered guard: at most one response per prompt (edopro's "answered" flag).
+    // Reset whenever a new prompt (or Retry) arrives.
+    private boolean responseSent;
+
+    /** Marks a response as sent for the current prompt. Returns false if one was already sent. */
+    public boolean markResponseSent() {
+        if (responseSent) return false;
+        responseSent = true;
+        return true;
+    }
+
+    /** Called by the screen right after a response is sent: clears the active prompt UI, keeping lastPrompt. */
+    public void onResponseSent() {
+        pendingPrompt = null;
+        clearCardActions();
+    }
+
+    /** Sets a new pending prompt, remembering it for Retry and resetting the answered guard. */
+    private void setPrompt(DuelMessage msg) {
+        pendingPrompt = msg;
+        lastPrompt = msg;
+        responseSent = false;
+        waitingForOpponent = false;
+        // edopro spends select_hint on the prompt it captions (duelclient.cpp:2016); a prompt that
+        // arrives without one falls back to its own text. Retry keeps the caption it was given.
+        promptCaptionDesc = selectHint;
+        selectHint = 0;
+        clearHighlights();
+    }
+
+    // Card actions: maps card location → available actions (for click-on-card UI).
+    // `desc` is the activating effect's description (0 for everything but Activate), so two
+    // effects on one card can be told apart in the option dialog.
+    public record CardAction(int actionType, int listIndex, long desc) {}
     public record CardLocation(int controller, int location, int sequence) {}
     public final Map<CardLocation, List<CardAction>> cardActions = new HashMap<>();
 
-    // Last game action message (for UI display)
-    public DuelMessage lastAction;
+    // ── Hint surfaces (MSG_HINT, edopro duelclient.cpp:1390-1522) ──
 
-    // Last hint (provides context for next selection, e.g., "Select a monster")
-    public int lastHintType;
-    public long lastHintData;
+    /** A HINT_SELECTMSG waiting for the prompt it captions ({@code select_hint}). */
+    private long selectHint;
+    /** The caption HINT_SELECTMSG gave the active prompt, 0 when it arrived without one. */
+    public long promptCaptionDesc;
+    /** HINT_MESSAGE text waiting on its blocking modal; the modal's OK clears it. */
+    public String pendingModal;
+    /** Toast lines from HINT_OPSELECTED/RACE/ATTRIB/CODE/NUMBER, shown one at a time. */
+    public final Deque<String> toasts = new ArrayDeque<>();
+    /** HINT_CARD: the card to drop into the info banner, 0 once the screen has shown it. */
+    public int revealCardCode;
+    /**
+     * HINT_ZONE: the zones to flash and when they were named. The bit layout is SELECT_PLACE's,
+     * but a <b>set</b> bit marks a zone to flash — the opposite of SELECT_PLACE's blocked bits.
+     */
+    public int zoneFlashMask;
+    public long zoneFlashAt;
+
+    /** Card-data lookups hint text needs; the screen swaps in the card-database backed one. */
+    public HintText hintText = HintText.CODES_ONLY;
+
+    /** The three lookups {@link #applyHint} needs, so this class stays free of the client's card data. */
+    public interface HintText {
+        /** An engine description code as text ({@code OptionTextResolver}). */
+        String desc(long desc);
+        /** A card code as its printed name. */
+        String cardName(int code);
+        /** A {@code strings.conf} {@code !system} entry, or null when it is unknown. */
+        String systemString(int code);
+
+        /** The fallback before the screen injects its own: codes, unresolved. */
+        HintText CODES_ONLY = new HintText() {
+            @Override public String desc(long desc) { return "#" + desc; }
+            @Override public String cardName(int code) { return String.valueOf(code); }
+            @Override public String systemString(int code) { return null; }
+        };
+    }
 
     // Confirm/reveal card display
     public String confirmTitle;
@@ -145,92 +304,96 @@ public class ClientDuelState {
     public int rpsHand0;
     public int rpsHand1;
 
-    // Winner (-1 = ongoing)
+    // Winner (-1 = ongoing, 2 = draw)
     public int winner = -1;
     public int winReason;
 
-    public ClientDuelState(DuelStartPayload startInfo) {
-        this.localPlayer = startInfo.localPlayer();
-        this.opponentName = startInfo.opponentName();
-        this.duelFlags = startInfo.duelFlags();
-        this.lp[0] = startInfo.lp0();
-        this.lp[1] = startInfo.lp1();
-        this.deckCount[0] = startInfo.deckSize();
-        this.deckCount[1] = startInfo.deckSize();
-        // Extra deck: codes unknown at start, use 0 as placeholder
-        for (int i = 0; i < startInfo.extraSize(); i++) {
-            extra[0].add(0);
-            extra[1].add(0);
+    /** Records the duel result, from MSG_WIN or a host-synthesised DuelEndPayload. */
+    public void applyResult(int winner, int reason) {
+        this.winner = winner;
+        this.winReason = reason;
+        dirtyFlags.add(DirtyFlag.WINNER);
+        // MSG_WIN and the host's DuelEndPayload both land here, so the result can arrive twice.
+        String result = winner == localPlayer ? "You win" : winner == opponent() ? "You lose" : "Draw";
+        if (!result.equals(duelLog.lastText())) log(0, result);
+        LOGGER.info("[State] Result: winner={}, reason={}", winner, reason);
+    }
+
+    public ClientDuelState(int localPlayer, String opponentName, int lp0, int lp1,
+                           int deckSize, int extraSize, long duelFlags) {
+        this.localPlayer = localPlayer;
+        this.opponentName = opponentName;
+        this.duelFlags = duelFlags;
+        this.lp[0] = lp0;
+        this.lp[1] = lp1;
+        this.startingLp[0] = lp0;
+        this.startingLp[1] = lp1;
+        // Decks and extra decks start as blank face-down cards: codes arrive later (reveals, queries).
+        for (int p = 0; p < 2; p++) {
+            fillBlanks(deck[p], p, LOCATION_DECK, deckSize);
+            fillBlanks(extra[p], p, LOCATION_EXTRA, extraSize);
         }
-        // Init overlay lists for each monster zone
-        for (int p = 0; p < 2; p++)
-            for (int s = 0; s < 7; s++)
-                overlay[p][s] = new ArrayList<>();
         LOGGER.debug("[State] Init: localPlayer={}, LP={}|{}, deck={}|{}, extra={}|{}",
-                localPlayer, lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
+                localPlayer, lp[0], lp[1], deckCount(0), deckCount(1), extraCount(0), extraCount(1));
     }
 
     /**
      * Apply a duel message to update state.
      */
     public void applyMessage(DuelMessage msg) {
-        lastAction = msg;
-
         switch (msg) {
             // ---- System ----
+            case DuelMessage.Waiting ignored -> {
+                waitingForOpponent = true;
+                dirtyFlags.add(DirtyFlag.PROMPT);
+                LOGGER.debug("[State] Waiting for the opponent");
+            }
             case DuelMessage.Retry ignored -> {
+                responseSent = false;
+                pendingPrompt = lastPrompt;
+                if (pendingPrompt instanceof DuelMessage.SelectIdleCmd sel) buildIdleCmdActions(sel);
+                else if (pendingPrompt instanceof DuelMessage.SelectBattleCmd sel) buildBattleCmdActions(sel);
+                retryMessage = "Invalid response, try again";
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.warn("[State] RETRY — last response was invalid, re-prompting");
             }
 
             // ---- UI/Info ----
-            case DuelMessage.Hint hint -> {
-                lastHintType = hint.hintType();
-                lastHintData = hint.data();
-                LOGGER.debug("[State] Hint: type={}, player={}, data={}", hint.hintType(), hint.player(), hint.data());
-            }
+            case DuelMessage.Hint hint -> applyHint(hint);
+            case DuelMessage.CardHint hint -> applyCardHint(hint);
 
             // ---- Lifecycle ----
-            case DuelMessage.Start start -> {
-                lp[0] = start.lp0();
-                lp[1] = start.lp1();
-                startingLP = Math.max(lp[0], lp[1]);
-                deckCount[0] = start.deckCount0();
-                deckCount[1] = start.deckCount1();
-                // Reset extra deck lists to new size (codes unknown, placeholder 0)
-                extra[0].clear();
-                extra[1].clear();
-                for (int i = 0; i < start.extraCount0(); i++) { extra[0].add(0); extraPos[0].add(POS_FACEDOWN_DEFENSE); }
-                for (int i = 0; i < start.extraCount1(); i++) { extra[1].add(0); extraPos[1].add(POS_FACEDOWN_DEFENSE); }
-                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
-                LOGGER.debug("[State] Start: LP={}|{}, Deck={}|{}, Extra={}|{}",
-                        lp[0], lp[1], deckCount[0], deckCount[1], extraCount(0), extraCount(1));
-            }
-            case DuelMessage.Win win -> {
-                winner = win.winner();
-                winReason = win.reason();
-                dirtyFlags.add(DirtyFlag.WINNER);
-                LOGGER.info("[State] Win: player={}, reason={}", winner, winReason);
-            }
+            case DuelMessage.Win win -> applyResult(win.winner(), win.reason());
             case DuelMessage.NewTurn nt -> {
                 currentTurn = nt.player();
                 turnCount++;
                 dirtyFlags.add(DirtyFlag.TURN_PHASE);
+                banner("Turn " + turnCount + " - "
+                        + (isLocalTurn() ? "Your turn" : "Opponent's turn"));
                 LOGGER.debug("[State] NewTurn: player={}, turnCount={}", currentTurn, turnCount);
             }
             case DuelMessage.NewPhase np -> {
                 currentPhase = np.phase();
                 dirtyFlags.add(DirtyFlag.TURN_PHASE);
+                banner(phaseName());
                 LOGGER.debug("[State] NewPhase: {}", phaseName());
             }
 
             // ---- Card Movement ----
             case DuelMessage.Draw draw -> {
-                hand[draw.player()].addAll(draw.codes());
-                deckCount[draw.player()] -= draw.codes().size();
-                dirtyFlags.add(handFlag(draw.player()));
+                int p = draw.player();
+                for (var drawn : draw.cards()) {
+                    // edopro writes the code onto the deck-top object and then moves it to the hand.
+                    ClientCard card = deck[p].isEmpty()
+                            ? new ClientCard(0, p, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE)
+                            : deck[p].removeLast();
+                    card.code = drawn.code();
+                    putAt(card, p, LOCATION_HAND, hand[p].size());
+                }
+                renumber(deck[p]);
+                dirtyFlags.add(handFlag(p));
                 dirtyFlags.add(DirtyFlag.PILE_COUNTS);
-                LOGGER.debug("[State] Draw: player={}, codes={}", draw.player(), draw.codes());
+                LOGGER.debug("[State] Draw: player={}, cards={}", p, draw.cards());
             }
             case DuelMessage.Move move -> {
                 LOGGER.debug("[State] Move: code={}, from=[p{} loc=0x{} seq={}] to=[p{} loc=0x{} seq={} pos=0x{}], reason=0x{}",
@@ -239,42 +402,56 @@ public class ClientDuelState {
                         move.to().controller(), Integer.toHexString(move.to().location()), move.to().sequence(),
                         Integer.toHexString(move.to().position()), Integer.toHexString(move.reason()));
                 applyMove(move);
-                markLocationDirty(move.from());
-                markLocationDirty(move.to());
+                markZoneDirty(move.from().controller(), move.from().location());
+                markZoneDirty(move.to().controller(), move.to().location());
             }
             case DuelMessage.PosChange pc -> {
-                if (pc.location() == LOCATION_MZONE) {
-                    if (pc.code() != 0) mzone[pc.controller()][pc.sequence()] = pc.code();
-                    mzonePos[pc.controller()][pc.sequence()] = pc.newPosition();
-                    dirtyFlags.add(mzoneFlag(pc.controller()));
-                } else if (pc.location() == LOCATION_SZONE) {
-                    if (pc.code() != 0) szone[pc.controller()][pc.sequence()] = pc.code();
-                    szonePos[pc.controller()][pc.sequence()] = pc.newPosition();
-                    dirtyFlags.add(szoneFlag(pc.controller()));
+                ClientCard card = cardAt(pc.controller(), pc.location(), pc.sequence());
+                if (card != null) {
+                    if ((pc.prevPosition() & POS_FACEUP) != 0 && (pc.newPosition() & POS_FACEDOWN) != 0) {
+                        card.counters.clear();
+                        clearTargets(card);
+                    }
+                    if (pc.code() != 0) card.code = pc.code();
+                    card.position = pc.newPosition();
                 }
+                markZoneDirty(pc.controller(), pc.location());
             }
             case DuelMessage.Set set -> {
+                // MSG_MOVE already placed the card (operations.cpp emits the move first);
+                // MSG_SET only confirms the code and the face-down position.
                 LOGGER.debug("[State] Set: code={}, loc=[p{} loc=0x{} seq={}]",
                         set.code(), set.location().controller(),
                         Integer.toHexString(set.location().location()), set.location().sequence());
-                placeCard(set.location(), set.code());
-                markLocationDirty(set.location());
+                var loc = set.location();
+                ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+                if (card == null) {
+                    place(new ClientCard(set.code(), loc.controller(), loc.location(),
+                            loc.sequence(), loc.position()), loc);
+                } else {
+                    if (set.code() != 0) card.code = set.code();
+                    card.position = loc.position();
+                }
+                markZoneDirty(loc.controller(), loc.location());
             }
             case DuelMessage.Swap swap -> {
                 swapCards(swap.loc1(), swap.loc2());
-                markLocationDirty(swap.loc1());
-                markLocationDirty(swap.loc2());
+                markZoneDirty(swap.loc1().controller(), swap.loc1().location());
+                markZoneDirty(swap.loc2().controller(), swap.loc2().location());
             }
 
             // ---- Summons ----
-            case DuelMessage.Summoning ignored -> { } // card appears via MSG_MOVE
-            case DuelMessage.SpSummoning ignored -> { }
+            case DuelMessage.Summoning s -> log(s.code(), "Summoning " + quoted(s.code()));  // card appears via MSG_MOVE
+            case DuelMessage.SpSummoning s -> log(s.code(), "Special Summoning " + quoted(s.code()));
             case DuelMessage.FlipSummoning fs -> {
-                if (fs.location().location() == LOCATION_MZONE) {
-                    mzone[fs.location().controller()][fs.location().sequence()] = fs.code();
-                    mzonePos[fs.location().controller()][fs.location().sequence()] = fs.location().position();
-                    dirtyFlags.add(mzoneFlag(fs.location().controller()));
+                var loc = fs.location();
+                ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+                if (card != null) {
+                    if (fs.code() != 0) card.code = fs.code();
+                    card.position = loc.position();
+                    markZoneDirty(loc.controller(), loc.location());
                 }
+                log(fs.code(), "Flip Summoning " + quoted(fs.code()));
             }
             case DuelMessage.Summoned ignored -> { }
             case DuelMessage.SpSummoned ignored -> { }
@@ -282,26 +459,37 @@ public class ClientDuelState {
 
             // ---- Chain ----
             case DuelMessage.Chaining c -> {
-                    chain.add(new ChainLink(c.code(), c.location(), c.chainCount()));
+                    chain.add(new ChainLink(c.code(), c.location(), c.chainCount(),
+                            c.trigController(), c.trigLocation(), c.trigSequence()));
                     dirtyFlags.add(DirtyFlag.CHAIN);
+                    log(c.code(), c.desc() == 0 ? quoted(c.code()) + " activated"
+                            : quoted(c.code()) + " activated: " + hintText.desc(c.desc()));
             }
             case DuelMessage.ChainEnd ignored -> {
                 chain.clear();
                 dirtyFlags.add(DirtyFlag.CHAIN);
             }
             case DuelMessage.Chained ignored -> { }
-            case DuelMessage.ChainSolving ignored -> { }
-            case DuelMessage.ChainSolved ignored -> { }
-            case DuelMessage.ChainNegated ignored -> { }
-            case DuelMessage.ChainDisabled ignored -> { }
+            case DuelMessage.ChainSolving cs -> {
+                for (var link : chain) link.solving = link.chainIndex == cs.chainIndex();
+                dirtyFlags.add(DirtyFlag.CHAIN);
+            }
+            case DuelMessage.ChainSolved cs -> {
+                chain.removeIf(link -> link.chainIndex == cs.chainIndex());
+                dirtyFlags.add(DirtyFlag.CHAIN);
+            }
+            case DuelMessage.ChainNegated cn -> stampNegated(cn.chainIndex(), "was negated");
+            case DuelMessage.ChainDisabled cd -> stampNegated(cd.chainIndex(), "was disabled");
 
             // ---- LP ----
             case DuelMessage.Damage dmg -> {
                 lp[dmg.player()] = Math.max(0, lp[dmg.player()] - dmg.amount());
+                lpFeedback(dmg.player(), -dmg.amount(), "lp-damage", "damage");
                 LOGGER.debug("[State] Damage: player={}, amount={}, lp now={}", dmg.player(), dmg.amount(), lp[dmg.player()]);
             }
             case DuelMessage.Recover rec -> {
                 lp[rec.player()] += rec.amount();
+                lpFeedback(rec.player(), rec.amount(), "lp-recover", "recover");
                 LOGGER.debug("[State] Recover: player={}, amount={}, lp now={}", rec.player(), rec.amount(), lp[rec.player()]);
             }
             case DuelMessage.LpUpdate upd -> {
@@ -310,60 +498,91 @@ public class ClientDuelState {
             }
             case DuelMessage.PayLpCost pay -> {
                 lp[pay.player()] = Math.max(0, lp[pay.player()] - pay.amount());
+                lpFeedback(pay.player(), -pay.amount(), "lp-cost", "cost");
                 LOGGER.debug("[State] PayLpCost: player={}, amount={}, lp now={}", pay.player(), pay.amount(), lp[pay.player()]);
             }
 
             // ---- Field stat updates ----
             case DuelMessage.UpdateData upd -> {
                 var cards = upd.cards();
-                if (upd.location() == LOCATION_MZONE) {
-                    for (int i = 0; i < Math.min(cards.size(), mzoneStats[upd.player()].length); i++) {
-                        mzoneStats[upd.player()][i] = cards.get(i);
+                if (upd.location() == LOCATION_MZONE || upd.location() == LOCATION_SZONE) {
+                    for (int i = 0; i < cards.size(); i++) {
+                        applyQuery(cardAt(upd.player(), upd.location(), i), cards.get(i));
                     }
-                } else if (upd.location() == LOCATION_SZONE) {
-                    for (int i = 0; i < Math.min(cards.size(), szoneStats[upd.player()].length); i++) {
-                        szoneStats[upd.player()][i] = cards.get(i);
+                } else {
+                    var list = pile(upd.player(), upd.location());
+                    if (list != null) {
+                        resize(list, upd.player(), upd.location(), cards.size());
+                        for (int i = 0; i < cards.size(); i++) applyQuery(list.get(i), cards.get(i));
+                        markZoneDirty(upd.player(), upd.location());
                     }
-                } else if (upd.location() == LOCATION_EXTRA) {
-                    // Update extra deck card codes and positions from query results
-                    extra[upd.player()].clear();
-                    extraPos[upd.player()].clear();
-                    for (var card : cards) {
-                        extra[upd.player()].add(card != null ? card.code : 0);
-                        extraPos[upd.player()].add(card != null ? card.position : POS_FACEDOWN_DEFENSE);
-                    }
-                    dirtyFlags.add(DirtyFlag.PILE_COUNTS);
                 }
                 dirtyFlags.add(DirtyFlag.FIELD_STATS);
             }
             case DuelMessage.UpdateCard upd -> {
-                if (upd.location() == LOCATION_MZONE && upd.sequence() < mzoneStats[upd.player()].length) {
-                    mzoneStats[upd.player()][upd.sequence()] = upd.card();
-                } else if (upd.location() == LOCATION_SZONE && upd.sequence() < szoneStats[upd.player()].length) {
-                    szoneStats[upd.player()][upd.sequence()] = upd.card();
-                }
+                applyQuery(cardAt(upd.player(), upd.location(), upd.sequence()), upd.card());
                 dirtyFlags.add(DirtyFlag.FIELD_STATS);
             }
 
             // ---- Deck/Hand ----
-            case DuelMessage.ShuffleDeck ignored -> { }
+            case DuelMessage.ShuffleDeck sd -> {
+                // edopro takes back every reveal a shuffle invalidates (duelclient.cpp:2691).
+                for (var card : deck[sd.player()]) {
+                    card.code = 0;
+                    card.position = POS_FACEDOWN_DEFENSE;
+                }
+                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+            }
+            case DuelMessage.ReverseDeck ignored -> {
+                deckReversed = !deckReversed;
+                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                LOGGER.debug("[State] ReverseDeck: reversed={}", deckReversed);
+            }
+            case DuelMessage.DeckTop top -> {
+                // duelclient.cpp:2862 counts from the top of the pile, which is the end of the list.
+                int index = deck[top.player()].size() - 1 - top.offsetFromTop();
+                if (index < 0 || index >= deck[top.player()].size()) {
+                    LOGGER.warn("[State] DeckTop offset {} outside p{}'s deck of {}",
+                            top.offsetFromTop(), top.player(), deckCount(top.player()));
+                } else {
+                    ClientCard card = deck[top.player()].get(index);
+                    card.code = top.code();
+                    card.position = top.position();
+                    dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                }
+            }
             case DuelMessage.ShuffleHand sh -> {
-                hand[sh.player()].clear();
-                hand[sh.player()].addAll(sh.codes());
+                // edopro re-codes the existing hand objects rather than replacing them.
+                var list = hand[sh.player()];
+                resize(list, sh.player(), LOCATION_HAND, sh.codes().size());
+                for (int i = 0; i < list.size(); i++) list.get(i).code = sh.codes().get(i);
                 dirtyFlags.add(handFlag(sh.player()));
             }
             case DuelMessage.ShuffleExtra ignored -> { }
+            case DuelMessage.SwapGraveDeck swap -> {
+                applySwapGraveDeck(swap);
+                dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+                LOGGER.debug("[State] SwapGraveDeck: player={}, deck={}, grave={}, extra={}",
+                        swap.player(), deckCount(swap.player()), graveCount(swap.player()),
+                        extraCount(swap.player()));
+            }
+            case DuelMessage.ShuffleSetCard set -> applyShuffleSetCard(set);
+            case DuelMessage.RemoveCards remove -> applyRemoveCards(remove.cards());
 
-            // ---- Battle (no state change, UI can animate from lastAction) ----
-            case DuelMessage.Attack ignored -> { }
-            case DuelMessage.Battle ignored -> { }
-            case DuelMessage.AttackDisabled ignored -> { }
+            // ---- Battle ----
+            case DuelMessage.Attack atk -> applyAttack(atk);
+            case DuelMessage.Battle battle -> {
+                applyCombatStats(battle.attacker(), battle.atkAtk(), battle.atkDef());
+                applyCombatStats(battle.defender(), battle.defAtk(), battle.defDef());
+                dirtyFlags.add(DirtyFlag.FIELD_STATS);
+            }
+            case DuelMessage.AttackDisabled ignored -> log(0, template(1621));
             case DuelMessage.DamageStepStart ignored -> { }
-            case DuelMessage.DamageStepEnd ignored -> { }
+            case DuelMessage.DamageStepEnd ignored -> clearCombatStats();
 
             // ---- Selection prompts — set pendingPrompt for the UI ----
             case DuelMessage.SelectIdleCmd sel -> {
-                pendingPrompt = msg;
+                setPrompt(msg);
                 buildIdleCmdActions(sel);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.info("[State] SelectIdleCmd: summon={}, spSummon={}, repos={}, setMon={}, setST={}, activate={}, battle={}, end={}",
@@ -377,13 +596,13 @@ public class ClientDuelState {
                 }
             }
             case DuelMessage.SelectBattleCmd sel -> {
-                pendingPrompt = msg;
+                setPrompt(msg);
                 buildBattleCmdActions(sel);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.debug("[State] Prompt: SelectBattleCmd player={}, actions={}", sel.player(), cardActions.size());
             }
             case DuelMessage.SelectCard sel -> {
-                pendingPrompt = msg;
+                setPrompt(msg);
                 dirtyFlags.add(DirtyFlag.PROMPT);
                 LOGGER.info("[State] Prompt: SelectCard player={}, min={}, max={}, cards={}",
                         sel.player(), sel.min(), sel.max(), sel.cards().size());
@@ -393,21 +612,21 @@ public class ClientDuelState {
                             c.sequence(), Integer.toHexString(c.position()));
                 }
             }
-            case DuelMessage.SelectChain sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
-            case DuelMessage.SelectEffectYn sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
-            case DuelMessage.SelectYesNo sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
-            case DuelMessage.SelectOption sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectOption player={}, options={}", sel.player(), sel.options()); }
-            case DuelMessage.SelectPlace sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPlace player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
-            case DuelMessage.SelectPosition sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPosition player={}, code={}, pos=0x{}", sel.player(), sel.code(), Integer.toHexString(sel.positions())); }
-            case DuelMessage.SelectTribute sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
-            case DuelMessage.SelectCounter sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }
-            case DuelMessage.SelectSum sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectSum player={}", sel.player()); }
+            case DuelMessage.SelectChain sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectChain player={}, count={}, forced={}", sel.player(), sel.count(), sel.forced()); }
+            case DuelMessage.SelectEffectYn sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectEffectYn player={}, code={}", sel.player(), sel.code()); }
+            case DuelMessage.SelectYesNo sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectYesNo player={}, desc={}", sel.player(), sel.desc()); }
+            case DuelMessage.SelectOption sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectOption player={}, options={}", sel.player(), sel.options()); }
+            case DuelMessage.SelectPlace sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPlace player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
+            case DuelMessage.SelectDisfield sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectDisfield player={}, count={}, field=0x{}", sel.player(), sel.count(), Integer.toHexString(sel.field())); }
+            case DuelMessage.SelectPosition sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectPosition player={}, code={}, pos=0x{}", sel.player(), sel.code(), Integer.toHexString(sel.positions())); }
+            case DuelMessage.SelectTribute sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectTribute player={}, min={}, max={}", sel.player(), sel.min(), sel.max()); }
+            case DuelMessage.SelectCounter sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectCounter player={}", sel.player()); }
+            case DuelMessage.SelectSum sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SelectSum player={}", sel.player()); }
             case DuelMessage.SelectUnselectCard sel -> {
-                pendingPrompt = msg;
+                setPrompt(msg);
                 dirtyFlags.add(DirtyFlag.PROMPT);
-                LOGGER.info("[State] Prompt: SelectUnselectCard player={} hint=0x{} selectable={} alreadySelected={}",
-                        sel.player(), Integer.toHexString(lastHintType),
-                        sel.selectableCards().size(), sel.unselectableCards().size());
+                LOGGER.info("[State] Prompt: SelectUnselectCard player={} selectable={} alreadySelected={}",
+                        sel.player(), sel.selectableCards().size(), sel.unselectableCards().size());
                 for (var c : sel.selectableCards()) {
                     LOGGER.info("[State]   selectable: code={} ctrl={} loc=0x{} seq={}",
                             c.code(), c.controller(), Integer.toHexString(c.location()), c.sequence());
@@ -417,36 +636,129 @@ public class ClientDuelState {
                             c.code(), c.controller(), Integer.toHexString(c.location()), c.sequence());
                 }
             }
-            case DuelMessage.SortCard sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortCard player={}", sel.player()); }
-            case DuelMessage.SortChain sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortChain player={}", sel.player()); }
-            case DuelMessage.AnnounceRace sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceRace player={}", sel.player()); }
-            case DuelMessage.AnnounceAttrib sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceAttrib player={}", sel.player()); }
-            case DuelMessage.AnnounceNumber sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceNumber player={}", sel.player()); }
-            case DuelMessage.AnnounceCard sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceCard player={}", sel.player()); }
-            case DuelMessage.RockPaperScissors sel -> { pendingPrompt = msg; dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: RockPaperScissors player={}", sel.player()); }
+            case DuelMessage.SortCard sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortCard player={}", sel.player()); }
+            case DuelMessage.SortChain sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: SortChain player={}", sel.player()); }
+            case DuelMessage.AnnounceRace sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceRace player={}", sel.player()); }
+            case DuelMessage.AnnounceAttrib sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceAttrib player={}", sel.player()); }
+            case DuelMessage.AnnounceNumber sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceNumber player={}", sel.player()); }
+            case DuelMessage.AnnounceCard sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: AnnounceCard player={}", sel.player()); }
+            case DuelMessage.RockPaperScissors sel -> { setPrompt(msg); dirtyFlags.add(DirtyFlag.PROMPT); LOGGER.debug("[State] Prompt: RockPaperScissors player={}", sel.player()); }
 
             // ---- Confirm/reveal ----
             case DuelMessage.ConfirmDeckTop confirm -> {
-                confirmTitle = "Revealed Cards";
-                confirmCards = confirm.cards();
-                dirtyFlags.add(DirtyFlag.CONFIRM);
+                revealPileTop(deck[confirm.player()], confirm.cards());
+                reveal(owner(confirm.player()) + "Deck (top)", confirm.cards());
                 LOGGER.debug("[State] ConfirmDeckTop: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
+            case DuelMessage.ConfirmExtraTop confirm -> {
+                revealPileTop(extra[confirm.player()], confirm.cards());
+                reveal(owner(confirm.player()) + "Extra Deck (top)", confirm.cards());
+                LOGGER.debug("[State] ConfirmExtraTop: player={}, cards={}", confirm.player(), confirm.cards().size());
+            }
             case DuelMessage.ConfirmCards confirm -> {
-                confirmTitle = "Confirmed Cards";
-                confirmCards = confirm.cards();
-                dirtyFlags.add(DirtyFlag.CONFIRM);
+                int shown = confirm.cards().isEmpty() ? confirm.player() : confirm.cards().getFirst().controller();
+                reveal(owner(shown) + "Revealed Cards", confirm.cards());
                 LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
             case DuelMessage.CardSelected sel -> {
-                // Informational: engine reporting which cards were just selected
                 LOGGER.info("[State] CardSelected: count={}", sel.cards().size());
-                for (var loc : sel.cards()) {
-                    LOGGER.info("[State]   selected: ctrl={} loc=0x{} seq={} pos=0x{}",
-                            loc.controller(), Integer.toHexString(loc.location()),
-                            loc.sequence(), Integer.toHexString(loc.position()));
+                highlight(sel.cards());
+                logCards(sel.cards(), " selected");
+            }
+            case DuelMessage.BecomeTarget bt -> {
+                LOGGER.debug("[State] BecomeTarget: count={}", bt.targets().size());
+                highlight(bt.targets());
+                logCards(bt.targets(), " targeted");
+            }
+            case DuelMessage.RandomSelected rs -> {
+                LOGGER.info("[State] RandomSelected: player={}, count={}", rs.player(), rs.cards().size());
+                highlight(rs.cards());
+                logCards(rs.cards(), " selected at random");
+            }
+            case DuelMessage.MissedEffect missed -> {
+                LOGGER.info("[State] MissedEffect: code={} at p{} loc=0x{} seq={}",
+                        missed.code(), missed.location().controller(),
+                        Integer.toHexString(missed.location().location()), missed.location().sequence());
+                highlight(List.of(missed.location()));
+                log(missed.code(), quoted(missed.code()) + " missed the timing");
+            }
+
+            // ---- Relationships, counters, disabled zones ----
+            case DuelMessage.FieldDisabled fd -> {
+                disabledZones[0] = fd.field() & 0xFFFF;
+                disabledZones[1] = (fd.field() >>> 16) & 0xFFFF;
+                dirtyFlags.addAll(EnumSet.of(DirtyFlag.MZONE_0, DirtyFlag.MZONE_1,
+                        DirtyFlag.SZONE_0, DirtyFlag.SZONE_1));
+                LOGGER.debug("[State] FieldDisabled: p0=0x{}, p1=0x{}",
+                        Integer.toHexString(disabledZones[0]), Integer.toHexString(disabledZones[1]));
+            }
+            case DuelMessage.AddCounter add -> {
+                ClientCard card = cardAt(add.controller(), add.location(), add.sequence());
+                if (card != null) {
+                    card.counters.merge(add.counterType(), add.count(), Integer::sum);
+                    markZoneDirty(add.controller(), add.location());
                 }
             }
+            case DuelMessage.RemoveCounter rem -> {
+                ClientCard card = cardAt(rem.controller(), rem.location(), rem.sequence());
+                if (card != null) {
+                    int left = card.counters.getOrDefault(rem.counterType(), 0) - rem.count();
+                    if (left > 0) card.counters.put(rem.counterType(), left);
+                    else card.counters.remove(rem.counterType());
+                    markZoneDirty(rem.controller(), rem.location());
+                }
+            }
+            case DuelMessage.Equip eq -> {
+                ClientCard card = resolveCard(eq.card());
+                ClientCard target = resolveCard(eq.target());
+                if (card != null && target != null) {
+                    detachEquipTarget(card);
+                    card.equipTarget = target;
+                    target.equippedBy.add(card);
+                    log(card.code, quoted(card.code) + " equipped to " + quoted(target.code));
+                }
+            }
+            case DuelMessage.CardTarget ct -> {
+                ClientCard card = resolveCard(ct.card());
+                ClientCard target = resolveCard(ct.target());
+                if (card != null && target != null) {
+                    card.targets.add(target);
+                    target.targetedBy.add(card);
+                    markZoneDirty(ct.target().controller(), ct.target().location());
+                }
+            }
+            case DuelMessage.CancelTarget ct -> {
+                ClientCard card = resolveCard(ct.card());
+                ClientCard target = resolveCard(ct.target());
+                if (card != null && target != null) {
+                    card.targets.remove(target);
+                    target.targetedBy.remove(card);
+                    markZoneDirty(ct.target().controller(), ct.target().location());
+                }
+            }
+            // ---- Player-level hints and match bookkeeping (no UI yet) ----
+            case DuelMessage.PlayerHint hint -> {
+                var hints = playerHints[hint.player()];
+                if (hint.hintType() == PHINT_DESC_ADD) {
+                    hints.merge(hint.desc(), 1, Integer::sum);
+                } else if (hint.hintType() == PHINT_DESC_REMOVE) {
+                    int left = hints.getOrDefault(hint.desc(), 0) - 1;
+                    if (left > 0) hints.put(hint.desc(), left);
+                    else hints.remove(hint.desc());
+                }
+            }
+            case DuelMessage.MatchKill mk -> {
+                matchKillCode = mk.code();
+                LOGGER.info("[State] MatchKill: code={}", mk.code());
+            }
+
+            // ---- Coin and dice: one line in the log and one toast (duelclient.cpp:3847, :3865) ----
+            case DuelMessage.TossCoin toss -> tossResult(template(1623), toss.results().stream()
+                    .map(result -> result != 0 ? systemStringOr(60, "Heads") : systemStringOr(61, "Tails"))
+                    .toList());
+            case DuelMessage.TossDice toss -> tossResult(template(1624), toss.results().stream()
+                    .map(String::valueOf).toList());
+
             case DuelMessage.HandResult res -> {
                 rpsHand0 = res.hand0();
                 rpsHand1 = res.hand1();
@@ -461,129 +773,606 @@ public class ClientDuelState {
 
     // ---- Dirty flag helpers ----
 
-    private void markLocationDirty(LocInfo loc) {
-        switch (loc.location()) {
-            case LOCATION_HAND -> dirtyFlags.add(handFlag(loc.controller()));
-            case LOCATION_MZONE -> dirtyFlags.add(mzoneFlag(loc.controller()));
-            case LOCATION_SZONE -> dirtyFlags.add(szoneFlag(loc.controller()));
-            case LOCATION_OVERLAY -> dirtyFlags.add(mzoneFlag(loc.controller()));
+    /** Marks the container a card sits in; overlay locations resolve to their host zone. */
+    private void markZoneDirty(int controller, int location) {
+        switch (location & ~LOCATION_OVERLAY) {
+            case LOCATION_HAND -> dirtyFlags.add(handFlag(controller));
+            case LOCATION_MZONE -> dirtyFlags.add(mzoneFlag(controller));
+            case LOCATION_SZONE -> dirtyFlags.add(szoneFlag(controller));
             case LOCATION_DECK, LOCATION_EXTRA, LOCATION_GRAVE, LOCATION_REMOVED ->
                     dirtyFlags.add(DirtyFlag.PILE_COUNTS);
             default -> { }
         }
     }
 
-    // ---- Move handling ----
+    // ---- Hints (edopro duelclient.cpp MSG_HINT :1390, MSG_CARD_HINT :3964) ----
+
+    private void applyHint(DuelMessage.Hint hint) {
+        switch (hint.hintType()) {
+            case HINT_SELECTMSG -> selectHint = hint.data();
+            case HINT_MESSAGE -> pendingModal = hintText.desc(hint.data());
+            case HINT_OPSELECTED, HINT_RACE, HINT_ATTRIB, HINT_CODE, HINT_NUMBER ->
+                    toasts.add(toastText(hint));
+            case HINT_CARD -> revealCardCode = (int) hint.data();
+            case HINT_ZONE -> {
+                zoneFlashMask = viewerZoneMask((int) hint.data(), hint.player());
+                zoneFlashAt = System.currentTimeMillis();
+            }
+            // HINT_EVENT and HINT_EFFECT drive edopro's log and card-reveal animation; HINT_SKILL
+            // and above belong to Speed Duel skills, which this mod does not run.
+            default -> LOGGER.debug("[State] Hint: type={}, player={}, data={}",
+                    hint.hintType(), hint.player(), hint.data());
+        }
+    }
+
+    /** The toast line for a declaration hint, in edopro's system-string templates (`:1419-1462`). */
+    private String toastText(DuelMessage.Hint hint) {
+        return switch (hint.hintType()) {
+            case HINT_OPSELECTED ->
+                    template(hint.player() == localPlayer ? 1510 : 1512, hintText.desc(hint.data()));
+            case HINT_RACE -> template(1511, CardStringHelper.raceName(hint.data()));
+            case HINT_ATTRIB -> template(1511, CardStringHelper.attributeName((int) hint.data()));
+            case HINT_CODE -> template(1511, hintText.cardName((int) hint.data()));
+            default -> template(1512, String.valueOf(hint.data()));   // HINT_NUMBER
+        };
+    }
+
+    /**
+     * A {@code strings.conf} template with its {@code {}} placeholders filled in order, or a
+     * built-in copy. Only ids whose entry uses {@code {}} belong here: the {@code %ls}/{@code %d}
+     * lines (1610, 1613-1616, 1622) cannot be filled this way and are written out in English.
+     */
+    private String template(int systemString, String... values) {
+        String text = hintText.systemString(systemString);
+        if (text == null) {
+            text = switch (systemString) {
+                case 1510 -> "Your choice: [{}]";
+                case 1511 -> "Opponent declared: [{}]";
+                case 1619 -> "\"{}\" is attacking \"{}\"";
+                case 1620 -> "\"{}\" is attacking directly";
+                case 1621 -> "An attack was negated";
+                case 1623 -> "Coin landed on:";
+                case 1624 -> "Die landed on:";
+                default -> "Your opponent's choice: [{}]";
+            };
+        }
+        for (String value : values) {
+            int at = text.indexOf("{}");
+            if (at < 0) break;
+            text = text.substring(0, at) + value + text.substring(at + 2);
+        }
+        return text;
+    }
+
+    private String systemStringOr(int systemString, String fallback) {
+        String text = hintText.systemString(systemString);
+        return text != null ? text : fallback;
+    }
+
+    /**
+     * HINT_ZONE masks name zones from the hinted player's side, so a hint about the other side has
+     * its two halves swapped to land in the viewer's own layout ({@code duelclient.cpp:1481}).
+     */
+    private int viewerZoneMask(int field, int player) {
+        return player == localPlayer ? field : (field >>> 16) | (field << 16);
+    }
+
+    private void applyCardHint(DuelMessage.CardHint hint) {
+        var loc = hint.location();
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card == null) return;   // edopro drops a hint whose card it cannot find (`:3969`)
+        if (hint.chintType() == CHINT_DESC_ADD) {
+            card.descHints.merge(hint.value(), 1, Integer::sum);
+        } else if (hint.chintType() == CHINT_DESC_REMOVE) {
+            int left = card.descHints.getOrDefault(hint.value(), 0) - 1;
+            if (left > 0) card.descHints.put(hint.value(), left);
+            else card.descHints.remove(hint.value());
+        } else {
+            card.hintType = hint.chintType();
+            card.hintValue = hint.value();
+        }
+        markZoneDirty(loc.controller(), loc.location());
+    }
+
+    // ---- Feedback surfaces: log lines, chain stamps, the attack arrow, LP numbers, banners ----
+
+    private void log(int code, String text) {
+        duelLog.add(code, text);
+        dirtyFlags.add(DirtyFlag.LOG);
+    }
+
+    private void logCards(List<LocInfo> locations, String suffix) {
+        for (var loc : locations) {
+            ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+            if (card != null) log(card.code, quoted(card.code) + suffix);
+        }
+    }
+
+    /** A card's printed name in quotes, falling back to its code when no database is loaded. */
+    private String quoted(int code) {
+        return "\"" + hintText.cardName(code) + "\"";
+    }
+
+    private void stampNegated(int chainIndex, String verb) {
+        for (var link : chain) {
+            if (link.chainIndex != chainIndex) continue;
+            link.negated = true;
+            log(link.code, quoted(link.code) + " " + verb);
+        }
+        dirtyFlags.add(DirtyFlag.CHAIN);
+    }
+
+    /** A zeroed target location means the attack goes at the player (duelclient.cpp:3762). */
+    private void applyAttack(DuelMessage.Attack atk) {
+        LocInfo target = atk.target().location() == 0 ? null : atk.target();
+        attack = new AttackArrow(atk.attacker(), target, System.currentTimeMillis());
+        var from = atk.attacker();
+        ClientCard attacker = cardAt(from.controller(), from.location(), from.sequence());
+        int code = attacker != null ? attacker.code : 0;
+        // 1619/1620 quote their own placeholders, so these take the bare name.
+        if (target == null) {
+            log(code, template(1620, hintText.cardName(code)));
+        } else {
+            ClientCard defender = cardAt(target.controller(), target.location(), target.sequence());
+            log(code, template(1619, hintText.cardName(code),
+                    hintText.cardName(defender != null ? defender.code : 0)));
+        }
+    }
+
+    private void applyCombatStats(LocInfo loc, int combatAttack, int combatDefense) {
+        if (loc.location() == 0) return;
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card == null) return;
+        card.combatAttack = combatAttack;
+        card.combatDefense = combatDefense;
+    }
+
+    /**
+     * The damage step is over, so every monster still on the field goes back to the stats the
+     * engine queries report. One destroyed in battle has already left ({@code processor.cpp:2720}
+     * fires MSG_DAMAGE_STEP_END after the destruction), and {@link #applyMove} moves the very same
+     * card object, so {@link #clearCombat} drops its override on the way out instead.
+     */
+    private void clearCombatStats() {
+        for (int p = 0; p < 2; p++) {
+            for (ClientCard card : mzone[p]) {
+                if (card != null) clearCombat(card);
+            }
+        }
+        dirtyFlags.add(DirtyFlag.FIELD_STATS);
+    }
+
+    private static void clearCombat(ClientCard card) {
+        card.combatAttack = null;
+        card.combatDefense = null;
+    }
+
+    /**
+     * Several LP messages can arrive in one batch. A number still on screen absorbs the new one
+     * rather than being replaced by it, so a pair of damage steps reads as one total instead of
+     * showing only the last. The screen clears the slot when the number times out.
+     */
+    private void lpFeedback(int player, int delta, String styleClass, String reason) {
+        LpDelta pending = lpDelta[player];
+        int amount = pending == null ? delta : pending.amount() + delta;
+        lpDelta[player] = new LpDelta(amount, styleClass, System.currentTimeMillis());
+        log(0, who(player) + ": " + (delta > 0 ? "+" : "-") + Math.abs(delta) + " LP (" + reason + ")");
+    }
+
+    private String who(int player) {
+        return player == localPlayer ? "You" : "Opponent";
+    }
+
+    private void banner(String text) {
+        banners.add(text);
+        log(0, text);
+    }
+
+    /** edopro puts a coin or dice result in both the log and a toast ({@code duelclient.cpp:3857}). */
+    private void tossResult(String heading, List<String> results) {
+        var line = new StringBuilder(heading).append(' ');
+        for (String result : results) line.append('[').append(result).append(']');
+        log(0, line.toString());
+        toasts.add(line.toString());
+    }
+
+    // ---- Reveals ----
+
+    /** "Your " or "Opponent's ", so a reveal panel says whose pile it is showing. */
+    private String owner(int player) {
+        return player == localPlayer ? "Your " : "Opponent's ";
+    }
+
+    private void reveal(String title, List<DuelMessage.ConfirmCard> cards) {
+        confirmTitle = title;
+        confirmCards = cards;
+        dirtyFlags.add(DirtyFlag.CONFIRM);
+    }
+
+    /**
+     * edopro writes a deck-top or extra-top reveal onto the pile's own card objects, so the codes
+     * survive until a shuffle takes them back (duelclient.cpp:2513, :2548). Each entry carries the
+     * revealed card's own sequence ({@code libduel.cpp:832, :854}), which is what addresses the
+     * pile: {@code ConfirmExtratop} skips the pendulum cards at the end of the extra deck, so
+     * counting down from the top would land on the wrong ones.
+     */
+    private void revealPileTop(List<ClientCard> pile, List<DuelMessage.ConfirmCard> cards) {
+        for (var card : cards) {
+            int index = card.sequence();
+            if (index < 0 || index >= pile.size()) {
+                LOGGER.warn("[State] Reveal sequence {} outside a pile of {}", index, pile.size());
+                continue;
+            }
+            if (card.code() != 0) pile.get(index).code = card.code();
+        }
+        dirtyFlags.add(DirtyFlag.PILE_COUNTS);
+    }
+
+    // ---- Card containers ----
+
+    private static void fillBlanks(List<ClientCard> list, int player, int location, int count) {
+        for (int i = 0; i < count; i++) {
+            list.add(new ClientCard(0, player, location, list.size(), POS_FACEDOWN_DEFENSE));
+        }
+    }
+
+    /** Grows a pile with blank cards or drops the tail so it matches a queried size. */
+    private static void resize(List<ClientCard> list, int player, int location, int size) {
+        while (list.size() > size) list.removeLast();
+        fillBlanks(list, player, location, size - list.size());
+    }
+
+    private static void renumber(List<ClientCard> list) {
+        for (int i = 0; i < list.size(); i++) list.get(i).sequence = i;
+    }
+
+    /** Puts a card into a container without touching its position (used by Draw and Swap). */
+    private void putAt(ClientCard card, int controller, int location, int sequence) {
+        card.controller = controller;
+        card.location = location;
+        card.sequence = sequence;
+        if (location == LOCATION_MZONE) {
+            mzone[controller][sequence] = card;
+            return;
+        }
+        if (location == LOCATION_SZONE) {
+            szone[controller][sequence] = card;
+            return;
+        }
+        var list = pile(controller, location);
+        if (list == null) return;
+        list.add(Math.min(Math.max(sequence, 0), list.size()), card);
+        renumber(list);
+    }
+
+    private void place(ClientCard card, LocInfo to) {
+        card.position = to.position();
+        putAt(card, to.controller(), to.location(), to.sequence());
+    }
+
+    /** Takes a card out of the container named by {@code from}, renumbering what is left behind. */
+    private void removeFrom(ClientCard card, LocInfo from) {
+        if ((from.location() & LOCATION_OVERLAY) != 0) {
+            detachMaterial(card, from);
+            return;
+        }
+        if (from.location() == LOCATION_MZONE) {
+            clearSlot(mzone[from.controller()], card, from.sequence());
+            return;
+        }
+        if (from.location() == LOCATION_SZONE) {
+            clearSlot(szone[from.controller()], card, from.sequence());
+            return;
+        }
+        var list = pile(from.controller(), from.location());
+        if (list != null && list.remove(card)) renumber(list);
+    }
+
+    private static void clearSlot(ClientCard[] zones, ClientCard card, int sequence) {
+        if (sequence >= 0 && sequence < zones.length && zones[sequence] == card) {
+            zones[sequence] = null;
+            return;
+        }
+        for (int i = 0; i < zones.length; i++) {
+            if (zones[i] == card) zones[i] = null;
+        }
+    }
+
+    /**
+     * The card a message points at. A material is addressed as
+     * {@code {host controller, host location | LOCATION_OVERLAY, host sequence, material index}}
+     * (`card::get_info_location()`), so `0x84` means "material of the monster zone card".
+     */
+    private ClientCard resolveCard(LocInfo loc) {
+        if (loc.location() == 0) return null;
+        if ((loc.location() & LOCATION_OVERLAY) != 0) {
+            return cardAt(loc.controller(), loc.location(), loc.sequence(), loc.position());
+        }
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card != null) return card;
+        // Out-of-range sequence into a pile: fall back to the tail so the count stays honest.
+        var list = pile(loc.controller(), loc.location());
+        if (list != null && !list.isEmpty()) {
+            LOGGER.warn("[State] No card at p{} loc=0x{} seq={}; using the last one",
+                    loc.controller(), Integer.toHexString(loc.location()), loc.sequence());
+            return list.getLast();
+        }
+        LOGGER.warn("[State] No card at p{} loc=0x{} seq={}",
+                loc.controller(), Integer.toHexString(loc.location()), loc.sequence());
+        return null;
+    }
+
+    // ---- Move handling (edopro duelclient.cpp MSG_MOVE, :3044-3215) ----
 
     private void applyMove(DuelMessage.Move move) {
-        removeCard(move.from());
-        if (move.to().location() != 0) {
-            placeCard(move.to(), move.code());
+        LocInfo from = move.from();
+        LocInfo to = move.to();
+        ClientCard card = resolveCard(from);
+
+        if (card == null) {
+            // A token appearing, or a card this client never saw. Nowhere to go means nothing to do.
+            if (to.location() == 0) return;
+            ClientCard appeared = new ClientCard(move.code(), to.controller(),
+                    to.location(), to.sequence(), to.position());
+            if ((to.location() & LOCATION_OVERLAY) != 0) attachMaterial(appeared, to);
+            else place(appeared, to);
+            return;
+        }
+        if (to.location() == 0) {
+            // Leaves play entirely (a token vanishing): drop every link this card was part of.
+            if (move.code() != 0) card.code = move.code();
+            clearTargets(card);
+            detachEquips(card);
+            clearCombat(card);
+            removeFrom(card, from);
+            highlighted.remove(card);
+            return;
+        }
+
+        boolean fromOverlay = (from.location() & LOCATION_OVERLAY) != 0;
+        boolean toOverlay = (to.location() & LOCATION_OVERLAY) != 0;
+
+        if (!fromOverlay && !toOverlay) {
+            if (move.code() != 0 || to.location() == LOCATION_EXTRA) card.code = move.code();
+            // edopro drops the single card hint on every move (duelclient.cpp:3105-3106). The
+            // refcounted descHints stay put; edopro clears those only on MSG_SHUFFLE_HAND (:2766),
+            // and a hand card here never carries one.
+            card.hintType = 0;
+            card.hintValue = 0;
+            if ((from.location() & LOCATION_ONFIELD) != 0 && to.location() != from.location()) {
+                card.counters.clear();
+            }
+            if (to.location() != from.location()) {
+                clearTargets(card);
+                detachEquipTarget(card);
+                clearCombat(card);
+            }
+            removeFrom(card, from);
+            place(card, to);
+        } else if (!fromOverlay) {
+            // Attach: the card becomes an XYZ material of the host named by `to`.
+            if (move.code() != 0) card.code = move.code();
+            card.counters.clear();
+            clearTargets(card);
+            clearCombat(card);
+            removeFrom(card, from);
+            attachMaterial(card, to);
+        } else if (!toOverlay) {
+            detachMaterial(card, from);
+            place(card, to);
+        } else {
+            detachMaterial(card, from);
+            attachMaterial(card, to);
         }
     }
 
-    private void removeCard(LocInfo loc) {
-        switch (loc.location()) {
-            case LOCATION_HAND -> {
-                if (loc.sequence() < hand[loc.controller()].size()) {
-                    hand[loc.controller()].remove(loc.sequence());
-                } else if (!hand[loc.controller()].isEmpty()) {
-                    hand[loc.controller()].removeLast();
-                }
+    private void attachMaterial(ClientCard card, LocInfo to) {
+        ClientCard host = cardAt(to.controller(), to.location() & ~LOCATION_OVERLAY, to.sequence());
+        if (host == null) {
+            LOGGER.warn("[State] Overlay attach with no host at p{} loc=0x{} seq={}",
+                    to.controller(), Integer.toHexString(to.location()), to.sequence());
+            return;
+        }
+        host.materials.add(card);
+        card.controller = to.controller();
+        card.location = LOCATION_OVERLAY;
+        card.sequence = host.materials.size() - 1;
+    }
+
+    private void detachMaterial(ClientCard card, LocInfo from) {
+        ClientCard host = cardAt(from.controller(), from.location() & ~LOCATION_OVERLAY, from.sequence());
+        if (host == null) return;
+        if (host.materials.remove(card)) renumber(host.materials);
+    }
+
+    // ---- Pile restructuring (edopro duelclient.cpp :2811, :2881, :4017) ----
+
+    /**
+     * The graveyard and the deck trade places, then every card the bitmask flags leaves the new
+     * deck for the extra deck, face-down ({@code duelclient.cpp:2811}).
+     */
+    private void applySwapGraveDeck(DuelMessage.SwapGraveDeck swap) {
+        int p = swap.player();
+        var wasGrave = List.copyOf(grave[p]);
+        grave[p].clear();
+        grave[p].addAll(deck[p]);
+        deck[p].clear();
+        deck[p].addAll(wasGrave);
+
+        for (var card : grave[p]) card.location = LOCATION_GRAVE;
+        renumber(grave[p]);
+
+        int index = 0;
+        for (var it = deck[p].iterator(); it.hasNext(); index++) {
+            ClientCard card = it.next();
+            if (maskBit(swap.extraMask(), index)) {
+                it.remove();
+                card.position = POS_FACEDOWN_DEFENSE;
+                putAt(card, p, LOCATION_EXTRA, extra[p].size());
+            } else {
+                card.location = LOCATION_DECK;
+                // These came from the graveyard face-up; edopro relies on its renderer to hide
+                // deck cards, this client reads the position, so turn them over here.
+                card.position = POS_FACEDOWN_DEFENSE;
             }
-            case LOCATION_MZONE -> {
-                mzone[loc.controller()][loc.sequence()] = 0;
-                mzonePos[loc.controller()][loc.sequence()] = 0;
-                overlay[loc.controller()][loc.sequence()].clear();
-                // Clear stats for source zone
-                if (loc.sequence() < mzoneStats[loc.controller()].length) {
-                    mzoneStats[loc.controller()][loc.sequence()] = null;
-                }
+        }
+        renumber(deck[p]);
+    }
+
+    private static boolean inRange(int sequence, ClientCard[] zone) {
+        return sequence >= 0 && sequence < zone.length;
+    }
+
+    /** Bit {@code index} of the engine's {@code ProgressiveBuffer}: byte {@code index/8}, bit {@code index%8}. */
+    private static boolean maskBit(byte[] mask, int index) {
+        int b = index / 8;
+        return b < mask.length && (mask[b] & (1 << (index % 8))) != 0;
+    }
+
+    /**
+     * Every named card loses its code; the second block re-places the ones carrying XYZ materials,
+     * swapping each with whatever sits in its new zone ({@code duelclient.cpp:2881}).
+     */
+    private void applyShuffleSetCard(DuelMessage.ShuffleSetCard set) {
+        ClientCard[][] zones = set.location() == LOCATION_MZONE ? mzone : szone;
+        var shuffled = new ArrayList<ClientCard>(set.from().size());
+        for (var from : set.from()) {
+            ClientCard card = cardAt(from.controller(), set.location(), from.sequence());
+            shuffled.add(card);
+            if (card != null) card.code = 0;
+            markZoneDirty(from.controller(), set.location());
+        }
+        for (int i = 0; i < set.follow().size() && i < shuffled.size(); i++) {
+            LocInfo to = set.follow().get(i);
+            ClientCard card = shuffled.get(i);
+            if (card == null || to.location() == 0) continue;
+            ClientCard[] zone = zones[to.controller()];
+            int previous = card.sequence;
+            if (!inRange(to.sequence(), zone) || !inRange(previous, zone)) {
+                LOGGER.warn("[State] ShuffleSetCard move {} -> {} outside p{}'s {} zones",
+                        previous, to.sequence(), to.controller(),
+                        Integer.toHexString(set.location()));
+                continue;
             }
-            case LOCATION_SZONE -> {
-                szone[loc.controller()][loc.sequence()] = 0;
-                szonePos[loc.controller()][loc.sequence()] = 0;
-                // Clear stats for source zone
-                if (loc.sequence() < szoneStats[loc.controller()].length) {
-                    szoneStats[loc.controller()][loc.sequence()] = null;
-                }
-            }
-            case LOCATION_DECK -> deckCount[loc.controller()]--;
-            case LOCATION_EXTRA -> {
-                int seq = loc.sequence();
-                int p = loc.controller();
-                if (seq < extra[p].size()) {
-                    extra[p].remove(seq);
-                    if (seq < extraPos[p].size()) extraPos[p].remove(seq);
-                } else if (!extra[p].isEmpty()) {
-                    extra[p].removeLast();
-                    if (!extraPos[p].isEmpty()) extraPos[p].removeLast();
-                }
-            }
-            case LOCATION_GRAVE -> {
-                int seq = loc.sequence();
-                if (seq < grave[loc.controller()].size()) {
-                    grave[loc.controller()].remove(seq);
-                } else if (!grave[loc.controller()].isEmpty()) {
-                    grave[loc.controller()].removeLast();
-                }
-            }
-            case LOCATION_REMOVED -> {
-                int seq = loc.sequence();
-                if (seq < banished[loc.controller()].size()) {
-                    banished[loc.controller()].remove(seq);
-                } else if (!banished[loc.controller()].isEmpty()) {
-                    banished[loc.controller()].removeLast();
-                }
-            }
-            case LOCATION_OVERLAY -> {
-                // XYZ material detach — remove from the monster's overlay list
-                // The sequence in the from-loc refers to the monster's zone sequence
-                // The overlay card is identified by position in the overlay list
-                var materials = overlay[loc.controller()][loc.sequence()];
-                if (!materials.isEmpty()) {
-                    materials.removeLast();
-                }
-            }
-            default -> { }
+            ClientCard displaced = zone[to.sequence()];
+            zone[previous] = displaced;
+            zone[to.sequence()] = card;
+            card.sequence = to.sequence();
+            if (displaced != null) displaced.sequence = previous;
+            markZoneDirty(to.controller(), set.location());
         }
     }
 
-    private void placeCard(LocInfo loc, int code) {
-        switch (loc.location()) {
-            case LOCATION_HAND -> hand[loc.controller()].add(code);
-            case LOCATION_MZONE -> {
-                mzone[loc.controller()][loc.sequence()] = code;
-                mzonePos[loc.controller()][loc.sequence()] = loc.position();
-            }
-            case LOCATION_SZONE -> {
-                szone[loc.controller()][loc.sequence()] = code;
-                szonePos[loc.controller()][loc.sequence()] = loc.position();
-            }
-            case LOCATION_DECK -> deckCount[loc.controller()]++;
-            case LOCATION_EXTRA -> {
-                extra[loc.controller()].add(code);
-                extraPos[loc.controller()].add(loc.position());
-            }
-            case LOCATION_GRAVE -> grave[loc.controller()].add(code);
-            case LOCATION_REMOVED -> banished[loc.controller()].add(code);
-            case LOCATION_OVERLAY -> {
-                // XYZ material attach — add to the monster's overlay list
-                overlay[loc.controller()][loc.sequence()].add(code);
-            }
-            default -> { }
+    /** Every named card is resolved before any is deleted, so removals do not shift the sequences. */
+    private void applyRemoveCards(List<LocInfo> locations) {
+        var doomed = new ArrayList<ClientCard>(locations.size());
+        for (var loc : locations) doomed.add(resolveCard(loc));
+        for (int i = 0; i < doomed.size(); i++) {
+            ClientCard card = doomed.get(i);
+            if (card == null) continue;
+            LocInfo loc = locations.get(i);
+            clearTargets(card);
+            detachEquips(card);
+            removeFrom(card, loc);
+            highlighted.remove(card);
+            markZoneDirty(loc.controller(), loc.location());
         }
     }
 
     private void swapCards(LocInfo loc1, LocInfo loc2) {
-        if (loc1.location() == LOCATION_MZONE && loc2.location() == LOCATION_MZONE) {
-            int tempCode = mzone[loc1.controller()][loc1.sequence()];
-            int tempPos = mzonePos[loc1.controller()][loc1.sequence()];
-            mzone[loc1.controller()][loc1.sequence()] = mzone[loc2.controller()][loc2.sequence()];
-            mzonePos[loc1.controller()][loc1.sequence()] = mzonePos[loc2.controller()][loc2.sequence()];
-            mzone[loc2.controller()][loc2.sequence()] = tempCode;
-            mzonePos[loc2.controller()][loc2.sequence()] = tempPos;
+        ClientCard card1 = resolveCard(loc1);
+        ClientCard card2 = resolveCard(loc2);
+        if (card1 != null) removeFrom(card1, loc1);
+        if (card2 != null) removeFrom(card2, loc2);
+        if (card1 != null) putAt(card1, loc2.controller(), loc2.location(), loc2.sequence());
+        if (card2 != null) putAt(card2, loc1.controller(), loc1.location(), loc1.sequence());
+    }
+
+    // ---- Links, highlights, queries ----
+
+    /** edopro's {@code ClientCard::ClearTarget()}: drops this card from both ends of every link. */
+    private static void clearTargets(ClientCard card) {
+        for (var target : card.targets) target.targetedBy.remove(card);
+        for (var source : card.targetedBy) source.targets.remove(card);
+        card.targets.clear();
+        card.targetedBy.clear();
+    }
+
+    private static void detachEquipTarget(ClientCard card) {
+        if (card.equipTarget == null) return;
+        card.equipTarget.equippedBy.remove(card);
+        card.equipTarget = null;
+    }
+
+    /** Detaches both directions, for a card that leaves play altogether. */
+    private static void detachEquips(ClientCard card) {
+        detachEquipTarget(card);
+        for (var equipped : card.equippedBy) equipped.equipTarget = null;
+        card.equippedBy.clear();
+    }
+
+    private void highlight(List<LocInfo> locations) {
+        for (var loc : locations) {
+            ClientCard card = resolveCard(loc);
+            if (card == null) continue;
+            highlighted.add(card);
+            markZoneDirty(loc.controller(), loc.location());
         }
+    }
+
+    /**
+     * edopro's {@code highlighting_card} (`duelclient.cpp:1944-1948`): tints the card a
+     * {@code SELECT_EFFECTYN} prompt is asking about. Cleared with every other highlight
+     * when the next prompt arrives.
+     */
+    public void highlightPromptCard(LocInfo loc) {
+        highlight(List.of(loc));
+    }
+
+    private void clearHighlights() {
+        if (highlighted.isEmpty()) return;
+        highlighted.clear();
+        dirtyFlags.addAll(EnumSet.of(DirtyFlag.MZONE_0, DirtyFlag.MZONE_1,
+                DirtyFlag.SZONE_0, DirtyFlag.SZONE_1));
+    }
+
+    /** Writes a query result onto a card, self-healing code and position when they are carried. */
+    private void applyQuery(ClientCard card, QueriedCard query) {
+        if (card == null || query == null) return;
+        QueriedCard previous = card.stats;
+        card.stats = query;
+        boolean visualChanged = false;
+        if ((query.flags & (QUERY_LSCALE | QUERY_RSCALE)) != 0 && (previous == null
+                || previous.lscale != query.lscale || previous.rscale != query.rscale)) {
+            visualChanged = true;   // the pendulum scale badge
+        }
+        if (query.code != 0 && query.code != card.code) {
+            card.code = query.code;
+            visualChanged = true;
+        }
+        if (query.position != 0 && query.position != card.position) {
+            card.position = query.position;
+            visualChanged = true;
+        }
+        if ((query.flags & QUERY_OVERLAY_CARD) != 0) {
+            for (int i = 0; i < Math.min(query.overlayCards.size(), card.materials.size()); i++) {
+                ClientCard material = card.materials.get(i);
+                if (material.code != query.overlayCards.get(i)) {
+                    material.code = query.overlayCards.get(i);
+                    visualChanged = true;
+                }
+            }
+        }
+        if ((query.flags & QUERY_COUNTERS) != 0) {
+            // The engine packs each counter as type in the low 16 bits, count in the high 16.
+            card.counters.clear();
+            for (int packed : query.counters) {
+                card.counters.put(packed & 0xFFFF, (packed >>> 16) & 0xFFFF);
+            }
+            visualChanged = true;
+        }
+        // A corrected code, position or counter total changes what the slot draws, not just its stats.
+        if (visualChanged) markZoneDirty(card.controller, card.location);
     }
 
     // ---- Helpers for the UI ----
@@ -596,13 +1385,19 @@ public class ClientDuelState {
         return 1 - localPlayer;
     }
 
+    /**
+     * The engine announces only six phases. All ten {@code MSG_NEW_PHASE} sites
+     * ({@code processor.cpp:2787, 2793, 2832, 2858, 3365, 3414, 3450, 3469, 3562, 3580}) write
+     * either a hard-coded {@code PHASE_BATTLE_START} or {@code infos.phase} at a point where it is
+     * DRAW, STANDBY, MAIN1, BATTLE_START, MAIN2 or END: {@code BATTLE_STEP}, {@code DAMAGE},
+     * {@code DAMAGE_CAL} and {@code BATTLE} are set internally and never sent.
+     */
     public String phaseName() {
         return switch (currentPhase) {
             case PHASE_DRAW -> "Draw";
             case PHASE_STANDBY -> "Standby";
             case PHASE_MAIN1 -> "Main 1";
-            case PHASE_BATTLE_START, PHASE_BATTLE_STEP, PHASE_DAMAGE,
-                 PHASE_DAMAGE_CAL, PHASE_BATTLE -> "Battle";
+            case PHASE_BATTLE_START -> "Battle";
             case PHASE_MAIN2 -> "Main 2";
             case PHASE_END -> "End";
             default -> "---";
@@ -614,37 +1409,42 @@ public class ClientDuelState {
     }
 
     private void addAction(int controller, int location, int sequence,
-                           int actionType, int listIndex, String label) {
+                           int actionType, int listIndex) {
+        addAction(controller, location, sequence, actionType, listIndex, 0L);
+    }
+
+    private void addAction(int controller, int location, int sequence,
+                           int actionType, int listIndex, long desc) {
         var key = new CardLocation(controller, location, sequence);
         cardActions.computeIfAbsent(key, k -> new ArrayList<>())
-                .add(new CardAction(actionType, listIndex, label));
+                .add(new CardAction(actionType, listIndex, desc));
     }
 
     private void buildIdleCmdActions(DuelMessage.SelectIdleCmd sel) {
         cardActions.clear();
         for (int i = 0; i < sel.summonable().size(); i++) {
             var c = sel.summonable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 0, i, "Summon");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SUMMON, i);
         }
         for (int i = 0; i < sel.specialSummonable().size(); i++) {
             var c = sel.specialSummonable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 1, i, "Sp. Summon");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SPECIAL_SUMMON, i);
         }
         for (int i = 0; i < sel.repositionable().size(); i++) {
             var c = sel.repositionable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 2, i, "Reposition");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.REPOSITION, i);
         }
         for (int i = 0; i < sel.settableMonsters().size(); i++) {
             var c = sel.settableMonsters().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 3, i, "Set");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SET_MONSTER, i);
         }
         for (int i = 0; i < sel.settableSpells().size(); i++) {
             var c = sel.settableSpells().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 4, i, "Set S/T");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.SET_SPELL_TRAP, i);
         }
         for (int i = 0; i < sel.activatable().size(); i++) {
             var c = sel.activatable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 5, i, "Activate");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.ACTIVATE, i, c.desc());
         }
     }
 
@@ -652,13 +1452,39 @@ public class ClientDuelState {
         cardActions.clear();
         for (int i = 0; i < sel.attackable().size(); i++) {
             var c = sel.attackable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 1, i, "Attack");
+            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ATTACK, i);
         }
         for (int i = 0; i < sel.activatable().size(); i++) {
             var c = sel.activatable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), 2, i, "Activate");
+            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ACTIVATE, i, c.desc());
         }
     }
 
-    public record ChainLink(int code, LocInfo location, int chainIndex) {}
+    /**
+     * One link of the current chain. edopro keeps the activating card plus the location the effect
+     * triggered from ({@code duelclient.cpp:3390-3397}); the marker is drawn at the trigger, which
+     * is often a different card from the one that activated.
+     */
+    public static final class ChainLink {
+        public final int code;
+        public final LocInfo location;
+        public final int chainIndex;
+        public final int trigController;
+        public final int trigLocation;
+        public final int trigSequence;
+        /** Set by MSG_CHAIN_NEGATED/MSG_CHAIN_DISABLED, cleared with the chain. */
+        public boolean negated;
+        /** Set while MSG_CHAIN_SOLVING names this link. */
+        public boolean solving;
+
+        ChainLink(int code, LocInfo location, int chainIndex,
+                  int trigController, int trigLocation, int trigSequence) {
+            this.code = code;
+            this.location = location;
+            this.chainIndex = chainIndex;
+            this.trigController = trigController;
+            this.trigLocation = trigLocation;
+            this.trigSequence = trigSequence;
+        }
+    }
 }

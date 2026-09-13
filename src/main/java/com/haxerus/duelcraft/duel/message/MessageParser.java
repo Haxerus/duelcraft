@@ -30,8 +30,7 @@ public class MessageParser {
                 case MSG_RETRY         -> new DuelMessage.Retry();
 
                 // Lifecycle
-                case MSG_START         -> parseStart(reader);
-                case MSG_WIN           -> parseWin(reader, bodyLength);
+                case MSG_WIN           -> parseWin(reader);
                 case MSG_NEW_TURN      -> parseNewTurn(reader);
                 case MSG_NEW_PHASE     -> parseNewPhase(reader);
 
@@ -76,14 +75,21 @@ public class MessageParser {
                 case MSG_SHUFFLE_DECK  -> new DuelMessage.ShuffleDeck(reader.readUint8());
                 case MSG_SHUFFLE_HAND  -> parseShuffleHand(reader);
                 case MSG_SHUFFLE_EXTRA -> parseShuffleExtra(reader);
+                case MSG_SWAP_GRAVE_DECK -> parseSwapGraveDeck(reader);
+                case MSG_SHUFFLE_SET_CARD -> parseShuffleSetCard(reader);
+                case MSG_REMOVE_CARDS  -> new DuelMessage.RemoveCards(readLocInfoList(reader));
+                case MSG_REVERSE_DECK  -> new DuelMessage.ReverseDeck();
+                case MSG_DECK_TOP      -> parseDeckTop(reader);
 
                 // UI/Info
                 case MSG_HINT          -> parseHint(reader);
-                // MSG_PLAYER_HINT ([u8 player][u8 type][u64 desc], field.cpp) stays Raw: its layout is not
-                // MSG_HINT's and no UI consumes it yet.
+                case MSG_PLAYER_HINT   -> parsePlayerHint(reader);
                 case MSG_CARD_HINT     -> parseCardHint(reader);
+                case MSG_MISSED_EFFECT -> new DuelMessage.MissedEffect(LocInfo.read(reader), reader.readInt32());
+                case MSG_MATCH_KILL    -> new DuelMessage.MatchKill(reader.readInt32());
                 case MSG_FIELD_DISABLED -> new DuelMessage.FieldDisabled(reader.readInt32());
                 case MSG_BECOME_TARGET -> parseBecomeTarget(reader);
+                case MSG_RANDOM_SELECTED -> parseRandomSelected(reader);
 
                 // Selection messages
                 case MSG_SELECT_IDLECMD   -> parseSelectIdleCmd(reader);
@@ -94,7 +100,7 @@ public class MessageParser {
                 case MSG_SELECT_YESNO     -> parseSelectYesNo(reader);
                 case MSG_SELECT_OPTION    -> parseSelectOption(reader);
                 case MSG_SELECT_PLACE     -> parseSelectPlace(reader);
-                case MSG_SELECT_DISFIELD  -> parseSelectPlace(reader); // same format
+                case MSG_SELECT_DISFIELD  -> parseSelectDisfield(reader);
                 case MSG_SELECT_POSITION  -> parseSelectPosition(reader);
                 case MSG_SELECT_TRIBUTE   -> parseSelectTribute(reader);
                 case MSG_SELECT_COUNTER   -> parseSelectCounter(reader);
@@ -106,15 +112,15 @@ public class MessageParser {
                 case MSG_ANNOUNCE_RACE    -> parseAnnounceRace(reader);
                 case MSG_ANNOUNCE_ATTRIB  -> parseAnnounceAttrib(reader);
                 case MSG_ANNOUNCE_NUMBER  -> parseAnnounceNumber(reader);
-                case MSG_ANNOUNCE_CARD    -> parseRawSelection(reader, bodyLength, MSG_ANNOUNCE_CARD);
+                case MSG_ANNOUNCE_CARD    -> parseAnnounceCard(reader);
                 case MSG_ROCK_PAPER_SCISSORS -> new DuelMessage.RockPaperScissors(reader.readUint8());
                 case MSG_CONFIRM_DECKTOP -> parseConfirmDeckTop(reader);
+                case MSG_CONFIRM_EXTRATOP -> parseConfirmExtraTop(reader);
                 case MSG_CONFIRM_CARDS   -> parseConfirmCards(reader);
                 case MSG_HAND_RES        -> parseHandResult(reader);
 
                 // Misc action
                 case MSG_EQUIP         -> new DuelMessage.Equip(LocInfo.read(reader), LocInfo.read(reader));
-                case MSG_UNEQUIP       -> new DuelMessage.Unequip(LocInfo.read(reader));
                 case MSG_CARD_TARGET   -> new DuelMessage.CardTarget(LocInfo.read(reader), LocInfo.read(reader));
                 case MSG_CANCEL_TARGET -> new DuelMessage.CancelTarget(LocInfo.read(reader), LocInfo.read(reader));
                 case MSG_ADD_COUNTER   -> parseAddCounter(reader);
@@ -156,18 +162,7 @@ public class MessageParser {
 
     // ---- Lifecycle ----
 
-    private static DuelMessage.Start parseStart(BufferReader r) {
-        int playerType = r.readUint8();
-        int lp0 = r.readInt32();
-        int lp1 = r.readInt32();
-        int deck0 = r.readUint16();
-        int extra0 = r.readUint16();
-        int deck1 = r.readUint16();
-        int extra1 = r.readUint16();
-        return new DuelMessage.Start(playerType, lp0, lp1, deck0, extra0, deck1, extra1);
-    }
-
-    private static DuelMessage.Win parseWin(BufferReader r, int bodyLength) {
+    private static DuelMessage.Win parseWin(BufferReader r) {
         int winner = r.readUint8();
         int reason = r.readUint8();
         return new DuelMessage.Win(winner, reason);
@@ -186,12 +181,11 @@ public class MessageParser {
     private static DuelMessage.Draw parseDraw(BufferReader r) {
         int player = r.readUint8();
         int count = r.readInt32();
-        List<Integer> codes = new ArrayList<>(count);
+        List<DuelMessage.DrawnCard> cards = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            codes.add(r.readInt32());
-            r.readInt32(); // position info (not needed for draw)
+            cards.add(DuelMessage.DrawnCard.read(r));
         }
-        return new DuelMessage.Draw(player, codes);
+        return new DuelMessage.Draw(player, cards);
     }
 
     private static DuelMessage.Move parseMove(BufferReader r) {
@@ -309,6 +303,35 @@ public class MessageParser {
         return new DuelMessage.ShuffleExtra(player);
     }
 
+    /** [u8 player][u32 extraCount][u32 maskBytes][mask bytes] (field.cpp:1048). */
+    private static DuelMessage.SwapGraveDeck parseSwapGraveDeck(BufferReader r) {
+        int player = r.readUint8();
+        int extraCount = r.readInt32();
+        byte[] mask = new byte[r.readInt32()];
+        for (int i = 0; i < mask.length; i++) mask[i] = (byte) r.readUint8();
+        return new DuelMessage.SwapGraveDeck(player, extraCount, mask);
+    }
+
+    /** [u8 loc][u8 n][n×loc_info old][n×loc_info material-follow] (libduel.cpp:1404). */
+    private static DuelMessage.ShuffleSetCard parseShuffleSetCard(BufferReader r) {
+        int location = r.readUint8();
+        int count = r.readUint8();
+        List<LocInfo> from = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) from.add(LocInfo.read(r));
+        List<LocInfo> follow = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) follow.add(LocInfo.read(r));
+        return new DuelMessage.ShuffleSetCard(location, from, follow);
+    }
+
+    /** [u8 player][u32 offsetFromTop][u32 code][u32 position] (processor.cpp:4929 and 13 more sites). */
+    private static DuelMessage.DeckTop parseDeckTop(BufferReader r) {
+        int player = r.readUint8();
+        int offsetFromTop = r.readInt32();
+        int code = r.readInt32();
+        int position = r.readInt32();
+        return new DuelMessage.DeckTop(player, offsetFromTop, code, position);
+    }
+
     // ---- UI/Info ----
 
     private static DuelMessage.Hint parseHint(BufferReader r) {
@@ -316,6 +339,19 @@ public class MessageParser {
         int player = r.readUint8();
         long data = r.readInt64();
         return new DuelMessage.Hint(hintType, player, data);
+    }
+
+    /** [u8 player][u8 type][u64 desc] (field.cpp:1332); not MSG_HINT's field order. */
+    private static DuelMessage.PlayerHint parsePlayerHint(BufferReader r) {
+        int player = r.readUint8();
+        int hintType = r.readUint8();
+        long desc = r.readInt64();
+        return new DuelMessage.PlayerHint(player, hintType, desc);
+    }
+
+    private static DuelMessage.RandomSelected parseRandomSelected(BufferReader r) {
+        int player = r.readUint8();
+        return new DuelMessage.RandomSelected(player, readLocInfoList(r));
     }
 
     private static DuelMessage.CardHint parseCardHint(BufferReader r) {
@@ -326,12 +362,17 @@ public class MessageParser {
     }
 
     private static DuelMessage.BecomeTarget parseBecomeTarget(BufferReader r) {
+        return new DuelMessage.BecomeTarget(readLocInfoList(r));
+    }
+
+    /** Read a count-prefixed list of LocInfo entries. */
+    private static List<LocInfo> readLocInfoList(BufferReader r) {
         int count = r.readInt32();
-        List<LocInfo> targets = new ArrayList<>(count);
+        List<LocInfo> list = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            targets.add(LocInfo.read(r));
+            list.add(LocInfo.read(r));
         }
-        return new DuelMessage.BecomeTarget(targets);
+        return list;
     }
 
     // ---- Selection messages ----
@@ -404,16 +445,6 @@ public class MessageParser {
         return list;
     }
 
-    /** Read a count-prefixed list of ActivatableCard entries (CardInfo + int64 desc). */
-    private static List<DuelMessage.ActivatableCard> readActivatableList(BufferReader r) {
-        int count = r.readInt32();
-        List<DuelMessage.ActivatableCard> list = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            list.add(DuelMessage.ActivatableCard.read(r));
-        }
-        return list;
-    }
-
     private static DuelMessage.SelectCard parseSelectCard(BufferReader r) {
         int player = r.readUint8();
         boolean cancelable = r.readUint8() != 0;
@@ -451,7 +482,8 @@ public class MessageParser {
             LocInfo loc = LocInfo.read(r);
             long desc = r.readInt64();
             int flag = r.readUint8();
-            chains.add(new DuelMessage.ActivatableCard(code, loc.controller(), loc.location(), loc.sequence(), desc, flag));
+            chains.add(new DuelMessage.ActivatableCard(code, loc.controller(), loc.location(),
+                    loc.sequence(), loc.position(), desc, flag));
         }
         return new DuelMessage.SelectChain(player, speCount, forced, hint0, hint1, chains);
     }
@@ -485,6 +517,13 @@ public class MessageParser {
         int count = r.readUint8();
         int field = r.readInt32();
         return new DuelMessage.SelectPlace(player, count, field);
+    }
+
+    private static DuelMessage.SelectDisfield parseSelectDisfield(BufferReader r) {
+        int player = r.readUint8();
+        int count = r.readUint8();
+        int field = r.readInt32();
+        return new DuelMessage.SelectDisfield(player, count, field);
     }
 
     private static DuelMessage.SelectPosition parseSelectPosition(BufferReader r) {
@@ -606,17 +645,14 @@ public class MessageParser {
         return new DuelMessage.AnnounceNumber(player, options);
     }
 
-    private static DuelMessage.AnnounceCard parseRawSelection(BufferReader r, int bodyLength,
-                                                               int msgType) {
-        int startPos = r.remaining();
+    private static DuelMessage.AnnounceCard parseAnnounceCard(BufferReader r) {
         int player = r.readUint8();
-        int consumed = startPos - r.remaining();
-        int remaining = bodyLength - consumed;
-        byte[] rawBody = new byte[remaining];
-        for (int i = 0; i < remaining; i++) {
-            rawBody[i] = (byte) r.readUint8();
+        int count = r.readUint8();
+        List<Long> opcodes = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            opcodes.add(r.readInt64());
         }
-        return new DuelMessage.AnnounceCard(player, rawBody);
+        return new DuelMessage.AnnounceCard(player, opcodes);
     }
 
     // ---- Confirm / Hand Result ----
@@ -629,6 +665,16 @@ public class MessageParser {
             cards.add(DuelMessage.ConfirmCard.read(r));
         }
         return new DuelMessage.ConfirmDeckTop(player, cards);
+    }
+
+    private static DuelMessage.ConfirmExtraTop parseConfirmExtraTop(BufferReader r) {
+        int player = r.readUint8();
+        int count = r.readInt32();
+        var cards = new ArrayList<DuelMessage.ConfirmCard>(count);
+        for (int i = 0; i < count; i++) {
+            cards.add(DuelMessage.ConfirmCard.read(r));
+        }
+        return new DuelMessage.ConfirmExtraTop(player, cards);
     }
 
     private static DuelMessage.ConfirmCards parseConfirmCards(BufferReader r) {
