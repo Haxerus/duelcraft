@@ -926,6 +926,10 @@ public class ClientDuelState {
         renumber(deck[p]);
     }
 
+    private static boolean inRange(int sequence, ClientCard[] zone) {
+        return sequence >= 0 && sequence < zone.length;
+    }
+
     /** Bit {@code index} of the engine's {@code ProgressiveBuffer}: byte {@code index/8}, bit {@code index%8}. */
     private static boolean maskBit(byte[] mask, int index) {
         int b = index / 8;
@@ -950,8 +954,8 @@ public class ClientDuelState {
             ClientCard card = shuffled.get(i);
             if (card == null || to.location() == 0) continue;
             ClientCard[] zone = zones[to.controller()];
-            if (to.sequence() < 0 || to.sequence() >= zone.length) continue;
             int previous = card.sequence;
+            if (!inRange(to.sequence(), zone) || !inRange(previous, zone)) continue;
             ClientCard displaced = zone[to.sequence()];
             zone[previous] = displaced;
             zone[to.sequence()] = card;
