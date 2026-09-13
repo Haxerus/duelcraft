@@ -338,7 +338,7 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 | `OCG_DuelNewCard` | ✅ | ✅ | ✅ deck + extra, `duelist = 0`, `seq = 0`, main deck added in reverse so index 0 is drawn first |
 | `OCG_StartDuel` | ✅ | ✅ | ✅ |
 | `OCG_DuelProcess` / `OCG_DuelGetMessage` / `OCG_DuelSetResponse` | ✅ | ✅ | ✅ |
-| `OCG_LoadScript` | ✅ internal to `ScriptProvider` | ➖ | `constant.lua`, `utility.lua` at creation; a failed load is logged as an error |
+| `OCG_LoadScript` | ✅ internal to `ScriptProvider` | ➖ | `constant.lua`, `utility.lua` at creation; a missing or rejected script is logged as an error |
 | `OCG_DuelQueryCount` | ✅ | ✅ | ⚠️ extra deck slot count only |
 | `OCG_DuelQuery` | ✅ | ✅ | ✅ single-slot refreshes |
 | `OCG_DuelQueryLocation` | ✅ | ✅ | ✅ whole-location refreshes |

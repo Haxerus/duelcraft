@@ -67,13 +67,10 @@ intptr_t DuelEngine::createDuel(const uint64_t seed[4], uint64_t flags,
     ctx->duel = duel;
     contexts_[handle] = std::move(ctx);
 
-    // Load bootstrap scripts. Without them no card script can run.
-    for (const char* bootstrap : { "constant.lua", "utility.lua" }) {
-        if (!scriptProvider_.loadScript(duel, bootstrap)) {
-            javaLog(OCG_LOG_TYPE_ERROR,
-                    std::string("bootstrap script ") + bootstrap + " could not be loaded");
-        }
-    }
+    // Load bootstrap scripts. Without them no card script can run; a failure of either is
+    // logged as an error by ScriptProvider or by the engine's log handler.
+    scriptProvider_.loadScript(duel, "constant.lua");
+    scriptProvider_.loadScript(duel, "utility.lua");
 
     return handle;
 }

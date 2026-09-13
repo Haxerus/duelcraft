@@ -19,7 +19,9 @@ int ScriptProvider::scriptReader(void* payload, OCG_Duel duel, const char* name)
 }
 
 bool ScriptProvider::loadScript(OCG_Duel duel, const std::string& name) {
-    // Bootstrap scripts: without them no card script can run at all.
+    // Bootstrap scripts: without them no card script can run at all. A miss is reported by
+    // readFile and a script the engine rejects by the engine's own log handler, so the
+    // caller adds nothing.
     auto content = readFile(name, OCG_LOG_TYPE_ERROR);
     if (!content.has_value()) {
         return false;
@@ -35,7 +37,12 @@ std::optional<std::vector<char>> ScriptProvider::readFile(const std::string& nam
         if (cached->second.empty()) {
             return std::nullopt; // known missing, already logged
         }
-        return readPath(cached->second);
+        auto buffer = readPath(cached->second);
+        if (!buffer.has_value()) {
+            javaLog(LOG_TYPE_BRIDGE_WARN,
+                    "script " + name + " can no longer be read from " + cached->second);
+        }
+        return buffer;
     }
 
     for (const auto& dir : searchPaths_) {
