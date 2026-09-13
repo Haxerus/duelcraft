@@ -907,10 +907,11 @@ public class LDLibDuelScreen {
             PacketDistributor.sendToServer(new DuelConcedePayload());
         }
 
-        /** True while the hint modal or the pause dialog owns the screen and clicks must stop there. */
+        /** True while a modal, the pause dialog or the result banner owns the screen and clicks must stop there. */
         private boolean isBlockingOverlayUp() {
             return (hintModal != null && !hintModal.hasClass("hidden"))
-                    || (pauseOverlay != null && !pauseOverlay.hasClass("hidden"));
+                    || (pauseOverlay != null && !pauseOverlay.hasClass("hidden"))
+                    || (resultOverlay != null && !resultOverlay.hasClass("hidden"));
         }
 
         void togglePauseOverlay() {

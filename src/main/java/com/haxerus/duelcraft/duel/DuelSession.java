@@ -126,8 +126,9 @@ public class DuelSession implements AutoCloseable {
                     emitRefreshes(RefreshSchedule.before(msg));
                     int result = listener.onMessage(msg);
                     if (result != DuelEventListener.CONTINUE) {
-                        if (result == DuelEventListener.DUEL_ENDED
-                                || status == OcgConstants.DUEL_STATUS_END) {
+                        // Only the listener ends the duel here: AWAIT_RESPONSE leaves a prompt live,
+                        // and the post-loop DUEL_STATUS_END check covers an end with no prompt owing.
+                        if (result == DuelEventListener.DUEL_ENDED) {
                             ended = true;
                             listener.onDuelEnd();
                         }

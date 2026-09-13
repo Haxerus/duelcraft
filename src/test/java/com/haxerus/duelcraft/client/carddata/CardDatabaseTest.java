@@ -75,6 +75,13 @@ class CardDatabaseTest {
     /** A lone truthy operand: every non-alias, non-token card is declarable. */
     private static final List<Long> ANY_CARD = List.of(1L);
 
+    /** A missing string caches by sentinel; the second lookup must still answer null, not the sentinel. */
+    @Test
+    void getCardString_missingStringStaysNullOnTheCachedLookup() {
+        assertNull(db.getCardString(89631139, 15));
+        assertNull(db.getCardString(89631139, 15));
+    }
+
     @Test
     void searchDeclarable_passcodeQueryFindsThatCard() {
         List<CardInfo> results = db.searchDeclarable("89631139", ANY_CARD, 50);

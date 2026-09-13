@@ -258,6 +258,17 @@ class FieldQueryTest {
         assertThrows(IllegalArgumentException.class, () -> FieldQuery.parseLocation(b.array()));
     }
 
+    /** A block longer than its own slot must be rejected, not allowed to read the next slot's bytes. */
+    @Test
+    void aBlockOverrunningTheDeclaredPayloadIsRejected() {
+        ByteBuffer payload = buf(10);
+        payload.putShort((short) 20); payload.putInt(QUERY_CODE); payload.putInt(89631139); // declares 20, carries 4
+        ByteBuffer b = buf(4 + 10 + 16);
+        b.putInt(10).put(payload.array()).put(new byte[16]);   // 16 bytes of the next slot follow the payload
+
+        assertThrows(IllegalArgumentException.class, () -> FieldQuery.parseLocation(b.array()));
+    }
+
     @Test
     void trailingBytesInABlockDoNotShiftTheNextBlock() {
         ByteBuffer b = buf(12 + 10 + 6);

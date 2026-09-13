@@ -220,6 +220,7 @@ class DuelMessageCodecTest {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
         DuelMessageCodec.encode(buf, sample);
         DuelMessage decoded = DuelMessageCodec.decode(buf);
+        assertEquals(0, buf.readableBytes(), "encode wrote bytes decode did not read");
 
         // QueriedCard is a mutable class with no equals(), and record equals() on a byte[]
         // field compares references, not contents; compare both by hand instead of relying

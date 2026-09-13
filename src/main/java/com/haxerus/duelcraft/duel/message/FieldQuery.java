@@ -29,7 +29,7 @@ public final class FieldQuery {
 
     public static QueriedCard parse(byte[] data) {
         var buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-        QueriedCard card = parseCard(buf);
+        QueriedCard card = parseCard(buf, buf.limit());
         if (card == null) throw new IllegalArgumentException("Query buffer holds an empty-slot marker, not a card");
         return card;
     }
@@ -45,19 +45,23 @@ public final class FieldQuery {
                     + " exceeds the " + buf.remaining() + " bytes returned");
         }
         int end = buf.position() + payload;
-        while (buf.position() < end) cards.add(parseCard(buf));
+        while (buf.position() < end) cards.add(parseCard(buf, end));
         return cards;
     }
 
-    /** One card's blocks up to and including {@code QUERY_END}, or null for an empty-slot marker. */
-    private static QueriedCard parseCard(ByteBuffer buf) {
+    /**
+     * One card's blocks up to and including {@code QUERY_END}, or null for an empty-slot marker.
+     * {@code limit} is where this card's payload ends — the declared payload length in a bulk answer,
+     * so an oversized block cannot read into the next slot.
+     */
+    private static QueriedCard parseCard(ByteBuffer buf, int limit) {
         var card = new QueriedCard();
         while (true) {
             int size = Short.toUnsignedInt(expect(buf, 2, "block size").getShort());
             if (size == 0) return null;
             if (size < 4) throw new IllegalArgumentException("Query block size " + size + " is below the flag width");
             int end = buf.position() + size;
-            if (end > buf.limit()) throw new IllegalArgumentException("Query block runs past the end of the buffer");
+            if (end > limit) throw new IllegalArgumentException("Query block runs past the end of the buffer");
             int flag = buf.getInt();
             if (flag == QUERY_END) return card;
             card.flags |= flag;

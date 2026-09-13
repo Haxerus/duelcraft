@@ -30,7 +30,7 @@ public class MessageParser {
                 case MSG_RETRY         -> new DuelMessage.Retry();
 
                 // Lifecycle
-                case MSG_WIN           -> parseWin(reader, bodyLength);
+                case MSG_WIN           -> parseWin(reader);
                 case MSG_NEW_TURN      -> parseNewTurn(reader);
                 case MSG_NEW_PHASE     -> parseNewPhase(reader);
 
@@ -162,7 +162,7 @@ public class MessageParser {
 
     // ---- Lifecycle ----
 
-    private static DuelMessage.Win parseWin(BufferReader r, int bodyLength) {
+    private static DuelMessage.Win parseWin(BufferReader r) {
         int winner = r.readUint8();
         int reason = r.readUint8();
         return new DuelMessage.Win(winner, reason);
