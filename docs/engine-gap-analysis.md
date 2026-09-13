@@ -95,14 +95,14 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 
 | # | Message | Core | Parse | Client | Test | Notes |
 |---|---|---|---|---|---|---|
-| 70 | `MSG_CHAINING` | ✅ `processor.cpp:3700` | ✅ `u32 code, loc_info, u8 tc, u8 tl, u32 ts, u64 desc, u32 count` | ⚠️ | ✅ | Only "Chain: N" text. `desc`, trigger location and the activating card are discarded; no per-link markers. |
+| 70 | `MSG_CHAINING` | ✅ `processor.cpp:3700` | ✅ `u32 code, loc_info, u8 tc, u8 tl, u32 ts, u64 desc, u32 count` | ✅ | ✅ | Numbered marker on the trigger slot, `desc` in the log, count on `#chain-count`. |
 | 71 | `MSG_CHAINED` | ✅ | ✅ `u8` | ⚠️ no-op | ✅ | |
-| 72 | `MSG_CHAIN_SOLVING` | ✅ | ✅ `u8` | ⚠️ no-op | ✅ | No "resolving link N" indicator. |
-| 73 | `MSG_CHAIN_SOLVED` | ✅ | ✅ `u8` | ⚠️ no-op | ✅ | Links are not popped, so the count stays at its peak until `CHAIN_END`. |
+| 72 | `MSG_CHAIN_SOLVING` | ✅ | ✅ `u8` | ✅ | ✅ | The resolving link's marker is stamped `.chain-solving`. |
+| 73 | `MSG_CHAIN_SOLVED` | ✅ | ✅ `u8` | ✅ | ✅ | Pops the link, so the count falls as the chain resolves. |
 | 74 | `MSG_CHAIN_END` | ✅ | ✅ empty | ✅ | ✅ | |
-| 75 | `MSG_CHAIN_NEGATED` | ✅ `operations.cpp:36` | ✅ `u8` | ⚠️ no-op | ✅ | Negation invisible to the player. |
-| 76 | `MSG_CHAIN_DISABLED` | ✅ 2 sites | ✅ `u8` | ⚠️ no-op | ✅ | |
-| 120 | `MSG_MISSED_EFFECT` | ✅ `processor.cpp:4374` | ✅ | ⚠️ | ✅ | `loc_info, u32 code`. Highlights the card and logs it; no "missed the timing" toast yet. |
+| 75 | `MSG_CHAIN_NEGATED` | ✅ `operations.cpp:36` | ✅ `u8` | ✅ | ✅ | Negated stamp on the link's marker plus a log line. |
+| 76 | `MSG_CHAIN_DISABLED` | ✅ 2 sites | ✅ `u8` | ✅ | ✅ | Same stamp and log line as `CHAIN_NEGATED`. |
+| 120 | `MSG_MISSED_EFFECT` | ✅ `processor.cpp:4374` | ✅ | ✅ | ✅ | `loc_info, u32 code`. Highlights the card and writes a "missed the timing" log line. |
 | 121 | `MSG_BE_CHAIN_TARGET` | ➖ | | | | |
 | 122 | `MSG_CREATE_RELATION` | ➖ | | | | |
 | 123 | `MSG_RELEASE_RELATION` | ➖ | | | | |
@@ -111,15 +111,15 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 
 | # | Message | Core | Parse | Client | Test | Notes |
 |---|---|---|---|---|---|---|
-| 91 | `MSG_DAMAGE` | ✅ `operations.cpp:603` | ✅ `u8 p, u32 delta` | ✅ | ✅ | LP is polled every frame; no dirty flag, no damage number or flash. |
-| 92 | `MSG_RECOVER` | ✅ | ✅ | ✅ | ✅ | |
+| 91 | `MSG_DAMAGE` | ✅ `operations.cpp:603` | ✅ `u8 p, u32 delta` | ✅ | ✅ | LP is polled every frame; a red floating number and a log line carry the change. |
+| 92 | `MSG_RECOVER` | ✅ | ✅ | ✅ | ✅ | Green floating number. |
 | 94 | `MSG_LPUPDATE` | ✅ `libduel.cpp:48`, `field.cpp:1240` | ✅ `u8 p, u32 newTotal` | ✅ | ✅ | Confirmed absolute, not a delta. |
-| 100 | `MSG_PAY_LPCOST` | ✅ `operations.cpp:749` | ✅ | ✅ | ✅ | Not visually distinguished from damage. |
-| 110 | `MSG_ATTACK` | ✅ 3 sites | ✅ `loc_info, loc_info` (zeroed target = direct attack) | ❌ no-op | ✅ | No attack arrow. |
-| 111 | `MSG_BATTLE` | ✅ `processor.cpp:2444` | ✅ layout; the two `u8` fields are **battle-destroyed flags**, misnamed `atkDamage`/`defDamage` in the record | ❌ no-op | ✅ | No damage-calculation display. |
-| 112 | `MSG_ATTACK_DISABLED` | ✅ | ✅ empty | ❌ no-op | ✅ | |
+| 100 | `MSG_PAY_LPCOST` | ✅ `operations.cpp:749` | ✅ | ✅ | ✅ | Blue floating number, told apart from damage. |
+| 110 | `MSG_ATTACK` | ✅ 3 sites | ✅ `loc_info, loc_info` (zeroed target = direct attack) | ✅ | ✅ | Attacker and target slots marked for ~1.5 s; a direct attack marks the LP bar. No drawn arrow. |
+| 111 | `MSG_BATTLE` | ✅ `processor.cpp:2444` | ✅ layout; the two `u8` fields are **battle-destroyed flags**, misnamed `atkDamage`/`defDamage` in the record | ✅ | ✅ | Combat ATK/DEF override the queried stats until `DAMAGE_STEP_END`. |
+| 112 | `MSG_ATTACK_DISABLED` | ✅ | ✅ empty | ✅ | ✅ | "An attack was negated" in the log. |
 | 113 | `MSG_DAMAGE_STEP_START` | ✅ 2 sites | ✅ empty | ❌ no-op | ✅ | |
-| 114 | `MSG_DAMAGE_STEP_END` | ✅ | ✅ empty | ❌ no-op | ✅ | |
+| 114 | `MSG_DAMAGE_STEP_END` | ✅ | ✅ empty | ✅ | ✅ | Clears the combat stat overrides. |
 
 ### 1.6 Relationships, counters, hints
 
@@ -396,22 +396,22 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [x] **Card object model.** edopro moves one card object between containers, so counters, equip links, targets and materials travel with it (§12.4). Duelcraft's parallel code/position arrays are the root cause of the `Swap`, overlay and counter gaps below.
 - [x] **Win/lose.** `DuelEndPayload` closes the screen at once; the win overlay code path is unreachable. Wanted: a result overlay with winner and reason, a concede button, and `LDLibDuelScreen.close()` on every exit so statics do not linger.
 - [x] **ESC** closes the screen with no way back (`shouldCloseOnEsc` inherited); incoming messages accumulate into an unrendered state. Needs `shouldCloseOnEsc = false` or `/duel show` rebuilding from `ClientDuelState` (or a `QueryField` resync).
-- [ ] **No duel log.** Attacks, coin flips, negations, targets, equips, LP reasons and every hint vanish once processed.
+- [x] **No duel log.** A `DuelLog` panel, toggled from the HUD, lists attacks, coin and dice results, chain activations and negations, targets, equips, LP changes with their reason, summons, missed timing, turns, phases and the result; a line naming a card opens it in the info banner.
 - [x] **Overlay materials** tracked (badly, §3.4) and never drawn. Now stored on the host card and badged with the material count.
 - [x] **Counters** have no client state. Now a per-card map, badged with the total.
 - [x] **Equip and target links** not tracked or drawn. Both are tracked bidirectionally now; only the target highlight is drawn, equip links still are not.
 - [x] **Targeting highlight** (`BecomeTarget`, `CardSelected`) drawn until the next prompt; `RandomSelected` is still unparsed.
 - [x] **Disabled zones**: `FieldDisabled` greys the zone out; `HINT_ZONE` flashes the zones it names.
-- [ ] **Chain visualisation**: count text only; no link numbers on cards, no resolve/negate feedback.
-- [ ] **Battle feedback**: no attack arrow, no damage-calculation display, no LP change animation or damage numbers.
+- [x] **Chain visualisation**: numbered markers on the trigger slot, a stamp while a link resolves and another when it is negated or disabled; `ChainSolved` pops the link.
+- [x] **Battle feedback**: the two ends of an attack are marked for ~1.5 s, `MSG_BATTLE`'s combat ATK/DEF replace the queried stats for the damage step, and each LP change floats a signed number in its reason's colour. A drawn arrow and real animation are still out of scope.
 - [x] **Pendulum scales** never shown (`LSCALE`/`RSCALE` not requested). Now requested for the spell zones and badged on the slot.
 - [x] **Card hints** (`CHINT_TURN` counters, `CHINT_DESC_ADD`) not shown. Now a badge and info-banner lines.
 - [x] **Hint captions**: prompt titles are hard-coded ("Select 1-1 card(s)") instead of `HINT_SELECTMSG`. Now the hint wins wherever edopro uses `select_hint`.
 - [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong. `extraPos[]` is filled only in the dead `Start` branch.
 - [x] `Swap` handles MZONE↔MZONE only and does not move stats or overlays.
 - [ ] `Move.reason` ignored (no destroy/banish/return distinction).
-- [ ] Battle sub-phases collapse to "Battle"; no phase-track widget.
-- [ ] Status label is written by both `updateStatusLabel()` (on `CHAIN` only) and the prompt controller; they overwrite each other.
+- [x] Battle sub-phases collapse to "Battle"; no phase-track widget. Each sub-phase is now named in the HUD and in the turn/phase banner; a phase-track widget is still open.
+- [x] Status label is written by both `updateStatusLabel()` (on `CHAIN` only) and the prompt controller; they overwrite each other. The chain count moved to `#chain-count` and `updateStatusLabel()` leaves the label alone while a prompt is up.
 - [ ] Mouse only; no keyboard handling.
 - [ ] Untextured cards render as the card back, indistinguishable from face-down cards.
 - [ ] Longer-term (carried from the old checklist): animations, sound, deck editor, replay, spectator mode, match mode.
@@ -630,12 +630,12 @@ Items already tracked in §3 are referenced, not repeated.
 - [ ] Query application rules: negative ATK renders "?"; `COUNTERS` assign; `IS_HIDDEN` stays server-side.
 - [ ] Rendering rules: ATK/DEF colour against base; link arrows only on hover as shaded zones; `STATUS_DISABLED | STATUS_FORBIDDEN` stamp; graveyard and overlay cards always face-up; hand cards face-down when `code == 0`.
 - [x] Surfaces: toast, blocking modal for `HINT_MESSAGE`.
-- [ ] Surfaces: scrollable log with click-to-view codes, turn/phase/result banners.
+- [x] Surfaces: scrollable log with click-to-view codes. Turn and phase banners are up; a result banner is the result overlay instead.
 - [x] Hint handling per type (§12.4 row `MSG_HINT`), `HINT_SELECTMSG` as the caption of the next prompt.
 - [x] Highlights for `BECOME_TARGET` and `CARD_SELECTED`; grey overlay for `FIELD_DISABLED`.
-- [ ] Highlight for `RANDOM_SELECTED`; negated stamp for `CHAIN_NEGATED`/`DISABLED`; chain markers at the trigger location.
-- [ ] LP feedback: signed floating number in red (damage), green (recover), blue (cost); `LPUPDATE` silent.
-- [ ] Coin and dice results as log plus toast.
+- [x] Highlight for `RANDOM_SELECTED`; negated stamp for `CHAIN_NEGATED`/`DISABLED`; chain markers at the trigger location.
+- [x] LP feedback: signed floating number in red (damage), green (recover), blue (cost); `LPUPDATE` silent.
+- [x] Coin and dice results as log plus toast.
 
 **Prompts**
 - [x] `answered` guard and send-after-close (`duelclient.cpp:4269-4271`).
