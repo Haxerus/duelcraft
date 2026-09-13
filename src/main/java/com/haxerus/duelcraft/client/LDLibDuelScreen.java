@@ -200,6 +200,8 @@ public class LDLibDuelScreen {
         private final Button phaseBtnLeft;
         private final Button phaseBtnCenter;
         private final Button phaseBtnRight;
+        // Shuffle hand: shown only while the idle command offers it (engine action type 8).
+        private final Button shuffleBtn;
 
         // Concede: the first click arms the button, a second one within CONCEDE_CONFIRM_MS sends it.
         private final Button concedeBtn;
@@ -274,6 +276,7 @@ public class LDLibDuelScreen {
             phaseBtnLeft = byId("phase-btn-left", Button.class);
             phaseBtnCenter = byId("phase-btn-center", Button.class);
             phaseBtnRight = byId("phase-btn-right", Button.class);
+            shuffleBtn = byId("shuffle-btn", Button.class);
 
             concedeBtn = byId("concede-btn", Button.class);
 
@@ -541,6 +544,12 @@ public class LDLibDuelScreen {
                         LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.BattleAction.END_BATTLE, 0));
                 });
             }
+            if (shuffleBtn != null) {
+                shuffleBtn.setOnClick(e -> {
+                    if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canShuffle())
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.IdleAction.SHUFFLE_HAND, 0));
+                });
+            }
         }
 
         private void updateStatusLabel() {
@@ -664,6 +673,8 @@ public class LDLibDuelScreen {
 
         private void updatePhaseButtons() {
             boolean myTurn = state.isLocalTurn();
+            setShuffleVisible(myTurn && state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle
+                    && idle.canShuffle());
             if (myTurn && state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle) {
                 setButtonActive(phaseBtnLeft, idle.canBattle(), "BP");
                 setButtonActive(phaseBtnCenter, false, "");
@@ -677,6 +688,13 @@ public class LDLibDuelScreen {
                 setButtonActive(phaseBtnCenter, false, "");
                 setButtonActive(phaseBtnRight, false, "");
             }
+        }
+
+        private void setShuffleVisible(boolean visible) {
+            if (shuffleBtn == null) return;
+            shuffleBtn.setActive(visible);
+            if (visible) shuffleBtn.removeClass("hidden");
+            else shuffleBtn.addClass("hidden");
         }
 
         private void setButtonActive(Button btn, boolean active, String text) {

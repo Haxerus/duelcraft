@@ -96,20 +96,40 @@ public class ClickDispatcher {
 
         contextMenu.clearAllChildren();
 
+        boolean battleCmd = prompt.isBattleCmd();
+        int activateType = battleCmd
+                ? ClientDuelState.BattleAction.ACTIVATE
+                : ClientDuelState.IdleAction.ACTIVATE;
+        // A card with several activatable effects gets one Activate icon; picking which effect
+        // happens in the option dialog, as in edopro.
+        var activations = actions.stream().filter(a -> a.actionType() == activateType).toList();
+        boolean activateShown = false;
+        int iconCount = 0;
+
         for (var action : actions) {
+            boolean isActivate = action.actionType() == activateType;
+            if (isActivate && activateShown) continue;
+            if (isActivate) activateShown = true;
+
             var icon = new UIElement();
             icon.addClass("ctx-action");
 
-            var info = getActionIconInfo(action.actionType(), prompt.isBattleCmd());
+            var info = getActionIconInfo(action.actionType(), battleCmd);
             icon.lss("background", "sdf(" + info.color() + ", 3, 2)");
             icon.lss("tooltips", info.tooltip());
 
             icon.addEventListener(UIEvents.CLICK, e -> {
                 e.stopPropagation();
-                callbacks.sendResponse(ResponseBuilder.selectCmd(action.actionType(), action.listIndex()));
+                if (isActivate && activations.size() > 1) {
+                    hideContextMenu();
+                    prompt.showActivateOptions(activations);
+                } else {
+                    callbacks.sendResponse(ResponseBuilder.selectCmd(action.actionType(), action.listIndex()));
+                }
             });
 
             contextMenu.addChild(icon);
+            iconCount++;
         }
 
         // Flip/nudge positioning so the menu never runs off the canvas
@@ -119,7 +139,7 @@ public class ClickDispatcher {
         //   width per icon = 14 (.ctx-action width) + 1 (gap-all) = 15
         //   total padding = 1 (padding-all) * 2 sides = 2
         //   height = 14 (.ctx-action height) + 2 (padding-all * 2) = 16
-        float menuW = actions.size() * 15f + 2f;
+        float menuW = iconCount * 15f + 2f;
         float menuH = 16f;
 
         float x = mouseX;

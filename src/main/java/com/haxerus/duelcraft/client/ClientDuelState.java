@@ -210,11 +210,14 @@ public class ClientDuelState {
         public static final int ACTIVATE = 5;
         public static final int TO_BATTLE = 6;
         public static final int END_TURN = 7;
+        public static final int SHUFFLE_HAND = 8;
         private IdleAction() { }
     }
 
-    // Card actions: maps card location → available actions (for click-on-card UI)
-    public record CardAction(int actionType, int listIndex, String label) {}
+    // Card actions: maps card location → available actions (for click-on-card UI).
+    // `desc` is the activating effect's description (0 for everything but Activate), so two
+    // effects on one card can be told apart in the option dialog.
+    public record CardAction(int actionType, int listIndex, String label, long desc) {}
     public record CardLocation(int controller, int location, int sequence) {}
     public final Map<CardLocation, List<CardAction>> cardActions = new HashMap<>();
 
@@ -1022,6 +1025,18 @@ public class ClientDuelState {
         }
     }
 
+    /**
+     * edopro's {@code highlighting_card} (`duelclient.cpp:1944-1948`): tints the card a
+     * {@code SELECT_EFFECTYN} prompt is asking about. Cleared with every other highlight
+     * when the next prompt arrives.
+     */
+    public void highlightPromptCard(LocInfo loc) {
+        ClientCard card = cardAt(loc.controller(), loc.location(), loc.sequence());
+        if (card == null) return;
+        highlighted.add(card);
+        markZoneDirty(loc.controller(), loc.location());
+    }
+
     private void clearHighlights() {
         if (highlighted.isEmpty()) return;
         highlighted.clear();
@@ -1097,9 +1112,14 @@ public class ClientDuelState {
 
     private void addAction(int controller, int location, int sequence,
                            int actionType, int listIndex, String label) {
+        addAction(controller, location, sequence, actionType, listIndex, label, 0L);
+    }
+
+    private void addAction(int controller, int location, int sequence,
+                           int actionType, int listIndex, String label, long desc) {
         var key = new CardLocation(controller, location, sequence);
         cardActions.computeIfAbsent(key, k -> new ArrayList<>())
-                .add(new CardAction(actionType, listIndex, label));
+                .add(new CardAction(actionType, listIndex, label, desc));
     }
 
     private void buildIdleCmdActions(DuelMessage.SelectIdleCmd sel) {
@@ -1126,7 +1146,7 @@ public class ClientDuelState {
         }
         for (int i = 0; i < sel.activatable().size(); i++) {
             var c = sel.activatable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), IdleAction.ACTIVATE, i, "Activate");
+            addAction(c.controller(), c.location(), c.sequence(), IdleAction.ACTIVATE, i, "Activate", c.desc());
         }
     }
 
@@ -1138,7 +1158,7 @@ public class ClientDuelState {
         }
         for (int i = 0; i < sel.activatable().size(); i++) {
             var c = sel.activatable().get(i);
-            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ACTIVATE, i, "Activate");
+            addAction(c.controller(), c.location(), c.sequence(), BattleAction.ACTIVATE, i, "Activate", c.desc());
         }
     }
 
