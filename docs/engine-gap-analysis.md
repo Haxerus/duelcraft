@@ -24,7 +24,7 @@ This document supersedes sections 1 to 3 of `docs/engine-implementation-checklis
 | Non-prompt records delivered to the client | 50 | 22 handled (`Retry` and `Hint` defectively), 18 deliberate no-ops, 10 dropped by the `default` branch |
 | `QUERY_*` flags | 27 | 14 requested by the server, 19 parsed by `FieldQuery`, 7 skipped; 3 of 8 locations refreshed |
 | `OCG_*` API functions | 13 | 12 exposed to Java, 10 used in production; `QueryLocation`, `QueryField` unused |
-| Parser cases with a byte-level test | 70 / 72 | `SELECT_IDLECMD` and `SELECT_BATTLECMD` untested; `DuelMessageCodec` has zero tests |
+| Parser cases with a byte-level test | 66 / 72 | `SELECT_IDLECMD` and `SELECT_BATTLECMD` untested; `DuelMessageCodec` has zero tests |
 | edopro divergences (§12.6) | 44 | 17 host (routing, hiding, refresh, lobby), 12 client model, 15 prompt behaviours |
 
 **Verified defects that break gameplay** (details in §3): `SELECT_SUM` parse and response, battle-phase Activate action code, `MSG_RETRY` hiding the prompt, overlay moves never applied, `SELECT_DISFIELD` with count > 1, face-up-destination `MSG_MOVE` leaking hidden codes, seven prompts without UI, `ANNOUNCE_CARD` with no response path at all.
@@ -436,7 +436,7 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 
 ## 10. Test coverage
 
-- [x] 70 of 72 parser cases have byte-level tests; all 366 shared constants match the engine header (values checked, including octal link markers).
+- [x] 66 of 72 parser cases have byte-level tests; all 366 shared constants match the engine header (values checked, including octal link markers).
 - [x] **Parsed but untested (28):** `RETRY`, `SELECT_BATTLECMD`, `SELECT_IDLECMD`, `SORT_CHAIN`, `SELECT_COUNTER`, `SELECT_DISFIELD`, `SORT_CARD`, `SWAP`, `FIELD_DISABLED`, `SPSUMMONING`, `SPSUMMONED`, `FLIPSUMMONING`, `FLIPSUMMONED`, `CHAIN_SOLVED`, `CHAIN_DISABLED`, `CARD_SELECTED`, `BECOME_TARGET`, `UNEQUIP`, `CARD_TARGET`, `CANCEL_TARGET`, `PAY_LPCOST`, `ADD_COUNTER`, `REMOVE_COUNTER`, `TOSS_DICE`, `ANNOUNCE_ATTRIB`, `ANNOUNCE_CARD`, `ANNOUNCE_NUMBER`, `CARD_HINT`. The two idle/battle command parsers (six and two variable-length lists with three entry widths) are the highest-risk untested code.
 - [x] `MessageParserTest.parseSelectSum` encodes the parser's wrong layout; rewrite from the engine layout (§3.1). Add an offset-level check, not just entry size, for every card-list parser.
 - [x] `DuelMessageCodec`: no tests at all. Add a round trip over every record with overlay locations (`0x84`) and `u64` descs.
