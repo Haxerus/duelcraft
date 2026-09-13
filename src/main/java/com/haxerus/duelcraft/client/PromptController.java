@@ -4,6 +4,7 @@ import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.ResponseValidator;
 import com.haxerus.duelcraft.duel.response.SumSelection;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -54,8 +56,11 @@ public class PromptController {
         void setCardImageBackground(UIElement elem, int code);
         void showCardInfo(int code);
         void hideCardInfo();
-        /** Send a response to the server (consumes current prompt, triggers onResponseSent). */
-        void sendResponse(byte[] response);
+        /**
+         * Build a response and send it (consumes the current prompt, triggers onResponseSent).
+         * A response {@link ResponseValidator} rejects is reported instead of sent.
+         */
+        void sendResponse(Supplier<byte[]> response);
         /** Resolve a card code to its display name (from the client's card DB). */
         String cardDisplayName(int code);
         /** Resolve a ygopro-core description code to human-readable text. */
@@ -222,10 +227,10 @@ public class PromptController {
 
             case DuelMessage.SelectOption sel -> buildOptionPrompt(hintCaption("Choose Option", ""),
                     sel.options().stream().map(callbacks::resolveDesc).toList(),
-                    i -> callbacks.sendResponse(ResponseBuilder.selectOption(i)));
+                    i -> callbacks.sendResponse(() -> ResponseValidator.selectOption(sel, i)));
             case DuelMessage.RockPaperScissors ignored -> buildOptionPrompt("Rock Paper Scissors",
                     List.of("Rock", "Paper", "Scissors"),
-                    i -> callbacks.sendResponse(ResponseBuilder.rockPaperScissors(i + 1)));
+                    i -> callbacks.sendResponse(() -> ResponseValidator.rockPaperScissors(i + 1)));
 
             case DuelMessage.SelectChain sel -> buildChainPrompt(sel);
 
@@ -259,7 +264,7 @@ public class PromptController {
                 String title = callbacks.systemString(565);
                 buildOptionPrompt(hintCaption(title != null ? title : "Declare a number", ""),
                         sel.options().stream().map(String::valueOf).toList(),
-                        i -> callbacks.sendResponse(ResponseBuilder.announceNumber(i)));
+                        i -> callbacks.sendResponse(() -> ResponseValidator.announceNumber(sel, i)));
             }
             case DuelMessage.AnnounceRace sel -> buildAnnounceRacePrompt(sel);
             case DuelMessage.AnnounceAttrib sel -> buildAnnounceAttribPrompt(sel);
@@ -295,15 +300,24 @@ public class PromptController {
         var yesBtn = new Button();
         yesBtn.setText(Component.literal("Yes"));
         yesBtn.addClass("prompt-btn");
-        yesBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectYesNo(true)));
+        yesBtn.setOnClick(e -> callbacks.sendResponse(() -> validatedYesNo(true)));
 
         var noBtn = new Button();
         noBtn.setText(Component.literal("No"));
         noBtn.addClass("prompt-btn");
-        noBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectYesNo(false)));
+        noBtn.setOnClick(e -> callbacks.sendResponse(() -> validatedYesNo(false)));
 
         promptButtons.addChild(yesBtn);
         promptButtons.addChild(noBtn);
+    }
+
+    /** Both yes/no prompts answer with the same int32; neither engine reader constrains it. */
+    private byte[] validatedYesNo(boolean yes) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SelectEffectYn sel -> ResponseValidator.selectEffectYn(sel, yes);
+            case DuelMessage.SelectYesNo sel -> ResponseValidator.selectYesNo(sel, yes);
+            default -> ResponseBuilder.selectYesNo(yes);
+        };
     }
 
     private void buildOptionPrompt(String title, List<String> options, IntConsumer onSelect) {
@@ -330,7 +344,7 @@ public class PromptController {
                 activations.stream().map(a -> callbacks.resolveDesc(a.desc())).toList(),
                 choice -> {
                     var action = activations.get(choice);
-                    callbacks.sendResponse(ResponseBuilder.selectCmd(action.actionType(), action.listIndex()));
+                    callbacks.sendResponse(() -> validatedCmd(action.actionType(), action.listIndex()));
                 });
     }
 
@@ -373,7 +387,7 @@ public class PromptController {
             var btn = new Button();
             btn.setText(Component.literal(card.name()));
             btn.addClass("prompt-name-btn");
-            btn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.announceCard(code)));
+            btn.setOnClick(e -> callbacks.sendResponse(() -> validatedAnnounceCard(code)));
             results.addScrollViewChild(btn);
         }
     }
@@ -391,7 +405,7 @@ public class PromptController {
         okBtn.setOnClick(e -> {
             try {
                 int code = Integer.parseInt(input.getValue().trim());
-                callbacks.sendResponse(ResponseBuilder.announceCard(code));
+                callbacks.sendResponse(() -> validatedAnnounceCard(code));
             } catch (NumberFormatException ignored) {
                 // Invalid/empty input: keep the dialog open.
             }
@@ -407,7 +421,7 @@ public class PromptController {
         // already has the same names hardcoded from OcgConstants RACE_* bits, so it's reused here.
         buildBitSelectionPrompt(563, "Declare a race", sel.count(),
                 bit -> CardStringHelper.raceName(1L << bit),
-                () -> callbacks.sendResponse(ResponseBuilder.announceRace(bitSelection.mask())));
+                () -> callbacks.sendResponse(() -> ResponseValidator.announceRace(sel, bitSelection.mask())));
     }
 
     private void buildAnnounceAttribPrompt(DuelMessage.AnnounceAttrib sel) {
@@ -416,7 +430,8 @@ public class PromptController {
         // already has the same names hardcoded from OcgConstants ATTRIBUTE_* bits, so it's reused here.
         buildBitSelectionPrompt(562, "Declare an attribute", sel.count(),
                 bit -> CardStringHelper.attributeName(1 << bit),
-                () -> callbacks.sendResponse(ResponseBuilder.announceAttrib((int) bitSelection.mask())));
+                () -> callbacks.sendResponse(
+                        () -> ResponseValidator.announceAttrib(sel, (int) bitSelection.mask())));
     }
 
     /**
@@ -460,8 +475,9 @@ public class PromptController {
         if (sel.chains().isEmpty()) {
             // A forced prompt always carries candidates (`processor.cpp:943-958`, `:663-668`), so an
             // empty forced list can only be a desync; answer 0 the way edopro's auto-chain-order
-            // does rather than leave the duel waiting for a pick that cannot be made.
-            callbacks.sendResponse(ResponseBuilder.selectChain(sel.forced() ? 0 : -1));
+            // does rather than leave the duel waiting for a pick that cannot be made. The validator
+            // would reject index 0 against an empty list, so this one path goes around it.
+            callbacks.sendResponse(() -> ResponseBuilder.selectChain(sel.forced() ? 0 : -1));
             return;
         }
 
@@ -486,7 +502,8 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                if (entry.size() == 1) callbacks.sendResponse(ResponseBuilder.selectChain(entry.get(0)));
+                if (entry.size() == 1)
+                    callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, entry.get(0)));
                 else buildChainEffectOptions(sel, entry);
             });
             scroller.addScrollViewChild(card);
@@ -496,7 +513,7 @@ public class PromptController {
             var passBtn = new Button();
             passBtn.setText(Component.literal("Pass"));
             passBtn.addClasses("prompt-btn");
-            passBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.selectChain(-1)));
+            passBtn.setOnClick(e -> callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, -1)));
             promptButtons.addChild(passBtn);
         }
     }
@@ -518,7 +535,8 @@ public class PromptController {
     private void buildChainEffectOptions(DuelMessage.SelectChain sel, List<Integer> indices) {
         buildOptionPrompt("Choose Effect",
                 indices.stream().map(i -> callbacks.resolveDesc(sel.chains().get(i).desc())).toList(),
-                choice -> callbacks.sendResponse(ResponseBuilder.selectChain(indices.get(choice))));
+                choice -> callbacks.sendResponse(
+                        () -> ResponseValidator.selectChain(sel, indices.get(choice))));
         chainEffectChooserOpen = true;
     }
 
@@ -585,13 +603,21 @@ public class PromptController {
         }
     }
 
+    /** Shared by SELECT_CARD and SELECT_TRIBUTE, which answer with the same index list. */
     private void sendSelectedCards() {
-        callbacks.sendResponse(ResponseBuilder.selectCards(
-                selectedIndices.stream().mapToInt(Integer::intValue).toArray()));
+        callbacks.sendResponse(() -> {
+            int[] indices = selectedIndices.stream().mapToInt(Integer::intValue).toArray();
+            return switch (state.pendingPrompt) {
+                case DuelMessage.SelectTribute sel -> ResponseValidator.selectTribute(sel, indices);
+                case DuelMessage.SelectCard sel -> ResponseValidator.selectCards(sel, indices);
+                default -> ResponseBuilder.selectCards(indices);
+            };
+        });
     }
 
     private void sendSelectCardsCancel() {
-        callbacks.sendResponse(ResponseBuilder.selectCardsCancel());
+        // parse_response_cards reads -1 before anything else, so there is nothing to validate.
+        callbacks.sendResponse(ResponseBuilder::selectCardsCancel);
     }
 
     /** edopro's battle-position window (title 561): one card-image button per offered position. */
@@ -626,7 +652,7 @@ public class PromptController {
         if ((position & POS_DEFENSE) != 0) card.addClass("defense");
         card.addEventListener(UIEvents.CLICK, ev -> {
             ev.stopPropagation();
-            callbacks.sendResponse(ResponseBuilder.selectPosition(position));
+            callbacks.sendResponse(() -> ResponseValidator.selectPosition(sel, position));
         });
 
         var caption = new Label();
@@ -695,7 +721,8 @@ public class PromptController {
         chosenPlaces.add(resolved);
         slot.addClass("selected");
         if (chosenPlaces.size() == count) {
-            callbacks.sendResponse(ResponseBuilder.selectPlaces(new ArrayList<>(chosenPlaces)));
+            var zones = List.copyOf(chosenPlaces);
+            callbacks.sendResponse(() -> validatedPlaces(zones));
         } else {
             updatePlaceStatus(count, disfield);
         }
@@ -738,7 +765,7 @@ public class PromptController {
             refreshCounterHighlights(sel);
             updateCounterStatus(sel);
             if (counterSelection.isComplete()) {
-                callbacks.sendResponse(ResponseBuilder.selectCounter(counterSelection.response()));
+                callbacks.sendResponse(() -> ResponseValidator.selectCounter(sel, counterSelection.response()));
             }
             return;
         }
@@ -770,7 +797,7 @@ public class PromptController {
                 sortSelection.assign(idx);
                 refreshSortOrdinals();
                 if (sortSelection.isComplete()) {
-                    callbacks.sendResponse(ResponseBuilder.sortCards(sortSelection.response()));
+                    callbacks.sendResponse(() -> validatedSort(sortSelection.response()));
                 }
             });
 
@@ -786,7 +813,8 @@ public class PromptController {
         var keepOrderBtn = new Button();
         keepOrderBtn.setText(Component.literal("Keep Order"));
         keepOrderBtn.addClasses("prompt-btn");
-        keepOrderBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder.sortCardsDefault()));
+        // A leading -1 skips sorting; the engine takes it unconditionally, nothing to validate.
+        keepOrderBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder::sortCardsDefault));
         promptButtons.addChild(keepOrderBtn);
     }
 
@@ -876,7 +904,15 @@ public class PromptController {
     }
 
     private void sendUnselectCardFinish() {
-        callbacks.sendResponse(ResponseBuilder.selectUnselectCardFinish());
+        sendUnselectCard(-1);
+    }
+
+    /** One card per round trip; {@code -1} finishes or cancels. */
+    private void sendUnselectCard(int index) {
+        callbacks.sendResponse(() ->
+                state.pendingPrompt instanceof DuelMessage.SelectUnselectCard sel
+                        ? ResponseValidator.selectUnselectCard(sel, index)
+                        : ResponseBuilder.selectUnselectCard(index));
     }
 
     private void buildUnselectCardPrompt(DuelMessage.SelectUnselectCard sel) {
@@ -899,7 +935,7 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(index));
+                sendUnselectCard(index);
             });
             scroller.addScrollViewChild(card);
         }
@@ -916,7 +952,7 @@ public class PromptController {
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(sel.selectableCards().size() + index));
+                sendUnselectCard(sel.selectableCards().size() + index);
             });
             scroller.addScrollViewChild(card);
         }
@@ -1055,7 +1091,9 @@ public class PromptController {
     }
 
     private void sendSumResponse() {
-        callbacks.sendResponse(ResponseBuilder.selectSum(sumSelection.responseIndices()));
+        callbacks.sendResponse(() -> state.pendingPrompt instanceof DuelMessage.SelectSum sel
+                ? ResponseValidator.selectSum(sel, sumSelection.responseIndices())
+                : ResponseBuilder.selectSum(sumSelection.responseIndices()));
     }
 
     private UIElement slotOf(DuelMessage.SumCard card) {
@@ -1170,14 +1208,14 @@ public class PromptController {
         for (int i = 0; i < sel.selectableCards().size(); i++) {
             var c = sel.selectableCards().get(i);
             if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(i));
+                sendUnselectCard(i);
                 return;
             }
         }
         for (int i = 0; i < sel.unselectableCards().size(); i++) {
             var c = sel.unselectableCards().get(i);
             if (c.controller() == player && c.location() == location && c.sequence() == sequence) {
-                callbacks.sendResponse(ResponseBuilder.selectUnselectCard(sel.selectableCards().size() + i));
+                sendUnselectCard(sel.selectableCards().size() + i);
                 return;
             }
         }
@@ -1252,12 +1290,12 @@ public class PromptController {
             // Inside the per-card effect chooser, backing out means the chain card list again —
             // only a right-click on the list itself declines the chain.
             if (chainEffectChooserOpen) buildChainPrompt(sel);
-            else if (!sel.forced()) callbacks.sendResponse(ResponseBuilder.selectChain(-1));
+            else if (!sel.forced()) callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, -1));
             return true;
         }
         if (state.pendingPrompt instanceof DuelMessage.SortCard || state.pendingPrompt instanceof DuelMessage.SortChain) {
             e.stopPropagation();
-            callbacks.sendResponse(ResponseBuilder.sortCardsDefault());
+            callbacks.sendResponse(ResponseBuilder::sortCardsDefault);
             return true;
         }
         return false;
@@ -1298,6 +1336,38 @@ public class PromptController {
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
                 && sel.mustSelect().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
+    }
+
+    // -- Validated response helpers (prompt resolved from state.pendingPrompt) --
+
+    private byte[] validatedCmd(int actionType, int listIndex) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SelectIdleCmd sel -> ResponseValidator.selectCmd(sel, actionType, listIndex);
+            case DuelMessage.SelectBattleCmd sel -> ResponseValidator.selectCmd(sel, actionType, listIndex);
+            default -> ResponseBuilder.selectCmd(actionType, listIndex);
+        };
+    }
+
+    private byte[] validatedAnnounceCard(int code) {
+        return state.pendingPrompt instanceof DuelMessage.AnnounceCard sel
+                ? ResponseValidator.announceCard(sel, code)
+                : ResponseBuilder.announceCard(code);
+    }
+
+    private byte[] validatedSort(int[] order) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SortCard sel -> ResponseValidator.sortCard(sel, order);
+            case DuelMessage.SortChain sel -> ResponseValidator.sortChain(sel, order);
+            default -> ResponseBuilder.sortCards(order);
+        };
+    }
+
+    private byte[] validatedPlaces(List<int[]> zones) {
+        return switch (state.pendingPrompt) {
+            case DuelMessage.SelectPlace sel -> ResponseValidator.selectPlaces(sel, zones);
+            case DuelMessage.SelectDisfield sel -> ResponseValidator.selectDisfield(sel, zones);
+            default -> ResponseBuilder.selectPlaces(zones);
+        };
     }
 
     // ── DOM helpers ────────────────────────────────────────────────────────

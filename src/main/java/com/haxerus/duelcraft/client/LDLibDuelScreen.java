@@ -1,7 +1,7 @@
 package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
-import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.ResponseValidator;
 import com.haxerus.duelcraft.server.DuelConcedePayload;
 import com.haxerus.duelcraft.server.DuelEndPayload;
 import com.haxerus.duelcraft.server.DuelResponsePayload;
@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -164,7 +165,26 @@ public class LDLibDuelScreen {
 
     // ─── Response Helper ─────────────────────────────────────
 
-    static void sendResponse(ClientDuelState state, byte[] response) {
+    /**
+     * Build a response through {@link ResponseValidator} and send it. edopro treats {@code MSG_RETRY}
+     * as a bug signal, so a response the engine would reject is reported on the status label and
+     * never reaches the server; the prompt stays open for another try.
+     */
+    static void sendResponse(ClientDuelState state, Supplier<byte[]> builder) {
+        byte[] response;
+        try {
+            response = builder.get();
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("[Duel] Rejected response for {}: {}",
+                    state.pendingPrompt == null ? "no prompt" : state.pendingPrompt.getClass().getSimpleName(),
+                    e.getMessage());
+            if (refresher != null) refresher.showStatus(e.getMessage());
+            return;
+        }
+        sendResponse(state, response);
+    }
+
+    private static void sendResponse(ClientDuelState state, byte[] response) {
         if (!state.markResponseSent()) {
             LOGGER.warn("Ignoring duplicate response for the current prompt");
             return;
@@ -344,7 +364,7 @@ public class LDLibDuelScreen {
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
                 }
-                @Override public void sendResponse(byte[] response) {
+                @Override public void sendResponse(Supplier<byte[]> response) {
                     LDLibDuelScreen.sendResponse(state, response);
                 }
                 @Override public String cardDisplayName(int code) {
@@ -567,29 +587,41 @@ public class LDLibDuelScreen {
             if (phaseBtnLeft != null) {
                 phaseBtnLeft.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canBattle())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(IdleAction.TO_BATTLE, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(idle, IdleAction.TO_BATTLE, 0));
                 });
             }
             if (phaseBtnCenter != null) {
                 phaseBtnCenter.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canMain2())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(BattleAction.TO_MAIN2, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(battle, BattleAction.TO_MAIN2, 0));
                 });
             }
             if (phaseBtnRight != null) {
                 phaseBtnRight.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(IdleAction.END_TURN, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(idle, IdleAction.END_TURN, 0));
                     else if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(BattleAction.END_BATTLE, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(battle, BattleAction.END_BATTLE, 0));
                 });
             }
             if (shuffleBtn != null) {
                 shuffleBtn.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canShuffle())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(IdleAction.SHUFFLE_HAND, 0));
+                        LDLibDuelScreen.sendResponse(state,
+                                () -> ResponseValidator.selectCmd(idle, IdleAction.SHUFFLE_HAND, 0));
                 });
             }
+        }
+
+        /** Shows a one-off message on the status label (a rejected response); the next state change replaces it. */
+        private void showStatus(String message) {
+            if (statusLabel == null) return;
+            statusLabel.removeClass("hidden");
+            if (statusLabel instanceof Label lbl) lbl.setText(Component.literal(message));
         }
 
         private void updateStatusLabel() {

@@ -1,7 +1,7 @@
 package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
-import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.ResponseValidator;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
@@ -9,6 +9,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import org.joml.Vector3f;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static com.haxerus.duelcraft.core.OcgConstants.BattleAction;
 import static com.haxerus.duelcraft.core.OcgConstants.IdleAction;
@@ -30,7 +31,8 @@ import static com.haxerus.duelcraft.core.OcgConstants.IdleAction;
 public class ClickDispatcher {
 
     public interface Callbacks {
-        void sendResponse(byte[] response);
+        /** Build a response and send it; a response the validator rejects is reported, not sent. */
+        void sendResponse(Supplier<byte[]> response);
     }
 
     private final UI ui;
@@ -126,8 +128,12 @@ public class ClickDispatcher {
                 if (isActivate && activations.size() > 1) {
                     hideContextMenu();
                     prompt.showActivateOptions(activations);
-                } else {
-                    callbacks.sendResponse(ResponseBuilder.selectCmd(action.actionType(), action.listIndex()));
+                } else if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle) {
+                    callbacks.sendResponse(() ->
+                            ResponseValidator.selectCmd(battle, action.actionType(), action.listIndex()));
+                } else if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle) {
+                    callbacks.sendResponse(() ->
+                            ResponseValidator.selectCmd(idle, action.actionType(), action.listIndex()));
                 }
             });
 
