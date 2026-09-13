@@ -131,7 +131,7 @@ Columns: **Core** = does the engine write it; **Parse** = `MessageParser` verdic
 | 97 | `MSG_CANCEL_TARGET` | ✅ `card.cpp:2358` | ✅ | ✅ | ❌ | |
 | 101 | `MSG_ADD_COUNTER` | ✅ `card.cpp:2241` | ✅ `u16 type, u8 con, u8 loc, u8 seq, u16 n` | ✅ | ✅ | Per-card counter map; the total is badged on the card. |
 | 102 | `MSG_REMOVE_COUNTER` | ✅ 4 sites | ✅ same | ✅ | ❌ | |
-| 160 | `MSG_CARD_HINT` | ✅ 5 sites | ✅ `loc_info, u8 type, u64 value` | ✅ | ✅ | `CHINT_TURN` badges the card; `CHINT_DESC_ADD/REMOVE` refcount per card and list in the info banner. Scripts can emit types 0 to 5; 6 and 7 are engine-only. |
+| 160 | `MSG_CARD_HINT` | ✅ 5 sites | ✅ `loc_info, u8 type, u64 value` | ✅ | ❌ | `CHINT_TURN` badges the card; `CHINT_DESC_ADD/REMOVE` refcount per card and list in the info banner. Scripts can emit types 0 to 5; 6 and 7 are engine-only. |
 | 165 | `MSG_PLAYER_HINT` | ✅ `field.cpp:1332-1402` | ✅ | ✅ | ✅ | `u8 player, u8 type (PHINT_DESC_ADD 6 / REMOVE 7), u64 desc`. Emitted only as a side effect of `EFFECT_FLAG_PLAYER_TARGET \| EFFECT_FLAG_CLIENT_HINT` effects. |
 | 161 | `MSG_TAG_SWAP` | ➖ unreachable | | | | `field::tag_swap` returns early unless `OCG_NewCardInfo.duelist > 0`; Duelcraft always passes 0. |
 | 162 | `MSG_RELOAD_FIELD` | ➖ Debug only | | | | Only from `Debug.ReloadFieldEnd`. Same payload as `OCG_DuelQueryField` minus the id byte, so a resync could be synthesised from the query instead. |
