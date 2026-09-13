@@ -112,10 +112,21 @@ class DuelLogTest {
         var state = newState();
 
         state.applyMessage(new DuelMessage.NewTurn(0));
-        state.applyMessage(new DuelMessage.NewPhase(PHASE_DAMAGE_CAL));
+        state.applyMessage(new DuelMessage.NewPhase(PHASE_BATTLE_START));
         state.applyMessage(new DuelMessage.Win(0, 1));
 
-        assertEquals(List.of("Turn 1 - Your turn", "Damage Calc", "You win"), lines(state));
+        assertEquals(List.of("Turn 1 - Your turn", "Battle", "You win"), lines(state));
+    }
+
+    /** MSG_WIN and the host's DuelEndPayload both reach applyResult; only one line comes out. */
+    @Test
+    void aRepeatedResultIsNotLoggedTwice() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.Win(1, 1));
+        state.applyResult(1, 1);
+
+        assertEquals(List.of("You lose"), lines(state));
     }
 
     @Test

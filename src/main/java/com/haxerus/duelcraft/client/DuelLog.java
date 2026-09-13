@@ -30,7 +30,8 @@ public class DuelLog {
         return List.copyOf(entries);
     }
 
-    public void clear() {
-        entries.clear();
+    /** The newest line's text, or null when nothing has been logged yet. */
+    public String lastText() {
+        return entries.isEmpty() ? null : entries.getLast().text();
     }
 }

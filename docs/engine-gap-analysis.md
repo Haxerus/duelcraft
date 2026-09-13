@@ -410,7 +410,7 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong. `extraPos[]` is filled only in the dead `Start` branch.
 - [x] `Swap` handles MZONE↔MZONE only and does not move stats or overlays.
 - [ ] `Move.reason` ignored (no destroy/banish/return distinction).
-- [x] Battle sub-phases collapse to "Battle"; no phase-track widget. Each sub-phase is now named in the HUD and in the turn/phase banner; a phase-track widget is still open.
+- [x] Battle sub-phases collapse to "Battle"; no phase-track widget. There is nothing to expand: all ten `MSG_NEW_PHASE` sites (`processor.cpp:2787, 2793, 2832, 2858, 3365, 3414, 3450, 3469, 3562, 3580`) announce only DRAW, STANDBY, MAIN1, BATTLE_START, MAIN2 and END, so `BATTLE_STEP`/`DAMAGE`/`DAMAGE_CAL`/`BATTLE` never reach the client. A phase-track widget is still open.
 - [x] Status label is written by both `updateStatusLabel()` (on `CHAIN` only) and the prompt controller; they overwrite each other. The chain count moved to `#chain-count` and `updateStatusLabel()` leaves the label alone while a prompt is up.
 - [ ] Mouse only; no keyboard handling.
 - [ ] Untextured cards render as the card back, indistinguishable from face-down cards.
