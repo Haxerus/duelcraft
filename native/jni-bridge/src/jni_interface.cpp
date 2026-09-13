@@ -38,8 +38,15 @@ Java_com_haxerus_duelcraft_core_OcgCore_nCreateEngine(
     auto* engine = new DuelEngine();
     auto dbs = jstringArrayToVector(env, dbPaths);
     auto scripts = jstringArrayToVector(env, scriptPaths);
-    if (!engine->init(dbs, scripts)) {
+    std::string error;
+    if (!engine->init(dbs, scripts, error)) {
         delete engine;
+        // An engine without card data is useless, so fail loudly rather than returning 0.
+        jclass cls = env->FindClass("java/lang/IllegalStateException");
+        if (cls != nullptr) {
+            env->ThrowNew(cls, ("Failed to open the card database: " + error).c_str());
+            env->DeleteLocalRef(cls);
+        }
         return 0;
     }
     return reinterpret_cast<jlong>(engine);

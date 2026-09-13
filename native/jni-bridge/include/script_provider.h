@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "ocgapi_types.h"
 
@@ -25,8 +26,15 @@ public:
 private:
     std::vector<std::string> searchPaths_;
 
-    // Read a file from the first matching search path
-    std::optional<std::vector<char>> readFile(const std::string& name);
+    // Resolved script name -> full path; an empty path records a miss already logged
+    std::unordered_map<std::string, std::string> resolved_;
+
+    // Read a file from the first matching search path. A name that resolves for the first
+    // time is remembered; a first miss is logged once at `missLogType` with the paths searched.
+    std::optional<std::vector<char>> readFile(const std::string& name, int missLogType);
+
+    static std::optional<std::vector<char>> readPath(const std::string& path);
+    std::string searchPathList() const;
 };
 
 #endif // SCRIPT_PROVIDER_H

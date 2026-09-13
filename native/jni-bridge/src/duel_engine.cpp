@@ -1,6 +1,6 @@
 #include "duel_engine.h"
 #include <cstring>
-#include <cstdio>
+#include "java_log.h"
 #include "ocgapi.h"
 
 OCG_Duel DuelEngine::toDuel(intptr_t handle) {
@@ -8,8 +8,9 @@ OCG_Duel DuelEngine::toDuel(intptr_t handle) {
 }
 
 bool DuelEngine::init(const std::vector<std::string>& dbPaths,
-                      const std::vector<std::string>& scriptPaths) {
-    if (!cardDb_.open(dbPaths)) {
+                      const std::vector<std::string>& scriptPaths,
+                      std::string& error) {
+    if (!cardDb_.open(dbPaths, error)) {
         return false;
     }
     scriptProvider_.setSearchPaths(scriptPaths);
@@ -66,9 +67,13 @@ intptr_t DuelEngine::createDuel(const uint64_t seed[4], uint64_t flags,
     ctx->duel = duel;
     contexts_[handle] = std::move(ctx);
 
-    // Load bootstrap scripts
-    scriptProvider_.loadScript(duel, "constant.lua");
-    scriptProvider_.loadScript(duel, "utility.lua");
+    // Load bootstrap scripts. Without them no card script can run.
+    for (const char* bootstrap : { "constant.lua", "utility.lua" }) {
+        if (!scriptProvider_.loadScript(duel, bootstrap)) {
+            javaLog(OCG_LOG_TYPE_ERROR,
+                    std::string("bootstrap script ") + bootstrap + " could not be loaded");
+        }
+    }
 
     return handle;
 }
@@ -153,9 +158,8 @@ std::pair<int, int> DuelEngine::getVersion() {
     return {major, minor};
 }
 
-void DuelEngine::logHandler(void* payload, const char* message, int type) {
-    // For now, log to stderr. Java log forwarding will be added later.
+void DuelEngine::logHandler(void* /*payload*/, const char* message, int type) {
     if (message) {
-        fprintf(stderr, "[ocgcore] %s\n", message);
+        javaLog(type, message);
     }
 }
