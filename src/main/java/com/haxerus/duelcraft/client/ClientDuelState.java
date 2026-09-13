@@ -186,7 +186,7 @@ public class ClientDuelState {
     /** MSG_WAITING: the opponent is answering a prompt of their own. Cleared by our next prompt. */
     public boolean waitingForOpponent;
 
-    /** Status text for {@link #waitingForOpponent}, edopro's system string 1390. */
+    /** Status text for {@link #waitingForOpponent}; our own wording, edopro's string 1390 is just "Waiting...". */
     public static final String WAITING_TEXT = "Waiting for opponent...";
 
     // Last prompt record received, kept after pendingPrompt is cleared so MSG_RETRY can restore it.
