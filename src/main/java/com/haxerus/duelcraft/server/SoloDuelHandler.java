@@ -115,7 +115,7 @@ public class SoloDuelHandler implements DuelEventListener {
             }
             LOGGER.warn("[Solo AI] No auto-response for {}, sending to player as fallback",
                     msg.getClass().getSimpleName());
-            sendToPlayer(msg);
+            forwardAiPrompt(msg);
             lastPromptTarget = 0;
             return AWAIT_RESPONSE;
         }
@@ -136,7 +136,7 @@ public class SoloDuelHandler implements DuelEventListener {
         if (retryCount > MAX_AI_RETRIES) {
             LOGGER.error("[Solo AI] Giving up after {} retries on {}, forwarding prompt to the player",
                     MAX_AI_RETRIES, lastPrompt.getClass().getSimpleName());
-            sendToPlayer(lastPrompt);
+            forwardAiPrompt(lastPrompt);
             lastPromptTarget = 0;
             return AWAIT_RESPONSE;
         }
@@ -145,7 +145,7 @@ public class SoloDuelHandler implements DuelEventListener {
         if (response == null) {
             LOGGER.error("[Solo AI] No fallback response for {}, forwarding prompt to the player",
                     lastPrompt.getClass().getSimpleName());
-            sendToPlayer(lastPrompt);
+            forwardAiPrompt(lastPrompt);
             lastPromptTarget = 0;
             return AWAIT_RESPONSE;
         }
@@ -165,6 +165,15 @@ public class SoloDuelHandler implements DuelEventListener {
     private void sendToPlayer(DuelMessage msg) {
         PacketDistributor.sendToPlayer(player,
                 new DuelMessagePayload(MessageSanitizer.forRecipient(msg, HUMAN_PLAYER)));
+    }
+
+    /**
+     * Hand the human a prompt the AI was asked but cannot answer. It goes out unsanitised on
+     * purpose: {@code forRecipient} zeroes candidates the <em>prompted</em> player does not control
+     * ({@code generic_duel.cpp:933-977}), which here would blank the human's own cards.
+     */
+    private void forwardAiPrompt(DuelMessage prompt) {
+        PacketDistributor.sendToPlayer(player, new DuelMessagePayload(prompt));
     }
 
     /** The prompt the human is expected to answer; the AI answers its own prompts internally. */

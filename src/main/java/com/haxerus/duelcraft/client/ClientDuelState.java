@@ -775,14 +775,19 @@ public class ClientDuelState {
 
     /**
      * edopro writes a deck-top or extra-top reveal onto the pile's own card objects, so the codes
-     * survive until a shuffle takes them back (duelclient.cpp:2513, :2548). The reveal counts down
-     * from the top of the pile, which is the end of the list.
+     * survive until a shuffle takes them back (duelclient.cpp:2513, :2548). Each entry carries the
+     * revealed card's own sequence ({@code libduel.cpp:832, :854}), which is what addresses the
+     * pile: {@code ConfirmExtratop} skips the pendulum cards at the end of the extra deck, so
+     * counting down from the top would land on the wrong ones.
      */
     private void revealPileTop(List<ClientCard> pile, List<DuelMessage.ConfirmCard> cards) {
-        for (int i = 0; i < cards.size(); i++) {
-            int index = pile.size() - 1 - i;
-            if (index < 0) return;
-            if (cards.get(i).code() != 0) pile.get(index).code = cards.get(i).code();
+        for (var card : cards) {
+            int index = card.sequence();
+            if (index < 0 || index >= pile.size()) {
+                LOGGER.warn("[State] Reveal sequence {} outside a pile of {}", index, pile.size());
+                continue;
+            }
+            if (card.code() != 0) pile.get(index).code = card.code();
         }
         dirtyFlags.add(DirtyFlag.PILE_COUNTS);
     }
@@ -989,6 +994,9 @@ public class ClientDuelState {
                 putAt(card, p, LOCATION_EXTRA, extra[p].size());
             } else {
                 card.location = LOCATION_DECK;
+                // These came from the graveyard face-up; edopro relies on its renderer to hide
+                // deck cards, this client reads the position, so turn them over here.
+                card.position = POS_FACEDOWN_DEFENSE;
             }
         }
         renumber(deck[p]);
@@ -1023,7 +1031,12 @@ public class ClientDuelState {
             if (card == null || to.location() == 0) continue;
             ClientCard[] zone = zones[to.controller()];
             int previous = card.sequence;
-            if (!inRange(to.sequence(), zone) || !inRange(previous, zone)) continue;
+            if (!inRange(to.sequence(), zone) || !inRange(previous, zone)) {
+                LOGGER.warn("[State] ShuffleSetCard move {} -> {} outside p{}'s {} zones",
+                        previous, to.sequence(), to.controller(),
+                        Integer.toHexString(set.location()));
+                continue;
+            }
             ClientCard displaced = zone[to.sequence()];
             zone[previous] = displaced;
             zone[to.sequence()] = card;

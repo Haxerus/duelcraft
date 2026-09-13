@@ -409,6 +409,60 @@ class ClientDuelStateTest {
         assertEquals(List.of(0, 1), state.deck[0].stream().map(card -> card.sequence).toList());
     }
 
+    /** Cards that came from the graveyard face-up have to turn over on their way into the deck. */
+    @Test
+    void swapGraveDeckTurnsTheNewDeckFaceDown() {
+        var state = newState();
+        draw(state, 0, 11111, 22222);
+        for (int code : new int[]{11111, 22222}) {
+            move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_GRAVE, state.graveCount(0), POS_FACEUP_ATTACK));
+        }
+
+        state.applyMessage(new DuelMessage.SwapGraveDeck(0, 15, new byte[]{0}));
+
+        assertEquals(List.of(11111, 22222), codesOf(state.deck[0]));
+        assertTrue(state.deck[0].stream().allMatch(ClientCard::isFaceDown),
+                "every card of the new deck is face-down");
+    }
+
+    /** libduel.cpp:832 writes each revealed card's own sequence; that is what addresses the pile. */
+    @Test
+    void confirmDeckTopWritesCodesAtTheRevealedSequences() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.ConfirmDeckTop(0, List.of(
+                new DuelMessage.ConfirmCard(11111, 0, LOCATION_DECK, 39),
+                new DuelMessage.ConfirmCard(22222, 0, LOCATION_DECK, 38))));
+
+        assertEquals(11111, state.deck[0].get(39).code);
+        assertEquals(22222, state.deck[0].get(38).code);
+        assertEquals(0, state.deck[0].get(37).code);
+    }
+
+    /** ConfirmExtratop skips the pendulum cards at the end of the list, so it names other sequences. */
+    @Test
+    void confirmExtraTopWritesCodesAtTheRevealedSequences() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.ConfirmExtraTop(0, List.of(
+                new DuelMessage.ConfirmCard(33333, 0, LOCATION_EXTRA, 12))));
+
+        assertEquals(33333, state.extra[0].get(12).code);
+        assertEquals(0, state.extra[0].get(14).code);
+    }
+
+    @Test
+    void revealOutsideThePileIsIgnored() {
+        var state = newState();
+
+        state.applyMessage(new DuelMessage.ConfirmDeckTop(0, List.of(
+                new DuelMessage.ConfirmCard(11111, 0, LOCATION_DECK, 99))));
+
+        assertEquals(40, state.deckCount(0));
+        assertTrue(state.deck[0].stream().allMatch(card -> card.code == 0));
+    }
+
     /** duelclient.cpp:4017 resolves every named card before deleting any of them. */
     @Test
     void removeCardsResolvesEverySequenceBeforeDeleting() {

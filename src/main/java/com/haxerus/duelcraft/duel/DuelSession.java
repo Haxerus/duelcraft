@@ -82,15 +82,17 @@ public class DuelSession implements AutoCloseable {
             if (messageBuffer != null && messageBuffer.length > 0) {
                 List<DuelMessage> messages = MessageParser.parse(messageBuffer);
                 for (DuelMessage msg : messages) {
-                    // Auto-pass empty chain prompts (no chainable cards, not forced). The rest of
-                    // the batch was parsed before the prompt, so it still belongs to the players.
+                    // Auto-pass empty chain prompts (no chainable cards, not forced).
+                    // OCG_DuelProcess stops the moment a processor unit needs an answer
+                    // (ocgapi.cpp:115-118, processor_visit.cpp:14-21), so the prompt is always the
+                    // last record of its batch and nothing is discarded by leaving the loop here.
                     if (msg instanceof DuelMessage.SelectChain chain
                             && chain.count() == 0 && !chain.forced()) {
                         LOGGER.debug("[Session] Auto-passing empty chain for player {}", chain.player());
                         OcgCore.nDuelSetResponse(eng, duelHandle,
                                 ResponseBuilder.selectChain(-1));
                         autoResponded = true;
-                        continue;
+                        break;
                     }
 
                     emitRefreshes(RefreshSchedule.before(msg));
