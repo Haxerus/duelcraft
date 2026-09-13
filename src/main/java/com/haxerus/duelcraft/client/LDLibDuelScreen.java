@@ -255,7 +255,7 @@ public class LDLibDuelScreen {
         private final UIElement[] lpDeltaLabels = new UIElement[2];
         private long attackShownAt;
         private final long[] lpDeltaShownAt = new long[2];
-        private long bannerShownAt;
+        private long bannerUntil;
 
         // Duel log panel
         private final UIElement logPanel;
@@ -777,6 +777,9 @@ public class LDLibDuelScreen {
                 if (entry.code() != 0) {
                     int code = entry.code();
                     line.addEventListener(UIEvents.CLICK, e -> {
+                        // The panel and the info banner share the left column, so the panel has to
+                        // step aside for the card it just sent there.
+                        if (logPanel != null) logPanel.addClass("hidden");
                         showCardInfo(code);
                         e.stopPropagation();
                     });
@@ -880,15 +883,17 @@ public class LDLibDuelScreen {
                 }
             }
 
+            // Banners queue like the toasts: a turn change and its draw phase arrive in one batch,
+            // and each deserves its moment rather than the last one winning.
             if (bannerLabel != null) {
-                if (state.bannerText != null && state.bannerAt != bannerShownAt) {
-                    setLabelText(bannerLabel, state.bannerText);
-                    bannerLabel.removeClass("hidden");
-                    bannerShownAt = state.bannerAt;
-                } else if (bannerShownAt != 0 && now - bannerShownAt > BANNER_MS) {
+                if (bannerUntil != 0 && now >= bannerUntil) {
                     bannerLabel.addClass("hidden");
-                    state.bannerText = null;
-                    bannerShownAt = 0;
+                    bannerUntil = 0;
+                }
+                if (bannerUntil == 0 && !state.banners.isEmpty()) {
+                    setLabelText(bannerLabel, state.banners.poll());
+                    bannerLabel.removeClass("hidden");
+                    bannerUntil = now + BANNER_MS;
                 }
             }
         }
