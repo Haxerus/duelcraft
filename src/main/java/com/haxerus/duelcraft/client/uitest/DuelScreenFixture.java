@@ -71,6 +71,27 @@ public final class DuelScreenFixture {
     }
 
     /**
+     * Layers the card-object model onto a populated MR5 field: two XYZ materials under the monster
+     * in zone 0, three counters on the monster in zone 1, a targeting highlight on zone 2 and a
+     * disabled zone 3 — one of each thing {@code ClientCard} now tracks.
+     */
+    public static void populateCardModel() {
+        // Attach two hand cards as materials of the monster in zone 0. The engine addresses a
+        // material by its host zone | LOCATION_OVERLAY, so the destination location is 0x84.
+        for (int i = 0; i < 2; i++) {
+            LDLibDuelScreen.applyMessage(new DuelMessage.Move(CODES.get(22 + i),
+                    new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, i),
+                    0));
+        }
+        LDLibDuelScreen.applyMessage(new DuelMessage.AddCounter(0x1, 0, LOCATION_MZONE, 1, 3));
+        LDLibDuelScreen.applyMessage(new DuelMessage.BecomeTarget(
+                List.of(new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_ATTACK))));
+        // Low 16 bits are player 0's zones; bit 3 is their fourth monster zone.
+        LDLibDuelScreen.applyMessage(new DuelMessage.FieldDisabled(1 << 3));
+    }
+
+    /**
      * Sends an idle command whose only entry makes the monster at {@code (player, MZONE, sequence)}
      * repositionable, so clicking that zone opens the context menu. Card codes follow
      * {@link #populate}'s five-column mapping, where monster zone N holds {@code CODES.get(N)}.
