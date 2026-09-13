@@ -1,5 +1,7 @@
 package com.haxerus.duelcraft.server;
 
+import com.haxerus.duelcraft.core.OcgConstants.BattleAction;
+import com.haxerus.duelcraft.core.OcgConstants.IdleAction;
 import com.haxerus.duelcraft.duel.DuelEventListener;
 import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
@@ -13,6 +15,8 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /**
  * Duel handler for solo testing mode.
@@ -54,7 +58,7 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.Win win -> {
                 PacketDistributor.sendToPlayer(player, new DuelEndPayload(win.winner(), win.reason()));
                 winSent = true;
-                yield 2;
+                yield DUEL_ENDED;
             }
 
             // Selection prompts — route to human or AI
@@ -84,7 +88,7 @@ public class SoloDuelHandler implements DuelEventListener {
                 // Broadcast info messages to the human player only, and only when the host
                 // policy lets them see the message at all
                 if (MessageSanitizer.recipientsOf(msg).includes(HUMAN_PLAYER)) sendToPlayer(msg);
-                yield 0;
+                yield CONTINUE;
             }
         };
     }
@@ -97,7 +101,7 @@ public class SoloDuelHandler implements DuelEventListener {
         if (targetPlayer == 0) {
             // Human player — send to client as normal
             sendToPlayer(msg);
-            return 1; // await response
+            return AWAIT_RESPONSE;
         } else {
             // AI player — auto-respond
             byte[] response = buildAutoResponse(msg);
@@ -106,14 +110,14 @@ public class SoloDuelHandler implements DuelEventListener {
                         msg.getClass().getSimpleName(), response.length);
                 // Schedule the response to be applied after this message batch completes
                 pendingAutoResponse = () -> DuelManager.get().handleSoloAutoResponse(duelId, response);
-                // Still return 1 to pause processing; DuelManager will apply and resume
-                return 1;
+                // Still pause processing; DuelManager will apply the answer and resume.
+                return AWAIT_RESPONSE;
             }
             LOGGER.warn("[Solo AI] No auto-response for {}, sending to player as fallback",
                     msg.getClass().getSimpleName());
             sendToPlayer(msg);
             lastPromptTarget = 0;
-            return 1;
+            return AWAIT_RESPONSE;
         }
     }
 
@@ -125,7 +129,7 @@ public class SoloDuelHandler implements DuelEventListener {
     private int handleRetry(DuelMessage retryMsg) {
         if (lastPromptTarget != 1 || lastPrompt == null) {
             sendToPlayer(retryMsg);
-            return 1;
+            return AWAIT_RESPONSE;
         }
 
         retryCount++;
@@ -134,7 +138,7 @@ public class SoloDuelHandler implements DuelEventListener {
                     MAX_AI_RETRIES, lastPrompt.getClass().getSimpleName());
             sendToPlayer(lastPrompt);
             lastPromptTarget = 0;
-            return 1;
+            return AWAIT_RESPONSE;
         }
 
         byte[] response = buildFallbackResponse(lastPrompt);
@@ -143,12 +147,12 @@ public class SoloDuelHandler implements DuelEventListener {
                     lastPrompt.getClass().getSimpleName());
             sendToPlayer(lastPrompt);
             lastPromptTarget = 0;
-            return 1;
+            return AWAIT_RESPONSE;
         }
         LOGGER.warn("[Solo AI] Retry {}/{} on {}, re-answering with fallback",
                 retryCount, MAX_AI_RETRIES, lastPrompt.getClass().getSimpleName());
         pendingAutoResponse = () -> DuelManager.get().handleSoloAutoResponse(duelId, response);
-        return 1;
+        return AWAIT_RESPONSE;
     }
 
     /** Check if there's a pending AI response that needs to be applied. */
@@ -185,24 +189,24 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.SelectIdleCmd sel -> {
                 // Priority: summon > set monster > set S/T > activate > battle > end turn
                 if (!sel.summonable().isEmpty())
-                    yield ResponseBuilder.selectCmd(0, 0);
+                    yield ResponseBuilder.selectCmd(IdleAction.SUMMON, 0);
                 if (!sel.settableMonsters().isEmpty())
-                    yield ResponseBuilder.selectCmd(3, 0);
+                    yield ResponseBuilder.selectCmd(IdleAction.SET_MONSTER, 0);
                 if (!sel.settableSpells().isEmpty())
-                    yield ResponseBuilder.selectCmd(4, 0);
+                    yield ResponseBuilder.selectCmd(IdleAction.SET_SPELL_TRAP, 0);
                 if (!sel.activatable().isEmpty())
-                    yield ResponseBuilder.selectCmd(5, 0);
+                    yield ResponseBuilder.selectCmd(IdleAction.ACTIVATE, 0);
                 if (sel.canBattle())
-                    yield ResponseBuilder.selectCmd(6, 0);
-                yield ResponseBuilder.selectCmd(7, 0); // end turn
+                    yield ResponseBuilder.selectCmd(IdleAction.TO_BATTLE, 0);
+                yield ResponseBuilder.selectCmd(IdleAction.END_TURN, 0);
             }
 
             case DuelMessage.SelectBattleCmd sel -> {
                 if (!sel.attackable().isEmpty())
-                    yield ResponseBuilder.selectCmd(1, 0); // attack with first
+                    yield ResponseBuilder.selectCmd(BattleAction.ATTACK, 0); // attack with first
                 if (sel.canMain2())
-                    yield ResponseBuilder.selectCmd(2, 0); // main phase 2
-                yield ResponseBuilder.selectCmd(3, 0); // end battle
+                    yield ResponseBuilder.selectCmd(BattleAction.TO_MAIN2, 0);
+                yield ResponseBuilder.selectCmd(BattleAction.END_BATTLE, 0);
             }
 
             case DuelMessage.SelectCard sel -> {
@@ -247,14 +251,14 @@ public class SoloDuelHandler implements DuelEventListener {
                 // Find first available monster zone (bits 0-4, 0 = selectable)
                 for (int seq = 0; seq < 5; seq++) {
                     if ((field & (1 << seq)) == 0)
-                        yield ResponseBuilder.selectPlace(sel.player(), 0x04, seq);
+                        yield ResponseBuilder.selectPlace(sel.player(), LOCATION_MZONE, seq);
                 }
                 // Try spell/trap zones (bits 8-12)
                 for (int seq = 0; seq < 5; seq++) {
                     if ((field & (1 << (seq + 8))) == 0)
-                        yield ResponseBuilder.selectPlace(sel.player(), 0x08, seq);
+                        yield ResponseBuilder.selectPlace(sel.player(), LOCATION_SZONE, seq);
                 }
-                yield ResponseBuilder.selectPlace(sel.player(), 0x04, 0); // fallback
+                yield ResponseBuilder.selectPlace(sel.player(), LOCATION_MZONE, 0); // fallback
             }
 
             case DuelMessage.SelectDisfield sel -> {
@@ -265,16 +269,16 @@ public class SoloDuelHandler implements DuelEventListener {
                 int other = 1 - self;
                 List<int[]> zones = new ArrayList<>();
                 for (int seq = 0; seq < 7 && zones.size() < sel.count(); seq++) {
-                    if ((fieldMask & (1 << seq)) == 0) zones.add(new int[]{self, 0x04, seq});
+                    if ((fieldMask & (1 << seq)) == 0) zones.add(new int[]{self, LOCATION_MZONE, seq});
                 }
                 for (int seq = 0; seq < 8 && zones.size() < sel.count(); seq++) {
-                    if ((fieldMask & (1 << (8 + seq))) == 0) zones.add(new int[]{self, 0x08, seq});
+                    if ((fieldMask & (1 << (8 + seq))) == 0) zones.add(new int[]{self, LOCATION_SZONE, seq});
                 }
                 for (int seq = 0; seq < 7 && zones.size() < sel.count(); seq++) {
-                    if ((fieldMask & (1 << (16 + seq))) == 0) zones.add(new int[]{other, 0x04, seq});
+                    if ((fieldMask & (1 << (16 + seq))) == 0) zones.add(new int[]{other, LOCATION_MZONE, seq});
                 }
                 for (int seq = 0; seq < 8 && zones.size() < sel.count(); seq++) {
-                    if ((fieldMask & (1 << (24 + seq))) == 0) zones.add(new int[]{other, 0x08, seq});
+                    if ((fieldMask & (1 << (24 + seq))) == 0) zones.add(new int[]{other, LOCATION_SZONE, seq});
                 }
                 yield ResponseBuilder.selectPlaces(zones);
             }
@@ -282,10 +286,10 @@ public class SoloDuelHandler implements DuelEventListener {
             case DuelMessage.SelectPosition sel -> {
                 int positions = sel.positions();
                 // Prefer face-up attack
-                if ((positions & 0x1) != 0) yield ResponseBuilder.selectPosition(0x1);
-                if ((positions & 0x4) != 0) yield ResponseBuilder.selectPosition(0x4);
-                if ((positions & 0x2) != 0) yield ResponseBuilder.selectPosition(0x2);
-                yield ResponseBuilder.selectPosition(0x8);
+                if ((positions & POS_FACEUP_ATTACK) != 0) yield ResponseBuilder.selectPosition(POS_FACEUP_ATTACK);
+                if ((positions & POS_FACEUP_DEFENSE) != 0) yield ResponseBuilder.selectPosition(POS_FACEUP_DEFENSE);
+                if ((positions & POS_FACEDOWN_ATTACK) != 0) yield ResponseBuilder.selectPosition(POS_FACEDOWN_ATTACK);
+                yield ResponseBuilder.selectPosition(POS_FACEDOWN_DEFENSE);
             }
 
             case DuelMessage.SelectCounter sel ->

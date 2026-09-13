@@ -10,6 +10,9 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
+import static com.haxerus.duelcraft.core.OcgConstants.BattleAction;
+import static com.haxerus.duelcraft.core.OcgConstants.IdleAction;
+
 /**
  * Routes card-slot and pile clicks to the right handler based on the current
  * pending prompt. Also owns the floating context menu (the row of action icons
@@ -98,8 +101,8 @@ public class ClickDispatcher {
 
         boolean battleCmd = prompt.isBattleCmd();
         int activateType = battleCmd
-                ? ClientDuelState.BattleAction.ACTIVATE
-                : ClientDuelState.IdleAction.ACTIVATE;
+                ? BattleAction.ACTIVATE
+                : IdleAction.ACTIVATE;
         // A card with several activatable effects gets one Activate icon; picking which effect
         // happens in the option dialog, as in edopro.
         var activations = actions.stream().filter(a -> a.actionType() == activateType).toList();
@@ -159,18 +162,18 @@ public class ClickDispatcher {
     private ActionIconInfo getActionIconInfo(int actionType, boolean isBattleCmd) {
         if (isBattleCmd) {
             return switch (actionType) {
-                case ClientDuelState.BattleAction.ATTACK -> new ActionIconInfo("#FF4444", "Attack");
-                case ClientDuelState.BattleAction.ACTIVATE -> new ActionIconInfo("#FF6644", "Activate");
+                case BattleAction.ATTACK -> new ActionIconInfo("#FF4444", "Attack");
+                case BattleAction.ACTIVATE -> new ActionIconInfo("#FF6644", "Activate");
                 default -> new ActionIconInfo("#AAAAAA", "Action");
             };
         }
         return switch (actionType) {
-            case ClientDuelState.IdleAction.SUMMON -> new ActionIconInfo("#FFCC00", "Summon");
-            case ClientDuelState.IdleAction.SPECIAL_SUMMON -> new ActionIconInfo("#44CC44", "Special Summon");
-            case ClientDuelState.IdleAction.REPOSITION -> new ActionIconInfo("#44AAFF", "Reposition");
-            case ClientDuelState.IdleAction.SET_MONSTER -> new ActionIconInfo("#6688FF", "Set");
-            case ClientDuelState.IdleAction.SET_SPELL_TRAP -> new ActionIconInfo("#8866FF", "Set S/T");
-            case ClientDuelState.IdleAction.ACTIVATE -> new ActionIconInfo("#FF6644", "Activate");
+            case IdleAction.SUMMON -> new ActionIconInfo("#FFCC00", "Summon");
+            case IdleAction.SPECIAL_SUMMON -> new ActionIconInfo("#44CC44", "Special Summon");
+            case IdleAction.REPOSITION -> new ActionIconInfo("#44AAFF", "Reposition");
+            case IdleAction.SET_MONSTER -> new ActionIconInfo("#6688FF", "Set");
+            case IdleAction.SET_SPELL_TRAP -> new ActionIconInfo("#8866FF", "Set S/T");
+            case IdleAction.ACTIVATE -> new ActionIconInfo("#FF6644", "Activate");
             default -> new ActionIconInfo("#AAAAAA", "Action");
         };
     }

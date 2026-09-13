@@ -567,27 +567,27 @@ public class LDLibDuelScreen {
             if (phaseBtnLeft != null) {
                 phaseBtnLeft.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canBattle())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.IdleAction.TO_BATTLE, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(IdleAction.TO_BATTLE, 0));
                 });
             }
             if (phaseBtnCenter != null) {
                 phaseBtnCenter.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canMain2())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.BattleAction.TO_MAIN2, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(BattleAction.TO_MAIN2, 0));
                 });
             }
             if (phaseBtnRight != null) {
                 phaseBtnRight.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.IdleAction.END_TURN, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(IdleAction.END_TURN, 0));
                     else if (state.pendingPrompt instanceof DuelMessage.SelectBattleCmd battle && battle.canEnd())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.BattleAction.END_BATTLE, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(BattleAction.END_BATTLE, 0));
                 });
             }
             if (shuffleBtn != null) {
                 shuffleBtn.setOnClick(e -> {
                     if (state.pendingPrompt instanceof DuelMessage.SelectIdleCmd idle && idle.canShuffle())
-                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(ClientDuelState.IdleAction.SHUFFLE_HAND, 0));
+                        LDLibDuelScreen.sendResponse(state, ResponseBuilder.selectCmd(IdleAction.SHUFFLE_HAND, 0));
                 });
             }
         }

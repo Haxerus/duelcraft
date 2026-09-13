@@ -40,39 +40,39 @@ public class ServerDuelHandler implements DuelEventListener {
                 // Bad response — edopro ends the duel here, but Duelcraft continues, so only
                 // the player who owns the rejected prompt needs to see it.
                 if (pendingPlayer >= 0) sendToPlayer(pendingPlayer, msg);
-                return 1; // stop processing, wait for corrected response
+                return AWAIT_RESPONSE; // wait for a corrected response
             }
             case DuelMessage.Win win -> {
                 var payload = new DuelEndPayload(win.winner(), win.reason());
                 PacketDistributor.sendToPlayer(player0, payload);
                 PacketDistributor.sendToPlayer(player1, payload);
                 winSent = true;
-                return 2;
+                return DUEL_ENDED;
             }
-            case DuelMessage.SelectIdleCmd sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectBattleCmd sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectChain sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectEffectYn sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectYesNo sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectOption sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectPlace sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectDisfield sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectPosition sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectTribute sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectCounter sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectSum sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SelectUnselectCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SortCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.SortChain sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceRace sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceAttrib sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceNumber sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.AnnounceCard sel -> { sendToPlayer(sel.player(), msg); return 1; }
-            case DuelMessage.RockPaperScissors sel -> { sendToPlayer(sel.player(), msg); return 1; }
+            case DuelMessage.SelectIdleCmd sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectBattleCmd sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectChain sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectEffectYn sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectYesNo sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectOption sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectPlace sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectDisfield sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectPosition sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectTribute sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectCounter sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectSum sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SelectUnselectCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SortCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.SortChain sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceRace sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceAttrib sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceNumber sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.AnnounceCard sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
+            case DuelMessage.RockPaperScissors sel -> { sendToPlayer(sel.player(), msg); return AWAIT_RESPONSE; }
             default -> {
                 broadcast(msg);
-                return 0;
+                return CONTINUE;
             }
         }
     }

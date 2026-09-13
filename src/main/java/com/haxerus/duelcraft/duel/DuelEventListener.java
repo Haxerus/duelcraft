@@ -8,13 +8,18 @@ import com.haxerus.duelcraft.duel.message.DuelMessage;
  */
 public interface DuelEventListener {
 
+    /** {@link #onMessage} result: hand the next message of the batch to the listener. */
+    int CONTINUE = 0;
+    /** {@link #onMessage} result: stop the batch, a player owes the engine a response. */
+    int AWAIT_RESPONSE = 1;
+    /** {@link #onMessage} result: stop the batch, the duel is over. */
+    int DUEL_ENDED = 2;
+
     /**
      * Called for each message produced by the duel engine during processing.
      *
      * @param msg the parsed duel message
-     * @return 0 to continue processing the next message,
-     *         1 to stop (awaiting player response),
-     *         2 to stop (duel ended)
+     * @return {@link #CONTINUE}, {@link #AWAIT_RESPONSE} or {@link #DUEL_ENDED}
      */
     int onMessage(DuelMessage msg);
 

@@ -453,6 +453,31 @@ public final class OcgConstants {
     public static final int DUEL_MODE_MR4_FORB = 0;
     public static final int DUEL_MODE_MR5_FORB = 0;
 
+    // ---- Command Action Types ----
+
+    /** {@code MSG_SELECT_BATTLECMD} action types ({@code playerop.cpp} select_battle_command). */
+    public static final class BattleAction {
+        public static final int ACTIVATE = 0;
+        public static final int ATTACK = 1;
+        public static final int TO_MAIN2 = 2;
+        public static final int END_BATTLE = 3;
+        private BattleAction() { }
+    }
+
+    /** {@code MSG_SELECT_IDLECMD} action types ({@code playerop.cpp} select_idle_command). */
+    public static final class IdleAction {
+        public static final int SUMMON = 0;
+        public static final int SPECIAL_SUMMON = 1;
+        public static final int REPOSITION = 2;
+        public static final int SET_MONSTER = 3;
+        public static final int SET_SPELL_TRAP = 4;
+        public static final int ACTIVATE = 5;
+        public static final int TO_BATTLE = 6;
+        public static final int END_TURN = 7;
+        public static final int SHUFFLE_HAND = 8;
+        private IdleAction() { }
+    }
+
     // ---- Announce Card Opcodes ----
 
     public static final long OPCODE_ADD           = 0x4000000000000000L;

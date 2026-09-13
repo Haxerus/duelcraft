@@ -197,29 +197,6 @@ public class ClientDuelState {
         clearHighlights();
     }
 
-    // MSG_SELECT_BATTLECMD action types (playerop.cpp select_battle_command).
-    public static final class BattleAction {
-        public static final int ACTIVATE = 0;
-        public static final int ATTACK = 1;
-        public static final int TO_MAIN2 = 2;
-        public static final int END_BATTLE = 3;
-        private BattleAction() { }
-    }
-
-    // MSG_SELECT_IDLECMD action types (playerop.cpp select_idle_command).
-    public static final class IdleAction {
-        public static final int SUMMON = 0;
-        public static final int SPECIAL_SUMMON = 1;
-        public static final int REPOSITION = 2;
-        public static final int SET_MONSTER = 3;
-        public static final int SET_SPELL_TRAP = 4;
-        public static final int ACTIVATE = 5;
-        public static final int TO_BATTLE = 6;
-        public static final int END_TURN = 7;
-        public static final int SHUFFLE_HAND = 8;
-        private IdleAction() { }
-    }
-
     // Card actions: maps card location → available actions (for click-on-card UI).
     // `desc` is the activating effect's description (0 for everything but Activate), so two
     // effects on one card can be told apart in the option dialog.

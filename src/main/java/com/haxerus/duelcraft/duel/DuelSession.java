@@ -95,8 +95,9 @@ public class DuelSession implements AutoCloseable {
 
                     emitRefreshes(RefreshSchedule.before(msg));
                     int result = listener.onMessage(msg);
-                    if (result != 0) {
-                        if (result == 2 || status == OcgConstants.DUEL_STATUS_END) {
+                    if (result != DuelEventListener.CONTINUE) {
+                        if (result == DuelEventListener.DUEL_ENDED
+                                || status == OcgConstants.DUEL_STATUS_END) {
                             ended = true;
                             listener.onDuelEnd();
                         }
