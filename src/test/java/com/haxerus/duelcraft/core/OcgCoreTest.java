@@ -264,8 +264,37 @@ class OcgCoreTest {
         assertEquals(card.code, hand.getFirst().code, "Bulk and per-slot queries agree on slot 0");
     }
 
+    /**
+     * Runs {@link com.haxerus.duelcraft.duel.MessageSanitizer} against a real engine query so
+     * {@link FieldQuery} is exercised on live bytes, not just hand-built test buffers.
+     */
     @Test
     @Order(7)
+    void testMessageSanitizerStripsHiddenCodeFromALiveQuery() {
+        assertNotEquals(0, duel, "Duel must be started first");
+
+        byte[] slot = OcgCore.nDuelQuery(engine, duel,
+                QUERY_CODE | QUERY_POSITION | QUERY_IS_PUBLIC,
+                0, LOCATION_DECK, 0, 0);
+        assertNotNull(slot, "Player 0's deck should still hold a card at seq 0");
+        QueriedCard card = FieldQuery.parse(slot);
+        assertFalse(card.isPublic, "A plain deck card is not public");
+
+        var update = new com.haxerus.duelcraft.duel.message.DuelMessage.UpdateData(0, LOCATION_DECK, List.of(card));
+
+        var forOpponent = (com.haxerus.duelcraft.duel.message.DuelMessage.UpdateData)
+                com.haxerus.duelcraft.duel.MessageSanitizer.forRecipient(update, 1);
+        QueriedCard opponentView = forOpponent.cards().getFirst();
+        assertEquals(0, opponentView.code, "The opponent must not see the deck card's code");
+        assertEquals(0, opponentView.flags & QUERY_CODE, "CODE flag must be cleared, not just the value zeroed");
+
+        var forOwner = (com.haxerus.duelcraft.duel.message.DuelMessage.UpdateData)
+                com.haxerus.duelcraft.duel.MessageSanitizer.forRecipient(update, 0);
+        assertEquals(card.code, forOwner.cards().getFirst().code, "The owner keeps their own card's code");
+    }
+
+    @Test
+    @Order(8)
     void testDuelLoopWithResponses() {
         assertNotEquals(0, duel, "Duel must be started first");
 
@@ -348,7 +377,7 @@ class OcgCoreTest {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     void testQueryField() {
         assertNotEquals(0, duel, "Duel must exist");
         // Query the full field — just verify it returns response without crashing
@@ -359,7 +388,7 @@ class OcgCoreTest {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     void testDestroyAndRecreate() {
         // Verify we can cleanly destroy and recreate a duel on the same engine
         OcgCore.nDestroyDuel(engine, duel);
