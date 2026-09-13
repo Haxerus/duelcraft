@@ -291,39 +291,39 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 |---|---|---|---|---|
 | `CODE` | u32 | ✅ | ✅ | ✅ extra deck rebuild |
 | `POSITION` | u32 | ✅ | ✅ | ✅ face-down test, extra deck |
-| `ALIAS` | u32 | ❌ | ✅ | ❌ |
+| `ALIAS` | u32 | ✅ | ✅ | ❌ |
 | `TYPE` | u32 | ✅ | ✅ | ❌ (Link detection uses the local DB instead) |
 | `LEVEL` / `RANK` | u32 | ✅ | ✅ | ✅ shown only when changed from the printed value |
 | `ATTRIBUTE` / `RACE` | u32 / u64 | ✅ | ✅ | ❌ |
 | `ATTACK` / `DEFENSE` | u32 | ✅ | ✅ | ✅ (`-2` renders as "?") |
 | `BASE_ATTACK` | u32 | ✅ | ✅ | ✅ drives buffed/debuffed colour |
 | `BASE_DEFENSE` | u32 | ✅ | ✅ | ❌ |
-| `REASON` | u32 | ❌ | ✅ | ❌ |
-| `REASON_CARD` / `EQUIP_CARD` | 10-byte loc_info (zeros when absent) | ❌ | ❌ skipped | ❌ |
-| `TARGET_CARD` | u32 n + n×loc_info | ❌ | ❌ skipped | ❌ |
-| `OVERLAY_CARD` | u32 n + n×u32 code | ❌ | ❌ skipped | ❌ (would fix overlay display) |
-| `COUNTERS` | u32 n + n×u32 `type \| count << 16` | ❌ | ❌ skipped | ❌ (would fix counter display) |
-| `OWNER` | u8 | ❌ | ❌ skipped | ❌ |
+| `REASON` | u32 | ✅ | ✅ | ❌ |
+| `REASON_CARD` / `EQUIP_CARD` | 10-byte loc_info (zeros when absent) | ❌ | ✅ (zeros → null) | ❌ |
+| `TARGET_CARD` | u32 n + n×loc_info | ❌ | ✅ | ❌ |
+| `OVERLAY_CARD` | u32 n + n×u32 code | ❌ | ✅ | ✅ sets the materials' codes |
+| `COUNTERS` | u32 n + n×u32 `type \| count << 16` | ❌ | ✅ | ✅ assigns the counter map |
+| `OWNER` | u8 | ❌ | ✅ | ❌ |
 | `STATUS` | u32 | ✅ | ✅ | ❌ |
-| `IS_PUBLIC` | u8 | ✅ | ✅ | server sanitiser only |
-| `LSCALE` / `RSCALE` | u32 | ❌ | ✅ | ❌ (pendulum scales never shown) |
+| `IS_PUBLIC` | u8 | ✅ hand, pile, single | ✅ | server sanitiser only |
+| `LSCALE` / `RSCALE` | u32 | ✅ spell zone, hand, single | ✅ | ✅ scale badge on the slot |
 | `LINK` | u32 link + u32 marker | ✅ | ✅ | ❌ |
-| `IS_HIDDEN` | u8 | ❌ | ❌ skipped | ❌ |
-| `COVER` | u32 | ❌ | ✅ | ❌ |
+| `IS_HIDDEN` | u8 | ✅ | ✅ | server sanitiser only |
+| `COVER` | u32 | ✅ | ✅ | ❌ |
 | `END` | terminator | n/a | ✅ | |
 
 ### 5.2 Behaviour and gaps
 
 - [x] Per-slot `OCG_DuelQuery` with `u16 size, u32 flag` blocks; `FieldQuery` resyncs on each block's declared size, so an unknown flag cannot shift later fields.
 - [x] Empty slot (`length == 0`) handled as `null`.
-- [ ] Only `MZONE` (7 slots, hardcoded), `SZONE` (8, hardcoded) and `EXTRA` are refreshed, for both players, after **every** engine pause (≥30 JNI calls and 2 to 3 payloads per player per pause). `HAND`, `GRAVE`, `REMOVED`, `DECK`, `OVERLAY` are never refreshed; those piles live on `MOVE`/`DRAW` deltas alone. edopro refreshes per event: hand after `DRAW`, a single slot after `MOVE`/`POS_CHANGE` face-up, extra after `SHUFFLE_EXTRA`.
-- [ ] `UpdateData` updates `mzoneStats`/`szoneStats` only; it never writes `code`/`position` back into `mzone[]`/`szone[]`, so movement-tracked state cannot self-heal. `szoneStats` is populated and never read.
-- [ ] `UpdateData` is sent **after** the prompt it should precede (early-return path in `process()`).
-- [ ] The empty-chain auto-pass `break`s out of the batch, discarding already-parsed trailing messages.
-- [ ] `OCG_DuelQueryLocation` (bulk per location) and `OCG_DuelQueryField` (full snapshot: `u32 flags`, per player `u32 lp`, 7 + 8 slot records, six pile counts, chain links) are exposed but unused. `QueryField` is the natural basis for reconnect/ESC-reopen resync.
-- [ ] `FieldQuery` stops silently on a truncated trailing block (`remaining() >= 6` guard) with no error for a missing `QUERY_END`.
-- [ ] `FieldQuery.parse` is never run against real engine output; `OcgCoreTest` never calls `nDuelQuery`.
-- [ ] edopro's schedule and masks (§12.2) differ on four points: the hand is refreshed before every idle, battle and chain prompt (with `IS_PUBLIC`, `LSCALE`, `RSCALE`, `IS_HIDDEN`, `COVER`); field zones are refreshed after state-changing messages rather than after every pause; overlays, counters, equips and targets are tracked from messages and never queried; private fields are omitted from the buffer rather than zeroed.
+- [x] Only `MZONE` (7 slots, hardcoded), `SZONE` (8, hardcoded) and `EXTRA` are refreshed, for both players, after **every** engine pause (≥30 JNI calls and 2 to 3 payloads per player per pause). `HAND`, `GRAVE`, `REMOVED`, `DECK`, `OVERLAY` are never refreshed; those piles live on `MOVE`/`DRAW` deltas alone. edopro refreshes per event: hand after `DRAW`, a single slot after `MOVE`/`POS_CHANGE` face-up, extra after `SHUFFLE_EXTRA`.
+- [x] `UpdateData` updates `mzoneStats`/`szoneStats` only; it never writes `code`/`position` back into `mzone[]`/`szone[]`, so movement-tracked state cannot self-heal. `szoneStats` is populated and never read.
+- [x] `UpdateData` is sent **after** the prompt it should precede (early-return path in `process()`). Now `RefreshSchedule.before(msg)` runs ahead of the message.
+- [x] The empty-chain auto-pass `break`s out of the batch, discarding already-parsed trailing messages. Now `continue`s, so the rest of the batch is delivered.
+- [ ] `OCG_DuelQueryField` (full snapshot: `u32 flags`, per player `u32 lp`, 7 + 8 slot records, six pile counts, chain links) is exposed but unused. `QueryField` is the natural basis for reconnect/ESC-reopen resync. (`OCG_DuelQueryLocation` now backs every whole-location refresh.)
+- [x] `FieldQuery` stops silently on a truncated trailing block (`remaining() >= 6` guard) with no error for a missing `QUERY_END`. Now throws; the caller drops that one refresh.
+- [x] `FieldQuery.parse` is never run against real engine output; `OcgCoreTest` never calls `nDuelQuery`.
+- [x] edopro's schedule and masks (§12.2) differ on four points: the hand is refreshed before every idle, battle and chain prompt (with `IS_PUBLIC`, `LSCALE`, `RSCALE`, `IS_HIDDEN`, `COVER`); field zones are refreshed after state-changing messages rather than after every pause; overlays, counters, equips and targets are tracked from messages and never queried; private fields are omitted from the buffer rather than zeroed.
 
 ---
 
@@ -340,8 +340,8 @@ Ranked by gameplay impact. Each was confirmed against the engine source at the c
 | `OCG_DuelProcess` / `OCG_DuelGetMessage` / `OCG_DuelSetResponse` | ✅ | ✅ | ✅ |
 | `OCG_LoadScript` | ✅ internal to `ScriptProvider` | ➖ | `constant.lua`, `utility.lua` at creation; result ignored |
 | `OCG_DuelQueryCount` | ✅ | ✅ | ⚠️ extra deck slot count only |
-| `OCG_DuelQuery` | ✅ | ✅ | ✅ per slot |
-| `OCG_DuelQueryLocation` | ✅ | ✅ | ❌ unused |
+| `OCG_DuelQuery` | ✅ | ✅ | ✅ single-slot refreshes |
+| `OCG_DuelQueryLocation` | ✅ | ✅ | ✅ whole-location refreshes |
 | `OCG_DuelQueryField` | ✅ | ✅ | ❌ unused (smoke-tested only) |
 
 ### 6.2 Options, readers, logging
@@ -404,7 +404,7 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [x] **Disabled zones**: `FieldDisabled` greys the zone out; `HINT_ZONE` still does nothing.
 - [ ] **Chain visualisation**: count text only; no link numbers on cards, no resolve/negate feedback.
 - [ ] **Battle feedback**: no attack arrow, no damage-calculation display, no LP change animation or damage numbers.
-- [ ] **Pendulum scales** never shown (`LSCALE`/`RSCALE` not requested).
+- [x] **Pendulum scales** never shown (`LSCALE`/`RSCALE` not requested). Now requested for the spell zones and badged on the slot.
 - [ ] **Card hints** (`CHINT_TURN` counters, `CHINT_DESC_ADD`) not shown.
 - [ ] **Hint captions**: prompt titles are hard-coded ("Select 1-1 card(s)") instead of `HINT_SELECTMSG`.
 - [ ] `DuelStartPayload` initialises both players' deck counts from the recipient's own deck; since `MSG_START` never arrives, asymmetric deck sizes stay wrong. `extraPos[]` is filled only in the dead `Start` branch.
@@ -422,7 +422,6 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 
 - [ ] `MSG_START`: `parseStart`, `DuelMessage.Start`, codec arm, `ClientDuelState` branch (engine never emits it).
 - [ ] `MSG_UNEQUIP`: parser case, `DuelMessage.Unequip`, codec arm.
-- [ ] `DuelMessage.UpdateCard` and its codec, sanitiser and client arms (nothing constructs one).
 - [ ] `MessageParser.readActivatableList` (no callers).
 - [ ] `ResponseValidator` (42 tests, zero production callers; several rules contradict the engine, §3.9). Decide: wire into `PromptController` or delete; the `MSG_RETRY` fix does not depend on it.
 - [ ] `DuelSession.queryLocation/queryField` wrappers (test-only).
@@ -442,8 +441,8 @@ Non-prompt records: 22 handled, 18 deliberate no-ops, 10 dropped (§1). Structur
 - [x] `MessageParserTest.parseSelectSum` encodes the parser's wrong layout; rewrite from the engine layout (§3.1). Add an offset-level check, not just entry size, for every card-list parser.
 - [x] `DuelMessageCodec`: no tests at all. Add a round trip over every record with overlay locations (`0x84`) and `u64` descs.
 - [ ] `ResponseBuilder`: `selectCardsCancel`, `sortCardsDefault` untested. `ResponseValidator`: `selectCmd`, `selectSum`, `announceCard` have no methods; `sortChain` untested.
-- [ ] `FieldQueryTest`: add `RACE` u64, `OVERLAY_CARD`, `COUNTERS`, `TARGET_CARD`, `REASON_CARD`/`EQUIP_CARD` present and absent, empty buffer, missing `QUERY_END`.
-- [ ] `OcgCoreTest`: never calls `nDuelQuery`, so `FieldQuery` is never run on real engine bytes; re-declares ~30 constants locally instead of importing `OcgConstants`; `MSG_WIN` read is wrong (§3.9); `testQueryField` asserts only non-empty.
+- [x] `FieldQueryTest`: add `RACE` u64, `OVERLAY_CARD`, `COUNTERS`, `TARGET_CARD`, `REASON_CARD`/`EQUIP_CARD` present and absent, empty buffer, missing `QUERY_END`.
+- [x] `OcgCoreTest`: never calls `nDuelQuery`, so `FieldQuery` is never run on real engine bytes; re-declares ~30 constants locally instead of importing `OcgConstants`; `MSG_WIN` read is wrong (§3.9). `testQueryField` still asserts only non-empty.
 - [ ] A live test that sets up a `DuelSession`, queries a face-down deck card with `QUERY_IS_PUBLIC`, and asserts the sanitiser strips it.
 - [ ] A test cross-checking `OcgConstants` against `ocgapi_constants.h` at build time (idea from the walkthrough).
 - [ ] CI: tests need EDOPro data and the native build is MSBuild-only; `-PskipNative` plus `assumeTrue` on data paths (decided, unscheduled).
@@ -610,7 +609,7 @@ Items already tracked in §3 are referenced, not repeated.
 - [x] Keep face-up draws visible to the opponent (`:1080-1084`).
 - [ ] Send `MSG_MISSED_EFFECT` to the controller only once parsed (`:1094-1098`).
 - [ ] Synthesise `MSG_WAITING` for the non-prompted player (`:1326-1343`).
-- [ ] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
+- [x] Refresh on edopro's schedule and masks (§12.2): hand before idle, battle and chain prompts; field after state changes; never the deck; single slot after `MOVE`, `POS_CHANGE` flip-up and `SWAP`.
 - [x] Omit private query fields instead of zeroing values while keeping flags (`core_utils.cpp:153-160`, `:224-232`).
 - [ ] Take the full-information copy before sanitising and keep it for a future replay.
 - [x] Response gate: per-player pending-response state plus the responder-equals-prompted check edopro lacks (`:1284-1297`).
