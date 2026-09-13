@@ -558,12 +558,37 @@ class MessageParserTest {
         assertEquals(1, sc.player());
         assertFalse(sc.forced());
         assertEquals(2, sc.count());
+        var first = sc.chains().getFirst();
+        assertEquals(POS_FACEUP_ATTACK, first.position());
         var second = sc.chains().get(1);
         assertEquals(46986414, second.code());
         assertEquals(LOCATION_SZONE, second.location());
         assertEquals(4, second.sequence());
+        assertEquals(POS_FACEDOWN_ATTACK, second.position());
         assertEquals((46986414L << 20) | 2, second.desc());
         assertEquals(1, second.flag());
+    }
+
+    /** The idle and battle command lists write no position; the record keeps 0 there. */
+    @Test
+    void parseSelectBattleCmd_activatableEntriesHaveNoPosition() {
+        // playerop.cpp select_battle_command: [u8 player][u32 n][ (u32 code, u8 con, u8 loc, u32 seq,
+        // u64 desc, u8 mode) * n ][u32 attackable=0][u8 canMain2][u8 canEnd]
+        ByteBuffer b = body(1 + 4 + 19 + 4 + 1 + 1);
+        b.put((byte) 0);
+        b.putInt(1);
+        b.putInt(89631139); b.put((byte) 0); b.put((byte) LOCATION_SZONE); b.putInt(3);
+        b.putLong(55L); b.put((byte) 0);
+        b.putInt(0);
+        b.put((byte) 1); b.put((byte) 1);
+
+        List<DuelMessage> msgs = MessageParser.parse(msg(MSG_SELECT_BATTLECMD, b.array()));
+        var bc = (DuelMessage.SelectBattleCmd) msgs.getFirst();
+        var activatable = bc.activatable().getFirst();
+        assertEquals(89631139, activatable.code());
+        assertEquals(3, activatable.sequence());
+        assertEquals(55L, activatable.desc());
+        assertEquals(0, activatable.position());
     }
 
     @Test

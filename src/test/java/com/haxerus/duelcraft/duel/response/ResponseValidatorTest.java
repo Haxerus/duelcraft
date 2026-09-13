@@ -68,7 +68,7 @@ class ResponseValidatorTest {
     // ---- SelectChain ----
 
     static DuelMessage.ActivatableCard activatable(int code) {
-        return new DuelMessage.ActivatableCard(code, 0, LOCATION_SZONE, 0, 0L, 0);
+        return new DuelMessage.ActivatableCard(code, 0, LOCATION_SZONE, 0, 0, 0L, 0);
     }
 
     static DuelMessage.TributeCard tribute(int code) {

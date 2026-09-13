@@ -450,7 +450,8 @@ public class MessageParser {
             LocInfo loc = LocInfo.read(r);
             long desc = r.readInt64();
             int flag = r.readUint8();
-            chains.add(new DuelMessage.ActivatableCard(code, loc.controller(), loc.location(), loc.sequence(), desc, flag));
+            chains.add(new DuelMessage.ActivatableCard(code, loc.controller(), loc.location(),
+                    loc.sequence(), loc.position(), desc, flag));
         }
         return new DuelMessage.SelectChain(player, speCount, forced, hint0, hint1, chains);
     }

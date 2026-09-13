@@ -135,16 +135,16 @@ class DuelMessageCodecTest {
                 List.of(new DuelMessage.ReposCard(2, 0, 0x04, 1)),
                 List.of(new DuelMessage.IdleCmdCard(3, 0, 0x04, 2)),
                 List.of(),
-                List.of(new DuelMessage.ActivatableCard(4, 0, 0x08, 0, U64_ABOVE_32BIT, 1)),
+                List.of(new DuelMessage.ActivatableCard(4, 0, 0x08, 0, 0, U64_ABOVE_32BIT, 1)),
                 true, true, false));
         SAMPLES.put(DuelMessage.SelectBattleCmd.class, new DuelMessage.SelectBattleCmd(1,
-                List.of(new DuelMessage.ActivatableCard(5, 1, 0x08, 1, U64_ABOVE_32BIT, 0)),
+                List.of(new DuelMessage.ActivatableCard(5, 1, 0x08, 1, 0, U64_ABOVE_32BIT, 0)),
                 List.of(new DuelMessage.AttackCard(6, 1, 0x04, 0, 1)),
                 false, true));
         SAMPLES.put(DuelMessage.SelectCard.class, new DuelMessage.SelectCard(0, true, 1, 2,
                 List.of(new DuelMessage.CardInfo(7, 0, 0x04, 0, 1))));
         SAMPLES.put(DuelMessage.SelectChain.class, new DuelMessage.SelectChain(1, 2, true, 3, 4,
-                List.of(new DuelMessage.ActivatableCard(8, 1, 0x08, 2, U64_ABOVE_32BIT, 1))));
+                List.of(new DuelMessage.ActivatableCard(8, 1, 0x08, 2, 0x8, U64_ABOVE_32BIT, 1))));
         SAMPLES.put(DuelMessage.SelectEffectYn.class, new DuelMessage.SelectEffectYn(0, 9, LOC_OVERLAY_MZONE, U64_ABOVE_32BIT));
         SAMPLES.put(DuelMessage.SelectYesNo.class, new DuelMessage.SelectYesNo(1, U64_ABOVE_32BIT));
         SAMPLES.put(DuelMessage.SelectOption.class, new DuelMessage.SelectOption(0, List.of(1L, 2L, 3L)));

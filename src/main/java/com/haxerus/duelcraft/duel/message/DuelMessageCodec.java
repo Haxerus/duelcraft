@@ -557,16 +557,16 @@ public class DuelMessageCodec {
         return list;
     }
 
-    // ActivatableCard: code(4) + con(1) + loc(1) + seq(4) + desc(8) + flag(1) = 19 bytes
+    // ActivatableCard: code(4) + con(1) + loc(1) + seq(4) + pos(4) + desc(8) + flag(1) = 23 bytes
     private static void writeActivatableList(FriendlyByteBuf buf, List<DuelMessage.ActivatableCard> list) {
         buf.writeInt(list.size());
-        for (var ac : list) { buf.writeInt(ac.code()); buf.writeByte(ac.controller()); buf.writeByte(ac.location()); buf.writeInt(ac.sequence()); buf.writeLong(ac.desc()); buf.writeByte(ac.flag()); }
+        for (var ac : list) { buf.writeInt(ac.code()); buf.writeByte(ac.controller()); buf.writeByte(ac.location()); buf.writeInt(ac.sequence()); buf.writeInt(ac.position()); buf.writeLong(ac.desc()); buf.writeByte(ac.flag()); }
     }
 
     private static List<DuelMessage.ActivatableCard> readActivatableList(FriendlyByteBuf buf) {
         int count = buf.readInt();
         List<DuelMessage.ActivatableCard> list = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) list.add(new DuelMessage.ActivatableCard(buf.readInt(), buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readInt(), buf.readLong(), buf.readByte()));
+        for (int i = 0; i < count; i++) list.add(new DuelMessage.ActivatableCard(buf.readInt(), buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readInt(), buf.readInt(), buf.readLong(), buf.readByte()));
         return list;
     }
 

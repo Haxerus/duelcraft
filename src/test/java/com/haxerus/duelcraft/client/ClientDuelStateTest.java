@@ -42,7 +42,7 @@ class ClientDuelStateTest {
     @Test
     void battleActivateSendsActionType0() {
         var state = newState();
-        var activatable = new DuelMessage.ActivatableCard(12345, 0, LOCATION_MZONE, 0, 100L, 0);
+        var activatable = new DuelMessage.ActivatableCard(12345, 0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK, 100L, 0);
         var battleCmd = new DuelMessage.SelectBattleCmd(0, List.of(activatable), List.of(), true, true);
 
         state.applyMessage(battleCmd);

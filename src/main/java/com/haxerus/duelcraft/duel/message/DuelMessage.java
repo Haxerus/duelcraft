@@ -480,14 +480,20 @@ public sealed interface DuelMessage {
         }
     }
 
-    /** A card that can be activated: code + con + loc + seq(uint32) + desc(uint64) + flag(uint8). */
-    record ActivatableCard(int code, int controller, int location, int sequence, long desc, int flag) {
+    /**
+     * A card that can be activated: code + con + loc + seq(uint32) + desc(uint64) + flag(uint8).
+     * {@code position} only reaches the record from {@code MSG_SELECT_CHAIN}, whose entries carry a
+     * full {@code loc_info}; the idle and battle command lists write no position and leave it 0.
+     */
+    record ActivatableCard(int code, int controller, int location, int sequence, int position,
+                           long desc, int flag) {
         public static ActivatableCard read(BufferReader reader) {
             return new ActivatableCard(
                 reader.readInt32(),
                 reader.readUint8(),
                 reader.readUint8(),
                 reader.readInt32(),
+                0,
                 reader.readInt64(),
                 reader.readUint8()
             );
