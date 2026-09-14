@@ -1,0 +1,39 @@
+- [ ] ocgcore duel engine - IN PROGRESS
+	- [ ] core mechanics and rules - IN PROGRESS
+	- [ ] duel UI - IN PROGRESS
+	- [ ] assets & animations - TODO
+- [ ] mod UI "home screen" - TODO
+	- allows you to start duels with other players (/duel command will be removed)
+		- pre-duel screen would let you pick duel and player options like banlist and master rule, etc
+	- you can view stats (wins, losses, # of monster summoned, etc.)
+	- can be opened with a hotkey or interacting with a "Duel Terminal" block
+	- allows you to view your card collection and build decks
+- [ ] duelcraft metaprogression system - TODO
+	- intentionally simple "duelist level" system
+	- you gain experience for dueling, completing challenges (summon 5 monsters, activate a trap card, etc)
+	- level system can be used by the vanilla integration system so it should be accessible to external mods
+- [ ] collection manager - TODO
+	- allows you to see all owned cards
+	- should have a robust filtering system like edopro and master duel
+	- could be combined with the deck builder UI
+	- should have a system for creating itemized versions of cards to trade with other players and consuming/storing card items in order to lessen vanilla storage burden (basically a withdrawal and deposit system)
+	- should have a system for turning duplicate cards into some form of metacurrency (like dust in master duel)
+- [ ] deck builder - TODO
+	- UI for building a deck out of cards in your collection
+	- should have a system for importing and exporting decks from YDKe string or .ydk files
+	- needs robust filtering system
+	- can be combined with collection manager UI
+	- could be cool to have a deck testing feature to allow for goldfishing
+- [ ] itemized cards and packs - TODO
+	- items would be dynamically generated at load/runtime from data (probably)
+	- pack opening opens a UI where the player can view the cards they opened, this can start out as a basic vanilla style inventory window but eventually it should be a custom screen with animations
+	- packs should use real world cards lists and ratios
+- [ ] utility blocks and items
+	- Tools and misc items that facilitate mod features
+	- Duel Terminal: Opens the mod ui when right clicked
+	- Duel Disk: Allows you to right click other player to challenge them to a duel
+	- Deck Boxes & Binders: Vanilla style card storage
+	- Itemized Metacurrency: For vanilla game integration (drops & loot tables)
+- [ ] vanilla game integration (separate mod?)
+	- implements ways to get cards and packs from vanilla game mechanics
+	- couples vanilla game progression to duelcraft progression
