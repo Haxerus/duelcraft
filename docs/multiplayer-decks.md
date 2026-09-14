@@ -15,7 +15,7 @@ This works through the normal Minecraft connection, whether singleplayer, LAN, a
 
 `/duel test` uses your uploaded deck for both you and the AI by default. An explicit `/duel test <aiDeck>` still loads the named AI deck from the **server's** `duelcraft/decks/` directory.
 
-The server still needs its own card database and Lua scripts for the engine. Deck selection uploads only card IDs and a display name. Existing legality checks cover positive passcodes, 40–60 main cards, at most 15 extra cards, and at most three copies per passcode across both sections. Unknown positive IDs, card types, aliases and banlists are not checked by the current validator. Side decks remain ignored.
+The server automatically downloads its card database and Lua scripts into its [managed cache](card-data.md). Deck selection uploads only card IDs and a display name. Existing legality checks cover positive passcodes, 40–60 main cards, at most 15 extra cards, and at most three copies per passcode across both sections. Unknown positive IDs, card types, aliases and banlists are not checked by the current validator. Side decks remain ignored.
 
 ## Regression checks
 

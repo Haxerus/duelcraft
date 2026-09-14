@@ -3,7 +3,7 @@ package com.haxerus.duelcraft;
 import com.haxerus.duelcraft.client.DuelClientCommand;
 import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
-import com.haxerus.duelcraft.client.carddata.CardDatabaseDownloader;
+import com.haxerus.duelcraft.core.data.CardData;
 import com.haxerus.duelcraft.client.carddata.CardImageManager;
 import com.haxerus.duelcraft.client.carddata.SystemStringTable;
 import net.minecraft.client.Minecraft;
@@ -23,9 +23,9 @@ import java.nio.file.Path;
 @Mod(value = Duelcraft.MODID, dist = Dist.CLIENT)
 public class DuelcraftClient {
 
-    private static @Nullable CardDatabase cardDatabase;
-    private static @Nullable CardImageManager cardImageManager;
-    private static @Nullable SystemStringTable systemStringTable;
+    private static volatile @Nullable CardDatabase cardDatabase;
+    private static volatile @Nullable CardImageManager cardImageManager;
+    private static volatile @Nullable SystemStringTable systemStringTable;
 
     public DuelcraftClient(IEventBus modBus, ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -49,9 +49,7 @@ public class DuelcraftClient {
             Path gameDir = Minecraft.getInstance().gameDirectory.toPath();
             Path cacheDir = gameDir.resolve("duelcraft").resolve("cache");
 
-            // Download card database if needed
-            String dbUrl = Config.CARD_DATABASE_URL.get();
-            Path dbPath = CardDatabaseDownloader.ensureDatabase(dbUrl, cacheDir);
+            Path dbPath = CardData.load().join().database();
             cardDatabase = new CardDatabase(dbPath);
             Duelcraft.LOGGER.info("Card database loaded from {}", dbPath);
 

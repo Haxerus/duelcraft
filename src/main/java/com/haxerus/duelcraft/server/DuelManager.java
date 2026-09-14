@@ -1,6 +1,6 @@
 package com.haxerus.duelcraft.server;
 
-import com.haxerus.duelcraft.Config;
+import com.haxerus.duelcraft.core.data.CardData;
 import com.haxerus.duelcraft.core.Deck;
 import com.haxerus.duelcraft.core.DeckValidator;
 import com.haxerus.duelcraft.core.DeckRegistry;
@@ -53,8 +53,9 @@ public class DuelManager {
     public static DuelManager get() { return instance; }
 
     public static void onServerStarting(ServerStartingEvent event) {
-        instance = new DuelManager();
-        instance.init();
+        DuelManager manager = new DuelManager();
+        manager.init();
+        instance = manager;
     }
 
     /** A duellist who logs out forfeits; their outstanding invites go with them. */
@@ -76,10 +77,8 @@ public class DuelManager {
     }
 
     public void init() {
-        List<String> dbPaths = new ArrayList<>(Config.CARD_DATABASE_PATHS.get());
-        List<String> scriptPaths = new ArrayList<>(Config.SCRIPT_SEARCH_PATHS.get());
-
-        engine = new DuelEngine(dbPaths, scriptPaths);
+        var data = CardData.load().join();
+        engine = new DuelEngine(List.of(data.database().toString()), data.scriptPaths());
 
         activeDuels = new HashMap<>();
         playerToDuel = new HashMap<>();

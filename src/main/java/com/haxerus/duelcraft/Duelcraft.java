@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft;
 
+import com.haxerus.duelcraft.core.data.CardData;
 import com.haxerus.duelcraft.server.DuelCommand;
 import com.haxerus.duelcraft.server.DuelManager;
 import com.haxerus.duelcraft.server.DuelNetworking;
@@ -97,6 +98,7 @@ public class Duelcraft {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
+        CardData.load();
         // Some common setup code
         LOGGER.info("HELLO FROM COMMON SETUP");
 

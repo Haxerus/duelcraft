@@ -1,5 +1,6 @@
 
 For local and multiplayer deck setup, see [Deck selection in multiplayer](docs/multiplayer-decks.md).
+Card databases and scripts are downloaded automatically; see [Automatic card data](docs/card-data.md) for cache and update behavior.
 
 Installation information
 =======
