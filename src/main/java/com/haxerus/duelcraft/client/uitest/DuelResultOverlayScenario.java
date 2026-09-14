@@ -36,6 +36,7 @@ public final class DuelResultOverlayScenario implements UIScenario {
          .checkTextContains("#result-title", "win")
          .checkText("#result-reason", "Life points")
          .checkVisible("#result-close")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_result_overlay")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

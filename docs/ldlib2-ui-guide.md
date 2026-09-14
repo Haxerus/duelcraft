@@ -180,6 +180,8 @@ private static UIElement createZone(ClientDuelState state, int player, int locat
 
 ### Hand Display
 
+The current screen uses horizontal `ScrollerView` hands in `LDLibDuelScreen.rebuildHand`; the example below is an earlier non-scrolling sketch. Center short hands with automatic outer margins on their first and last cards, so overflow remains reachable from either end. In LDLib2 2.2.39.a, use the full `margin` shorthand (for example `0 auto` for a single card): per-edge `marginLeftAuto()` / `marginRightAuto()` fall back to zero in `TaffyLayoutStyle.LPARectData`. `DuelHandLayoutScenario` checks centering, both scroll endpoints and recentering after cards leave the hand.
+
 ```java
 private static UIElement createHand(ClientDuelState state, int player) {
     var hand = new UIElement();

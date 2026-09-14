@@ -1,6 +1,5 @@
 package com.haxerus.duelcraft;
 
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -33,19 +32,6 @@ public class Config {
 //            .comment("A list of items to log on common setup.")
 //            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "",);
 
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> CARD_DATABASE_PATHS = BUILDER
-            .comment("Paths to your Yu-Gi-Oh! card database files")
-            .defineList("dbPaths", List.of("C:/ProjectIgnis/expansions/cards.cdb"), () -> "",  Config::validateNonEmpty);
-
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> SCRIPT_SEARCH_PATHS = BUILDER
-            .comment("Paths to your Yu-Gi-Oh! card script files")
-            .defineList("scriptPaths", List.of("C:/ProjectIgnis/script", "C:/ProjectIgnis/script/official"), () -> "",  Config::validateNonEmpty);
-
-    public static final ModConfigSpec.ConfigValue<String> CARD_DATABASE_URL = BUILDER
-            .comment("URL to download the card database from (BabelCDB)")
-            .define("cardDatabaseUrl",
-                    "https://raw.githubusercontent.com/ProjectIgnis/BabelCDB/master/cards.cdb");
-
     public static final ModConfigSpec.ConfigValue<String> CARD_IMAGE_BASE_URL = BUILDER
             .comment("Base URL for card images (code.jpg appended)")
             .define("cardImageBaseUrl",
@@ -58,8 +44,4 @@ public class Config {
                     "https://raw.githubusercontent.com/ProjectIgnis/Distribution/master/config/strings.conf");
 
     static final ModConfigSpec SPEC = BUILDER.build();
-
-    private static boolean validateNonEmpty(final Object obj) {
-        return obj instanceof String path && !path.isEmpty();
-    }
 }

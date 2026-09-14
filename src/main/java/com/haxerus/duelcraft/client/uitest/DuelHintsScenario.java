@@ -57,6 +57,7 @@ public final class DuelHintsScenario implements UIScenario {
          .ticks(2)
          .checkVisible("#hint-modal")
          .checkVisible("#hint-modal-ok")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_hints")
          // OK dismisses the modal on the press, so the builder's click() cannot re-resolve the
          // button for its release step; the press and release go to one set of bounds instead.

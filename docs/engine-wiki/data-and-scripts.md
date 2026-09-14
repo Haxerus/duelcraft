@@ -158,6 +158,16 @@ Compile/runtime failures in `interpreter::load_script` go to `OCG_LogHandler` wi
 
 The `enableUnsafeLibraries` option changes Lua library exposure. Current core always opens base, string, table, and math libraries; it opens `io` and retains `dofile`/`loadfile` only when that option is nonzero at [`interpreter::interpreter`](../../native/ygopro-core/interpreter.cpp#L60). EDOPro sets it to `1` in `Game::SetupDuel`. Choose this setting as part of your execution environment and script-pack contract; the callback mechanism itself works without filesystem functions inside Lua.
 
+## Duelcraft managed data snapshots
+
+As of 2026-09-13, common startup starts `CardData.load()` once per process. `CardDataCache` resolves the master commits of ProjectIgnis/CardScripts and ProjectIgnis/BabelCDB and downloads their full archives under `<gameDir>/duelcraft/cache/card-data`. An integrated server and client share that future; a dedicated server prepares its own cache. Native initialization waits for the result. There is no configured EDOPro database/script path.
+
+Every root BabelCDB `.cdb` is included. `CardDatabaseMerger` copies official `cards.cdb` first, then inserts missing IDs from supplements in filename order. Official IDs win; the first supplementary occurrence wins otherwise. Both `datas` and `texts` retain the same winning row, and matching IDs/schema/SQLite integrity are validated. The resulting single database is passed to the native reader and client `CardDatabase`.
+
+The full script collection retains its directories. Search order is root libraries, `official`, then other directories in path order, with native first-match behavior unchanged. This includes GOAT and pre-errata passcodes without replacing ordinary official scripts. No new game-rule support follows from downloading additional data.
+
+Archives are staged, paths checked, and required base scripts/database validated before an atomic `current` pointer publishes an immutable snapshot. Startup records both upstream commit IDs. Unchanged revisions reuse the snapshot; download/validation failures fall back to the last valid snapshot. First-run failure without a cache prevents engine startup. Published directories are retained so running processes keep stable script paths. Updates happen only on process launch; versions are not negotiated over the duel protocol. See [cache management](../card-data.md).
+
 ## Provider checklist
 
 - Pin database and script versions to the tested core snapshot.

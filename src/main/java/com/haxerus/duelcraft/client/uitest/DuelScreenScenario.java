@@ -49,7 +49,8 @@ public abstract class DuelScreenScenario implements UIScenario {
          .check("zone grids are vertically aligned", DuelScreenScenario::gridsAligned)
          .check("field area fits inside the canvas", DuelScreenScenario::fieldAreaFitsCanvas);
         ruleChecks(s);
-        s.screenshot(rule.id() + "-scale" + guiScale)
+        s.step("visual layout", DuelUiAssertions::audit)
+         .screenshot(rule.id() + "-scale" + guiScale)
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();
              ctx.mc().setScreen(null);

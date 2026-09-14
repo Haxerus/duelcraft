@@ -346,6 +346,21 @@ class ResponseValidatorTest {
     // ---- SelectUnselectCard ----
 
     @Test
+    void finishBelowMaximumSendsTheFinishSentinelInsteadOfTogglingMinusOne() {
+        var prompt = new DuelMessage.SelectUnselectCard(0, true, false, 2, 4,
+                List.of(card(1), card(2)), List.of(card(3), card(4)));
+        assertArrayEquals(new byte[]{-1, -1, -1, -1}, ResponseValidator.selectUnselectCard(prompt, -1));
+        assertArrayEquals(new byte[]{1, 0, 0, 0, 2, 0, 0, 0}, ResponseValidator.selectUnselectCard(prompt, 2));
+    }
+
+    @Test
+    void cancelAnIterativeSelectionSendsTheCancelSentinel() {
+        var prompt = new DuelMessage.SelectUnselectCard(0, false, true, 2, 4,
+                List.of(card(1), card(2)), List.of());
+        assertArrayEquals(new byte[]{-1, -1, -1, -1}, ResponseValidator.selectUnselectCard(prompt, -1));
+    }
+
+    @Test
     void selectUnselectCardValid() {
         var prompt = new DuelMessage.SelectUnselectCard(0, true, false, 1, 3,
                 List.of(card(1), card(2)), List.of());

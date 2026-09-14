@@ -41,6 +41,7 @@ public final class DuelCardModelScenario implements UIScenario {
          .checkClass("#plr-mon-2", "targeted")
          .checkClass("#plr-mon-3", "disabled")
          .checkText("#plr-st-0 .card-scales", "1/8")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_card_model")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

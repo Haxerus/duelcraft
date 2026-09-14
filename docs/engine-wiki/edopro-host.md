@@ -97,6 +97,8 @@ First, [`GenericDuel::Sending`](../../../edopro/gframe/generic_duel.cpp#L829) ro
 | Move, set, facedown special summon, draw, tag swap | Send owner/full form first; rewrite hidden codes to zero for opponents and observers. |
 | Public events | Broadcast and add the sanitized packet to observer catch-up. |
 
+The zeroed foreign selection codes do not mean a revealed hand should be drawn blank. EDOPro's `MSG_CONFIRM_CARDS` consumer (`duelclient.cpp:2582`) writes each nonzero revealed identity onto its addressed card before displaying it. Duelcraft now retains hand reveals the same way, so later sanitized candidates resolve through `ClientDuelState.candidateCode` even after the reveal panel consumes its list. Unrevealed cards stay unknown; `ShuffleHand` replaces remembered identities with the recipient's sanitized codes. Real Confiscation and Trap Dustshoot regressions cover this flow in `PlaytestInteractionTest`. This fix is scoped to hand reveals; other zone knowledge/invalidation is unchanged.
+
 Second, query refreshes produce different buffers. [`Query::IsPublicQuery`](../../../edopro/gframe/core_utils.cpp#L224) treats code, alias, type, level/rank, attribute/race, combat values, status, scales, and link data as private unless the card is public or face-up. [`Query::GenerateBuffer`](../../../edopro/gframe/core_utils.cpp#L144) omits private query fields when building a public view.
 
 [`GenericDuel::RefreshLocation`](../../../edopro/gframe/generic_duel.cpp#L1370) sends the owner-side view first and the public view to the opposing side and observers. `RefreshSingle` follows the same split. The core query API has no recipient parameter. Calling `OCG_DuelQuery*` and broadcasting its bytes leaks state; the host must derive each recipient view.

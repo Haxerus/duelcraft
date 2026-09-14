@@ -45,6 +45,7 @@ public final class DeckValidator {
         for (int code : deck.main()) copies.merge(code, 1, Integer::sum);
         for (int code : deck.extra()) copies.merge(code, 1, Integer::sum);
         copies.forEach((code, count) -> {
+            if (code <= 0) problems.add("card passcode must be positive: " + code);
             if (count > MAX_COPIES) {
                 problems.add(count + " copies of card " + code + ", at most " + MAX_COPIES);
             }

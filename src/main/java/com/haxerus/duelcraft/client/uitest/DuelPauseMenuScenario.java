@@ -31,13 +31,20 @@ public final class DuelPauseMenuScenario implements UIScenario {
         s.openScreen("duel pause menu",
                         ctx -> LDLibDuelScreen.create(DuelScreenFixture.startPayload(DuelRule.MR5)))
          .awaitModularUI()
-         .checkHidden("#pause-overlay")
+         .checkHidden("#pause-overlay");
+        DuelPanelLayoutScenario.press(s, "#concede-btn");
+        s.checkVisible("#pause-overlay")
+         .checkText("#concede-btn", "Concede")
+         .screenshot("concede-confirmation");
+        DuelPanelLayoutScenario.press(s, "#pause-stay");
+        s.checkHidden("#pause-overlay")
          .key(GLFW.GLFW_KEY_ESCAPE)
          .ticks(2)
          .checkScreen(DuelScreen.class)
          .checkVisible("#pause-overlay")
          .checkVisible("#pause-concede")
          .checkVisible("#pause-stay")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_pause_menu")
          .key(GLFW.GLFW_KEY_ESCAPE)
          .ticks(2)

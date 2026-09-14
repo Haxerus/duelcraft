@@ -1,5 +1,7 @@
 # Duelcraft Code Walkthrough
 
+The card-data startup and path configuration described here were replaced on 2026-09-13 by the [automatic shared cache](card-data.md). The remaining walkthrough describes its original snapshot below.
+
 A bottom-up tour of the codebase, written 2026-09-07 for the project owner to read system by system. Stops 1 to 3 (native bridge, message layer, DuelSession) were covered live in a working session; a recap of what they established opens this document. Stops 4 to 8 are written out in full.
 
 Line numbers refer to the tree at commit `2be7e70` on branch `message-layer-cleanup`, after the first cleanup commit landed. Later commits on that branch move a few lines in `DuelSession`, `MessageParser`, `FieldQuery`, `DuelCommand`, and the docs. Search for the method name when a line reference misses.

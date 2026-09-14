@@ -182,24 +182,49 @@
         opacity: 0;
         }
 
-        /* Shuffle hand (SELECT_IDLECMD, canShuffle). Hidden with display:none so the
-           center row keeps its usual width whenever the engine does not offer it. */
-        #shuffle-btn {
-        width: 40;
-        height: 14;
+        /* Controls grow upward beside the hand without moving the board or permanent buttons. */
+        #duel-controls {
+        z-index: 10;
+        position: absolute;
+        /* Java anchors this canvas-level layer to the field's right edge and hand baseline. */
+        width: 68;
+        flex-direction: column;
+        align-items: stretch;
+        gap-all: 4;
+        padding-all: 4;
+        background: rect(#1A1A2E, 4, 1, #4444AA);
         }
 
-        #shuffle-btn.hidden {
+        .duel-control-btn {
+        width: 100%;
+        height: 20;
+        }
+
+        .duel-control-btn .__button_text__ {
+        font-size: 8;
+        adaptive-width: false;
+        width: 100%;
+        margin-horizontal: 0;
+        }
+
+        #duel-controls-divider {
+        height: 1;
+        margin-top: 2;
+        background: rect(#4444AA);
+        }
+
+        #shuffle-btn.hidden, #prompt-toggle-btn.hidden {
         display: none;
         }
 
         /* ── Status Label (centered overlay) ── */
         #status-label {
         position: absolute;
-        bottom: 50;
+        bottom: 48;
         left: 0;
         width: 100%;
         font-size: 8;
+        adaptive-height: true;
         text-color: #FFAA00;
         horizontal-align: center;
         padding-vertical: 2;
@@ -213,10 +238,11 @@
         /* ── Hint toast (edopro's stACMessage: one declaration hint at a time) ── */
         #toast {
         position: absolute;
-        top: 26;
+        bottom: 4;
         left: 0;
         width: 100%;
         font-size: 8;
+        adaptive-height: true;
         text-color: #FFDD55;
         horizontal-align: center;
         padding-vertical: 2;
@@ -246,10 +272,11 @@
            Below the field, above the chain count, so it covers no card and no button. */
         #banner {
         position: absolute;
-        bottom: 80;
+        bottom: 76;
         left: 0;
         width: 100%;
         font-size: 14;
+        adaptive-height: true;
         text-color: #FFFFFF;
         horizontal-align: center;
         padding-vertical: 3;
@@ -264,9 +291,10 @@
            Above the side panels, which both start at the same top edge. ── */
         .lp-delta {
         position: absolute;
-        top: 21;
+        top: 30;
         width: 30%;
         font-size: 12;
+        adaptive-height: true;
         horizontal-align: center;
         z-index: 5;
         }
@@ -299,7 +327,7 @@
         #duel-log {
         position: absolute;
         left: 0;
-        top: 20;
+        top: 44;
         bottom: 0;
         width: 210;
         flex-direction: column;
@@ -324,6 +352,13 @@
         flex: 1;
         }
 
+        #duel-log-close, #zone-inspector-close {
+        align-self: center;
+        min-width: 32;
+        height: 20;
+        padding-horizontal: 6;
+        }
+
         #duel-log-list .__scroller_view_view-container__ {
         flex-direction: column;
         gap-all: 1;
@@ -336,11 +371,6 @@
         text-wrap: wrap;
         font-size: 7;
         text-color: #DDDDDD;
-        }
-
-        #log-toggle {
-        width: 28;
-        height: 14;
         }
 
         /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
@@ -365,7 +395,7 @@
         /* ── Shared Cancel/Finish button (edopro's btnCancelOrFinish) ── */
         #prompt-action-bar {
         position: absolute;
-        bottom: 32;
+        bottom: 24;
         left: 0;
         width: 100%;
         flex-direction: row;
@@ -591,15 +621,11 @@
         horizontal-align: center;
         }
 
-        #concede-btn {
-        width: 44;
-        height: 14;
-        }
         /* ── Card Info Banner (left overlay) ── */
         #card-info-banner {
         position: absolute;
         left: 0;
-        top: 20;
+        top: 44;
         bottom: 0;
         width: 210;
         flex-direction: column;
@@ -671,7 +697,7 @@
         #zone-inspector {
         position: absolute;
         right: 0;
-        top: 20;
+        top: 44;
         bottom: 0;
         width: 210;
         flex-direction: column;
@@ -687,7 +713,10 @@
         }
 
         #zone-inspector-title {
-        height: 12;
+        width: 100%;
+        min-height: 12;
+        adaptive-height: true;
+        text-wrap: wrap;
         font-size: 9;
         text-color: #FFFFFF;
         }
@@ -695,12 +724,15 @@
         #zone-inspector-list {
         flex: 1;
         gap-all: 2;
+        scroller-vertical-display: always;
         }
 
         #zone-inspector-list .__scroller_view_view-container__ {
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
+        display: grid;
+        grid-template-columns: repeat(4, 36px);
+        grid-auto-rows: 48px;
+        align-content: flex_start;
+        justify-content: space_between;
         gap-all: 2;
         padding-all: 2;
         }
@@ -739,16 +771,18 @@
 
         #prompt-dialog {
         flex-direction: column;
-        align-content: center;
-
-        gap-all: 4;
+        align-items: stretch;
+        gap-all: 8;
         padding-all: 8;
-        width: 200;
+        width: 280;
         background: rect(#1A1A2E, 4, 1, #4444AA);
         }
 
         #prompt-title {
-        height: 12;
+        width: 100%;
+        min-height: 12;
+        adaptive-height: true;
+        text-wrap: wrap;
         font-size: 9;
         text-color: #FFFFFF;
         horizontal-align: center;
@@ -763,13 +797,72 @@
 
         #prompt-buttons {
         flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
         justify-content: center;
         gap-all: 4;
         }
 
         .prompt-btn {
-        width: 60;
-        height: 16;
+        min-width: 32;
+        height: 20;
+        flex-shrink: 0;
+        padding-horizontal: 6;
+        align-self: center;
+        }
+
+        #prompt-overlay.inspection-hidden {
+        display: none;
+        }
+
+        .prompt-btn .__button_text__ {
+        font-size: 8;
+        }
+
+        .prompt-caption {
+        width: 100%;
+        adaptive-height: true;
+        text-wrap: wrap;
+        horizontal-align: center;
+        font-size: 8;
+        }
+
+        .prompt-option-scroller {
+        scroller-view-mode: VERTICAL;
+        scroller-vertical-display: AUTO;
+        align-self: stretch;
+        }
+
+        .prompt-option-scroller .__scroller_view_view-port__ {
+        max-height: 180;
+        padding-all: 2;
+        }
+
+        .prompt-option-scroller .__scroller_view_view-container__ {
+        flex-direction: column;
+        gap-all: 4;
+        }
+
+        .prompt-option-grid .__scroller_view_view-container__ {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        }
+
+        .prompt-option-btn {
+        width: 100%;
+        height: auto;
+        min-height: 20;
+        padding-vertical: 4;
+        }
+
+        .prompt-option-btn .__button_text__ {
+        width: 100%;
+        height: auto;
+        adaptive-width: false;
+        adaptive-height: true;
+        text-wrap: wrap;
+        horizontal-align: left;
         }
 
         /* ── Horizontal card scroller inside prompt dialogs ── */
@@ -791,6 +884,7 @@
 
         /* ── Duel Result Overlay (shown when the duel ends) ── */
         #result-overlay {
+        z-index: 20;
         position: absolute;
         left: 0;
         top: 0;
@@ -818,14 +912,20 @@
         }
 
         #result-title {
-        height: 14;
+        width: 100%;
+        min-height: 14;
+        adaptive-height: true;
+        text-wrap: wrap;
         font-size: 12;
         text-color: #FFFFFF;
         horizontal-align: center;
         }
 
         #result-reason {
-        height: 10;
+        width: 100%;
+        min-height: 10;
+        adaptive-height: true;
+        text-wrap: wrap;
         font-size: 8;
         text-color: #AAAAAA;
         horizontal-align: center;
@@ -833,6 +933,7 @@
 
         /* ── Hint Modal (HINT_MESSAGE; above the prompts, below the pause dialog) ── */
         #hint-modal {
+        z-index: 20;
         position: absolute;
         left: 0;
         top: 0;
@@ -870,6 +971,7 @@
 
         /* ── Pause Overlay (ESC while the duel is live; drawn above every other overlay) ── */
         #pause-overlay {
+        z-index: 20;
         position: absolute;
         left: 0;
         top: 0;
@@ -897,7 +999,10 @@
         }
 
         #pause-title {
-        height: 12;
+        width: 100%;
+        min-height: 12;
+        adaptive-height: true;
+        text-wrap: wrap;
         font-size: 9;
         text-color: #FFFFFF;
         horizontal-align: center;
@@ -918,22 +1023,30 @@
 
         .prompt-name-scroller .__scroller_view_view-container__ {
         flex-direction: column;
-        gap-all: 1;
+        gap-all: 4;
         }
 
         .prompt-name-scroller .__scroller_view_view-port__ {
         background: built-in(ui-gdp:RECT_LIGHT);
-        height: 80;
+        height: 160;
         }
 
         .prompt-name-btn {
         align-self: stretch;
-        height: 12;
-        padding-all: 1;
+        height: auto;
+        min-height: 20;
+        flex-shrink: 0;
+        padding-all: 4;
         }
 
         .prompt-name-btn .__button_text__ {
-        font-size: 7;
+        width: 100%;
+        height: auto;
+        adaptive-width: false;
+        adaptive-height: true;
+        text-wrap: wrap;
+        horizontal-align: left;
+        font-size: 8;
         }
 
         /* ── Battle position choices (SELECT_POSITION card-image buttons) ── */
@@ -957,6 +1070,7 @@
         }
 
         .position-label {
+        width: 100%;
         font-size: 6;
         text-color: #FFFFFF;
         horizontal-align: center;
@@ -964,6 +1078,7 @@
 
         /* ── Sort ordinal badge (SortCard/SortChain) ── */
         .card-ordinal {
+        adaptive-width: true;
         position: absolute;
         top: 0;
         left: 0;
@@ -1079,8 +1194,6 @@
                 <label id="hud-turn-phase">Turn 1 - Main Phase 1</label>
                 <label id="duel-title-label">Joey vs. Weevil</label>
             </element>
-            <button id="log-toggle" text="Log" />
-            <button id="concede-btn" text="Concede" />
             <progress-bar id="opp-lp-bar" class="lp-bar" min-value="0" max-value="8000" value="8000" text="8000" />
         </element>
 
@@ -1176,7 +1289,6 @@
                     <button id="phase-btn-center" class="phase-btn" text="BP" />
                     <element id="emz-right" class="square-slot emz-slot" />
                     <button id="phase-btn-right" class="phase-btn" text="EP" />
-                    <button id="shuffle-btn" class="hidden" text="Shuffle" />
                 </element>
                 <element id="plr-piles-banished" class="pile-column">
                     <element id="plr-banished" class="card-slot pile-slot">
@@ -1261,6 +1373,15 @@
             </scroller-view>
         </element>
 
+        <element id="duel-controls">
+            <button id="shuffle-btn" class="duel-control-btn hidden" text="Shuffle" />
+            <button id="prompt-toggle-btn" class="duel-control-btn hidden" text="Hide Prompt" />
+            <button id="chain-toggle-btn" class="duel-control-btn" text="Chain: ON" />
+            <button id="log-toggle" class="duel-control-btn" text="Log" />
+            <element id="duel-controls-divider" />
+            <button id="concede-btn" class="duel-control-btn" text="Concede" />
+        </element>
+
         <!-- ══════════ OVERLAYS (absolute positioned) ══════════ -->
 
         <!-- Status Label (chain / waiting overlay) -->
@@ -1288,32 +1409,7 @@
             <button id="prompt-action-btn" class="prompt-btn hidden" text="Finish" />
         </element>
 
-        <!-- Card Info Banner (left, shown on hover) -->
-        <element id="card-info-banner" class="hidden">
-            <element id="card-image-area" />
-            <text id="card-name-label" class="card-label">Number 11: Big Eye</text>
-            <text id="card-stats-label" class="card-label">DARK / Rank 7 / Spellcaster / Xyz /
-                Effect</text>
-            <scroller-view id="card-text-scroll">
-                <text id="card-text">Pendulum Effect: You can remove 6 Spell Counters from your
-                    field; Special Summon this card from the Pendulum Zone, then count the number of
-                    cards you control that can have a Spell Counter, destroy up to that many cards
-                    on the field, and if you do, place Spell Counters on this card equal to the
-                    number of cards destroyed. You can only use this effect of "Endymion, the Mighty
-                    Master of Magic" once per turn. Monster Effect: Once per turn, when a Spell/Trap
-                    Card or effect is activated (Quick Effect): You can return 1 card you control
-                    with a Spell Counter to the hand, and if you do, negate the activation, and if
-                    you do that, destroy it. Then, you can place the same number of Spell Counters
-                    on this card that the returned card had. While this card has a Spell Counter,
-                    your opponent cannot target it with card effects, also it cannot be destroyed by
-                    your opponent's card effects. When this card with a Spell Counter is destroyed
-                    by battle: You can add 1 Normal Spell from your Deck to your hand. </text>
-            </scroller-view>
-            <text id="card-atk-def-label" class="card-label">ATK 2600 / DEF 2000</text>
-            <text id="card-hints" class="card-label hidden" />
-        </element>
-
-        <!-- Duel log (left, toggled from the HUD; declared after the card info banner so it wins) -->
+        <!-- Duel log (left; opening it hides the card info banner) -->
         <element id="duel-log" class="hidden">
             <label id="duel-log-title">Duel log</label>
             <scroller-view id="duel-log-list">
@@ -1342,6 +1438,31 @@
                     <!-- Confirm/Cancel buttons added dynamically -->
                 </element>
             </element>
+        </element>
+
+        <!-- Card Info Banner (above selection dimmer so descriptions remain scrollable) -->
+        <element id="card-info-banner" class="hidden">
+            <element id="card-image-area" />
+            <text id="card-name-label" class="card-label">Number 11: Big Eye</text>
+            <text id="card-stats-label" class="card-label">DARK / Rank 7 / Spellcaster / Xyz /
+                Effect</text>
+            <scroller-view id="card-text-scroll">
+                <text id="card-text">Pendulum Effect: You can remove 6 Spell Counters from your
+                    field; Special Summon this card from the Pendulum Zone, then count the number of
+                    cards you control that can have a Spell Counter, destroy up to that many cards
+                    on the field, and if you do, place Spell Counters on this card equal to the
+                    number of cards destroyed. You can only use this effect of "Endymion, the Mighty
+                    Master of Magic" once per turn. Monster Effect: Once per turn, when a Spell/Trap
+                    Card or effect is activated (Quick Effect): You can return 1 card you control
+                    with a Spell Counter to the hand, and if you do, negate the activation, and if
+                    you do that, destroy it. Then, you can place the same number of Spell Counters
+                    on this card that the returned card had. While this card has a Spell Counter,
+                    your opponent cannot target it with card effects, also it cannot be destroyed by
+                    your opponent's card effects. When this card with a Spell Counter is destroyed
+                    by battle: You can add 1 Normal Spell from your Deck to your hand. </text>
+            </scroller-view>
+            <text id="card-atk-def-label" class="card-label">ATK 2600 / DEF 2000</text>
+            <text id="card-hints" class="card-label hidden" />
         </element>
 
         <!-- Duel Result Overlay (winner and reason, shown when the duel ends) -->

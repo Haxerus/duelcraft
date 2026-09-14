@@ -44,6 +44,7 @@ public final class DuelDisfieldPromptScenario implements UIScenario {
          .click("#plr-mon-3")
          .frames(2)
          .checkTextContains("#status-label", "Select 1 zone(s) to become unusable")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_disfield_prompt")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

@@ -122,6 +122,33 @@ public class PromptController {
 
     // SelectChain: true while the per-card effect chooser has replaced the chain card list.
     private boolean chainEffectChooserOpen;
+    private boolean inspectingField;
+
+    public boolean isInspectingField() { return inspectingField; }
+
+    public boolean hasDialog() {
+        return state.pendingPrompt != null && !promptOverlay.hasClass("hidden");
+    }
+
+    /** Keep the dialog and its selections intact while exposing the field underneath it. */
+    public void toggleInspection() {
+        if (!hasDialog()) return;
+        inspectingField = !inspectingField;
+        if (inspectingField) promptOverlay.addClass("inspection-hidden");
+        else promptOverlay.removeClass("inspection-hidden");
+    }
+
+    private void resetInspection() {
+        inspectingField = false;
+        promptOverlay.removeClass("inspection-hidden");
+    }
+
+    public void skipOptionalChain() {
+        if (state.pendingPrompt instanceof DuelMessage.SelectChain sel && !sel.forced()) {
+            resetInspection();
+            callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, -1));
+        }
+    }
 
     public PromptController(UI ui, ClientDuelState state, FieldRenderer field,
                             UIElement statusLabel, Callbacks callbacks) {
@@ -194,6 +221,7 @@ public class PromptController {
     // ── Rebuild dispatch (PROMPT dirty) ────────────────────────────────────
 
     public void rebuild() {
+        resetInspection();
         LOGGER.debug("Rebuilding prompt: {}", state.pendingPrompt != null ? state.pendingPrompt.getClass().getSimpleName() : "null");
         // Drop the previous prompt's dialog twin first: a field-mode builder never clears the dialog
         // content, so a stale reference would keep the field-level button suppressed.
@@ -338,13 +366,25 @@ public class PromptController {
         if (promptTitle instanceof Label t) t.setText(Component.literal(title));
         clearPromptContent();
 
+        boolean descriptions = !(state.pendingPrompt instanceof DuelMessage.AnnounceNumber
+                || state.pendingPrompt instanceof DuelMessage.RockPaperScissors);
+        ScrollerView choices = null;
+        if (descriptions || options.size() > 8) {
+            choices = new ScrollerView();
+            choices.addClass("prompt-option-scroller");
+            if (!descriptions) choices.addClass("prompt-option-grid");
+            promptBody.addChild(choices);
+        }
+
         for (int i = 0; i < options.size(); i++) {
             int idx = i;
             var btn = new Button();
             btn.setText(Component.literal(options.get(i)));
             btn.addClass("prompt-btn");
+            if (descriptions) btn.addClass("prompt-option-btn");
             btn.setOnClick(e -> onSelect.accept(idx));
-            promptButtons.addChild(btn);
+            if (choices != null) choices.addScrollViewChild(btn);
+            else promptButtons.addChild(btn);
         }
     }
 
@@ -460,6 +500,7 @@ public class PromptController {
         clearPromptContent();
 
         bitSelectionCaption = new Label();
+        bitSelectionCaption.addClass("prompt-caption");
         promptBody.addChild(bitSelectionCaption);
 
         for (int bit : bitSelection.bits()) {
@@ -1153,6 +1194,7 @@ public class PromptController {
      * Returns true if the click was consumed by a prompt, false otherwise.
      */
     public boolean handleFieldClick(int player, int location, int sequence) {
+        if (inspectingField) return true;
         // A selection being made in the overlay dialog owns the clicks: the same card would
         // otherwise be toggled twice, once in the dialog and once on the field behind it.
         if (isDialogSelectionOpen()) return true;
@@ -1283,6 +1325,10 @@ public class PromptController {
      * stop further processing).
      */
     public boolean handleRightClick(UIEvent e) {
+        if (inspectingField) {
+            e.stopPropagation();
+            return true;
+        }
         // edopro binds right-click to the shared Cancel/Finish button (`event_handler.cpp:1498-1511`).
         if (actionButtonAction != null) {
             e.stopPropagation();
@@ -1317,6 +1363,7 @@ public class PromptController {
     // ── Cleanup after a response is sent ───────────────────────────────────
 
     public void onResponseSent() {
+        resetInspection();
         if (promptOverlay != null) promptOverlay.addClass("hidden");
         dialogActionBtn = null;
         setActionButton(ActionButton.HIDDEN, null);

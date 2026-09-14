@@ -50,6 +50,7 @@ public final class DuelSortCardPromptScenario implements UIScenario {
                  !ctx.el("#sort-card-0 .card-ordinal").text().isBlank()
                          && !ctx.el("#sort-card-2 .card-ordinal").text().isBlank())
          .checkText("#sort-card-1 .card-ordinal", "")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_sort_card")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

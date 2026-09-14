@@ -10,7 +10,7 @@ Only prompt messages consume `OCG_DuelSetResponse`. Responses are unframed byte 
 | `MSG_SELECT_IDLECMD` | same packing | type 0 summon, 1 special summon, 2 position, 3 monster set, 4 spell/trap set, 5 activate; 6 Battle Phase, 7 End Phase, 8 shuffle hand | [`SelectIdleCmd`](../../native/ygopro-core/playerop.cpp#L69) |
 | `MSG_SELECT_EFFECTYN`, `MSG_SELECT_YESNO` | `i32` 0 or 1 | no/yes | [`SelectEffectYesNo`](../../native/ygopro-core/playerop.cpp#L166), [`SelectYesNo`](../../native/ygopro-core/playerop.cpp#L189) |
 | `MSG_SELECT_OPTION` | `i32 index` | zero-based index into options | [`SelectOption`](../../native/ygopro-core/playerop.cpp#L205) |
-| `MSG_SELECT_CHAIN` | `i32 index`, or `-1` | `-1` declines only when `forced == 0` | [`SelectChain`](../../native/ygopro-core/playerop.cpp#L454) |
+| `MSG_SELECT_CHAIN` | `i32 index`, or `-1` | `-1` declines only when `forced == 0`; Duelcraft's Chain OFF and hold-C controls use this optional-only path through `ResponseValidator.selectChain` | [`SelectChain`](../../native/ygopro-core/playerop.cpp#L454) |
 | `MSG_SELECT_POSITION` | `i32 position` | exactly one of `1,2,4,8`, and present in offered mask | [`SelectPosition`](../../native/ygopro-core/playerop.cpp#L604) |
 | `MSG_ROCK_PAPER_SCISSORS` | `i32` 1..3 | hand value; core prompts players in sequence | [`RockPaperScissors`](../../native/ygopro-core/playerop.cpp#L1120) |
 | `MSG_ANNOUNCE_RACE` | `u64 mask` | subset of offered mask with the requested popcount | [`AnnounceRace`](../../native/ygopro-core/playerop.cpp#L916) |
@@ -122,6 +122,10 @@ repeat unselectable_count: u32 code, location_info card
 ```
 
 Reply with two `i32` values: `{1, combined_index}` to toggle one card, or a single `i32 -1` to finish/cancel when either flag permits it. `combined_index` indexes selectable cards first, followed by unselectable cards ([producer and validator](../../native/ygopro-core/playerop.cpp#L391)). This response does not use the generic card-list encoding. EDOPro makes the two-word reply explicitly ([`SetResponseSelectedCards`](../../../edopro/gframe/event_handler.cpp#L2821)).
+
+`{1, -1}` is an invalid toggle, **not** a finish response. Duelcraft's `ResponseBuilder.selectUnselectCard(-1)` delegates to the four-byte finish sentinel. The UI still relies on `ResponseValidator` to enforce `finishable || cancelable`. Link procedure scripts can send `min=1, max=1` for each toggle while more than one material is already selected; those bounds must not override the engine's finishable flag or be treated as total material counts.
+
+`PlaytestInteractionTest` exercises a real Gaia Saber summon using LANphorhynchus plus one other monster from a field of four. It demonstrates that the old `{1,-1}` response produces `MSG_RETRY`, then that the corrected finish response completes the summon with the two unused monsters still on the field.
 
 ## Place, counter, and sort responses
 

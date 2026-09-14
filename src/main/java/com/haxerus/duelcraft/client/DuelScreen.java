@@ -3,6 +3,7 @@ package com.haxerus.duelcraft.client;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.network.chat.Component;
 
@@ -36,6 +37,11 @@ public final class DuelScreen extends ModularUIScreen {
      */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (modifiers != 0) LDLibDuelScreen.setChainSkipHeld(false);
+        if (keyCode == InputConstants.KEY_C && modifiers == 0 && LDLibDuelScreen.isDuelLive() && !isTyping()) {
+            LDLibDuelScreen.setChainSkipHeld(true);
+            return true;
+        }
         if (keyCode == InputConstants.KEY_ESCAPE && LDLibDuelScreen.isDuelLive()) {
             LDLibDuelScreen.togglePauseMenu();
             return true;
@@ -43,8 +49,28 @@ public final class DuelScreen extends ModularUIScreen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    private boolean isTyping() {
+        for (var element = modularUI.getFocusedElement(); element != null; element = element.getParent()) {
+            if (element instanceof TextField) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == InputConstants.KEY_C) LDLibDuelScreen.setChainSkipHeld(false);
+        return super.keyReleased(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void tick() {
+        if (!minecraft.isWindowActive() || isTyping()) LDLibDuelScreen.setChainSkipHeld(false);
+        super.tick();
+    }
+
     @Override
     public void removed() {
+        LDLibDuelScreen.setChainSkipHeld(false);
         super.removed();
         LDLibDuelScreen.onScreenRemoved(this);
     }

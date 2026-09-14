@@ -41,12 +41,14 @@ public final class DuelAnnounceCardPromptScenario implements UIScenario {
          .ticks(2)
          .checkVisible("#prompt-overlay")
          .checkVisible("#announce-card-search")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_announce_card")
          .step("announce card, ISTYPE monster",
                  ctx -> LDLibDuelScreen.applyMessage(
                          new DuelMessage.AnnounceCard(0, List.of((long) TYPE_MONSTER, OPCODE_ISTYPE))))
          .ticks(2)
          .checkVisible("#announce-card-search")
+         .step("visual layout", DuelUiAssertions::audit)
          .screenshot("duel_announce_card_monsters")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

@@ -179,9 +179,10 @@ public class ResponseBuilder {
      * MSG_SELECT_UNSELECT_CARD selection response.
      * Format: [int32 formatCode=1][int32 cardIndex]
      * Engine rejects formatCode 0 and >1; only 1 is valid for selection.
-     * @param index card index to select (0-based, from combined selectable+unselectable list)
+     * @param index card index to select (0-based, from combined selectable+unselectable list), or -1 to finish/cancel
      */
     public static byte[] selectUnselectCard(int index) {
+        if (index == -1) return selectUnselectCardFinish();
         return new ResponseBuilder(8)
                 .putInt32(1)
                 .putInt32(index)

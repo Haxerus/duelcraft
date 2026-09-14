@@ -91,6 +91,9 @@ public class ClientDuelState {
     public int currentPhase;
     public int turnCount;
 
+    // Per-duel preference; survives closing and reopening the screen.
+    public boolean chainPromptsEnabled = true;
+
     // Hands — one card object per held card (code 0 = hidden from this client)
     @SuppressWarnings("unchecked")
     public final List<ClientCard>[] hand = new List[]{ new ArrayList<>(), new ArrayList<>() };
@@ -656,6 +659,16 @@ public class ClientDuelState {
                 LOGGER.debug("[State] ConfirmExtraTop: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
             case DuelMessage.ConfirmCards confirm -> {
+                // Retain hand reveals for later prompts whose foreign candidate codes are stripped.
+                // EDOPro writes these onto GetCard(controller, location, sequence) before showing the reveal.
+                for (var info : confirm.cards()) {
+                    if (info.location() != LOCATION_HAND) continue;
+                    ClientCard card = cardAt(info.controller(), info.location(), info.sequence());
+                    if (card != null && info.code() != 0) {
+                        card.code = info.code();
+                        markZoneDirty(card.controller, card.location);
+                    }
+                }
                 int shown = confirm.cards().isEmpty() ? confirm.player() : confirm.cards().getFirst().controller();
                 reveal(owner(shown) + "Revealed Cards", confirm.cards());
                 LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());

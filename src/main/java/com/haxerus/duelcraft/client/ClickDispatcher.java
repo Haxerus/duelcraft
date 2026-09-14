@@ -67,6 +67,7 @@ public class ClickDispatcher {
     // ── Primary entry point ────────────────────────────────────────────────
 
     public void onCardClicked(int player, int location, int sequence, UIEvent event) {
+        if (prompt.isInspectingField()) return;
         var loc = new ClientDuelState.CardLocation(player, location, sequence);
         var actions = state.cardActions.get(loc);
 
