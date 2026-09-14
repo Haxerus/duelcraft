@@ -659,6 +659,16 @@ public class ClientDuelState {
                 LOGGER.debug("[State] ConfirmExtraTop: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
             case DuelMessage.ConfirmCards confirm -> {
+                // Retain hand reveals for later prompts whose foreign candidate codes are stripped.
+                // EDOPro writes these onto GetCard(controller, location, sequence) before showing the reveal.
+                for (var info : confirm.cards()) {
+                    if (info.location() != LOCATION_HAND) continue;
+                    ClientCard card = cardAt(info.controller(), info.location(), info.sequence());
+                    if (card != null && info.code() != 0) {
+                        card.code = info.code();
+                        markZoneDirty(card.controller, card.location);
+                    }
+                }
                 int shown = confirm.cards().isEmpty() ? confirm.player() : confirm.cards().getFirst().controller();
                 reveal(owner(shown) + "Revealed Cards", confirm.cards());
                 LOGGER.debug("[State] ConfirmCards: player={}, cards={}", confirm.player(), confirm.cards().size());

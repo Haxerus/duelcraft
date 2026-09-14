@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import org.junit.jupiter.api.Test;
 
@@ -381,6 +382,31 @@ class ClientDuelStateTest {
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0))));
 
         assertEquals("Opponent's Revealed Cards", state.confirmTitle);
+    }
+
+    @Test
+    void revealedOpponentHandRemainsKnownToTheFollowingSanitizedSelection() {
+        var state = newState();
+        draw(state, 1, 0, 0, 0);
+        var prompt = new DuelMessage.SelectCard(0, false, 1, 1, List.of(
+                new DuelMessage.CardInfo(89631139, 1, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE),
+                new DuelMessage.CardInfo(46986414, 1, LOCATION_HAND, 1, POS_FACEDOWN_DEFENSE)));
+        var sanitized = (DuelMessage.SelectCard) MessageSanitizer.forRecipient(prompt, 0);
+        assertEquals(0, sanitized.cards().getFirst().code());
+        assertEquals(0, state.candidateCode(sanitized.cards().getFirst()), "Unrevealed cards stay hidden");
+
+        state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
+                new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0),
+                new DuelMessage.ConfirmCard(46986414, 1, LOCATION_HAND, 1))));
+        state.confirmCards = null; // The reveal panel consumes its display list.
+        state.applyMessage(sanitized);
+        assertEquals(89631139, state.candidateCode(sanitized.cards().get(0)));
+        assertEquals(46986414, state.candidateCode(sanitized.cards().get(1)));
+        assertEquals(0, state.hand[1].get(2).code, "Cards outside the reveal stay hidden");
+
+        state.applyMessage(MessageSanitizer.forRecipient(new DuelMessage.ShuffleHand(1,
+                List.of(46986414, 89631139, 12345)), 0));
+        assertEquals(0, state.candidateCode(sanitized.cards().getFirst()), "Shuffle invalidates revealed identities");
     }
 
     // ---- Pile restructuring (Task 14) ----
