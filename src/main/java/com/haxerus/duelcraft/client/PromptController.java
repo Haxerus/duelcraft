@@ -86,6 +86,8 @@ public class PromptController {
     // DOM references (resolved in constructor)
     private final UIElement promptOverlay;
     private final UIElement promptTitle;
+    private final Label promptSourceTitle;
+    private final Label statusSourceTitle;
     private final UIElement promptBody;
     private final UIElement promptButtons;
     private final UIElement statusLabel;
@@ -158,6 +160,8 @@ public class PromptController {
         this.callbacks = callbacks;
         this.promptOverlay = byId("prompt-overlay");
         this.promptTitle = byId("prompt-title");
+        this.promptSourceTitle = (Label) byId("prompt-source-title");
+        this.statusSourceTitle = (Label) byId("status-source-title");
         this.promptBody = byId("prompt-body");
         this.promptButtons = byId("prompt-buttons");
         this.statusLabel = statusLabel;
@@ -218,10 +222,62 @@ public class PromptController {
         return callbacks.resolveDesc(state.promptCaptionDesc) + suffix;
     }
 
+    private String selectionCaption(String fallback, String suffix,
+                                    List<SelectionCaptions.Source> sources) {
+        setSelectionSourceTitle(sources);
+        return hintCaption(fallback, suffix);
+    }
+
+    private void setSelectionSourceTitle(List<SelectionCaptions.Source> sources) {
+        String title = SelectionCaptions.sourceTitle(state.localPlayer, sources);
+        boolean fieldMode = promptOverlay.hasClass("hidden");
+        promptSourceTitle.setText(Component.literal(title));
+        statusSourceTitle.setText(Component.literal(title));
+        toggleClass(promptSourceTitle, "hidden", title.isEmpty() || fieldMode);
+        toggleClass(statusSourceTitle, "hidden", title.isEmpty() || !fieldMode);
+        toggleClass(statusLabel, "selection-subtitle", !title.isEmpty() && fieldMode);
+    }
+
+    private void clearSourceTitles() {
+        promptSourceTitle.addClass("hidden");
+        statusSourceTitle.addClass("hidden");
+        statusLabel.removeClass("selection-subtitle");
+    }
+
+    private static SelectionCaptions.Source source(int controller, int location) {
+        return new SelectionCaptions.Source(controller, location);
+    }
+
+    /** Per-card labels are useful only when the dialog combines distinct sources. */
+    private List<String> mixedSourceLabels(List<SelectionCaptions.Source> sources) {
+        var labels = SelectionCaptions.sourceLabels(state.localPlayer, sources);
+        long distinct = labels.stream().filter(label -> !label.isEmpty()).distinct().count();
+        return distinct > 1 ? labels : List.of();
+    }
+
+    private static void addPromptCard(ScrollerView scroller, UIElement card, String id,
+                                      List<String> labels, int index) {
+        if (index >= labels.size() || labels.get(index).isEmpty()) {
+            scroller.addScrollViewChild(card);
+            return;
+        }
+        var choice = new UIElement();
+        choice.addClass("prompt-card-choice");
+        choice.addChild(card);
+
+        var label = new Label();
+        label.setId(id);
+        label.addClass("card-source");
+        label.setText(Component.literal(labels.get(index)));
+        choice.addChild(label);
+        scroller.addScrollViewChild(choice);
+    }
+
     // ── Rebuild dispatch (PROMPT dirty) ────────────────────────────────────
 
     public void rebuild() {
         resetInspection();
+        clearSourceTitles();
         LOGGER.debug("Rebuilding prompt: {}", state.pendingPrompt != null ? state.pendingPrompt.getClass().getSimpleName() : "null");
         // Drop the previous prompt's dialog twin first: a field-mode builder never clears the dialog
         // content, so a stale reference would keep the field-level button suppressed.
@@ -251,8 +307,9 @@ public class PromptController {
                 buildYesNoPrompt(callbacks.resolveDesc(sel.desc()));
             case DuelMessage.SelectEffectYn sel -> {
                 state.highlightPromptCard(sel.location());
-                buildYesNoPrompt(callbacks.resolveDesc(sel.desc())
-                        + "\n(" + callbacks.cardDisplayName(sel.code()) + ")");
+                buildYesNoPrompt(EffectPromptText.question(sel.desc(), callbacks.cardDisplayName(sel.code()),
+                        effectLocation(sel.location().location(), sel.location().sequence()),
+                        callbacks::resolveDesc, callbacks::systemString));
             }
 
             case DuelMessage.SelectOption sel -> buildOptionPrompt(hintCaption("Choose Option", ""),
@@ -332,6 +389,36 @@ public class PromptController {
     }
 
     // ── Prompt builders ────────────────────────────────────────────────────
+
+    /** EDOPro's FormatLocation distinguishes the dedicated Field and Pendulum slots. */
+    private String effectLocation(int location, int sequence) {
+        int systemCode = switch (location) {
+            case LOCATION_DECK -> 1000;
+            case LOCATION_HAND -> 1001;
+            case LOCATION_MZONE -> 1002;
+            case LOCATION_SZONE -> sequence < 5 ? 1003 : sequence == 5 ? 1008 : 1009;
+            case LOCATION_GRAVE -> 1004;
+            case LOCATION_REMOVED -> 1005;
+            case LOCATION_EXTRA -> 1006;
+            case LOCATION_OVERLAY -> 1007;
+            default -> 0;
+        };
+        String text = callbacks.systemString(systemCode);
+        if (text != null) return text;
+        return switch (systemCode) {
+            case 1000 -> "Deck";
+            case 1001 -> "Hand";
+            case 1002 -> "Monster Zone";
+            case 1003 -> "Spell/Trap Zone";
+            case 1004 -> "Graveyard";
+            case 1005 -> "Banished";
+            case 1006 -> "Extra Deck";
+            case 1007 -> "Xyz Material";
+            case 1008 -> "Field Spell Zone";
+            case 1009 -> "Pendulum Zone";
+            default -> "Unknown location";
+        };
+    }
 
     private void buildYesNoPrompt(String title) {
         promptOverlay.removeClass("hidden");
@@ -541,12 +628,20 @@ public class PromptController {
         boolean resolveMode = sel.chains().stream()
                 .anyMatch(c -> c.flag() == EFFECT_CLIENT_MODE_RESOLVE);
         String title = callbacks.systemString(resolveMode ? 556 : 550);
-        if (promptTitle instanceof Label t)
-            t.setText(Component.literal(title != null ? title : "Activate Chain?"));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
-        for (var entry : chainEntriesByCard(sel).values()) {
+        var entries = new ArrayList<>(chainEntriesByCard(sel).values());
+        var sources = entries.stream().map(entry -> {
+            var chain = sel.chains().get(entry.getFirst());
+            return source(chain.controller(), chain.location());
+        }).toList();
+        setSelectionSourceTitle(sources);
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(title != null ? title : "Activate Chain?"));
+        var sourceLabels = mixedSourceLabels(sources);
+        for (int cardIndex = 0; cardIndex < entries.size(); cardIndex++) {
+            var entry = entries.get(cardIndex);
             int code = sel.chains().get(entry.get(0)).code();
 
             var card = new UIElement();
@@ -560,7 +655,7 @@ public class PromptController {
                     callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, entry.get(0)));
                 else buildChainEffectOptions(sel, entry);
             });
-            scroller.addScrollViewChild(card);
+            addPromptCard(scroller, card, "chain-source-" + cardIndex, sourceLabels, cardIndex);
         }
 
         if (!sel.forced()) {
@@ -587,6 +682,8 @@ public class PromptController {
 
     /** One card with several activatable effects: edopro's option dialog over each entry's desc. */
     private void buildChainEffectOptions(DuelMessage.SelectChain sel, List<Integer> indices) {
+        var card = sel.chains().get(indices.getFirst());
+        setSelectionSourceTitle(List.of(source(card.controller(), card.location())));
         buildOptionPrompt("Choose Effect",
                 indices.stream().map(i -> callbacks.resolveDesc(sel.chains().get(i).desc())).toList(),
                 choice -> callbacks.sendResponse(
@@ -598,11 +695,14 @@ public class PromptController {
         selectedIndices.clear();
         promptOverlay.removeClass("hidden");
         if (promptTitle instanceof Label t)
-            t.setText(Component.literal(hintCaption("Select " + sel.min() + "-" + sel.max() + " card(s)",
-                    "(" + sel.min() + "-" + sel.max() + ")")));
+            t.setText(Component.literal(selectCardCaption(sel)));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
+        var sources = sel.cards().stream()
+                .map(card -> source(card.controller(), card.location()))
+                .toList();
+        var sourceLabels = mixedSourceLabels(sources);
         for (int i = 0; i < sel.cards().size(); i++) {
             int idx = i;
             var cardInfo = sel.cards().get(i);
@@ -624,7 +724,7 @@ public class PromptController {
                 }
                 applyCardSelectionGate(sel);
             });
-            scroller.addScrollViewChild(card);
+            addPromptCard(scroller, card, "selection-source-" + i, sourceLabels, i);
         }
 
         dialogActionBtn = addDialogActionButton();
@@ -802,6 +902,8 @@ public class PromptController {
 
     private void updateCounterStatus(DuelMessage.SelectCounter sel) {
         if (!(statusLabel instanceof Label lbl)) return;
+        setSelectionSourceTitle(sel.cards().stream()
+                .map(card -> source(card.controller(), card.location())).toList());
         String name = callbacks.counterName(sel.counterType());
         if (name == null) name = "counter type " + sel.counterType();
         lbl.setText(Component.literal("Remove " + counterSelection.remaining() + " \"" + name + "\""));
@@ -832,10 +934,16 @@ public class PromptController {
         sortOrdinalLabels.clear();
         promptOverlay.removeClass("hidden");
         String title = callbacks.systemString(titleStringCode);
-        if (promptTitle instanceof Label t) t.setText(Component.literal(title != null ? title : fallbackTitle));
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
+        var sources = cards.stream()
+                .map(card -> source(card.controller(), card.location()))
+                .toList();
+        setSelectionSourceTitle(sources);
+        if (promptTitle instanceof Label t)
+            t.setText(Component.literal(title != null ? title : fallbackTitle));
+        var sourceLabels = mixedSourceLabels(sources);
         for (int i = 0; i < cards.size(); i++) {
             int idx = i;
             int code = cards.get(i).code();
@@ -859,8 +967,7 @@ public class PromptController {
             ordinalLabel.addClass("card-ordinal");
             card.addChild(ordinalLabel);
             sortOrdinalLabels.add(ordinalLabel);
-
-            scroller.addScrollViewChild(card);
+            addPromptCard(scroller, card, "sort-source-" + i, sourceLabels, i);
         }
         refreshSortOrdinals();
 
@@ -898,6 +1005,8 @@ public class PromptController {
 
     private void updateTributeStatus(DuelMessage.SelectTribute sel) {
         if (!(statusLabel instanceof Label lbl)) return;
+        setSelectionSourceTitle(sel.cards().stream()
+                .map(card -> source(card.controller(), card.location())).toList());
         int sum = currentTributeSum(sel);
         String text;
         if (sel.min() == sel.max()) {
@@ -940,11 +1049,16 @@ public class PromptController {
         setUnselectCardActionButton(sel);
     }
 
-    /** edopro's caption for a running per-click selection: how many are in, and the bounds. */
+    /** One response toggles one card; the already-selected list carries total material progress. */
     private String unselectCardCaption(DuelMessage.SelectUnselectCard sel) {
-        return hintCaption("Selected " + sel.unselectableCards().size()
-                        + " (" + sel.min() + "-" + sel.max() + ")",
-                "(" + sel.min() + "-" + sel.max() + ")");
+        int selected = sel.unselectableCards().size();
+        String caption = hintCaption(SelectionCaptions.iterative(selected),
+                " (" + selected + " selected; select or deselect 1 card)");
+        var sources = new ArrayList<SelectionCaptions.Source>();
+        sel.selectableCards().forEach(card -> sources.add(source(card.controller(), card.location())));
+        sel.unselectableCards().forEach(card -> sources.add(source(card.controller(), card.location())));
+        setSelectionSourceTitle(sources);
+        return caption;
     }
 
     /** The engine takes {@code -1} whenever either flag is set; the caption is all that differs. */
@@ -976,6 +1090,10 @@ public class PromptController {
         clearPromptContent();
 
         var scroller = createPromptCardScroller();
+        var sources = new ArrayList<SelectionCaptions.Source>();
+        sel.selectableCards().forEach(card -> sources.add(source(card.controller(), card.location())));
+        sel.unselectableCards().forEach(card -> sources.add(source(card.controller(), card.location())));
+        var sourceLabels = mixedSourceLabels(sources);
 
         for (int i = 0; i < sel.selectableCards().size(); i++) {
             var cardInfo = sel.selectableCards().get(i);
@@ -991,7 +1109,7 @@ public class PromptController {
                 ev.stopPropagation();
                 sendUnselectCard(index);
             });
-            scroller.addScrollViewChild(card);
+            addPromptCard(scroller, card, "unselect-source-" + i, sourceLabels, i);
         }
 
         for (int i = 0; i < sel.unselectableCards().size(); i++) {
@@ -1008,7 +1126,8 @@ public class PromptController {
                 ev.stopPropagation();
                 sendUnselectCard(sel.selectableCards().size() + index);
             });
-            scroller.addScrollViewChild(card);
+            int combinedIndex = sel.selectableCards().size() + i;
+            addPromptCard(scroller, card, "unselect-source-" + combinedIndex, sourceLabels, combinedIndex);
         }
 
         dialogActionBtn = addDialogActionButton();
@@ -1049,15 +1168,20 @@ public class PromptController {
 
         var scroller = createPromptCardScroller();
         sumSelectableCards.clear();
+        var sources = new ArrayList<SelectionCaptions.Source>();
+        sel.mustSelect().forEach(card -> sources.add(source(card.controller(), card.location())));
+        sel.selectable().forEach(card -> sources.add(source(card.controller(), card.location())));
+        var sourceLabels = mixedSourceLabels(sources);
 
-        for (var mustCard : sel.mustSelect()) {
+        for (int i = 0; i < sel.mustSelect().size(); i++) {
+            var mustCard = sel.mustSelect().get(i);
             var card = new UIElement();
             card.addClasses("card", "selected");
             callbacks.setCardImageBackground(card, mustCard.code());
             int code = mustCard.code();
             card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
-            scroller.addScrollViewChild(card);
+            addPromptCard(scroller, card, "sum-source-" + i, sourceLabels, i);
 
             UIElement slot = slotOf(mustCard);
             if (slot != null) slot.addClass("selected");
@@ -1078,8 +1202,9 @@ public class PromptController {
                 toggleSumPick(sel, index, false);
             });
 
+            int combinedIndex = sel.mustSelect().size() + i;
+            addPromptCard(scroller, card, "sum-source-" + combinedIndex, sourceLabels, combinedIndex);
             sumSelectableCards.add(card);
-            scroller.addScrollViewChild(card);
         }
 
         refreshSumHighlights(sel, "target");
@@ -1123,8 +1248,12 @@ public class PromptController {
 
     private void updateSumCaption(DuelMessage.SelectSum sel, boolean fieldMode) {
         String target = (sel.selectMode() ? ">=" : "") + sel.targetSum();
-        String text = hintCaption("Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")",
-                "(" + sumSelection.currentSum() + " / " + target + ")");
+        var sources = new ArrayList<SelectionCaptions.Source>();
+        sel.mustSelect().forEach(card -> sources.add(source(card.controller(), card.location())));
+        sel.selectable().forEach(card -> sources.add(source(card.controller(), card.location())));
+        String text = selectionCaption(
+                "Select Materials (Sum: " + sumSelection.currentSum() + " / " + target + ")",
+                "(" + sumSelection.currentSum() + " / " + target + ")", sources);
         if (fieldMode) {
             // A complete selection that can still be extended has no other way out — SELECT_SUM
             // has no cancel encoding, so the field prompt must offer the Finish gesture.
@@ -1170,10 +1299,7 @@ public class PromptController {
         }
 
         if (statusLabel instanceof Label lbl) {
-            lbl.setText(Component.literal(hintCaption(sel.min() == sel.max()
-                            ? "Select " + sel.min() + " card(s)"
-                            : "Select " + sel.min() + "-" + sel.max() + " card(s)",
-                    "(" + sel.min() + "-" + sel.max() + ")")));
+            lbl.setText(Component.literal(selectCardCaption(sel)));
             statusLabel.removeClass("hidden");
         }
         setInitialSelectionButton(sel.cancelable(), sel.min() == 0, this::sendSelectedCards);
@@ -1185,6 +1311,16 @@ public class PromptController {
         selectedIndices.clear();
         ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));
         if (statusLabel != null) statusLabel.addClass("hidden");
+    }
+
+    private String selectCardCaption(DuelMessage.SelectCard sel) {
+        String fallback = sel.min() == sel.max()
+                ? "Select " + sel.min() + " card(s)"
+                : "Select " + sel.min() + "-" + sel.max() + " card(s)";
+        return selectionCaption(fallback, "(" + sel.min() + "-" + sel.max() + ")",
+                sel.cards().stream()
+                        .map(card -> source(card.controller(), card.location()))
+                        .toList());
     }
 
     // ── Field click dispatch ───────────────────────────────────────────────
@@ -1364,6 +1500,7 @@ public class PromptController {
 
     public void onResponseSent() {
         resetInspection();
+        clearSourceTitles();
         if (promptOverlay != null) promptOverlay.addClass("hidden");
         dialogActionBtn = null;
         setActionButton(ActionButton.HIDDEN, null);

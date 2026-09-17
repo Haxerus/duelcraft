@@ -164,11 +164,14 @@ public class FieldRenderer {
         slot.getChildren().stream()
                 .filter(c -> c.hasClass("card") || c.hasClass("card-back")
                         || c.hasClass("stat-atk-def") || c.hasClass("stat-level")
-                        || c.hasClass("card-materials") || c.hasClass("card-counters")
+                        || c.hasClass("card-counters")
                         || c.hasClass("card-scales") || c.hasClass("card-turns")
                         || c.hasClass("chain-marker"))
                 .toList()
-                .forEach(slot::removeChild);
+                .forEach(child -> {
+                    callbacks.clearPendingImage(child);
+                    slot.removeChild(child);
+                });
 
         slot.removeClass("targeted");
         slot.removeClass("disabled");
@@ -179,6 +182,8 @@ public class FieldRenderer {
             int position = card.position;
             boolean faceDown = code == 0 || card.isFaceDown();
             boolean defense = (position & (POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE)) != 0;
+
+            if (locationType == LOCATION_MZONE) addMaterials(slot, card, defense, player != state.localPlayer, sequence);
 
             var cardVisual = new UIElement();
             if (faceDown) {
@@ -220,8 +225,30 @@ public class FieldRenderer {
         }
     }
 
+    /** Cards fan along the square slot's spare axis; the centered host is added last, above them. */
+    private void addMaterials(UIElement slot, ClientCard host, boolean defense, boolean opponent, int sequence) {
+        int count = host.materials.size();
+        for (int i = count - 1; i >= 0; i--) {
+            var material = new UIElement();
+            material.addClass("card");
+            material.addClass("xyz-material");
+            int code = host.materials.get(i).code;
+            if (code == 0) material.addClass("card-back");
+            else callbacks.setCardImageBackground(material, code);
+            if (defense) material.addClass("defense");
+            if (opponent && (sequence == 5 || sequence == 6)) material.addClass("emz-opp");
+
+            // A 36x48 card leaves six units on each side of a 48x48 slot. Spread at most
+            // 12.5% of the slot, with smaller steps for larger stacks so every card stays inside.
+            float offset = Math.min(count, 3) * (12.5f / 3) * (i + 1) / count;
+            if (!opponent) offset = -offset;
+            material.lss(defense ? "top" : "left", (defense ? offset : 12.5f + offset) + "%");
+            slot.addChild(material);
+        }
+    }
+
     /**
-     * Overlay material count (bottom-left), total counters (top-left) and pendulum scales
+     * Total counters (top-left) and pendulum scales
      * (top-right), each drawn only when the card carries one. Scales come from the spell-zone
      * refresh mask, so a non-pendulum card there reports 0/0 and gets no badge.
      */
@@ -232,12 +259,6 @@ public class FieldRenderer {
             var badge = new Label();
             badge.addClass("card-scales");
             badge.setText(Component.literal(stats.lscale + "/" + stats.rscale));
-            slot.addChild(badge);
-        }
-        if (!card.materials.isEmpty()) {
-            var badge = new Label();
-            badge.addClass("card-materials");
-            badge.setText(Component.literal("x" + card.materials.size()));
             slot.addChild(badge);
         }
         int counters = card.counterTotal();
