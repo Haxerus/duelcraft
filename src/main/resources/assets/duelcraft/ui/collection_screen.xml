@@ -4,8 +4,8 @@
     <stylesheet location="ldlib2:lss/gdp.lss" />
     <style>
         #collection-root { width: 1280; height: 720; }
-        #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: rect(#c6c6c6, 0, 3, #252820); }
-        label, text { font-size: 12; text-color: #262921; text-shadow: false; }
+        #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        label, text { font-size: 12; text-color: #FFFFFF; text-shadow: true; }
         button { height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT); }
         button text { font-size: 12; text-color: #ffffff; }
         selector text, selector label { text-color: #ffffff; }
@@ -13,33 +13,34 @@
         .row { flex-direction: row; gap-all: 6; align-items: center; }
         .grow { flex: 1; min-width: 0; min-height: 0; }
         .wrap { text-wrap: wrap; adaptive-height: true; width: 100%; }
-        .muted { text-color: #55594c; }
+        .muted { text-color: #AAAAAA; }
         .heading { font-size: 16; height: 20; flex-shrink: 0; }
         #editor-header { height: 56; flex-shrink: 0; flex-direction: row; gap-all: 12; align-items: center; }
         #header-title { flex: 1; gap-all: 3; }
         #header-title label { height: 14; }
         #editor-title { height: 22; }
         #save-deck { width: 182; height: 36; }
-        #sample-label { width: 230; text-wrap: wrap; adaptive-height: true; text-color: #59435f; }
+        #sample-label { width: 230; text-wrap: wrap; adaptive-height: true; text-color: #AAAAAA; }
         #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
-        #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: rect(#e1ded2, 0, 2, #858979); }
+        #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: built-in(ui-gdp:RECT); }
         #card-details-scroll { flex: 1; min-height: 0; }
         #card-details-scroll .__scroller_view_view-container__ { gap-all: 8; }
         #inspector-art { height: 174; align-items: center; flex-shrink: 0; }
         .inspector-card { width: 118; height: 172; }
-        #inspector-name { font-size: 16; }
+        #inspector-name { font-size: 16; text-color: #FFFF00; }
+        #inspector-stats { text-color: #CCCCCC; }
         #inspector-description { font-size: 13; }
         #inspector-owned, #inspector-used, #inspector-missing { height: 18; }
-        #inspector-missing { text-color: #795019; }
+        #inspector-missing { text-color: #FFDD55; }
         #card-edit-controls { flex-shrink: 0; gap-all: 4; }
         #card-edit-controls .row button { flex: 1; min-width: 0; }
         #add-card, #remove-card { height: 34; }
         #deck-sections { flex: 1; min-width: 0; min-height: 0; gap-all: 8; }
-        .deck-section { min-height: 0; background: rect(#afb0a6, 0, 2, #69715d); }
+        .deck-section { min-height: 0; background: built-in(ui-gdp:RECT_LIGHT); }
         #main-section { flex: 1; min-height: 0; }
         #extra-section { height: 128; flex-shrink: 0; }
         #side-section { height: 32; flex-shrink: 0; }
-        .section-header { height: 30; flex-shrink: 0; flex-direction: row; align-items: center; padding-horizontal: 8; background: rect(#c2c8b4); }
+        .section-header { height: 30; flex-shrink: 0; flex-direction: row; align-items: center; padding-horizontal: 8; background: built-in(ui-gdp:RECT); }
         .section-header label { flex: 1; }
         #toggle-side { width: 90; height: 24; }
         .deck-grid { flex: 1; min-height: 0; }
@@ -47,11 +48,11 @@
         .large .deck-grid .__scroller_view_view-container__ { grid-template-columns: repeat(8, 70px); grid-auto-rows: 103px; }
         .deck-card { width: 54; height: 79; }
         .large .deck-card { width: 70; height: 103; }
-        .card-tile { padding-all: 2; flex-shrink: 0; background: rect(#b8aa87, 0, 2, #70684e); }
-        .card-art { width: 100%; height: 100%; justify-content: center; align-items: center; overflow: hidden; background: rect(#d2c4a4, 0, 1, #7b765f); }
-        .card-placeholder { width: 100%; text-wrap: wrap; adaptive-height: true; horizontal-align: center; font-size: 10; text-color: #343b2c; padding-all: 3; }
-        .selected { background: rect(#897694, 0, 2, #513966); }
-        .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #473512; horizontal-align: center; background: rect(#f3d277); }
+        .card-tile { padding-all: 2; flex-shrink: 0; background: built-in(ui-gdp:RECT_RD_DARK); }
+        .card-art { width: 100%; height: 100%; justify-content: center; align-items: center; overflow: hidden; background: built-in(ui-gdp:RECT); }
+        .card-placeholder { width: 100%; text-wrap: wrap; adaptive-height: true; horizontal-align: center; font-size: 10; text-color: #DDDDDD; padding-all: 3; }
+        .selected { overlay: rect(#6600FF00); }
+        .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; background: rect(#CCFFAA00); }
         #collection-pane { width: 348; flex-shrink: 0; min-height: 0; gap-all: 6; }
         #collection-search { flex: 1; min-width: 0; }
         #toggle-filters { width: 104; }
@@ -68,7 +69,7 @@
         .collection-card { width: 74; height: 108; }
         .collection-caption { width: 74; height: 14; font-size: 10; horizontal-align: center; }
         #collection-empty { height: 40; text-wrap: wrap; horizontal-align: center; }
-        #filter-panel { flex: 1; min-height: 0; padding-all: 8; gap-all: 6; background: rect(#d7d9cb, 0, 2, #858979); }
+        #filter-panel { flex: 1; min-height: 0; padding-all: 8; gap-all: 6; background: built-in(ui-gdp:RECT); }
         #filter-scroll { flex: 1; min-height: 0; }
         #filter-groups { gap-all: 6; }
         .filter-heading { width: 100%; height: 22; padding-top: 5; }
@@ -82,12 +83,12 @@
         #editor-footer { height: 36; flex-shrink: 0; flex-direction: row; align-items: center; gap-all: 8; }
         #card-density { width: 158; }
         #card-density text { adaptive-width: false; width: 100%; }
-        #deck-warnings { flex: 1; min-width: 0; font-size: 11; text-wrap: wrap; adaptive-height: true; text-color: #71501d; }
+        #deck-warnings { flex: 1; min-width: 0; font-size: 11; text-wrap: wrap; adaptive-height: true; text-color: #FFDD55; }
         #editor-status { height: 18; flex-shrink: 0; font-size: 12; }
         scroller-view { scroller-view-mode: vertical; scroller-vertical-display: always; scroller-horizontal-display: never; adaptive-height: false; adaptive-width: false; }
         .__scroller_view_view-port__ { padding-all: 3; background: rect(#00000000); }
         .__scroller_view_vertical-scroller__ { width: 10; }
-        #close-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#bb181b16); z-index: 100; }
+        #close-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 100; }
         #close-panel { width: 460; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #close-panel label { text-color: #ffffff; }
         #close-panel button { flex: 1; }

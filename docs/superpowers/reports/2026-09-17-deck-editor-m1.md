@@ -80,3 +80,13 @@ The keep-open launch was performed at completion: **1/1 scenario and 87/87 check
 At 960x540, the design canvas scales to 75% of its nominal framebuffer size and small text becomes noticeably dense. Large density enlarges deck cards; it does not enlarge every label. No comfortable minimum window size or performance target has been declared. The resize/scroll/click checks and inspected captures establish behavior and geometry; the user's in-game playtest decides comfort and readability.
 
 All five milestone tasks are complete and no required automated checks are blocked. Milestone 2 is ready for its storage/network plan, but has not been implemented. The implementation branch/worktree are retained; nothing was merged or pushed. The main checkout's pre-existing `docs/engine-gap-analysis.md` modification remains untouched (SHA-256 `EE936ED651173B30F4E32CFD285C5FBC4FDB6D2517CB5DB81CA7EED211809581` before/after final verification).
+
+## Dark-theme correction after playtest
+
+The user identified that the light editor palette did not match the existing duel UI. Updated only `collection_screen.xml` styling to reuse the duel screen's LDLib GDP beveled panels (`BORDER_THICK_RT1`, `RECT`, `RECT_LIGHT`, `RECT_RD_DARK`), white/gray text with shadows, yellow inspector titles/warnings and green selected overlays. Placeholder artwork now uses dark panels. Layout measurements, Java behavior and the existing duel screen remain unchanged.
+
+Independent source review approved the styling. The actual 1280x720 client run passed all three collection scenarios and 250 checks with no layout-loop warnings. Inspected Standard, filters, Large/expanded Side and dirty-close screenshots. Updated evidence is under `build/collection-evidence/dark-1280x720/`, with log `build/collection-dark-1280x720.log`.
+
+The 960x540 run also passed all three scenarios and 250 checks (requested GUI scale 3, effective scale 2); inspected its Standard capture. Combined theme verification: **6/6 scenario runs, 500/500 checks**. Small-window evidence: `build/collection-evidence/dark-960x540/`; log: `build/collection-dark-960x540.log`. The text remains small at that viewport, but now uses the duel UI's high-contrast text treatment. No Java/model behavior changed, so this follow-up reran the relevant real-screen scenarios rather than repeating the prior unit suite or unrelated duel scenarios.
+
+Reopened the dark editor with the same keep-open command: **87/87 checks passed** and Minecraft was left running. Evidence: `build/collection-evidence/dark-playtest/`; log: `build/collection-dark-playtest.log`.
