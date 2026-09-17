@@ -42,7 +42,7 @@ The library can run without EDOPro, Minecraft, SQLite, a window system, or a net
 | [`tevent`, `chain`](../../native/ygopro-core/field.h#L31) | Rule events and chain links with triggering context and targets | Activation/response timing and chain resolution |
 | [`interpreter`](../../native/ygopro-core/interpreter.h) | Lua VM, object registration, script loading, calls and coroutines | Script errors, missing functions, yielding operations |
 
-Card **code** identifies a database definition; it does not identify one physical copy. `controller/location/sequence` identifies a current address that can change after moves and shuffles. Retain host tracking state from messages rather than using code as a unique key. Read [card_state](../../native/ygopro-core/card.h#L33), [field::add_card](../../native/ygopro-core/field.cpp#L116), and [protocol location records](protocol.md).
+Card **code** identifies a database definition; it does not identify one physical copy. `controller/location/sequence` identifies a current address that can change after moves and shuffles. Retain host tracking state from messages rather than using code as a unique key. Read [card_state](../../native/ygopro-core/card.h#L33), [field::add_card](../../native/ygopro-core/field.cpp#L119), and [protocol location records](protocol.md).
 
 ## Processor execution
 
@@ -71,6 +71,6 @@ Sources: [entry point](../../native/ygopro-core/ocgapi.cpp#L106), [queue visitor
 | Core flags vs script-only flags | [ocgapi_constants.h](../../native/ygopro-core/ocgapi_constants.h), [common.h](../../native/ygopro-core/common.h), [effect_constants.h](../../native/ygopro-core/effect_constants.h) | [rules and coordinates](rules-and-coordinates.md) |
 | Native crash around Lua failure | [interpreter.cpp](../../native/ygopro-core/interpreter.cpp#L31) | [build and compatibility](build-and-compatibility.md) |
 
-For a Lua function, search the implementation macro, e.g. `LUA_STATIC_FUNCTION(SelectYesNo)` in [libduel.cpp](../../native/ygopro-core/libduel.cpp#L3067), rather than expecting a C++ method named `Duel::SelectYesNo`. Registration maps these functions into Lua tables. [scriptlib::check_action_permission](../../native/ygopro-core/scriptlib.cpp#L50) also explains why some operations are forbidden in non-action contexts.
+For a Lua function, search the implementation macro, e.g. `LUA_STATIC_FUNCTION(SelectYesNo)` in [libduel.cpp](../../native/ygopro-core/libduel.cpp#L3098), rather than expecting a C++ method named `Duel::SelectYesNo`. Registration maps these functions into Lua tables. [scriptlib::check_action_permission](../../native/ygopro-core/scriptlib.cpp#L50) also explains why some operations are forbidden in non-action contexts.
 
 The wiki maps the script API into its implementations; it does not duplicate every Lua method or card ruling. A host needs the data/script loading contract first. Card-specific semantics still belong to the actual script pack and engine revision.
