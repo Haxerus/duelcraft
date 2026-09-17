@@ -1,0 +1,514 @@
+package com.haxerus.duelcraft.client.collection;
+
+import com.haxerus.duelcraft.client.carddata.CardInfo;
+import com.haxerus.duelcraft.client.carddata.CardStringHelper;
+import com.haxerus.duelcraft.collection.DeckList;
+import com.lowdragmc.lowdraglib2.gui.ui.UI;
+import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
+import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
+
+import static com.haxerus.duelcraft.core.OcgConstants.*;
+
+/** Local editor state is retained independently of mounted/recycled card widgets. */
+final class CollectionController {
+    private final UI ui;
+    private final DeckEditorModel model;
+    private final List<CardInfo> cards;
+    private final Map<Integer, CardInfo> byCode = new HashMap<>();
+    private final IntFunction<ResourceLocation> textures;
+    private final Consumer<DeckList> saveDraft;
+    private final Runnable close;
+    private final CollectionCardGrid collection;
+    private int selectedCode;
+    private DeckEditorModel.Section selectedSection = DeckEditorModel.Section.MAIN;
+    private boolean largeCards;
+    private boolean sideOpen;
+    private boolean filtersOpen;
+    private String query = "";
+    private CardSearch.Filters filters = CardSearch.Filters.ALL;
+    private CardSearch.Ownership ownership = CardSearch.Ownership.ALL;
+    private CardSearch.Sort sort = CardSearch.Sort.NAME;
+    private CardSearch.Measure measure = CardSearch.Measure.ANY;
+    private final Map<String, Long> masks = new HashMap<>();
+    private final Map<String, String> ranges = new HashMap<>();
+    private record FilterChoice(String group, long bit, Button button) {}
+    private final Map<String, FilterChoice> choices = new LinkedHashMap<>();
+    private final Map<ScrollerView, Float> pendingScrollOffsets = new HashMap<>();
+    private List<CardInfo> results = List.of();
+
+    CollectionController(UI ui, DeckEditorModel model, List<CardInfo> cards,
+            IntFunction<ResourceLocation> textures, Consumer<DeckList> saveDraft, Runnable close) {
+        this.ui = ui;
+        this.model = model;
+        this.cards = List.copyOf(cards);
+        this.textures = textures;
+        this.saveDraft = saveDraft;
+        this.close = close;
+        for (var entry : Map.of("editor-title", "title", "sample-label", "sample", "editor-status", "unavailable").entrySet()) {
+            ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
+        }
+        cards.forEach(card -> byCode.put(card.code(), card));
+        selectedCode = cards.isEmpty() ? 0 : cards.getFirst().code();
+        collection = new CollectionCardGrid(textures, this::selectCard);
+        collection.setId("collection-results");
+        element("collection-results-host").addChild(collection);
+        button("save-deck").setOnClick(event -> save());
+        button("add-card").setOnClick(event -> edit(true));
+        button("remove-card").setOnClick(event -> edit(false));
+        for (var section : DeckEditorModel.Section.values()) {
+            button("section-" + section.name().toLowerCase(Locale.ROOT)).setOnClick(event -> {
+                selectedSection = section;
+                if (section == DeckEditorModel.Section.SIDE) sideOpen = true;
+                refreshPanes();
+                refreshInspector(false);
+            });
+        }
+        button("toggle-side").setOnClick(event -> {
+            sideOpen = !sideOpen;
+            refreshPanes();
+        });
+        button("card-density").setOnClick(event -> {
+            largeCards = !largeCards;
+            refreshPanes();
+        });
+        button("toggle-filters").setOnClick(event -> showFilters(!filtersOpen));
+        button("filter-apply").setOnClick(event -> {
+            if (applyFilters()) showFilters(false);
+        });
+        button("filter-clear").setOnClick(event -> clearFilters());
+        ((TextField) element("collection-search")).setTextResponder(text -> {
+            query = text;
+            refreshResults(true);
+            refreshChips();
+        });
+        configureSelector("collection-ownership", List.of(CardSearch.Ownership.values()), ownership,
+                value -> { ownership = value; applyOrdering(); });
+        configureSelector("card-sort", List.of(CardSearch.Sort.values()), sort,
+                value -> { sort = value; applyOrdering(); });
+        configureSelector("filter-measure", List.of(CardSearch.Measure.values()), measure,
+                value -> measure = value);
+        element("collection-ownership").getStyle().tooltips(Component.literal("Missing: this draft needs more than you own."),
+                Component.literal("Extras: owned copies beyond this draft's requirement."));
+        createFilters();
+        button("close-save").setOnClick(event -> { if (save()) close.run(); });
+        button("close-discard").setOnClick(event -> close.run());
+        button("close-cancel").setOnClick(event -> element("close-dialog").setDisplay(false));
+        for (String id : List.of("deposit-cards", "withdraw-card", "activate-deck")) {
+            element(id).setActive(false).getStyle()
+                    .tooltips(Component.translatable("duelcraft.collection.unavailable"));
+        }
+        element("close-dialog").setDisplay(false);
+        showFilters(false);
+        refreshDecks();
+        refreshPanes();
+        refreshInspector(true);
+        refreshResults(true);
+        refreshChips();
+    }
+
+    private UIElement element(String id) {
+        return ui.selectId(id).findFirst().orElseThrow(() -> new IllegalStateException("Missing #" + id));
+    }
+
+    private Button button(String id) { return (Button) element(id); }
+
+    private void text(String id, String value) {
+        ((TextElement) element(id)).setText(Component.literal(value));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Enum<T>> void configureSelector(String id, List<T> values, T initial, Consumer<T> changed) {
+        var selector = (Selector<T>) element(id);
+        selector.setCandidates(values).setValue(initial, false).setCandidateUIProvider(UIElementProvider.text(
+                value -> Component.literal(title(value.name()))));
+        selector.setValue(initial, false).setOnValueChanged(changed);
+    }
+
+    private static String title(String value) {
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1).toLowerCase(Locale.ROOT);
+    }
+
+    private void selectCard(int code) {
+        selectedCode = code;
+        refreshInspector(true);
+        refreshSelection();
+    }
+
+    private void refreshSelection() {
+        for (var section : DeckEditorModel.Section.values()) {
+            var codes = sectionCodes(section);
+            for (int index = 0; index < codes.size(); index++) {
+                var tile = element(section.name().toLowerCase(Locale.ROOT) + "-card-" + index);
+                if (codes.get(index) == selectedCode) tile.addClass("selected");
+                else tile.removeClass("selected");
+            }
+        }
+        collection.setPresentation(selectedCode, code -> model.owned().getOrDefault(code, 0L)
+                + " / " + model.draft().requiredCopies().getOrDefault(code, 0));
+    }
+
+    private void refreshInspector(boolean changedCard) {
+        var card = byCode.get(selectedCode);
+        button("add-card").setActive(card != null);
+        button("remove-card").setActive(card != null && sectionCodes(selectedSection).contains(selectedCode));
+        for (var section : DeckEditorModel.Section.values()) {
+            var target = element("section-" + section.name().toLowerCase(Locale.ROOT));
+            if (section == selectedSection) target.addClass("selected");
+            else target.removeClass("selected");
+        }
+        if (card == null) {
+            text("inspector-name", "Select a card");
+            return;
+        }
+        if (changedCard) {
+            element("inspector-art").clearAllChildren();
+            element("inspector-art").addChild(new CollectionCardGrid.CardTile(card, textures, () -> {})
+                    .addClass("inspector-card"));
+            text("inspector-name", card.name());
+            text("inspector-stats", CardStringHelper.typeLine(card) + "\n" + CardStringHelper.atkDefLine(card));
+            text("inspector-description", card.desc());
+            ((ScrollerView) element("card-details-scroll")).verticalScroller.setNormalizedValue(0);
+        }
+        text("inspector-owned", "In collection: " + model.owned().getOrDefault(selectedCode, 0L));
+        text("inspector-used", "In this list: " + model.draft().requiredCopies().getOrDefault(selectedCode, 0));
+        text("inspector-missing", model.missing(selectedCode) > 0 ? "Missing " + model.missing(selectedCode) + " copies" : "All copies owned");
+    }
+
+    private List<Integer> sectionCodes(DeckEditorModel.Section section) {
+        return switch (section) {
+            case MAIN -> model.draft().main();
+            case EXTRA -> model.draft().extra();
+            case SIDE -> model.draft().side();
+        };
+    }
+
+    private void edit(boolean add) {
+        if (selectedCode == 0) return;
+        if (add) model.add(selectedSection, selectedCode);
+        else if (!model.remove(selectedSection, selectedCode)) return;
+        if (selectedSection == DeckEditorModel.Section.SIDE) sideOpen = true;
+        refreshDecks();
+        refreshPanes();
+        refreshInspector(false);
+        // Requery ownership filters, but keep the scroll position if membership/order is unchanged.
+        refreshResults(false);
+        text("editor-status", (add ? "Added one card to " : "Removed one card from ")
+                + title(selectedSection.name()) + ". Draft only; ownership is unchanged.");
+    }
+
+    private void refreshDecks() {
+        var seen = new HashMap<Integer, Integer>();
+        for (var section : DeckEditorModel.Section.values()) {
+            String id = section.name().toLowerCase(Locale.ROOT);
+            var grid = (ScrollerView) element(id + "-grid");
+            if (grid.isDisplayed()) {
+                pendingScrollOffsets.put(grid, Math.max(0, -grid.viewContainer.getLayoutY()));
+            }
+            grid.clearAllScrollViewChildren();
+            var codes = sectionCodes(section);
+            for (int index = 0; index < codes.size(); index++) {
+                int code = codes.get(index);
+                var card = byCode.getOrDefault(code, new CardInfo(code, "Unknown card", "No sample metadata.", 0, 0, 0, 0, 0, 0));
+                var tile = new CollectionCardGrid.CardTile(card, textures, () -> {
+                    selectedSection = section;
+                    selectCard(code);
+                });
+                tile.setId(id + "-card-" + index);
+                tile.addClass("deck-card");
+                if (seen.merge(code, 1, Integer::sum) > model.owned().getOrDefault(code, 0L)) {
+                    tile.addChild(new Label().setText("Missing").addClass("missing-copy"));
+                }
+                grid.addScrollViewChild(tile);
+            }
+            text(id + "-count", title(id) + " Deck  " + codes.size() + (section == DeckEditorModel.Section.MAIN ? " / 40–60" : " / 15"));
+        }
+        refreshSummary();
+        refreshSelection();
+    }
+
+    private void refreshSummary() {
+        var draft = model.draft();
+        long missing = draft.requiredCopies().keySet().stream().mapToLong(model::missing).sum();
+        var warnings = new ArrayList<String>();
+        if (draft.main().size() < 40 || draft.main().size() > 60) warnings.add("Main needs 40–60");
+        if (draft.extra().size() > 15) warnings.add("Extra exceeds 15");
+        if (draft.side().size() > 15) warnings.add("Side exceeds 15");
+        if (draft.requiredCopies().values().stream().anyMatch(count -> count > 3)) warnings.add("More than 3 copies");
+        if (missing > 0) warnings.add(missing + " missing");
+        text("deck-summary", "Main " + draft.main().size() + " · Extra " + draft.extra().size()
+                + " · Side " + draft.side().size() + (model.dirty() ? " · Unsaved changes" : " · Sample draft"));
+        text("deck-warnings", warnings.isEmpty() ? "Drafts may be saved without owning every card." : String.join(" · ", warnings));
+    }
+
+    /** Runs once after LDLib has laid out rebuilt rows, including edits with unchanged row counts. */
+    void afterLayout() {
+        for (var entry : pendingScrollOffsets.entrySet()) {
+            var grid = entry.getKey();
+            if (!grid.isDisplayed()) continue;
+            float extent = Math.max(0, grid.getContainerHeight() - grid.viewPort.getContentHeight());
+            grid.verticalScroller.setNormalizedValue(extent == 0 ? 0 : Math.min(1, entry.getValue() / extent));
+        }
+        pendingScrollOffsets.clear();
+    }
+
+    private void refreshPanes() {
+        var deck = element("deck-sections");
+        if (largeCards) deck.addClass("large");
+        else deck.removeClass("large");
+        element("extra-section").lss("height", largeCards ? "150" : "128");
+        element("side-section").lss("height", sideOpen ? "150" : "32");
+        element("side-grid").setDisplay(sideOpen);
+        button("toggle-side").setText(sideOpen ? "Collapse" : "Expand");
+        button("card-density").setText(largeCards ? "Cards: Large" : "Cards: Standard");
+    }
+
+    private void refreshResults(boolean reset) {
+        var found = CardSearch.search(cards, query, filters, model.owned(), model.draft());
+        boolean changed = !found.equals(results);
+        if (changed) {
+            results = found;
+            collection.showCards(results);
+        }
+        collection.setPresentation(selectedCode, code -> model.owned().getOrDefault(code, 0L)
+                + " / " + model.draft().requiredCopies().getOrDefault(code, 0));
+        if (reset || changed) collection.scrollToTop();
+        text("result-count", results.size() + " cards · owned / in list");
+        element("collection-empty").setDisplay(results.isEmpty());
+    }
+
+    private boolean save() {
+        try {
+            saveDraft.accept(model.draft());
+            model.markSaved();
+            refreshSummary();
+            text("editor-status", "Sample draft saved in memory. Missing copies remain marked.");
+            return true;
+        } catch (RuntimeException failure) {
+            text("editor-status", "Save failed: " + (failure.getMessage() == null ? "try again" : failure.getMessage()) + ". Your draft is retained.");
+            return false;
+        }
+    }
+
+    void requestClose() {
+        if (model.dirty()) element("close-dialog").setDisplay(true);
+        else close.run();
+    }
+
+    private void showFilters(boolean open) {
+        syncFilterForm();
+        filtersOpen = open;
+        element("filter-panel").setDisplay(open);
+        element("browse-results").setDisplay(!open);
+        button("toggle-filters").setText(open ? "Close filters" : "Filters");
+    }
+
+    private void applyOrdering() {
+        filters = new CardSearch.Filters(filters.categoryAny(), filters.subtypeAny(), filters.requiredProperties(),
+                filters.raceAny(), filters.attributeAny(), filters.measure(), filters.measureRange(), filters.atkRange(),
+                filters.defRange(), filters.scaleRange(), ownership, sort);
+        refreshResults(true);
+        refreshChips();
+    }
+
+    private void syncFilterForm() {
+        masks.put("category", (long) filters.categoryAny());
+        masks.put("subtype", (long) filters.subtypeAny());
+        masks.put("property", (long) filters.requiredProperties());
+        masks.put("race", filters.raceAny());
+        masks.put("attribute", (long) filters.attributeAny());
+        measure = filters.measure();
+        resetSelector("filter-measure", measure);
+        choices.values().forEach(choice -> {
+            if ((mask(choice.group()) & choice.bit()) != 0) choice.button().addClass("selected");
+            else choice.button().removeClass("selected");
+        });
+        for (String group : List.of("measure", "atk", "def", "scale")) {
+            var value = appliedRange(group);
+            String min = value == null ? "" : Integer.toString(value.min());
+            String max = value == null || value.max() == Integer.MAX_VALUE ? "" : Integer.toString(value.max());
+            ranges.put(group + "-min", min);
+            ranges.put(group + "-max", max);
+            ((TextField) element("filter-" + group + "-min")).setText(min, false);
+            ((TextField) element("filter-" + group + "-max")).setText(max, false);
+        }
+    }
+
+    private CardSearch.Range appliedRange(String group) {
+        return switch (group) {
+            case "measure" -> filters.measureRange();
+            case "atk" -> filters.atkRange();
+            case "def" -> filters.defRange();
+            default -> filters.scaleRange();
+        };
+    }
+
+    private boolean applyFilters() {
+        try {
+            filters = new CardSearch.Filters((int) mask("category"), (int) mask("subtype"),
+                    (int) mask("property"), mask("race"), (int) mask("attribute"), measure,
+                    range("measure"), range("atk"), range("def"), range("scale"), ownership, sort);
+            refreshResults(true);
+            refreshChips();
+            return true;
+        } catch (IllegalArgumentException invalid) {
+            text("editor-status", "Enter whole numbers with minimum no greater than maximum.");
+            return false;
+        }
+    }
+
+    private CardSearch.Range range(String group) {
+        String min = ranges.getOrDefault(group + "-min", "");
+        String max = ranges.getOrDefault(group + "-max", "");
+        if (min.isBlank() && max.isBlank()) return null;
+        int lower = min.isBlank() ? 0 : Integer.parseInt(min);
+        int upper = max.isBlank() ? Integer.MAX_VALUE : Integer.parseInt(max);
+        if (lower < 0 || lower > upper) throw new IllegalArgumentException("Invalid range");
+        return new CardSearch.Range(lower, upper);
+    }
+
+    private long mask(String group) { return masks.getOrDefault(group, 0L); }
+
+    @SuppressWarnings("unchecked")
+    private void clearFilters() {
+        masks.clear();
+        ranges.clear();
+        choices.values().forEach(choice -> choice.button().removeClass("selected"));
+        query = "";
+        filters = CardSearch.Filters.ALL;
+        ownership = CardSearch.Ownership.ALL;
+        sort = CardSearch.Sort.NAME;
+        measure = CardSearch.Measure.ANY;
+        ((TextField) element("collection-search")).setText("", false);
+        ((Selector<CardSearch.Ownership>) element("collection-ownership")).setValue(ownership, false);
+        ((Selector<CardSearch.Sort>) element("card-sort")).setValue(sort, false);
+        ((Selector<CardSearch.Measure>) element("filter-measure")).setValue(measure, false);
+        for (String group : List.of("measure", "atk", "def", "scale")) {
+            for (String bound : List.of("min", "max")) ((TextField) element("filter-" + group + "-" + bound)).setText("", false);
+        }
+        refreshResults(true);
+        refreshChips();
+        showFilters(false);
+    }
+
+    private void createFilters() {
+        addChoices("category", "Card category · any", new String[]{"Monster", "Spell", "Trap"}, new long[]{TYPE_MONSTER, TYPE_SPELL, TYPE_TRAP});
+        addChoices("attribute", "Attribute · any", new String[]{"Earth", "Water", "Fire", "Wind", "Light", "Dark", "Divine"},
+                new long[]{ATTRIBUTE_EARTH, ATTRIBUTE_WATER, ATTRIBUTE_FIRE, ATTRIBUTE_WIND, ATTRIBUTE_LIGHT, ATTRIBUTE_DARK, ATTRIBUTE_DIVINE});
+        addChoices("subtype", "Frame / subtype · any", new String[]{"Normal", "Fusion", "Ritual", "Synchro", "Xyz", "Link", "Quickplay", "Continuous", "Equip", "Field", "Counter"},
+                new long[]{TYPE_NORMAL, TYPE_FUSION, TYPE_RITUAL, TYPE_SYNCHRO, TYPE_XYZ, TYPE_LINK, TYPE_QUICKPLAY, TYPE_CONTINUOUS, TYPE_EQUIP, TYPE_FIELD, TYPE_COUNTER});
+        addChoices("property", "Properties · all required", new String[]{"Effect", "Tuner", "Pendulum", "Spirit", "Union", "Gemini", "Flip", "Toon"},
+                new long[]{TYPE_EFFECT, TYPE_TUNER, TYPE_PENDULUM, TYPE_SPIRIT, TYPE_UNION, TYPE_GEMINI, TYPE_FLIP, TYPE_TOON});
+        long[] races = {RACE_WARRIOR, RACE_SPELLCASTER, RACE_FAIRY, RACE_FIEND, RACE_ZOMBIE, RACE_MACHINE,
+                RACE_AQUA, RACE_PYRO, RACE_ROCK, RACE_WINGEDBEAST, RACE_PLANT, RACE_INSECT, RACE_THUNDER,
+                RACE_DRAGON, RACE_BEAST, RACE_BEASTWARRIOR, RACE_DINOSAUR, RACE_FISH, RACE_SEASERPENT,
+                RACE_REPTILE, RACE_PSYCHIC, RACE_DIVINE, RACE_CREATORGOD, RACE_WYRM, RACE_CYBERSE,
+                RACE_ILLUSION, RACE_CYBORG, RACE_MAGICALKNIGHT, RACE_HIGHDRAGON, RACE_OMEGAPSYCHIC,
+                RACE_CELESTIALWARRIOR, RACE_GALAXY, RACE_YOKAI};
+        String[] raceNames = new String[races.length];
+        for (int index = 0; index < races.length; index++) raceNames[index] = CardStringHelper.raceName(races[index]);
+        addChoices("race", "Monster type · any", raceNames, races);
+        for (String group : List.of("measure", "atk", "def", "scale")) {
+            for (String bound : List.of("min", "max")) {
+                String key = group + "-" + bound;
+                ((TextField) element("filter-" + key)).setTextResponder(value -> ranges.put(key, value));
+            }
+        }
+    }
+
+    private void addChoices(String group, String heading, String[] names, long[] bits) {
+        var container = element("filter-groups");
+        container.addChild(new Label().setText(Component.literal(heading)).addClass("filter-heading"));
+        var row = new UIElement().addClass("filter-choices");
+        for (int index = 0; index < names.length; index++) {
+            String name = names[index];
+            long bit = bits[index];
+            String id = "filter-" + group + "-" + name.toLowerCase(Locale.ROOT).replace(' ', '-');
+            var choice = new Button().setText(Component.literal(name));
+            choice.setId(id).addClass("filter-choice");
+            choice.setOnClick(event -> {
+                long next = mask(group) ^ bit;
+                masks.put(group, next);
+                if ((next & bit) != 0) choice.addClass("selected");
+                else choice.removeClass("selected");
+            });
+            choices.put(id, new FilterChoice(group, bit, choice));
+            row.addChild(choice);
+        }
+        container.addChild(row);
+    }
+
+    private void refreshChips() {
+        var chips = (ScrollerView) element("active-filters");
+        chips.clearAllScrollViewChildren();
+        if (!query.isBlank()) addChip(chips, "query", query, () -> {
+            query = "";
+            ((TextField) element("collection-search")).setText("", false);
+        });
+        for (var entry : choices.entrySet()) {
+            var choice = entry.getValue();
+            long applied = switch (choice.group()) {
+                case "category" -> filters.categoryAny();
+                case "subtype" -> filters.subtypeAny();
+                case "property" -> filters.requiredProperties();
+                case "race" -> filters.raceAny();
+                case "attribute" -> filters.attributeAny();
+                default -> 0;
+            };
+            if ((applied & choice.bit()) != 0) {
+                addChip(chips, entry.getKey().substring("filter-".length()),
+                        choice.button().text.getText().getString(), () -> {
+                            masks.put(choice.group(), mask(choice.group()) & ~choice.bit());
+                            choice.button().removeClass("selected");
+                        });
+            }
+        }
+        if (filters.ownership() != CardSearch.Ownership.ALL) addChip(chips, "ownership", title(filters.ownership().name()), () -> {
+            ownership = CardSearch.Ownership.ALL;
+            resetSelector("collection-ownership", ownership);
+        });
+        if (filters.measure() != CardSearch.Measure.ANY) addChip(chips, "measure", title(filters.measure().name()), () -> {
+            measure = CardSearch.Measure.ANY;
+            resetSelector("filter-measure", measure);
+        });
+        for (String group : List.of("measure", "atk", "def", "scale")) {
+            CardSearch.Range range = appliedRange(group);
+            if (range != null) addChip(chips, group.equals("measure") ? "number" : group,
+                    title(group) + " " + range.min() + "–" + (range.max() == Integer.MAX_VALUE ? "any" : range.max()), () -> {
+                        for (String bound : List.of("min", "max")) {
+                            ranges.remove(group + "-" + bound);
+                            ((TextField) element("filter-" + group + "-" + bound)).setText("", false);
+                        }
+                    });
+        }
+        chips.setDisplay(!chips.viewContainer.getChildren().isEmpty());
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> void resetSelector(String id, T value) {
+        ((Selector<T>) element(id)).setValue(value, false);
+    }
+
+    private void addChip(ScrollerView chips, String id, String label, Runnable remove) {
+        var chip = new Button().setText(Component.literal(label + " ×"));
+        chip.setId("chip-" + id).addClass("filter-chip");
+        chip.setOnClick(event -> { syncFilterForm(); remove.run(); applyFilters(); });
+        chips.addScrollViewChild(chip);
+    }
+}

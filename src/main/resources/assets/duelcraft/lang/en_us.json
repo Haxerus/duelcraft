@@ -9,5 +9,9 @@
   "duelcraft.configuration.items": "Item List",
   "duelcraft.configuration.logDirtBlock": "Log Dirt Block",
   "duelcraft.configuration.magicNumberIntroduction": "Magic Number Text",
-  "duelcraft.configuration.magicNumber": "Magic Number"
+  "duelcraft.configuration.magicNumber": "Magic Number",
+  "duelcraft.collection.title": "Sample deck editor",
+  "duelcraft.collection.sample": "Sample data · no real collection",
+  "duelcraft.collection.save": "Save sample draft",
+  "duelcraft.collection.unavailable": "Sample data only. Transfers and activation are unavailable."
 }
