@@ -7,7 +7,7 @@ Use this page when compiling the engine, loading it from another language, or up
 | Input | Source-backed requirement |
 |---|---|
 | Engine sources | Use one pinned core checkout with its matching public headers. |
-| Compiler | The core's [Premake project](../../native/ygopro-core/premake5.lua#L1) requests C++17 and disables RTTI. |
+| Compiler | The core's [Premake project](../../native/ygopro-core/premake5.lua#L5) requests C++17 and disables RTTI. |
 | Lua | The checked-out submodule is Lua 5.4, commit `6e22fedb74cf0c9b6656e9fce8b7331db847c605`. Use the core's build settings, including C++ compilation and custom configuration. |
 | Build generator | Upstream's documented primary path uses Premake 5. [scripts/generate.bat](../../native/ygopro-core/scripts/generate.bat) prepares Visual Studio output. |
 | Card database and scripts | Runtime inputs supplied by the host; not part of the standalone core build. |
@@ -24,9 +24,9 @@ The following commands reproduce the commands documented by the repository; this
 | POSIX or MinGW | Install Premake as described by `scripts/install-premake5.sh`; run `./premake5 gmake2`, then `make -Cbuild ocgcoreshared config=release` (or target `ocgcore`). | Consult generated configurations for architecture-specific MinGW names. |
 | Android | Configure NDK and invoke `ndk-build`; inspect `jni/Android.mk` and `jni/Application.mk`. | Android is a separate upstream build path, not the Duelcraft Windows JNI packaging task. |
 
-Sources: [upstream build instructions](../../native/ygopro-core/README.md#L9), [static/shared projects](../../native/ygopro-core/premake5.lua#L117), [platform output directories](../../native/ygopro-core/premake5.lua#L65), [Android build](../../native/ygopro-core/jni/Android.mk).
+Sources: [upstream build instructions](../../native/ygopro-core/README.md#L9), [static/shared projects](../../native/ygopro-core/premake5.lua#L124), [platform output directories](../../native/ygopro-core/premake5.lua#L72), [Android build](../../native/ygopro-core/jni/Android.mk).
 
-The repository also contains [meson.build](../../native/ygopro-core/meson.build). It declares project version `9.1` and a `lua-5.4` dependency, while the compiled API reports `11.0`. Treat that project-version string as build metadata. A system Lua package must still satisfy this core revision's runtime unwinding check.
+The repository also contains [meson.build](../../native/ygopro-core/meson.build). It declares project version `11.0` and builds the vendored Lua sources as C++ with the custom configuration. Duelcraft's 2026-09-17 upgrade was built with the existing VS2022/Premake pipeline; Meson was not exercised.
 
 ## Lua is a compatibility constraint
 

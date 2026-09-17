@@ -2,7 +2,7 @@
 
 An agent-oriented reference for embedding the Yu-Gi-Oh! simulator into a native application, server, game, or foreign-language runtime. EDOPro supplies a complete host example; Duelcraft supplies a C++/JNI/Java example.
 
-**Engine baseline:** `native/ygopro-core` at `7471af3c`, API **11.0**. **EDOPro baseline:** `../edopro` at `48ec006c`, with a different core revision. Read [source versions](source-versions.md) before using these contracts with another checkout. Facts below come from the local sources, not from an assumed upstream protocol version.
+**Engine baseline:** `native/ygopro-core` at `122e0d09`, API **11.0**. **EDOPro baseline:** `../edopro` at `48ec006c`, with a different core revision. Read [source versions](source-versions.md) before using these contracts with another checkout. Facts below come from the local sources, not from an assumed upstream protocol version.
 
 ## Task router
 

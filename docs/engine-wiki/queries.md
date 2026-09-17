@@ -1,6 +1,6 @@
 # Card and field queries
 
-Queries are synchronous snapshots from the C API. They are separate from the message stream, although a host commonly wraps their bytes in `MSG_UPDATE_DATA` or `MSG_UPDATE_CARD`. This page describes commit `7471af3c268669b9ae5c23664ba0cb2f37a5eca0` only.
+Queries are synchronous snapshots from the C API. They are separate from the message stream, although a host commonly wraps their bytes in `MSG_UPDATE_DATA` or `MSG_UPDATE_CARD`. This page describes commit `122e0d091a0f399221a4510cc98a406ae485905f` only.
 
 ## API calls and lifetimes
 
@@ -13,7 +13,7 @@ Queries are synchronous snapshots from the C API. They are separate from the mes
 
 The public declarations and `OCG_QueryInfo` fields are in [`ocgapi.h`](../../native/ygopro-core/ocgapi.h#L42) and [`ocgapi_types.h`](../../native/ygopro-core/ocgapi_types.h#L90). All three blob-returning calls reuse `duel::query_buffer`; copy a result before the next query. A missing single card returns `nullptr` and length 0 ([`OCG_DuelQuery`](../../native/ygopro-core/ocgapi.cpp#L180)). Initialize the output length before each call: an invalid location mask returns null before writing it.
 
-`flags` chooses fields. `con` is controller/team, `loc` is one base location, `seq` is the slot/card index, and `overlay_seq` selects a material. For a direct overlay query, callers are expected to OR `LOCATION_OVERLAY` into a base location. At this pinned commit the implementation masks to `LOCATION_OVERLAY` and passes `0x80` to `get_field_card`, whose switch accepts base locations instead ([overlay branch](../../native/ygopro-core/ocgapi.cpp#L186), [`get_field_card`](../../native/ygopro-core/field.cpp#L518)). The direct overlay branch therefore resolves no host card. Treat this as a core defect at this SHA; query the host card with `QUERY_OVERLAY_CARD` to obtain material codes unless you patch or upgrade the core.
+`flags` chooses fields. `con` is controller/team, `loc` is one base location, `seq` is the slot/card index, and `overlay_seq` selects a material. For a direct overlay query, callers are expected to OR `LOCATION_OVERLAY` into a base location. At this pinned commit the implementation masks to `LOCATION_OVERLAY` and passes `0x80` to `get_field_card`, whose switch accepts base locations instead ([overlay branch](../../native/ygopro-core/ocgapi.cpp#L186), [`get_field_card`](../../native/ygopro-core/field.cpp#L521)). The direct overlay branch therefore resolves no host card. Treat this as a core defect at this SHA; query the host card with `QUERY_OVERLAY_CARD` to obtain material codes unless you patch or upgrade the core.
 
 ## Query chunk grammar
 
@@ -64,11 +64,11 @@ u32 QUERY_END
 | `QUERY_COVER 0x2000000` | `u32` | cover/card-back identifier |
 | `QUERY_END 0x80000000` | none | terminator, emitted regardless of requested flags |
 
-The constant values are declared together in [`ocgapi_constants.h`](../../native/ygopro-core/ocgapi_constants.h#L168). Widths and compound layouts come from [`card::get_infos`](../../native/ygopro-core/card.cpp#L119). Signed attack values use the same four bytes as `u32`; decode them as `i32`. `QUERY_POSITION` calls `get_info_location()`, which substitutes an overlay material's `current.sequence` for position ([implementation](../../native/ygopro-core/card.cpp#L216)).
+The constant values are declared together in [`ocgapi_constants.h`](../../native/ygopro-core/ocgapi_constants.h#L168). Widths and compound layouts come from [`card::get_infos`](../../native/ygopro-core/card.cpp#L119). Signed attack values use the same four bytes as `u32`; decode them as `i32`. `QUERY_POSITION` calls `get_info_location()`, which substitutes an overlay material's `current.sequence` for position ([implementation](../../native/ygopro-core/card.cpp#L222)).
 
 ## Visibility belongs to the host
 
-The core returns every requested field. It does not know which remote viewer will receive the result. `QUERY_IS_PUBLIC` becomes 1 for face-up cards, chain-related cards, or hand cards affected by `EFFECT_PUBLIC`; `QUERY_IS_HIDDEN` reports `EFFECT_DARKNESS_HIDE` ([producer](../../native/ygopro-core/card.cpp#L189)). These are inputs to a host's disclosure policy, not automatic redaction.
+The core returns every requested field and always includes `QUERY_IS_PUBLIC`, even if its bit was absent from the requested mask. It does not know which remote viewer will receive the result. `QUERY_IS_PUBLIC` becomes 1 for face-up cards, chain-related cards, or cards in the hand or on the field affected by `EFFECT_PUBLIC`; `QUERY_IS_HIDDEN` reports `EFFECT_DARKNESS_HIDE` ([producer](../../native/ygopro-core/card.cpp#L191)). These are inputs to a host's disclosure policy, not automatic redaction. Parsers must accept the extra visibility chunk; hosts must still filter recipient views.
 
 EDOPro parses the raw query once, then generates different buffers for the owning side and public viewers in [`GenericDuel::RefreshLocation`](../../../edopro/gframe/generic_duel.cpp#L1367) and [`GenericDuel::RefreshSingle`](../../../edopro/gframe/generic_duel.cpp#L1394). Its [`Query::IsPublicQuery`](../../../edopro/gframe/core_utils.cpp#L224) treats code, alias, type, level/rank, attribute/race, combat stats, status, scales, and link data as private unless the card is public or face-up. Copy that policy only if it matches your product's spectator and team rules; the essential invariant is to filter before serialization to an unauthorized process or network peer.
 

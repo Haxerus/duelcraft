@@ -1,6 +1,6 @@
 # Core C API and duel lifecycle
 
-Use this page to implement a native adapter or FFI binding. Scope: Duelcraft's core `7471af3c`, API **11.0**. See [source versions](source-versions.md) before applying it to another binary. [Index](README.md) · [data callbacks](data-and-scripts.md) · [protocol](protocol.md).
+Use this page to implement a native adapter or FFI binding. Scope: Duelcraft's core `122e0d09`, API **11.0**. See [source versions](source-versions.md) before applying it to another binary. [Index](README.md) · [data callbacks](data-and-scripts.md) · [protocol](protocol.md).
 
 ## Binding contract
 
