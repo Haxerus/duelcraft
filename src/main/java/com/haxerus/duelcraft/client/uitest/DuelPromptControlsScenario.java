@@ -84,6 +84,14 @@ public final class DuelPromptControlsScenario implements UIScenario {
         chain(s, true);
         s.checkVisible("#prompt-overlay");
         capture(s, "forced-chain-off");
+        // Synthetic input deliberately runs without taking desktop focus. Held shortcuts need
+        // the active-window precondition; the explicit lost-focus check below still exercises it.
+        s.step("active window for synthetic held shortcuts", ctx -> {
+            boolean active = ctx.mc().isWindowActive();
+            ctx.put("window-active-before-shortcuts", active);
+            ctx.log("Window active before shortcut fixture: " + active);
+            ctx.mc().setWindowActive(true);
+        });
         s.keyDown(GLFW.GLFW_KEY_C).ticks(2).checkVisible("#prompt-overlay")
          .keyUp(GLFW.GLFW_KEY_C).ticks(2).checkText("#chain-toggle-btn", "Chain: OFF");
         s.step("other prompts are never skipped", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.SelectYesNo(0, 1)))
@@ -135,7 +143,13 @@ public final class DuelPromptControlsScenario implements UIScenario {
          .ticks(2).checkText("#chain-toggle-btn", "Chain: ON").keyUp(GLFW.GLFW_KEY_C).keyUp(GLFW.GLFW_KEY_LEFT_CONTROL);
         s.step("new duel resets preference", ctx -> ctx.mc().setScreen(LDLibDuelScreen.create(DuelScreenFixture.startPayload(DuelRule.MR5))))
          .awaitModularUI().ticks(2).checkText("#chain-toggle-btn", "Chain: ON");
-        s.teardown("close", ctx -> { LDLibDuelScreen.close(); ctx.mc().setScreen(null); });
+        s.teardown("close", ctx -> {
+            try { LDLibDuelScreen.close(); ctx.mc().setScreen(null); }
+            finally {
+                Boolean active = ctx.get("window-active-before-shortcuts");
+                if (active != null) ctx.mc().setWindowActive(active);
+            }
+        });
     }
 
     private static void chain(ScenarioBuilder s, boolean forced) {

@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import org.junit.jupiter.api.Test;
@@ -476,6 +477,63 @@ class ClientDuelStateTest {
 
         assertEquals(33333, state.extra[0].get(12).code);
         assertEquals(0, state.extra[0].get(14).code);
+    }
+
+    @Test
+    void shuffleExtraForgetsRevealedOpponentCardsAfterPublicRefresh() {
+        var state = newState();
+        var refresh = new DuelMessage.UpdateData(1, LOCATION_EXTRA, List.of(
+                extraQuery(11111, POS_FACEDOWN_DEFENSE),
+                extraQuery(22222, POS_FACEDOWN_DEFENSE),
+                extraQuery(33333, POS_FACEUP_DEFENSE)));
+        state.applyMessage(MessageSanitizer.forRecipient(refresh, 0));
+        state.applyMessage(new DuelMessage.ConfirmExtraTop(1, List.of(
+                new DuelMessage.ConfirmCard(11111, 1, LOCATION_EXTRA, 0))));
+        var candidate = new DuelMessage.CardInfo(0, 1, LOCATION_EXTRA, 0, 0);
+        assertEquals(11111, state.candidateCode(candidate));
+        state.extra[0].getFirst().code = 44444;
+        state.consumeDirtyFlags();
+
+        state.applyMessage(new DuelMessage.ShuffleExtra(1));
+
+        assertEquals(0, state.candidateCode(candidate));
+        assertEquals(33333, state.extra[1].get(2).code, "Face-up Pendulum cards are not shuffled");
+        assertEquals(44444, state.extra[0].getFirst().code, "The other pile is unaffected");
+        assertTrue(state.consumeDirtyFlags().contains(ClientDuelState.DirtyFlag.PILE_COUNTS));
+        state.applyMessage(MessageSanitizer.forRecipient(refresh, 0));
+        assertEquals(List.of(0, 0, 33333), codesOf(state.extra[1]));
+        assertEquals(0, state.candidateCode(candidate), "A public refresh must not restore stale knowledge");
+    }
+
+    @Test
+    void shuffleExtraOwnerRefreshRestoresTheNewOrder() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.UpdateData(0, LOCATION_EXTRA, List.of(
+                extraQuery(11111, POS_FACEDOWN_DEFENSE),
+                extraQuery(22222, POS_FACEDOWN_DEFENSE),
+                extraQuery(33333, POS_FACEUP_DEFENSE))));
+        var faceUpStats = state.extra[0].get(2).stats;
+
+        state.applyMessage(new DuelMessage.ShuffleExtra(0));
+
+        assertEquals(List.of(0, 0, 33333), codesOf(state.extra[0]));
+        assertNull(state.extra[0].getFirst().stats, "Cached identity data belongs to the old order");
+        assertSame(faceUpStats, state.extra[0].get(2).stats);
+        var reordered = new DuelMessage.UpdateData(0, LOCATION_EXTRA, List.of(
+                extraQuery(22222, POS_FACEDOWN_DEFENSE),
+                extraQuery(11111, POS_FACEDOWN_DEFENSE),
+                extraQuery(33333, POS_FACEUP_DEFENSE)));
+        state.applyMessage(MessageSanitizer.forRecipient(reordered, 0));
+        assertEquals(List.of(22222, 11111, 33333), codesOf(state.extra[0]));
+        assertEquals(22222, state.extra[0].getFirst().stats.code);
+    }
+
+    private static QueriedCard extraQuery(int code, int position) {
+        var query = new QueriedCard();
+        query.flags = QUERY_CODE | QUERY_POSITION;
+        query.code = code;
+        query.position = position;
+        return query;
     }
 
     @Test

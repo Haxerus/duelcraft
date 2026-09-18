@@ -31,4 +31,7 @@ public record CardInfo(
 
     /** For Link monsters, the level field stores the Link rating. */
     public int linkRating() { return level & 0xFF; }
+
+    /** The database stores a Link monster's marker mask in its DEF column. */
+    public int linkMarkers() { return isLink() ? def : 0; }
 }

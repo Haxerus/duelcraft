@@ -1,11 +1,56 @@
 package com.haxerus.duelcraft.client.carddata;
 
 import org.junit.jupiter.api.Test;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CardStringHelperTest {
+
+    @Test
+    void linkMarkers_preservePrintedDirectionMasksIncludingZero() {
+        for (int mask : new int[]{0, 0x40, 0x80, 0x100, 0x8, 0x20, 0x1, 0x2, 0x4, 0x1ef}) {
+            assertEquals(Integer.valueOf(mask), CardStringHelper.linkMarkers(linkCard(mask), null));
+        }
+    }
+
+    @Test
+    void linkMarkers_liveQueryOverridesPrintedMaskIncludingZero() {
+        var query = new QueriedCard();
+        query.flags = QUERY_LINK | QUERY_TYPE;
+        query.type = TYPE_MONSTER | TYPE_LINK;
+        query.linkMarker = LINK_MARKER_BOTTOM;
+        assertEquals(Integer.valueOf(LINK_MARKER_BOTTOM), CardStringHelper.linkMarkers(linkCard(LINK_MARKER_TOP), query));
+        query.linkMarker = 0;
+        assertEquals(Integer.valueOf(0), CardStringHelper.linkMarkers(linkCard(LINK_MARKER_TOP), query));
+        query.flags = QUERY_TYPE;
+        assertEquals(Integer.valueOf(LINK_MARKER_TOP), CardStringHelper.linkMarkers(linkCard(LINK_MARKER_TOP), query));
+        query.flags = QUERY_LINK;
+        query.type = TYPE_MONSTER;
+        query.linkMarker = LINK_MARKER_RIGHT;
+        assertEquals(Integer.valueOf(LINK_MARKER_RIGHT), CardStringHelper.linkMarkers(linkCard(LINK_MARKER_TOP), query));
+    }
+
+    @Test
+    void linkMarkers_nonLinkAndUnknownCardsHaveNoMarkers() {
+        var monster = new CardInfo(1, "Monster", "", TYPE_MONSTER, 1000, 2000, 4, RACE_WARRIOR, ATTRIBUTE_LIGHT);
+        assertNull(CardStringHelper.linkMarkers(monster, null));
+        assertNull(CardStringHelper.linkMarkers(null, null));
+        var query = new QueriedCard();
+        query.flags = QUERY_TYPE | QUERY_LINK;
+        query.type = TYPE_MONSTER;
+        query.linkMarker = LINK_MARKER_TOP;
+        assertNull(CardStringHelper.linkMarkers(linkCard(LINK_MARKER_TOP), query));
+        query.type = TYPE_MONSTER | TYPE_LINK;
+        assertNull(CardStringHelper.linkMarkers(null, query));
+        assertEquals(Integer.valueOf(LINK_MARKER_TOP), CardStringHelper.linkMarkers(monster, query));
+    }
+
+    private static CardInfo linkCard(int markers) {
+        return new CardInfo(1, "Link monster", "", TYPE_MONSTER | TYPE_LINK,
+                2300, markers, 3, RACE_CYBERSE, ATTRIBUTE_DARK);
+    }
 
     @Test
     void attributeName_returnsCorrectNames() {

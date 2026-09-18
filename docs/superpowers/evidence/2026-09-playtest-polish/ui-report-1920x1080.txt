@@ -1,0 +1,79 @@
+========= LDLib2 UI test run 12084_686ace1f =========
+selection : group:duelcraft
+status    : PASS
+scenarios : 36/36 passed
+checks    : 10494/10494 passed
+steps     : 1656
+duration  : 195969 ms
+
+[ok  ] duel_announce_card (3406 ms)
+
+[ok  ] duel_announce_number (914 ms)
+
+[ok  ] duel_announce_race (1101 ms)
+
+[ok  ] duel_card_model (2513 ms)
+
+[ok  ] duel_deck_upload (714 ms)
+
+[ok  ] duel_disfield_prompt (1379 ms)
+
+[ok  ] duel_effect_prompt (2118 ms)
+
+[ok  ] duel_feedback (5747 ms)
+
+[ok  ] duel_hand_layout (14443 ms)
+
+[ok  ] duel_hints (2647 ms)
+
+[ok  ] duel_idle_shuffle (12369 ms)
+
+[ok  ] duel_link_markers (3816 ms)
+
+[ok  ] duel_mr3_scale3 (2098 ms)
+
+[ok  ] duel_mr5_scale2 (2046 ms)
+
+[ok  ] duel_mr5_scale3 (2029 ms)
+
+[ok  ] duel_mr5_scale3_click (1999 ms)
+
+[ok  ] duel_mr5_scale4 (1764 ms)
+
+[ok  ] duel_panel_layout (13976 ms)
+
+[ok  ] duel_pause_menu (2274 ms)
+
+[ok  ] duel_player_hints (6215 ms)
+
+[ok  ] duel_prompt_controls (17690 ms)
+
+[ok  ] duel_prompt_layout (12895 ms)
+
+[ok  ] duel_result_overlay (1092 ms)
+
+[ok  ] duel_revealed_hand (2843 ms)
+
+[ok  ] duel_search_layout (3028 ms)
+
+[ok  ] duel_select_card_finish (1910 ms)
+
+[ok  ] duel_select_counter (1482 ms)
+
+[ok  ] duel_select_position (1083 ms)
+
+[ok  ] duel_selection_captions (11947 ms)
+
+[ok  ] duel_selection_surfaces (9741 ms)
+
+[ok  ] duel_sort_card (1676 ms)
+
+[ok  ] duel_speed_scale3 (2717 ms)
+
+[ok  ] duel_toast_readability (21682 ms)
+
+[ok  ] duel_waiting (1573 ms)
+
+[ok  ] duel_xyz_materials (3566 ms)
+
+[ok  ] duel_zone_inspector_actions (5131 ms)

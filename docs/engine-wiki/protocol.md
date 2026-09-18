@@ -70,7 +70,7 @@ These fields follow the message ID inside a frame. They are a starter reference 
 |---|---|---|
 | `MSG_HINT` | `u8 hint_type, u8 player, u64 value` | Hint subtype selects the meaning of value; [Duel.Hint](../../native/ygopro-core/libduel.cpp#L3063). |
 | `MSG_NEW_TURN` | `u8 player` | Canonical core team starting a turn; [Turn](../../native/ygopro-core/processor.cpp#L3334). |
-| `MSG_NEW_PHASE` | `u16 phase` | Phase constant, including battle subphases; [Turn](../../native/ygopro-core/processor.cpp#L3365). |
+| `MSG_NEW_PHASE` | `u16 phase` | An announced phase; ordinary turns emit Draw, Standby, Main 1, Battle Start, Main 2 and End. ForcedBattle can restore a saved phase; see boundaries below. [Turn](../../native/ygopro-core/processor.cpp#L3365). |
 | `MSG_DRAW` | `u8 player, u32 count`, then `count * (u32 code, u32 position)` | Entries contain position as well as code; [Draw](../../native/ygopro-core/operations.cpp#L482). |
 | `MSG_MOVE` | `u32 code, location_info from, location_info to, u32 reason` | Update zone membership and address; [SendTo](../../native/ygopro-core/operations.cpp#L4547). |
 | `MSG_SUMMONING` | `u32 code, location_info card` | Summon in progress; [SummonRule](../../native/ygopro-core/operations.cpp#L2239). |
@@ -81,6 +81,45 @@ These fields follow the message ID inside a frame. They are a starter reference 
 | `MSG_CHAINING` | `u32 code, location_info handler, u8 trigger_controller, u8 trigger_location, u32 trigger_sequence, u64 description, u32 chain_size` | Handler address and triggering address are separate; [AddChain](../../native/ygopro-core/processor.cpp#L3700). |
 | `MSG_CHAINED` | `u8 chain_count` | This count has a different width from `MSG_CHAINING`; [AddChain](../../native/ygopro-core/processor.cpp#L3893). |
 | `MSG_WIN` | `u8 winner, u8 reason` | Preserve both values for host end policy; [engine win logic](../../native/ygopro-core/processor.cpp#L4420). |
+
+### Log boundaries and chain numbers
+
+Use received records as context. Normal turns enter Battle Step internally without `MSG_NEW_PHASE`
+([producer](../../native/ygopro-core/processor.cpp#L3497)). `ForcedBattle` emits Battle Start and later
+restores its saved `infos.phase`, so the protocol is not restricted to the six normal turn labels
+([producer](../../native/ygopro-core/processor.cpp#L2780), [restore](../../native/ygopro-core/processor.cpp#L2858)).
+An unfamiliar received phase can use a neutral numeric label.
+
+`MSG_DAMAGE_STEP_START` and `MSG_DAMAGE_STEP_END` have no payload and mark real damage-step boundaries
+([start](../../native/ygopro-core/processor.cpp#L2295), [end](../../native/ygopro-core/processor.cpp#L2719)).
+Damage Calculation is internal; `MSG_BATTLE` supplies battle stats, not a phase transition. EDOPro
+consumes the damage-step records without inventing additional phases
+([consumer](../../../edopro/gframe/duelclient.cpp#L3832)). Duelcraft logs these two boundaries without
+changing its last received phase or adding banners.
+
+`MSG_CHAINING` supplies the one-based link number as `u32`; solving, solved, negated and disabled
+records identify that same link with `u8`. Display the engine number, not the link's current list
+position ([activation](../../native/ygopro-core/processor.cpp#L3693),
+[solving](../../native/ygopro-core/processor.cpp#L4113),
+[consumer](../../../edopro/gframe/duelclient.cpp#L3426)). Duelcraft logs activation and solving once,
+plus negation/disable when received, using the stored link before it is removed by `ChainSolved`.
+Card-name spans use only recipient-sanitized codes and existing client state; styling performs no
+additional identity lookup. Each line retains its primary card code for the existing whole-line click.
+Sanitized code zero never reaches the name resolver: target/selection lines use "Face-down card"
+when the client position is face-down, otherwise "Unknown card". These labels use plain styling
+and retain click code zero; no hidden name or card type is inferred.
+
+### Effect-question text arguments
+
+`MSG_SELECT_EFFECTYN` carries the card and location needed to format its description. EDOPro uses
+system string 200 for description zero, and system string 221 followed by hint 223 for description
+221. Both receive the card name and formatted location; other descriptions receive only the card
+name ([consumer](../../../edopro/gframe/duelclient.cpp#L1927)). These templates use `%ls`, which is
+not a Java formatter conversion. Duelcraft substitutes arguments in the original template so a
+percent sequence inside an inserted name is not interpreted again. Plain descriptions retain
+their existing card-name context. Location labels follow EDOPro's system strings, including Field
+Spell Zone and Pendulum Zone for spell/trap sequences 5 and 6+
+([location formatting](../../../edopro/gframe/data_manager.cpp#L425)).
 
 ## Set-card shuffle ordering
 

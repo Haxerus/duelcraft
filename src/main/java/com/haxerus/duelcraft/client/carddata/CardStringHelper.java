@@ -1,5 +1,7 @@
 package com.haxerus.duelcraft.client.carddata;
 
+import com.haxerus.duelcraft.duel.message.QueriedCard;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,6 +10,15 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 public final class CardStringHelper {
 
     private CardStringHelper() {}
+
+    /** Current marker mask for a known Link card, or null when its grid should be hidden. */
+    public static Integer linkMarkers(CardInfo card, QueriedCard query) {
+        if (card == null) return null;
+        boolean isLink = query != null && (query.flags & QUERY_TYPE) != 0
+                ? (query.type & TYPE_LINK) != 0 : card.isLink();
+        if (!isLink) return null;
+        return query != null && (query.flags & QUERY_LINK) != 0 ? query.linkMarker : card.linkMarkers();
+    }
 
     public static String attributeName(int attribute) {
         return switch (Integer.highestOneBit(attribute)) {

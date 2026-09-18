@@ -15,13 +15,20 @@ public final class DuelUiAssertions {
     private DuelUiAssertions() {}
 
     public static void audit(TestContext ctx) {
-        for (String id : new String[]{"toast", "banner", "status-label", "chain-count", "plr-hints", "opp-hints", "lp-delta-0", "lp-delta-1"}) {
+        for (String selector : new String[]{".card-counters", ".card-turns",
+                ".card-scales", ".chain-marker", ".stat-atk-def", ".stat-level"}) {
+            for (var badge : ctx.all(selector)) {
+                if (visible(badge.element())) textFits(ctx, badge.as(TextElement.class));
+            }
+        }
+        for (String id : new String[]{"toast", "banner", "status-label", "status-source-title", "chain-count", "plr-hints", "opp-hints", "lp-delta-0", "lp-delta-1"}) {
             var ref = ctx.el("#" + id);
             if (visible(ref.element())) {
                 contains(ctx, ctx.el("#duel-canvas").bounds(), ref.bounds(), id + " inside canvas");
                 textFits(ctx, ref.as(TextElement.class));
             }
         }
+        surface(ctx, "#feedback-footer");
         for (String id : new String[]{"prompt", "pause", "result"}) {
             if (ctx.el("#" + id + "-overlay").isVisible()) {
                 surface(ctx, "#" + id + "-dialog");

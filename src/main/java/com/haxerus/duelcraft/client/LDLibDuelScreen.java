@@ -366,6 +366,7 @@ public class LDLibDuelScreen {
 
             // ── Overlays ──
             toastLabel = byId("toast");
+            toastLabel.setAllowHitTest(false);
             hintModal = byId("hint-modal");
             hintModalText = byId("hint-modal-text");
             hintModalOk = byId("hint-modal-ok", Button.class);
@@ -540,15 +541,34 @@ public class LDLibDuelScreen {
             bindPileCount(banishedCountLabels[plr], () -> state.banishedCount(plr));
 
             // Refcounted MSG_PLAYER_HINT descs, under the name each LP bar carries.
-            bindLabel(byId("plr-hints"), () -> playerHintsText(plr));
-            bindLabel(byId("opp-hints"), () -> playerHintsText(opp));
+            bindPlayerHints(byId("plr-hints", Label.class), plr, cardInfoBanner, logPanel);
+            bindPlayerHints(byId("opp-hints", Label.class), opp, byId("zone-inspector"));
         }
 
-        /** The player's standing hints as one line, empty when the engine has named none. */
+        /** Each standing effect gets its own wrapped paragraph. */
         private String playerHintsText(int player) {
             return state.playerHints[player].keySet().stream()
                     .map(state.hintText::desc)
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining("\n"));
+        }
+
+        private void bindPlayerHints(Label label, int player, UIElement... panels) {
+            var canvas = byId("duel-canvas");
+            Runnable positionPanels = () -> {
+                float top = label.hasClass("hidden") ? 44
+                        : label.getPositionY() - canvas.getPositionY() + label.getSizeHeight() + 4;
+                for (var panel : panels) panel.layout(layout -> layout.top(top));
+            };
+            label.addEventListener(UIEvents.LAYOUT_CHANGED, event -> positionPanels.run());
+            // Hidden labels do not tick; observe from the canvas so a new effect can reveal them.
+            canvas.addEventListener(UIEvents.TICK, event -> {
+                String text = playerHintsText(player);
+                if (label.getText().getString().equals(text)) return;
+                label.setText(Component.literal(text));
+                if (text.isEmpty()) label.addClass("hidden");
+                else label.removeClass("hidden");
+                positionPanels.run();
+            });
         }
 
         private void bindLabel(UIElement element, java.util.function.Supplier<String> textSupplier) {
@@ -608,6 +628,7 @@ public class LDLibDuelScreen {
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
                 prompt.rebuild();
                 updatePhaseButtons();
+                zoneInspector.refresh();
             }
 
             // Turn/phase change also affects button visibility (hide on opponent's turn)
@@ -823,7 +844,17 @@ public class LDLibDuelScreen {
             for (var entry : state.duelLog.entries()) {
                 var line = new Label();
                 line.addClass("log-line");
-                line.setText(Component.literal(entry.text()));
+                var text = Component.empty();
+                for (var segment : entry.segments()) {
+                    var part = Component.literal(segment.text());
+                    switch (segment.role()) {
+                        case CARD_NAME -> part.withStyle(style -> style.withColor(0xE6C878));
+                        case CONTEXT -> part.withStyle(style -> style.withColor(0xA9C7EF).withBold(true));
+                        case PLAIN -> { }
+                    }
+                    text.append(part);
+                }
+                line.setText(text);
                 if (entry.code() != 0) {
                     int code = entry.code();
                     line.addEventListener(UIEvents.CLICK, e -> {
@@ -862,6 +893,7 @@ public class LDLibDuelScreen {
                     toastLabel.removeClass("hidden");
                     toastUntil = now + TOAST_MS;
                 }
+                if (!toastLabel.hasClass("hidden")) positionToast();
             }
 
             // Keyed on the hint's own timestamp, so a second HINT_ZONE restarts the flash instead
@@ -959,6 +991,27 @@ public class LDLibDuelScreen {
         }
 
         /** True while a modal, the pause dialog or the result banner owns the screen and clicks must stop there. */
+        /** Keep transient results near the board, clear of any open dialog. */
+        private void positionToast() {
+            var canvas = byId("duel-canvas");
+            var fieldArea = byId("field-area");
+            float left = fieldArea.getPositionX() - canvas.getPositionX()
+                    + (fieldArea.getSizeWidth() - toastLabel.getSizeWidth()) / 2;
+            float top = fieldArea.getPositionY() - canvas.getPositionY()
+                    + (fieldArea.getSizeHeight() - toastLabel.getSizeHeight()) / 2;
+            for (String id : new String[]{"prompt-dialog", "hint-modal-dialog", "pause-dialog", "result-dialog"}) {
+                var dialog = byId(id);
+                var overlay = dialog.getParent();
+                if (!overlay.hasClass("hidden") && !overlay.hasClass("inspection-hidden")) {
+                    top = Math.min(top, dialog.getPositionY() - canvas.getPositionY()
+                            - toastLabel.getSizeHeight() - 4);
+                }
+            }
+            float hudBottom = byId("hud-bar").getPositionY() + byId("hud-bar").getSizeHeight();
+            float positionedTop = Math.max(hudBottom - canvas.getPositionY() + 4, top);
+            toastLabel.layout(layout -> layout.left(left).top(positionedTop));
+        }
+
         private boolean isBlockingOverlayUp() {
             return (hintModal != null && !hintModal.hasClass("hidden"))
                     || (pauseOverlay != null && !pauseOverlay.hasClass("hidden"))
@@ -1046,6 +1099,7 @@ public class LDLibDuelScreen {
             clicks.hideContextMenu();
             prompt.onResponseSent();
             updatePhaseButtons();
+            zoneInspector.refresh();
         }
 
         // Exposed so FieldRenderer/ZoneInspectorController callbacks can forward here.
@@ -1076,6 +1130,22 @@ public class LDLibDuelScreen {
 
             CardDatabase db = DuelcraftClient.getCardDatabase();
             CardInfo card = db != null ? db.getCard(code) : null;
+
+            Integer markers = CardStringHelper.linkMarkers(card, onField != null ? onField.stats : null);
+            if (markers == null) {
+                byId("card-link-markers").addClass("hidden");
+            } else {
+                byId("card-link-markers").removeClass("hidden");
+                int[] directions = {LINK_MARKER_TOP_LEFT, LINK_MARKER_TOP, LINK_MARKER_TOP_RIGHT,
+                        LINK_MARKER_LEFT, LINK_MARKER_RIGHT,
+                        LINK_MARKER_BOTTOM_LEFT, LINK_MARKER_BOTTOM, LINK_MARKER_BOTTOM_RIGHT};
+                String[] names = {"tl", "t", "tr", "l", "r", "bl", "b", "br"};
+                for (int i = 0; i < directions.length; i++) {
+                    var arrow = byId("card-link-" + names[i]);
+                    if ((markers & directions[i]) != 0) arrow.addClass("active");
+                    else arrow.removeClass("active");
+                }
+            }
 
             var imageArea = byId("card-image-area");
 

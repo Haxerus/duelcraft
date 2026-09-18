@@ -1,5 +1,6 @@
 package com.haxerus.duelcraft.client;
 
+import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
@@ -83,6 +84,7 @@ public class ZoneInspectorController {
 
             var card = new UIElement();
             card.addClass("card");
+            if (isActionable(player, location, seq)) card.addClass("selectable");
             callbacks.setCardImageBackground(card, code);
             card.addEventListener(UIEvents.CLICK, ev -> {
                 ev.stopPropagation();
@@ -158,6 +160,13 @@ public class ZoneInspectorController {
             case LOCATION_EXTRA -> state.extra[player];
             default -> List.of();
         };
+    }
+
+    private boolean isActionable(int player, int location, int sequence) {
+        if (!(state.pendingPrompt instanceof DuelMessage.SelectIdleCmd
+                || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) return false;
+        var actions = state.cardActions.get(new ClientDuelState.CardLocation(player, location, sequence));
+        return actions != null && !actions.isEmpty();
     }
 
     private UIElement byId(String id) {

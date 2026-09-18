@@ -217,11 +217,22 @@
         display: none;
         }
 
-        /* ── Status Label (centered overlay) ── */
-        #status-label {
+        /* ── Field prompt and waiting status (centered below the field) ── */
+        #feedback-footer {
         position: absolute;
         bottom: 48;
         left: 0;
+        width: 100%;
+        flex-direction: column;
+        gap-all: 2;
+        }
+
+        #status-panel {
+        width: 100%;
+        flex-direction: column;
+        }
+
+        #status-label {
         width: 100%;
         font-size: 8;
         adaptive-height: true;
@@ -231,35 +242,47 @@
         background: rect(#aa000000);
         }
 
-        #status-label.hidden {
+        #status-label.selection-subtitle {
+        text-color: #FFFFFF;
+        }
+
+        #status-source-title {
+        width: 100%;
+        adaptive-height: true;
+        text-wrap: wrap;
+        font-size: 11;
+        text-color: #FFAA00;
+        horizontal-align: center;
+        background: rect(#aa000000);
+        }
+
+        #status-label.hidden, #status-source-title.hidden, #prompt-source-title.hidden {
         display: none;
         }
 
         /* ── Hint toast (edopro's stACMessage: one declaration hint at a time) ── */
         #toast {
+        z-index: 30;
         position: absolute;
-        bottom: 4;
-        left: 0;
-        width: 100%;
-        font-size: 8;
+        width: 280;
+        font-size: 10;
         adaptive-height: true;
+        text-wrap: wrap;
         text-color: #FFDD55;
         horizontal-align: center;
-        padding-vertical: 2;
-        background: rect(#aa000000);
+        padding-all: 6;
+        background: rect(#cc000000);
         }
 
         #toast.hidden {
         display: none;
         }
 
-        /* ── Chain depth, on its own row so prompt captions keep the status label ── */
+        /* ── Chain depth, on its own row above the selection heading ── */
         #chain-count {
-        position: absolute;
-        bottom: 62;
-        left: 0;
         width: 100%;
         font-size: 8;
+        adaptive-height: true;
         text-color: #FF88FF;
         horizontal-align: center;
         }
@@ -268,18 +291,14 @@
         display: none;
         }
 
-        /* ── Turn and phase banner (edopro's showcard 101 / phase card, about a second) ──
-           Below the field, above the chain count, so it covers no card and no button. */
+        /* ── Turn and phase banner, stacked above chain and prompt feedback ── */
         #banner {
-        position: absolute;
-        bottom: 76;
-        left: 0;
         width: 100%;
         font-size: 14;
         adaptive-height: true;
         text-color: #FFFFFF;
         horizontal-align: center;
-        padding-vertical: 3;
+        padding-vertical: 1;
         background: rect(#aa000000);
         }
 
@@ -376,19 +395,27 @@
         /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
         .player-hints {
         position: absolute;
-        top: 20;
-        width: 30%;
-        font-size: 6;
+        top: 44;
+        width: 210;
+        font-size: 8;
+        text-wrap: wrap;
+        adaptive-height: true;
+        padding-all: 4;
         text-color: #FFDD55;
+        background: rect(#AA000000);
+        }
+
+        .player-hints.hidden {
+        display: none;
         }
 
         #plr-hints {
-        left: 4;
+        left: 0;
         horizontal-align: left;
         }
 
         #opp-hints {
-        right: 4;
+        right: 0;
         horizontal-align: right;
         }
 
@@ -449,15 +476,20 @@
         padding-horizontal: 1;
         }
 
-        /* ── XYZ material count badge (sits just above the ATK/DEF bar) ── */
-        .card-materials {
+        /* Annotation fills follow the rendered text, including multi-digit labels. */
+        .stat-level, .card-counters, .card-turns, .card-scales, .chain-marker {
+        adaptive-width: true;
+        adaptive-height: true;
+        padding-vertical: 1;
+        }
+
+        /* Material cards sit beneath the host without participating in slot layout. */
+        .xyz-material {
         position: absolute;
-        bottom: 7;
-        left: 0;
-        font-size: 5;
-        background: rect(#CC5522AA);
-        text-color: #FFFFFF;
-        padding-horizontal: 1;
+        top: 0;
+        left: 12.5%;
+        height: 100%;
+        transition: none;
         }
 
         /* ── Counter total badge ── */
@@ -669,6 +701,41 @@
 
         #card-atk-def-label {
         horizontal-align: center;
+        }
+
+        #card-link-markers {
+        width: 42;
+        height: 42;
+        flex-shrink: 0;
+        align-self: center;
+        flex-direction: column;
+        }
+
+        #card-link-markers.hidden {
+        display: none;
+        }
+
+        .link-marker-row {
+        height: 14;
+        flex-shrink: 0;
+        flex-direction: row;
+        }
+
+        .link-marker, #card-link-center {
+        width: 14;
+        height: 14;
+        flex-shrink: 0;
+        }
+
+        .link-marker {
+        font-size: 12;
+        horizontal-align: center;
+        vertical-align: center;
+        text-color: #777777;
+        }
+
+        .link-marker.active {
+        text-color: #FF5555;
         }
 
         /* Card hints (MSG_CARD_HINT) below the stats, as edopro's tooltip lines */
@@ -1088,6 +1155,40 @@
         padding-horizontal: 2;
         }
 
+        /* Mixed-zone card lists pair intact card art with a readable source caption. */
+        .prompt-card-choice {
+        flex-direction: column;
+        align-items: center;
+        width: 64;
+        gap-all: 2;
+        flex-shrink: 0;
+        }
+
+        .prompt-card-choice .card {
+        width: 36;
+        height: 48;
+        flex-shrink: 0;
+        }
+
+        .card-source {
+        width: 100%;
+        adaptive-height: true;
+        text-wrap: wrap;
+        font-size: 8;
+        background: rect(#CC000000);
+        text-color: #FFFFFF;
+        horizontal-align: center;
+        }
+
+        #prompt-source-title {
+        width: 100%;
+        adaptive-height: true;
+        text-wrap: wrap;
+        font-size: 11;
+        text-color: #FFAA00;
+        horizontal-align: center;
+        }
+
         .target {
         overlay: rect(#6600FFFF);
         }
@@ -1384,25 +1485,26 @@
 
         <!-- ══════════ OVERLAYS (absolute positioned) ══════════ -->
 
-        <!-- Status Label (chain / waiting overlay) -->
-        <label id="status-label" class="hidden">Waiting...</label>
-
-        <!-- Chain depth, kept off the status label so prompt captions are not overwritten -->
-        <label id="chain-count" class="hidden">Chain: 1</label>
+        <!-- Shared footer rows grow without overlapping the selection heading. -->
+        <element id="feedback-footer">
+            <label id="banner" class="hidden">Battle Phase</label>
+            <label id="chain-count" class="hidden">Chain: 1</label>
+            <element id="status-panel">
+                <label id="status-source-title" class="hidden" />
+                <label id="status-label" class="hidden">Waiting...</label>
+            </element>
+        </element>
 
         <!-- Hint toast (one declaration hint at a time, a couple of seconds each) -->
         <label id="toast" class="hidden">Opponent declared: []</label>
-
-        <!-- Turn and phase banner (MSG_NEW_TURN / MSG_NEW_PHASE) -->
-        <label id="banner" class="hidden">Battle Phase</label>
 
         <!-- Floating LP numbers, one per absolute player index -->
         <label id="lp-delta-0" class="lp-delta hidden">-500</label>
         <label id="lp-delta-1" class="lp-delta hidden">-500</label>
 
         <!-- Refcounted player hints (MSG_PLAYER_HINT), under each player's name -->
-        <label id="plr-hints" class="player-hints" />
-        <label id="opp-hints" class="player-hints" />
+        <label id="plr-hints" class="player-hints hidden" />
+        <label id="opp-hints" class="player-hints hidden" />
 
         <!-- Shared Cancel/Finish button for field selections, also bound to right-click -->
         <element id="prompt-action-bar">
@@ -1430,6 +1532,7 @@
         <!-- Prompt Dialog (centered overlay for selections) -->
         <element id="prompt-overlay" class="hidden">
             <element id="prompt-dialog">
+                <label id="prompt-source-title" class="hidden" />
                 <label id="prompt-title">Select an option</label>
                 <element id="prompt-body">
                     <!-- Prompt-specific content added dynamically -->
@@ -1446,6 +1549,23 @@
             <text id="card-name-label" class="card-label">Number 11: Big Eye</text>
             <text id="card-stats-label" class="card-label">DARK / Rank 7 / Spellcaster / Xyz /
                 Effect</text>
+            <element id="card-link-markers" class="hidden">
+                <element class="link-marker-row">
+                    <text id="card-link-tl" class="link-marker">↖</text>
+                    <text id="card-link-t" class="link-marker">↑</text>
+                    <text id="card-link-tr" class="link-marker">↗</text>
+                </element>
+                <element class="link-marker-row">
+                    <text id="card-link-l" class="link-marker">←</text>
+                    <element id="card-link-center" />
+                    <text id="card-link-r" class="link-marker">→</text>
+                </element>
+                <element class="link-marker-row">
+                    <text id="card-link-bl" class="link-marker">↙</text>
+                    <text id="card-link-b" class="link-marker">↓</text>
+                    <text id="card-link-br" class="link-marker">↘</text>
+                </element>
+            </element>
             <scroller-view id="card-text-scroll">
                 <text id="card-text">Pendulum Effect: You can remove 6 Spell Counters from your
                     field; Special Summon this card from the Pendulum Zone, then count the number of
