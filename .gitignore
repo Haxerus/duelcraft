@@ -38,6 +38,7 @@ src/main/resources/natives/
 ### Minecraft Modding ###
 run/
 runs/
+run-collection-lifecycle/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/

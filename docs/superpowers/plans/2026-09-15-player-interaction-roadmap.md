@@ -7,13 +7,13 @@ This roadmap covers the complete integration. Milestone 1 is complete through `2
 | Milestone | Detailed plan |
 | --- | --- |
 | 1. Sample-data editor — complete | [Editor](2026-09-15-deck-editor-milestone-1.md) |
-| 2. Persistence and saved lists | [Personal collections](2026-09-17-player-collections-milestone-2.md) |
+| 2. Persistence and saved lists — implemented and verified; broad review pending | [Personal collections](2026-09-17-player-collections-milestone-2.md) |
 | 3. Physical cards and transfers | [Inventory transfers](2026-09-17-card-transfers-milestone-3.md) |
 | 4. Duel preparation and import | [Authoritative preparation](2026-09-17-duel-preparation-milestone-4.md) |
 | 5. Home, binder, mat and lobby | [Player entry points](2026-09-17-player-entry-points-milestone-5.md) |
 | 6. Release validation | [Tests and documentation](2026-09-17-interaction-release-milestone-6.md) |
 
-Read the [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md) alongside each plan. They settle storage/packet bounds, operation signatures, acknowledged saving, inventory scope, and preparation rules. Milestones 2–6 remain to be implemented and verified.
+Read the [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md) alongside each plan. They settle storage/packet bounds, operation signatures, acknowledged saving, inventory scope, and preparation rules. Milestone 2's [verification report](../reports/2026-09-17-player-collections-m2.md) records 846 unit/JNI tests, real editor/respawn, dedicated two-player privacy and retained-world rejoin/distinct-JVM restart evidence. Independent broad review follows this implementation handoff. Milestones 3–6 remain; no physical transfers begin before M2 state/acknowledgement acceptance. Legacy upload/deck-command ownership bypasses remain until M4, so this intermediate branch is not a collection-enforced release.
 
 ## 1. Playable editor with sample data
 

@@ -19,6 +19,28 @@ def ldTestOutDirFile = file(ldTestOutDir)
 // (it would need a live Project). A plain boolean local serializes fine.
 def ldTestEnabled = project.hasProperty('ldTest')
 
+// Retained-world phases deliberately use the interactive runner, never its fresh-world mode.
+if (project.hasProperty('collectionLifecycle')) {
+    def phase = project.property('collectionLifecycle').toString()
+    if (!(phase in ['seed', 'verify']) || ldTestEnabled) {
+        throw new GradleException('collectionLifecycle requires seed|verify and cannot use ldTest')
+    }
+    neoForge.runs.matching { it.name == 'client' }.configureEach { run ->
+        run.gameDirectory = project.file('run-collection-lifecycle')
+        run.systemProperty 'duelcraft.uitest.collectionLifecycle', phase
+        run.programArgument '--username'
+        run.programArgument 'CollectionTest'
+        run.programArgument '--width'
+        run.programArgument '1280'
+        run.programArgument '--height'
+        run.programArgument '720'
+        if (phase == 'verify') {
+            run.programArgument '--quickPlaySingleplayer'
+            run.programArgument 'collection_m2_retained_20260917'
+        }
+    }
+}
+
 if (project.hasProperty('ldTest')) {
     // System properties rather than program arguments: Minecraft's argument parser owns the
     // command line and rejects what it does not recognise.
