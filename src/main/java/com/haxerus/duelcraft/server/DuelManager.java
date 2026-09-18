@@ -1,6 +1,10 @@
 package com.haxerus.duelcraft.server;
 
 import com.haxerus.duelcraft.core.data.CardData;
+import com.haxerus.duelcraft.core.data.CardCatalog;
+import com.haxerus.duelcraft.server.collection.CollectionPayloadHandler;
+import com.haxerus.duelcraft.server.collection.CollectionService;
+import com.haxerus.duelcraft.server.collection.CollectionSnapshotStore;
 import com.haxerus.duelcraft.core.Deck;
 import com.haxerus.duelcraft.core.DeckValidator;
 import com.haxerus.duelcraft.core.DeckRegistry;
@@ -36,6 +40,8 @@ public class DuelManager {
     private static DuelManager instance;
 
     private DuelEngine engine;
+    private final CollectionSnapshotStore collectionSnapshots = new CollectionSnapshotStore();
+    private CollectionPayloadHandler collectionHandler;
     private Map<UUID, DuelSession> activeDuels;
     private Map<UUID, UUID> playerToDuel;
     private Map<UUID, SoloDuelHandler> soloHandlers;
@@ -78,6 +84,11 @@ public class DuelManager {
 
     public void init() {
         var data = CardData.load().join();
+        try {
+            collectionHandler = new CollectionPayloadHandler(new CollectionService(CardCatalog.load(data.database())), collectionSnapshots);
+        } catch (java.sql.SQLException exception) {
+            throw new IllegalStateException("Cannot load collection card facts", exception);
+        }
         engine = new DuelEngine(List.of(data.database().toString()), data.scriptPaths());
 
         activeDuels = new HashMap<>();
@@ -95,6 +106,7 @@ public class DuelManager {
     }
 
     public void shutdown() {
+        collectionSnapshots.clear();
         for (DuelSession session : activeDuels.values()) {
             session.close();
         }
@@ -271,6 +283,7 @@ public class DuelManager {
 
     private void handleLogout(ServerPlayer player) {
         UUID playerUUID = player.getUUID();
+        collectionSnapshots.invalidate(playerUUID);
         clearPlayerCurrentDeck(playerUUID);
         duelInvites.remove(playerUUID);
         duelInvites.values().removeIf(pending -> pending.challengerUUID().equals(playerUUID));
@@ -350,6 +363,8 @@ public class DuelManager {
     public boolean isBusy(ServerPlayer player) {
         return playerToDuel.containsKey(player.getUUID()) || firstTurnRolls.containsKey(player.getUUID());
     }
+
+    public CollectionPayloadHandler collectionHandler() { return collectionHandler; }
 
     /** Rolls for the first turn; the duel starts once the winner has chosen who goes first. */
     public void beginFirstTurnRoll(ServerPlayer challenger, ServerPlayer accepter, long seed, DuelRule rule,

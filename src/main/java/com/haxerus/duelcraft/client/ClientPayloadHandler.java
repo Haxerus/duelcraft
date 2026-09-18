@@ -3,12 +3,24 @@ package com.haxerus.duelcraft.client;
 import com.haxerus.duelcraft.server.DuelEndPayload;
 import com.haxerus.duelcraft.server.DuelMessagePayload;
 import com.haxerus.duelcraft.server.DuelStartPayload;
+import com.haxerus.duelcraft.server.collection.CollectionReplyPayload;
+import java.util.Objects;
+import java.util.function.Consumer;
 import com.mojang.logging.LogUtils;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.slf4j.Logger;
 
 public class ClientPayloadHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static Consumer<CollectionReplyPayload> collectionReceiver = ignored -> {};
+
+    public static void setCollectionReceiver(Consumer<CollectionReplyPayload> receiver) {
+        collectionReceiver = Objects.requireNonNull(receiver);
+    }
+
+    public static void handleCollection(CollectionReplyPayload payload, IPayloadContext context) {
+        collectionReceiver.accept(payload);
+    }
 
     public static void handleStart(DuelStartPayload payload, IPayloadContext context) {
         LOGGER.info("Duel starting — player {}, opponent: {}, LP={}|{}, deck={}, extra={}",

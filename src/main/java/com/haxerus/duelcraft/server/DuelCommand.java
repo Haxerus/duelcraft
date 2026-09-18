@@ -332,6 +332,10 @@ public class DuelCommand {
 
     private static int deckClear(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
+        if (DuelManager.get().isBusy(player)) {
+            player.sendSystemMessage(Component.literal("Cannot clear deck while preparing or dueling."));
+            return 0;
+        }
         DuelManager.get().clearPlayerCurrentDeck(player.getUUID());
         player.sendSystemMessage(Component.literal("Current deck cleared."));
         return 1;
