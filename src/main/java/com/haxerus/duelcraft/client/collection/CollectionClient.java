@@ -33,6 +33,8 @@ public final class CollectionClient {
     private volatile long generation;
     private boolean connected;
     private CompletableFuture<ClientCollectionState.View> refreshing;
+    private long requiredRevision;
+    private long refreshingRevision;
 
     public CollectionClient(Executor client) {
         this(PacketDistributor::sendToServer, (task, delay) -> {
@@ -61,11 +63,16 @@ public final class CollectionClient {
         generation++;
         var requests = new ArrayList<>(pending.values());
         pending.clear();
+        var refresh = refreshing;
+        refreshing = null;
+        requiredRevision = 0;
+        refreshingRevision = 0;
         state.clear();
         for (var request : requests) {
             request.cancel.run();
             request.result.completeExceptionally(new CancellationException("Collection connection closed"));
         }
+        if (refresh != null) refresh.completeExceptionally(new CancellationException("Collection connection closed"));
     }
 
     public CompletionStage<CollectionReply> request(CollectionCommand command) {
@@ -112,8 +119,15 @@ public final class CollectionClient {
                 request.result.completeExceptionally(new IllegalArgumentException("Reply does not match collection request"));
                 return;
             }
+            switch (reply) {
+                case CollectionReply.Changed changed -> requiredRevision = Math.max(requiredRevision, changed.revision());
+                case CollectionReply.Deck deck -> requiredRevision = Math.max(requiredRevision, deck.revision());
+                case CollectionReply.Rejected rejected -> requiredRevision = Math.max(requiredRevision, rejected.revision());
+                default -> {}
+            }
             if (request.command instanceof CollectionCommand.ReadDeck read && reply instanceof CollectionReply.Deck deck
-                    && (state.view() == null || state.view().revision() != deck.revision() || !read.id().equals(deck.deck().id()))) {
+                    && (state.view() == null || state.view().revision() != deck.revision()
+                    || deck.revision() < requiredRevision || !read.id().equals(deck.deck().id()))) {
                 request.result.completeExceptionally(new IllegalStateException("Deck does not match the current collection view; refreshing"));
                 refresh();
                 return;
@@ -149,7 +163,7 @@ public final class CollectionClient {
         return expected >= 0 && expected < Long.MAX_VALUE && received == expected + 1;
     }
 
-    /** Pulls one page at a time. Concurrent callers share the same refresh and last complete view. */
+    /** Pulls one page at a time. Callers coalesce only while the pull meets the required revision. */
     public CompletionStage<ClientCollectionState.View> refresh() {
         var result = new CompletableFuture<ClientCollectionState.View>();
         long connection = generation;
@@ -158,15 +172,22 @@ public final class CollectionClient {
                 result.completeExceptionally(new CancellationException("Collection is disconnected"));
                 return;
             }
-            if (refreshing != null) {
+            if (refreshing != null && refreshingRevision >= requiredRevision) {
                 refreshing.whenComplete((view, error) -> complete(result, view, error));
                 return;
             }
+            var previous = refreshing;
             refreshing = result;
+            refreshingRevision = requiredRevision;
+            state.discardPending();
+            if (previous != null) previous.completeExceptionally(new CancellationException("Collection refresh superseded"));
             request(new CollectionCommand.Open()).whenComplete((reply, error) -> {
+                if (refreshing != result) return;
                 if (error != null) { finishRefresh(result, error); return; }
                 try {
                     if (!(reply instanceof CollectionReply.Opened opened)) throw new IllegalStateException("Collection refresh rejected: " + reply);
+                    if (opened.revision() < requiredRevision) throw new IllegalStateException("Collection snapshot is outdated");
+                    refreshingRevision = opened.revision();
                     state.begin(opened);
                     pullPage(result);
                 } catch (RuntimeException exception) { finishRefresh(result, exception); }
@@ -179,8 +200,10 @@ public final class CollectionClient {
         var page = state.nextPage();
         if (page == null) { finishRefresh(result, null); return; }
         request(page).whenComplete((reply, error) -> {
+            if (refreshing != result) return;
             if (error != null) { finishRefresh(result, error); return; }
             try {
+                if (refreshingRevision < requiredRevision) throw new IllegalStateException("Collection changed during refresh");
                 state.accept(reply);
                 pullPage(result);
             } catch (RuntimeException exception) { finishRefresh(result, exception); }
@@ -188,7 +211,8 @@ public final class CollectionClient {
     }
 
     private void finishRefresh(CompletableFuture<ClientCollectionState.View> result, Throwable error) {
-        if (refreshing == result) refreshing = null;
+        if (refreshing != result) return;
+        refreshing = null;
         if (error != null) state.discardPending();
         complete(result, state.view(), error);
     }

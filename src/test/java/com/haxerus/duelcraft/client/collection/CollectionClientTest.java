@@ -183,4 +183,70 @@ class CollectionClientTest {
         h.reply(1, new CollectionReply.Changed(2, null, DECK, 0, EMPTY));
         assertTrue(save.isCompletedExceptionally());
     }
+
+    @Test void postSaveRefreshStartsFreshPullAndLateOldPageCannotDiscardNewAssembly() {
+        var h = new Harness();
+        var old = h.client.refresh().toCompletableFuture();
+        var save = h.client.request(new CollectionCommand.Save(2, DECK)).toCompletableFuture();
+        h.reply(0, new CollectionReply.Opened(UUID.randomUUID(), 2, 1, 0, null));
+        var changed = new CollectionReply.Changed(3, null, DECK, 0, EMPTY);
+        h.reply(1, changed);
+        var fresh = h.client.refresh().toCompletableFuture();
+        var shared = h.client.refresh().toCompletableFuture();
+        assertEquals(4, h.sent.size());
+        assertEquals(new CollectionCommand.Open(), h.sent.get(3).command());
+        var id = UUID.randomUUID();
+        h.reply(3, new CollectionReply.Opened(id, 3, 1, 1, DECK.id()));
+        h.reply(4, new CollectionReply.Counts(id, 3, 0, Map.of(7, 2L)));
+        h.reply(2, new CollectionReply.Rejected(CollectionError.STALE, 3, EMPTY));
+        assertFalse(fresh.isDone());
+        h.reply(5, new CollectionReply.Decks(id, 3, 0, List.of(new CollectionReply.Summary(DECK.id(), "Draft", 0, 0, 0))));
+        assertEquals(changed, save.join());
+        assertTrue(old.isCompletedExceptionally());
+        assertEquals(3, fresh.join().revision());
+        assertEquals(Map.of(7, 2L), fresh.join().counts());
+        assertSame(fresh.join(), shared.join());
+        assertSame(fresh.join(), h.client.state().view());
+        assertEquals(1, h.sent.stream().filter(packet -> packet.command() instanceof CollectionCommand.Save).count());
+    }
+
+    @Test void newerReadDeckResponseSupersedesOlderOpenAndItsLateHeaderCannotPublish() {
+        var h = new Harness();
+        h.client.refresh(); h.reply(0, new CollectionReply.Opened(UUID.randomUUID(), 2, 0, 0, null));
+        var old = h.client.refresh().toCompletableFuture();
+        var read = h.client.request(new CollectionCommand.ReadDeck(DECK.id())).toCompletableFuture();
+        h.reply(2, new CollectionReply.Deck(3, DECK));
+        assertTrue(read.isCompletedExceptionally());
+        assertEquals(4, h.sent.size());
+        assertEquals(new CollectionCommand.Open(), h.sent.get(3).command());
+        var fresh = h.client.refresh().toCompletableFuture();
+        var id = UUID.randomUUID();
+        h.reply(3, new CollectionReply.Opened(id, 3, 1, 0, null));
+        h.reply(1, new CollectionReply.Opened(UUID.randomUUID(), 2, 0, 0, null));
+        assertEquals(2, h.client.state().view().revision());
+        assertFalse(fresh.isDone());
+        h.reply(4, new CollectionReply.Counts(id, 3, 0, Map.of(9, 1L)));
+        assertTrue(old.isCompletedExceptionally());
+        assertEquals(3, fresh.join().revision());
+        assertEquals(Map.of(9, 1L), fresh.join().counts());
+    }
+
+    @Test void knownNewRevisionPreventsOlderPageOrFreshHeaderFromPublishing() {
+        var h = new Harness();
+        h.client.refresh(); h.reply(0, new CollectionReply.Opened(UUID.randomUUID(), 2, 0, 0, null));
+        var previous = h.client.state().view();
+        var old = h.client.refresh().toCompletableFuture();
+        var id = UUID.randomUUID();
+        h.reply(1, new CollectionReply.Opened(id, 2, 1, 0, null));
+        var save = h.client.request(new CollectionCommand.Save(2, DECK)).toCompletableFuture();
+        h.reply(3, new CollectionReply.Changed(3, null, DECK, 0, EMPTY));
+        h.reply(2, new CollectionReply.Counts(id, 2, 0, Map.of(7, 1L)));
+        assertTrue(old.isCompletedExceptionally());
+        assertSame(previous, h.client.state().view());
+        var fresh = h.client.refresh().toCompletableFuture();
+        h.reply(4, new CollectionReply.Opened(UUID.randomUUID(), 2, 0, 0, null));
+        assertTrue(fresh.isCompletedExceptionally());
+        assertSame(previous, h.client.state().view());
+        assertEquals(3, ((CollectionReply.Changed) save.join()).revision());
+    }
 }
