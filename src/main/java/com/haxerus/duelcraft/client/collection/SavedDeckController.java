@@ -7,6 +7,7 @@ import java.util.function.*;
 
 /** Client-thread owner of saved-list identity, acknowledgement and deferred navigation. */
 public final class SavedDeckController {
+    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false);
     private final DeckEditorModel model;
     private final DeckSaveHandler saveHandler;
     private final Function<CollectionCommand, CompletionStage<CollectionReply>> request;
@@ -29,6 +30,7 @@ public final class SavedDeckController {
     private boolean decision;
     private String status = "";
     private String detail = "";
+    private DeckEligibility.Report eligibility = EMPTY;
 
     public SavedDeckController(DeckEditorModel model, UUID id, String name, DeckSaveHandler saveHandler,
             Function<CollectionCommand, CompletionStage<CollectionReply>> request,
@@ -57,6 +59,7 @@ public final class SavedDeckController {
     public boolean dirty() { return !stored || model.dirty() || !name.equals(savedName); }
     public String status() { return status; }
     public String detail() { return detail; }
+    public DeckEligibility.Report eligibility() { return eligibility; }
 
     public void rename(String name) {
         requireEditable();
@@ -66,6 +69,7 @@ public final class SavedDeckController {
 
     public void newDraft() {
         requireEditable();
+        eligibility = EMPTY;
         readToken++;
         id = UUID.randomUUID();
         name = "New list";
@@ -143,6 +147,7 @@ public final class SavedDeckController {
             stored = true;
             model.load(deck.deck().cards());
             status = "";
+            eligibility = EMPTY;
             changed.run();
         }, client);
     }
@@ -170,6 +175,8 @@ public final class SavedDeckController {
         try { submitted = new SavedDeck(id, name, model.draft()); }
         catch (RuntimeException error) { fail(error); return; }
         readToken++;
+        eligibility = EMPTY;
+        detail = "";
         setPending(true);
         status = "saving";
         changed.run();
@@ -195,7 +202,7 @@ public final class SavedDeckController {
                 savedName = submitted.name();
                 stored = true;
                 model.acknowledge(submitted.cards());
-                status = "saved";
+                status = eligibility.eligible() ? "saved" : "saved_active_cleared";
                 changed.run();
                 finishNavigation();
                 if (saveHandler == null) refresh();
@@ -215,6 +222,8 @@ public final class SavedDeckController {
 
     private void mutate(CollectionCommand command, boolean delete) {
         if (pending || disposed || !ready) return;
+        eligibility = EMPTY;
+        detail = "";
         setPending(true);
         changed.run();
         request.apply(command).whenCompleteAsync((reply, error) -> {
@@ -240,6 +249,7 @@ public final class SavedDeckController {
     }
 
     private void applyAcknowledgement(CollectionReply.Changed ack) {
+        eligibility = ack.eligibility();
         if (ack.revision() >= revision) {
             revision = ack.revision();
             activeId = ack.activeId();
@@ -260,10 +270,12 @@ public final class SavedDeckController {
     }
 
     private void reject(CollectionReply reply) { fail(rejection(reply)); }
-    private static RuntimeException rejection(CollectionReply reply) {
+    private RuntimeException rejection(CollectionReply reply) {
         if (reply instanceof CollectionReply.Rejected rejected) {
+            eligibility = rejected.eligibility();
             return new IllegalStateException(rejected.error().name() + (rejected.eligibility().missing().isEmpty()
-                    ? "" : ": missing copies " + rejected.eligibility().missing()));
+                    ? "" : ": missing copies (" + rejected.eligibility().missing().values().stream()
+                            .mapToInt(Integer::intValue).sum() + ")"));
         }
         return new IllegalStateException("Collection changed; refresh and retry");
     }

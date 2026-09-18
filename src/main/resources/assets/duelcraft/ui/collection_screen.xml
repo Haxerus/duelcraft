@@ -93,6 +93,13 @@
         #card-density text { adaptive-width: false; width: 100%; }
         #deck-warnings { flex: 1; min-width: 0; font-size: 11; text-wrap: wrap; adaptive-height: true; text-color: #FFDD55; }
         #editor-status { height: 18; flex-shrink: 0; font-size: 12; }
+        #status-row { height: 18; flex-shrink: 0; }
+        #editor-status { flex: 1; min-width: 0; }
+        #eligibility-details { width: 94; height: 18; }
+        #eligibility-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 96; }
+        #eligibility-panel { width: 620; height: 420; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #eligibility-scroll { flex: 1; min-height: 0; }
+        #eligibility-scroll .__scroller_view_view-container__ { gap-all: 10; }
         scroller-view { scroller-view-mode: vertical; scroller-vertical-display: always; scroller-horizontal-display: never; adaptive-height: false; adaptive-width: false; }
         .__scroller_view_view-port__ { padding-all: 3; background: rect(#00000000); }
         .__scroller_view_vertical-scroller__ { width: 10; }
@@ -194,7 +201,18 @@
                 <label id="deck-warnings" />
                 <button id="card-density" text="Cards: Standard" />
             </element>
-            <label id="editor-status">duelcraft.collection.unavailable</label>
+            <element id="status-row" class="row">
+                <label id="editor-status">duelcraft.collection.unavailable</label>
+                <button id="eligibility-details" />
+            </element>
+            <element id="eligibility-dialog">
+                <element id="eligibility-panel">
+                    <label id="eligibility-title" class="heading" />
+                    <label id="eligibility-summary" class="wrap" />
+                    <scroller-view id="eligibility-scroll" />
+                    <button id="eligibility-close" />
+                </element>
+            </element>
             <element id="lists-dialog">
                 <element id="lists-panel">
                     <label id="lists-title" class="heading">duelcraft.collection.lists</label>

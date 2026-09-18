@@ -4,6 +4,7 @@ import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.collection.CollectionCommand;
 import com.haxerus.duelcraft.collection.CollectionReply;
+import com.haxerus.duelcraft.collection.DeckEligibility;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
@@ -40,6 +41,7 @@ final class CollectionController {
     private final Map<Integer, CardInfo> byCode = new HashMap<>();
     private final IntFunction<ResourceLocation> textures;
     private final SavedDeckController lists;
+    private DeckEligibility.Report displayedEligibility;
     private final CollectionQuery search;
     private long queryGeneration;
     private boolean disposed;
@@ -134,6 +136,12 @@ final class CollectionController {
                     .tooltips(Component.translatable("duelcraft.collection.unavailable"));
         }
         configureLists();
+        button("eligibility-details").setText(Component.translatable("duelcraft.collection.details"));
+        button("eligibility-details").setOnClick(event -> element("eligibility-dialog").setDisplay(true));
+        button("eligibility-close").setText(Component.translatable("duelcraft.collection.done"));
+        button("eligibility-close").setOnClick(event -> element("eligibility-dialog").setDisplay(false));
+        ((TextElement) element("eligibility-title")).setText(Component.translatable("duelcraft.collection.eligibility_title"));
+        element("eligibility-dialog").setDisplay(false);
         element("close-dialog").setDisplay(false);
         showFilters(false);
         refreshDecks();
@@ -199,9 +207,43 @@ final class CollectionController {
                 (lists.id().equals(lists.activeId()) ? "active" : "not_active")));
         if (!lists.status().isEmpty()) ((TextElement) element("editor-status")).setText(
                 Component.translatable("duelcraft.collection." + lists.status(), failureDetail()));
+        refreshEligibility();
         refreshDecks();
         refreshInspector(true);
         refreshResults(false);
+    }
+
+    private void refreshEligibility() {
+        var report = lists.eligibility();
+        element("eligibility-details").setDisplay(!report.eligible());
+        if (report == displayedEligibility) return;
+        displayedEligibility = report;
+        var details = (ScrollerView) element("eligibility-scroll");
+        details.clearAllScrollViewChildren();
+        if (report.eligible()) {
+            element("eligibility-dialog").setDisplay(false);
+            return;
+        }
+        ((TextElement) element("eligibility-summary")).setText(Component.translatable("duelcraft.collection." +
+                ("saved_active_cleared".equals(lists.status()) ? "saved_active_cleared" : "eligibility_rejected")));
+        for (int index = 0; index < report.problems().size(); index++) {
+            var issue = report.problems().get(index);
+            var row = new Label().setText(Component.translatable(issue.key(), issue.code(), issue.actual(), issue.limit()));
+            row.setId("eligibility-issue-" + index).addClass("wrap");
+            details.addScrollViewChild(row);
+        }
+        for (int code : report.missing().keySet().stream().sorted().toList()) {
+            var row = new Label().setText(Component.translatable("duelcraft.collection.missing_copies", code, report.missing().get(code)));
+            row.setId("eligibility-missing-" + code).addClass("wrap");
+            details.addScrollViewChild(row);
+        }
+        if (report.moreProblems()) {
+            var row = new Label().setText(Component.translatable("duelcraft.collection.more_problems"));
+            row.setId("eligibility-more").addClass("wrap");
+            details.addScrollViewChild(row);
+        }
+        details.verticalScroller.setNormalizedValue(0);
+        element("eligibility-dialog").setDisplay(true);
     }
 
     private Component failureDetail() {

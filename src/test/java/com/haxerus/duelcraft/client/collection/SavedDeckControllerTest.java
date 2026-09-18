@@ -7,6 +7,84 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SavedDeckControllerTest {
+    @Test void ownedWrongPlacementActivationRetainsActionableReportWithoutShortages() {
+        var c = productionController();
+        var main = new ArrayList<>(java.util.stream.IntStream.rangeClosed(10001, 10040).boxed().toList());
+        main.add(43227);
+        var owned = new HashMap<Integer, Long>();
+        main.forEach(code -> owned.put(code, 1L));
+        model.load(new DeckList(main, List.of(), List.of()));
+        c.applyView(new ClientCollectionState.View(4, owned, List.of(), null));
+        c.activate();
+        replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
+                new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
+                        "duelcraft.collection.issue.main_placement", 43227, 65, 0)), Map.of(), false)));
+        assertEquals("operation_failed", c.status());
+        assertFalse(c.dirty());
+        assertTrue(c.eligibility().missing().isEmpty());
+        assertEquals(List.of(new DeckEligibility.Issue("duelcraft.collection.issue.main_placement", 43227, 65, 0)),
+                c.eligibility().problems());
+    }
+
+    @Test void truncatedActivationReportRetainsOmissionFlagAndExactShortages() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null));
+        c.activate();
+        replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
+                new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
+                        "duelcraft.collection.issue.copies", 123, 4, 3)), Map.of(123, 2), true)));
+        assertTrue(c.eligibility().moreProblems());
+        assertEquals(Map.of(123, 2), c.eligibility().missing());
+        assertEquals(4, c.eligibility().problems().getFirst().actual());
+        assertEquals(3, c.eligibility().problems().getFirst().limit());
+    }
+
+    @Test void explicitClearAndDeleteClearPriorEligibilityFeedbackAsOrdinarySuccesses() {
+        for (boolean delete : List.of(false, true)) {
+            commands.clear();
+            replies.clear();
+            var c = productionController();
+            c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), id));
+            c.activate();
+            replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
+                    new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
+                            "duelcraft.collection.issue.unknown", 123, 0, 0)), Map.of(), true)));
+            if (delete) c.delete();
+            else c.clearActive();
+            replies.getLast().complete(new CollectionReply.Changed(5, null, null, 0,
+                    new DeckEligibility.Report(List.of(), Map.of(), false)));
+            assertEquals("updated", c.status());
+            assertNull(c.activeId());
+            assertTrue(c.eligibility().eligible());
+        }
+    }
+
+    @Test void invalidatingSaveAcknowledgesSubmittedBaselineAndExplainsClearedActivation() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(43227, 1L), List.of(), id));
+        model.add(DeckEditorModel.Section.MAIN, 43227);
+        c.save();
+        var submitted = ((CollectionCommand.Save) commands.getFirst()).deck();
+        replies.getFirst().complete(new CollectionReply.Changed(5, null, submitted, 0,
+                new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
+                        "duelcraft.collection.issue.main_placement", 43227, 65, 0)), Map.of(), false)));
+        assertFalse(c.pending());
+        assertFalse(c.dirty());
+        assertEquals(submitted.cards(), model.draft());
+        assertNull(c.activeId());
+        assertEquals("saved_active_cleared", c.status());
+        assertEquals(43227, c.eligibility().problems().getFirst().code());
+        model.add(DeckEditorModel.Section.SIDE, 123);
+        model.discard();
+        assertEquals(submitted.cards(), model.draft(), "invalidating Save still advances the acknowledged baseline");
+    }
+
+    private SavedDeckController productionController() {
+        return new SavedDeckController(model, id, "List", null,
+                command -> { commands.add(command); var reply = new CompletableFuture<CollectionReply>(); replies.add(reply); return reply; },
+                CompletableFuture<ClientCollectionState.View>::new, Runnable::run, () -> {});
+    }
+
     @Test void clearActiveAcknowledgementKeepsDirtyCloseBehindSaveDiscardCancel() {
         controller.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), id));
         model.add(DeckEditorModel.Section.MAIN, 123);
