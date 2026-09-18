@@ -1,6 +1,6 @@
 # EDOPro as a host integration reference
 
-Use this page when designing a server, game client, bot runner, or other host around ygopro-core. EDOPro supplies a mature reference host, but its application protocol is not part of the core API. Scope: EDOPro `48ec006c` with vendored core `158aebe7`; core contracts elsewhere in this wiki use Duelcraft's newer core `7471af3c`. See [source versions](source-versions.md), [core API](core-api.md), and [data and scripts](data-and-scripts.md).
+Use this page when designing a server, game client, bot runner, or other host around ygopro-core. EDOPro supplies a mature reference host, but its application protocol is not part of the core API. Scope: EDOPro `48ec006c` with vendored core `158aebe7`; core contracts elsewhere in this wiki use Duelcraft's newer core `122e0d09`. See [source versions](source-versions.md), [core API](core-api.md), and [data and scripts](data-and-scripts.md).
 
 ## Task lookup
 

@@ -1,6 +1,6 @@
 # ygopro-core binary protocol
 
-This reference describes the C API and binary output of ygopro-core commit `7471af3c268669b9ae5c23664ba0cb2f37a5eca0` (API version 11.0). It is for hosts that embed the core in any language or runtime. It does not describe EDOPro's lobby protocol, replay container, deck format, JNI, or Duelcraft networking.
+This reference describes the C API and binary output of ygopro-core commit `122e0d091a0f399221a4510cc98a406ae485905f` (API version 11.0). It is for hosts that embed the core in any language or runtime. It does not describe EDOPro's lobby protocol, replay container, deck format, JNI, or Duelcraft networking.
 
 EDOPro commit `48ec006c49d7899b39f39420b9a71dea5ecdd22a` embeds a different core commit (`158aebe758be3c46249c75d602e3f16d63d2ef31`). Its client code is cited as a working decoder and compatibility guide. Treat this core checkout as authoritative when the two differ.
 
@@ -68,7 +68,7 @@ These fields follow the message ID inside a frame. They are a starter reference 
 
 | Message | Payload after ID | Interpretation and producer |
 |---|---|---|
-| `MSG_HINT` | `u8 hint_type, u8 player, u64 value` | Hint subtype selects the meaning of value; [Duel.Hint](../../native/ygopro-core/libduel.cpp#L3032). |
+| `MSG_HINT` | `u8 hint_type, u8 player, u64 value` | Hint subtype selects the meaning of value; [Duel.Hint](../../native/ygopro-core/libduel.cpp#L3063). |
 | `MSG_NEW_TURN` | `u8 player` | Canonical core team starting a turn; [Turn](../../native/ygopro-core/processor.cpp#L3334). |
 | `MSG_NEW_PHASE` | `u16 phase` | An announced phase; ordinary turns emit Draw, Standby, Main 1, Battle Start, Main 2 and End. ForcedBattle can restore a saved phase; see boundaries below. [Turn](../../native/ygopro-core/processor.cpp#L3365). |
 | `MSG_DRAW` | `u8 player, u32 count`, then `count * (u32 code, u32 position)` | Entries contain position as well as code; [Draw](../../native/ygopro-core/operations.cpp#L482). |
@@ -120,6 +120,10 @@ percent sequence inside an inserted name is not interpreted again. Plain descrip
 their existing card-name context. Location labels follow EDOPro's system strings, including Field
 Spell Zone and Pendulum Zone for spell/trap sequences 5 and 6+
 ([location formatting](../../../edopro/gframe/data_manager.cpp#L425)).
+
+## Set-card shuffle ordering
+
+`MSG_SHUFFLE_SET_CARD` writes `u8 location, u8 count`, then `count` source locations followed by `count` follow locations. Both lists use the same card-ID order. A follow entry contains the new location only for a card with overlay materials; other entries are zero locations. Resolve the source list before applying follows, and clear the shuffled cards' known identities. The upstream update fixes ordering without changing field widths or list structure ([producer](../../native/ygopro-core/libduel.cpp#L1423)).
 
 ## Small byte fixtures
 

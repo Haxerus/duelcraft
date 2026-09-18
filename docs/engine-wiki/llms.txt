@@ -1,6 +1,6 @@
 # ygopro-core embedding wiki
 
-> Source-grounded integration contracts for ygopro-core API 11.0 at 7471af3c268669b9ae5c23664ba0cb2f37a5eca0, with EDOPro 48ec006c49d7899b39f39420b9a71dea5ecdd22a and Duelcraft JNI host examples. Read only the pages needed for the task. Check source-versions.md before assuming freshness.
+> Source-grounded integration contracts for ygopro-core API 11.0 at 122e0d091a0f399221a4510cc98a406ae485905f, with EDOPro 48ec006c49d7899b39f39420b9a71dea5ecdd22a and Duelcraft JNI host examples. Read only the pages needed for the task. Check source-versions.md before assuming freshness.
 
 ## Entry
 - [Task router and invariants](README.md): Start here.

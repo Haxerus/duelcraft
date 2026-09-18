@@ -11,7 +11,7 @@
     {
       "name": "ygopro-core",
       "path": "../../native/ygopro-core",
-      "head": "7471af3c268669b9ae5c23664ba0cb2f37a5eca0",
+      "head": "122e0d091a0f399221a4510cc98a406ae485905f",
       "api": "11.0"
     },
     {
@@ -91,7 +91,7 @@
     },
     {
       "path": "../../native/ygopro-core/card.cpp",
-      "sha256_lf": "9b984e23177291ad382d34964d7186dc8aa3ebfffccf82da5e972009855f113f",
+      "sha256_lf": "27544345ece5e57d71b6db07ab86174f157ca6f123b1e43d221cf4dcd58bfade",
       "cited_by": [
         "architecture.md",
         "message-index.md",
@@ -100,7 +100,7 @@
     },
     {
       "path": "../../native/ygopro-core/card.h",
-      "sha256_lf": "4f6fa45da9b48a6460a8f642bfec63ec5d83c217b6a885afd5cc8bb33a22de42",
+      "sha256_lf": "033330adecc458f848ae36c5d633bc4d609353e3441435fcc4f654ea440d0e65",
       "cited_by": [
         "architecture.md",
         "protocol.md",
@@ -109,7 +109,7 @@
     },
     {
       "path": "../../native/ygopro-core/common.h",
-      "sha256_lf": "c298975e123572342e064cbcb57d4b39de563d957ca8d61af401dc2d8c8eefb8",
+      "sha256_lf": "ffa851aee10ad3e5a5bad95e391cecdb168d6045d642f41f894d1d0adfcc0211",
       "cited_by": [
         "architecture.md",
         "rules-and-coordinates.md"
@@ -161,9 +161,10 @@
     },
     {
       "path": "../../native/ygopro-core/field.cpp",
-      "sha256_lf": "180c7b45a519646687ba336521cc550cca0381d17f6e90e1c1049dce0c8f1762",
+      "sha256_lf": "7f35276e14b30c3236b9d971c9b9b9ec54a2a11346e79be68ebadd3ae772e31e",
       "cited_by": [
         "architecture.md",
+        "data-and-scripts.md",
         "message-index.md",
         "protocol.md",
         "queries.md",
@@ -172,7 +173,7 @@
     },
     {
       "path": "../../native/ygopro-core/field.h",
-      "sha256_lf": "724629864d125db6ff2eb293165062c24e84801224331ffe0544e12c62aace83",
+      "sha256_lf": "bf123ec97f8c53eda31654743ccf3f68f36f2dda4e25211e8eed432d812484bc",
       "cited_by": [
         "architecture.md",
         "queries.md",
@@ -188,7 +189,7 @@
     },
     {
       "path": "../../native/ygopro-core/interpreter.cpp",
-      "sha256_lf": "0a68dad275153d1c2a7abb20722d71917521cb77b9712268749d98339d648e2e",
+      "sha256_lf": "dfd8681a2f1d8f4755f3b7b82688c3b9f34a4f82eecc979e99dd0f3b6b8c9f7d",
       "cited_by": [
         "architecture.md",
         "build-and-compatibility.md",
@@ -221,7 +222,7 @@
     },
     {
       "path": "../../native/ygopro-core/libduel.cpp",
-      "sha256_lf": "4ab920702a710596d76bcf6db262be8c3ea7d1647ed5d5aa197c9850300c4e7f",
+      "sha256_lf": "2508f0e41806b36a21bc06bdab5f946594c051c718aa8afd9c1ea14c3c649165",
       "cited_by": [
         "architecture.md",
         "data-and-scripts.md",
@@ -254,7 +255,7 @@
     },
     {
       "path": "../../native/ygopro-core/meson.build",
-      "sha256_lf": "051b0806be34f6cfdca7fc3a49297de6b9c72c6724874bb7d1b8736ebdd16a97",
+      "sha256_lf": "0a1c29dfa123229c8072c652ce9d8e1bcae9b049584fd352cf6bd53a522820f7",
       "cited_by": [
         "build-and-compatibility.md",
         "source-versions.md"
@@ -319,9 +320,10 @@
     },
     {
       "path": "../../native/ygopro-core/operations.cpp",
-      "sha256_lf": "12176478ea04e6b2998ddd13d291543486757cd9a42571ac8e5622ab855a1f2c",
+      "sha256_lf": "651a9bc6ef45d9b40c2506ae8eac513e65618233eee992b582eac7516d5b3764",
       "cited_by": [
         "architecture.md",
+        "data-and-scripts.md",
         "message-index.md",
         "protocol.md",
         "rules-and-coordinates.md"
@@ -339,7 +341,7 @@
     },
     {
       "path": "../../native/ygopro-core/premake5.lua",
-      "sha256_lf": "53955546b809c078b75522f955c8cf49329c87e1e11ff4e34f46092a29d0d78a",
+      "sha256_lf": "67bbf3b16116b4113c274e7a277c44a50ee25799489f8c6778579d48eea98ca6",
       "cited_by": [
         "build-and-compatibility.md"
       ]
@@ -357,7 +359,7 @@
     },
     {
       "path": "../../native/ygopro-core/processor_unit.h",
-      "sha256_lf": "46c18d1f4016d95fa472cd112277ee8d4c47292be15984948840387bfb7bb625",
+      "sha256_lf": "c62ced33ea35647d430c73549b5f584da236361125715c10fb08b5a6cfe960b8",
       "cited_by": [
         "architecture.md"
       ]
@@ -397,7 +399,7 @@
     },
     {
       "path": "../../native/ygopro-core/scriptlib.h",
-      "sha256_lf": "55de79e6f4bd6540151bad3cba0a5186ff74190f728fc4da2a03eb5d78844aee",
+      "sha256_lf": "43486704024f9f695a7038c94ddffd7c68e053d91eb8c79e9eb0c18d9fef1b0f",
       "cited_by": [
         "architecture.md"
       ]
@@ -722,5 +724,6 @@
         "build-and-compatibility.md"
       ]
     }
-  ]
+  ],
+  "core_review_date": "2026-09-17"
 }

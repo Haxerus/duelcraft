@@ -7,10 +7,15 @@ import com.haxerus.duelcraft.duel.message.MessageParser;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.duel.response.ResponseValidator;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -24,8 +29,11 @@ class PlaytestInteractionTest {
 
     @BeforeEach
     void createDuel() {
-        engine = OcgCore.nCreateEngine(new String[]{System.getProperty("duelcraft.test.dbPath")},
-                System.getProperty("duelcraft.test.scriptPaths").split(";"));
+        createDuel(System.getProperty("duelcraft.test.scriptPaths").split(";"));
+    }
+
+    private void createDuel(String[] scriptPaths) {
+        engine = OcgCore.nCreateEngine(new String[]{System.getProperty("duelcraft.test.dbPath")}, scriptPaths);
         duel = OcgCore.nCreateDuel(engine, new long[]{42,42,42,42}, DUEL_MODE_MR5, 8000,0,1,8000,0,1);
         assertNotEquals(0, duel);
         for (int player = 0; player < 2; player++) {
@@ -37,6 +45,66 @@ class PlaytestInteractionTest {
     void close() {
         if (duel != 0) OcgCore.nDestroyDuel(engine, duel);
         if (engine != 0) OcgCore.nDestroyEngine(engine);
+    }
+
+    @Test
+    void kusanagiCanActivateAfterBeingTributedFromDeck(@TempDir Path scripts) throws IOException {
+        // Exercise the current upstream API even when the local EDOPro scripts predate it.
+        var paths = Arrays.asList(System.getProperty("duelcraft.test.scriptPaths").split(";"));
+        Path ritualScript = paths.stream().map(p -> Path.of(p, "c81560239.lua"))
+                .filter(Files::isRegularFile).findFirst().orElseThrow();
+        Files.writeString(scripts.resolve("c81560239.lua"), Files.readString(ritualScript) + """
+
+                function c81560239.extraop(mat,e,tp,eg,ep,ev,re,r,rp,tc)
+                    Duel.ReleaseRitualMaterial(mat,true)
+                end
+                """);
+        close();
+        engine = duel = 0;
+        var scriptPaths = new ArrayList<String>();
+        scriptPaths.add(scripts.toString());
+        scriptPaths.addAll(paths);
+        createDuel(scriptPaths.toArray(String[]::new));
+        int kusanagi = 82782870;
+        int ritual = 81560239;
+        add(20295753, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE); // Night Sword Serpent
+        add(kusanagi, 0, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
+        add(18176525, 0, LOCATION_GRAVE, 0, POS_FACEUP_ATTACK); // Saji, a legal recovery target
+        add(55397172, 0, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE); // Futsu no Mitama, Level 8
+        add(ritual, 0, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE);
+        OcgCore.nStartDuel(engine, duel);
+        var idle = assertInstanceOf(DuelMessage.SelectIdleCmd.class, passChains(pump()));
+        int activate = -1;
+        for (int i = 0; i < idle.activatable().size(); i++) {
+            if (idle.activatable().get(i).code() == ritual) activate = i;
+        }
+        assertTrue(activate >= 0, "Mitsurugi Ritual must be activatable");
+        DuelMessage next = respond(ResponseValidator.selectCmd(idle, IdleAction.ACTIVATE, activate));
+        for (int i = 0; i < 30; i++) {
+            if (next instanceof DuelMessage.SelectIdleCmd) break;
+            if (next instanceof DuelMessage.SelectEffectYn effect && effect.code() == kusanagi) break;
+            if (next instanceof DuelMessage.SelectChain chain
+                    && chain.chains().stream().anyMatch(c -> c.code() == kusanagi)) break;
+            next = switch (next) {
+                case DuelMessage.SelectPlace place -> respond(firstPlace(place));
+                case DuelMessage.SelectOption ignored -> respond(ResponseBuilder.selectOption(0));
+                case DuelMessage.SelectEffectYn ignored -> respond(ResponseBuilder.selectYesNo(false));
+                case DuelMessage.SelectChain chain -> respond(ResponseValidator.selectChain(chain, -1));
+                case DuelMessage.SelectCard cards -> respond(ResponseValidator.selectCards(cards, 0));
+                case DuelMessage.SelectUnselectCard cards -> respond(ResponseValidator.selectUnselectCard(cards,
+                        cards.finishable() ? -1 : 0));
+                case DuelMessage.SelectPosition ignored -> respond(ResponseBuilder.selectPosition(POS_FACEUP_ATTACK));
+                default -> throw new AssertionError("Unexpected ritual prompt: " + next);
+            };
+        }
+        assertTrue(events.stream().anyMatch(m -> m instanceof DuelMessage.Move move
+                && move.code() == kusanagi && move.from().location() == LOCATION_DECK
+                && move.to().location() == LOCATION_GRAVE && (move.reason() & REASON_RELEASE) != 0),
+                "Kusanagi must have been tributed from the Deck");
+        assertTrue(next instanceof DuelMessage.SelectEffectYn effect && effect.code() == kusanagi
+                || next instanceof DuelMessage.SelectChain chain
+                && chain.chains().stream().anyMatch(c -> c.code() == kusanagi),
+                "Kusanagi's tribute trigger must be offered; got " + next);
     }
 
     @Test

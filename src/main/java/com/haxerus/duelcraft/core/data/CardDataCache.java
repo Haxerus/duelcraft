@@ -75,6 +75,7 @@ public final class CardDataCache {
             } finally {
                 Files.deleteIfExists(pointer);
             }
+            prune(root, published);
             LOGGER.info("Card data ready: {}", published);
             return snapshot(published);
         } catch (IOException | SQLException | InterruptedException e) {
@@ -88,12 +89,33 @@ public final class CardDataCache {
                     + "Minecraft/the server to download ProjectIgnis/CardScripts and ProjectIgnis/BabelCDB. Cache: " + root, e);
         } finally {
             if (staging != null) {
-                try (var paths = Files.walk(staging)) {
-                    for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
-                } catch (IOException cleanupFailure) {
+                try { delete(staging); }
+                catch (IOException cleanupFailure) {
                     LOGGER.warn("Could not remove incomplete card-data download {}", staging, cleanupFailure);
                 }
             }
+        }
+    }
+
+    /** Reclaims superseded snapshots and downloads abandoned by a killed process. */
+    private void prune(Path root, Path published) {
+        List<Path> stale;
+        try (var entries = Files.list(root)) {
+            stale = entries.filter(p -> !p.equals(published)
+                    && !p.getFileName().toString().equals("current")).toList();
+        } catch (IOException e) {
+            LOGGER.warn("Could not list card data cache {}", root, e);
+            return;
+        }
+        for (Path path : stale) {
+            try { delete(path); }
+            catch (IOException e) { LOGGER.warn("Could not remove stale card data {}", path, e); }
+        }
+    }
+
+    private static void delete(Path directory) throws IOException {
+        try (var paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
         }
     }
 

@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -109,18 +110,32 @@ class CardDataCacheTest {
     }
 
     @Test
-    void updatePublishesNewDataWithoutChangingPreviousSnapshot() throws Exception {
+    void updatePublishesNewDataAndKeepsServingItOffline() throws Exception {
         var first = cache.prepare(temp.resolve("cache"));
         revision = "b".repeat(40);
         databases = zip(Map.of("repo/cards.cdb", database("updated", Map.of(1, "Updated"))));
         var updated = cache.prepare(temp.resolve("cache"));
         assertNotEquals(first.database(), updated.database());
-        try (var oldDb = new CardDatabase(first.database()); var newDb = new CardDatabase(updated.database())) {
-            assertEquals("Official", oldDb.getCard(1).name());
-            assertEquals("Updated", newDb.getCard(1).name());
+        try (var db = new CardDatabase(updated.database())) {
+            assertEquals("Updated", db.getCard(1).name());
         }
         offline = true;
         assertEquals(updated, cache.prepare(temp.resolve("cache")));
+    }
+
+    @Test
+    void publishingRemovesSupersededSnapshotsAndAbandonedDownloads() throws Exception {
+        Path root = temp.resolve("cache");
+        var first = cache.prepare(root);
+        Path abandoned = Files.createDirectory(root.resolve(".download-killed"));
+        Files.writeString(abandoned.resolve("CardScripts.zip"), "partial");
+        revision = "b".repeat(40);
+        var updated = cache.prepare(root);
+        try (var entries = Files.list(root)) {
+            assertEquals(List.of("current", updated.database().getParent().getFileName().toString()),
+                    entries.map(p -> p.getFileName().toString()).sorted().toList());
+        }
+        assertFalse(Files.exists(first.database()));
     }
 
     @Test
