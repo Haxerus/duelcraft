@@ -132,6 +132,3 @@ class CollectionPayloadTest {
     private static void countHeader(FriendlyByteBuf buf) { buf.writeByte(1); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); }
     private static void deckHeader(FriendlyByteBuf buf) { buf.writeByte(2); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); }
     private static void rejectionHeader(FriendlyByteBuf buf) { buf.writeByte(5); buf.writeByte(CollectionError.INVALID.ordinal()); buf.writeVarLong(0); }}
-
-
-

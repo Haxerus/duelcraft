@@ -82,5 +82,3 @@ class CollectionHandlerTest {
         }
         assertEquals(5, sender.writes); assertEquals(5, sender.data.revision());
     }}
-
-
