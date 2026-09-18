@@ -226,7 +226,7 @@ public final class SavedDeckController {
             if (delete) newDraft();
             status = "updated";
             changed.run();
-            finishNavigation();
+            if (navigation != null) navigate(navigation);
             refresh();
         }, client);
     }

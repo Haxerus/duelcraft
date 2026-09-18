@@ -185,9 +185,10 @@ final class CollectionController {
         ((TextField) element("list-name")).setText(lists.name(), false);
         element("list-name").setActive(!lists.pending());
         element("list-picker").setActive(!lists.pending() && lists.ready());
-        for (String id : List.of("save-deck", "list-new", "list-rename", "list-duplicate", "close-save", "close-discard", "close-cancel")) {
+        for (String id : List.of("save-deck", "list-new", "list-rename", "list-duplicate", "close-save")) {
             element(id).setActive(!lists.pending() && lists.ready());
         }
+        for (String id : List.of("close-discard", "close-cancel")) element(id).setActive(!lists.pending());
         element("list-delete").setActive(!lists.pending() && lists.ready() && lists.stored());
         element("list-clear-active").setActive(!lists.pending() && lists.activeId() != null);
         element("list-refresh").setActive(!lists.pending());

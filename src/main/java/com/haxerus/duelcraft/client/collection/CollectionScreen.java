@@ -45,8 +45,16 @@ public final class CollectionScreen extends ModularUIScreen {
     public static CollectionScreen create(DeckEditorModel model, List<CardInfo> cards,
             IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search) {
         return create(model, cards, textures, id, saveDraft, search,
-                command -> CompletableFuture.failedFuture(new IllegalStateException("Sample list actions unavailable")),
-                () -> CompletableFuture.completedFuture(new ClientCollectionState.View(0, model.owned(), List.of(), null)), Runnable::run);
+                () -> CompletableFuture.completedFuture(new ClientCollectionState.View(0, model.owned(), List.of(), null)));
+    }
+
+    public static CollectionScreen create(DeckEditorModel model, List<CardInfo> cards,
+            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search,
+            Supplier<CompletionStage<ClientCollectionState.View>> refresh) {
+        var screen = create(model, cards, textures, id, saveDraft, search,
+                command -> CompletableFuture.failedFuture(new IllegalStateException("Sample list actions unavailable")), refresh, Runnable::run);
+        if (saveDraft == null) screen.controller.initializeCollections();
+        return screen;
     }
 
     /** Real private collection; routing to this screen is supplied by the later management milestone. */

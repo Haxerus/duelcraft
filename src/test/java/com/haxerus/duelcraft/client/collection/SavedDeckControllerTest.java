@@ -7,6 +7,31 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SavedDeckControllerTest {
+    @Test void clearActiveAcknowledgementKeepsDirtyCloseBehindSaveDiscardCancel() {
+        controller.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), id));
+        model.add(DeckEditorModel.Section.MAIN, 123);
+        controller.rename("Edited name");
+        var dirtyDraft = model.draft();
+        int[] closed = {0};
+        controller.clearActive();
+        assertEquals(new CollectionCommand.ClearActive(4), commands.getFirst());
+        controller.navigate(() -> closed[0]++);
+        assertTrue(controller.pending());
+        assertFalse(controller.needsDecision());
+        replies.getFirst().complete(new CollectionReply.Changed(5, null, null, 0,
+                new DeckEligibility.Report(List.of(), Map.of(), false)));
+        assertEquals(0, closed[0], "Clear Active never acknowledges the dirty card/name edits");
+        assertTrue(controller.needsDecision());
+        assertTrue(controller.dirty());
+        assertEquals(dirtyDraft, model.draft());
+        assertEquals("Edited name", controller.name());
+        controller.cancelNavigation();
+        assertFalse(controller.needsDecision());
+        assertEquals(0, closed[0]);
+        controller.navigate(() -> closed[0]++);
+        controller.discardNavigation();
+        assertEquals(1, closed[0]);
+    }
     private static final DeckList EMPTY = new DeckList(List.of(), List.of(), List.of());
     private final UUID id = UUID.randomUUID();
     private final DeckEditorModel model = new DeckEditorModel(EMPTY, Map.of());

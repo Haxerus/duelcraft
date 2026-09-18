@@ -66,6 +66,30 @@ public final class CollectionSavedListScenario implements UIScenario {
          .screenshot("collection-save-awaiting-acknowledgement")
          .step("acknowledge renamed list", CollectionSavedListScenario::acknowledge).ticks(2)
          .check("only acknowledgement completes close", ctx -> !(ctx.screen() instanceof CollectionScreen))
+         .openScreen("initial collection synchronization failure", ctx -> {
+             var model = ctx.put("unavailableModel", new DeckEditorModel(new DeckList(List.of(), List.of(), List.of()), Map.of()));
+             var refresh = ctx.put("unavailableRefresh", new CompletableFuture<ClientCollectionState.View>());
+             return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
+                     CollectionFixture.LIST_ID, null, CollectionFixture.query(), () -> refresh);
+         }).awaitModularUI().ticks(3)
+         .step("fail initial snapshot", ctx -> ctx.<CompletableFuture<ClientCollectionState.View>>get("unavailableRefresh")
+                 .completeExceptionally(new IllegalStateException("Initial synchronization unavailable")))
+         .ticks(2)
+         .checkTextContains("#editor-status", "refresh failed")
+         .key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .checkVisible("#close-dialog")
+         .check("failed initial snapshot keeps local close decisions usable", ctx ->
+                 !ctx.el("#close-save").isActive() && ctx.el("#close-cancel").isActive() && ctx.el("#close-discard").isActive())
+         .screenshot("collection-initial-refresh-failure-close")
+         .step("Cancel after failed synchronization", ctx -> CollectionLayoutScenario.press(ctx, "#close-cancel"))
+         .step("release Cancel", CollectionLayoutScenario::release).ticks(2)
+         .checkScreen(CollectionScreen.class)
+         .checkHidden("#close-dialog")
+         .key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .checkVisible("#close-dialog")
+         .step("Discard after failed synchronization", ctx -> CollectionLayoutScenario.press(ctx, "#close-discard"))
+         .step("release Discard", CollectionLayoutScenario::release).ticks(2)
+         .check("Discard closes without a ready snapshot", ctx -> !(ctx.screen() instanceof CollectionScreen))
          .teardown("close collection", ctx -> ctx.mc().setScreen(null));
     }
 
