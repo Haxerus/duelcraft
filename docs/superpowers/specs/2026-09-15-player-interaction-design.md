@@ -2,13 +2,15 @@
 
 Date: 2026-09-15. Product behavior agreed in the design conversation; technical integration proposal for implementation planning.
 
+Implementation update 2026-09-17: milestone 1 is complete in `codex/deck-editor-m1` through `2030dae`; see its [verification report](../reports/2026-09-17-deck-editor-m1.md). That implementation is the baseline for milestones 2–6. The [implementation contracts](2026-09-17-player-interaction-contracts.md) resolve their shared technical choices.
+
 ## Outcome
 
 Players can manage their personal collection, build saved deck lists, and arrange duels through a hotkey home screen. A binder opens collection/deckbuilding directly; a placed duel mat opens invitations and duel preparation directly. Items provide physical entry points without becoming access requirements.
 
 The accepted editor reference is the [fixed 1280x720 prototype](../references/2026-09-17-deck-editor-1280x720.html), copied unchanged into the repository for the implementation handoff on 2026-09-17.
 The original remains at `C:/Users/haxer/.codex/visualizations/2026/09/16/01a0a7ac-e1fe-70d0-9df2-65139ed2a651/duelcraft-deck-720.html`.
-The layout and behavior below are the implementation contract; the browser prototype supplies visual and interaction references.
+The layout and behavior below are the implementation contract. The browser prototype remains a geometry and interaction reference; its light palette is superseded by the user's approved **dark styling matching the existing duel UI**, implemented in `2030dae`. Preserve that dark XML styling when adding collection features.
 
 ## Agreed product rules
 
@@ -60,16 +62,19 @@ Keep `core.Deck` as the simulation input. Introduce an immutable `collection.Dec
 
 Use one server-persisted player attachment for collection counts, saved lists, and optional active-list ID. Opt into copying on death and verify respawn, End return, restart, and reconnect. Keep it private: send management data to the owning player only. Do not synchronize it to entity trackers or expose deck contents in lobby messages.
 
-Proposed counting semantics for this integration:
+Confirmed ownership and card-identity rules (user clarification, 2026-09-17):
 
 - Only deposited collection copies satisfy activation. Carried card items become usable through Deposit; silently counting inventory cards would make dropping/trading items invalidate decks outside collection operations.
 - Key ownership by exact card passcode, using a nonnegative `long` count with checked arithmetic. This has no gameplay capacity limit, although machine representations remain finite.
-- Include Main + Extra + Side when checking copies needed by a list. Single duels pass Main/Extra to the engine; saving Side does not introduce match mode or sideboarding.
-- Treat alternate-art passcodes as distinct owned items initially. Alias-aware legality, if implemented, must remain separate from ownership identity.
+- Include Main + Extra + Side when checking copies needed by a list, including for single duels. Single duels pass Main/Extra to the engine; saving Side does not introduce match mode or sideboarding.
+- The card passcode is the primary key. Each passcode has separate ownership. Do not introduce alternate-art identities, ownership equivalence, or passcode substitution.
+
+Additional implementation defaults:
+
 - Saving edits to the active list rechecks eligibility; clear active status if the new contents are ineligible. Deleting the active list also clears it. Renaming preserves selection.
 - Do not auto-reactivate after depositing cards. The player chooses the active list.
 
-These are concrete technical defaults for the plan, not additional product decisions claimed to have been discussed already.
+The ownership and identity rules above are user-confirmed. The edit/delete/reactivation behaviors are implementation defaults consistent with those rules.
 
 ## State transitions
 
@@ -94,15 +99,15 @@ Register one physical card item with a passcode data component. Server transfer 
 
 All transfer and list mutations run on the server thread. Test repeated/stale operations for conservation, full inventory, partial stacks, negative/overflow quantities, and active-deck invalidation. Save inventory and collection through the player's normal persistence lifecycle.
 
-Card acquisition, pack loot, trading screens, rarity/foil variants, and recipes are separate content work. Integration tests may grant physical cards through a restricted development command; ordinary deck selection never grants ownership.
+The user will handle card acquisition later; do not reopen it as a question or expand this integration to design it. Pack loot, trading screens, rarity/foil variants, and recipes are separate content work. Integration tests may grant physical cards through a restricted development command; ordinary deck selection never grants ownership.
 
 ## Deck validity and existing commands
 
 Activation returns actionable missing-card counts and supported legality problems. Draft saving validates the storage/request shape, not playability. Keep decoder bounds separate from gameplay limits so an invalid imported draft can still be represented safely.
 
-For the collection release, add authoritative known-card/type facts for activation and card-item validation. Proposed implementation: a small common/server catalog loaded once from the existing managed merged database, independent of client presentation classes. This adds a Java host-policy read of the managed database; it does not move engine callbacks or scripts out of C++. Compare this with exposing native metadata when detailing the persistence milestone, and keep the decision explicit.
+For the collection release, add authoritative known-card/type facts for activation and card-item validation. The milestone 2 plan chooses a small common/server catalog loaded once from the existing managed merged database, independent of client presentation classes. This adds a Java host-policy read of the managed database; it does not move engine callbacks or scripts out of C++. It avoids adding a JNI metadata API; the shared implementation contracts describe the chosen boundary.
 
-Preserve the current structural rule behavior initially, add Side size/copy checks, reject unknown cards/tokens and wrong Main/Extra placement before activation. Show the implemented validation scope honestly. Banlist selection and format-specific rules beyond existing support need a separate specification; do not invent a default banlist.
+The user confirmed the planned validation scope: preserve the current structural rule behavior, add Side size/copy checks, reject unknown cards/tokens and wrong Main/Extra placement before activation, and enforce collection ownership. Show the implemented validation scope honestly. Banlist selection and format-specific rules beyond existing support remain outside this integration; do not invent a default banlist.
 
 Retain YDK import as a list operation, including Side; importing grants no cards. Route normal `/duel deck set`, challenge, accept, and solo-player preparation through the ownership policy. Server AI decks remain content, not a player collection. Remove the old upload bypass when the new path ships. If unrestricted engine testing remains necessary, give it an explicit operator/dev-only path rather than a normal player exception.
 

@@ -2,7 +2,18 @@
 
 **Design:** [Player interaction and collection](../specs/2026-09-15-player-interaction-design.md).
 
-This roadmap covers the complete integration. Each milestone produces a testable result and gets a focused implementation plan before coding. Milestone 1 has its detailed plan now; later plans use the decisions and file boundaries below, revised with actual playtest findings.
+This roadmap covers the complete integration. Milestone 1 is complete through `2030dae` in `codex/deck-editor-m1`, including the approved dark duel-UI styling; see the [verification report](../reports/2026-09-17-deck-editor-m1.md). Its implementation is reconciled onto main `bc2fcba` in `codex/player-collections`, with 720 unit tests passing. Milestones 2–6 have detailed plans. Extend the completed editor and incorporate playtest findings without silently changing product scope.
+
+| Milestone | Detailed plan |
+| --- | --- |
+| 1. Sample-data editor — complete | [Editor](2026-09-15-deck-editor-milestone-1.md) |
+| 2. Persistence and saved lists | [Personal collections](2026-09-17-player-collections-milestone-2.md) |
+| 3. Physical cards and transfers | [Inventory transfers](2026-09-17-card-transfers-milestone-3.md) |
+| 4. Duel preparation and import | [Authoritative preparation](2026-09-17-duel-preparation-milestone-4.md) |
+| 5. Home, binder, mat and lobby | [Player entry points](2026-09-17-player-entry-points-milestone-5.md) |
+| 6. Release validation | [Tests and documentation](2026-09-17-interaction-release-milestone-6.md) |
+
+Read the [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md) alongside each plan. They settle storage/packet bounds, operation signatures, acknowledged saving, inventory scope, and preparation rules. Milestones 2–6 remain to be implemented and verified.
 
 ## 1. Playable editor with sample data
 
@@ -12,17 +23,11 @@ Create `collection/DeckList.java`, `client/collection/` editor/model/search file
 
 **Exit:** actual Minecraft screenshots at 1280x720 and smaller/larger windows, transformed clicks at GUI scales 2/3/4, overflow without overlapping rows, and a large synthetic catalog with bounded mounted widgets. User playtests readability before measurements become fixed.
 
-**Implementation record — 2026-09-17:** Milestone 1 is implemented on `codex/deck-editor-m1` in `.worktrees/deck-editor-m1`. The independent 1280x720 sample editor supports permissive Main/Extra/Side drafts, rich filters, virtual collection rows, Standard/Large density, independent scrolling, save failures and dirty-close choices. The original duel UI and engine `Deck` are unchanged. Review-driven regressions cover unapplied filters, edit/resize scroll retention and collapsed Side; an adaptive text-width layout loop was reproduced and fixed.
-
-Verification: 694 JUnit tests passed with no skips; all nine requested window/GUI-scale combinations passed 2,250 checks; the full `group:duelcraft` run passed 32 scenarios and 7,691 checks. The 16,000-card fixture mounted five rows at both ends of its 4,000-row catalog. Actual viewport scales, non-16:9 dirty-resize captures, screenshot paths and the keep-open playtest command are in the [verification record](../reports/2026-09-17-deck-editor-m1.md). Text is noticeably small at 960x540; comfortable density and minimum window size remain user playtest decisions.
-
-Milestone 2 is ready for its focused storage/network implementation plan. No persistence, transfers, activation, production entry point, items or lobbies were implemented in milestone 1.
-
 ## 2. Persistent personal collections and saved lists
 
 Create focused common models and storage in `collection/`: `SavedDeck`, `PlayerCollectionData`, and attachment registration. Add `server/collection/CollectionService` for list CRUD, activation, eligibility checks, and ownership mutations. Add small typed payloads under `server/collection/` and `client/collection/ClientCollectionState` for the private view. Register through `Duelcraft` and `DuelNetworking`; clear client state on logout in `DuelcraftClient`.
 
-Write the detailed storage/sync plan first, including schema version, request bounds, page sizes, expected revisions, missing-card result shape, and the server catalog choice described in the design. Reuse the editor's local `DeckList` rather than serializing UI objects. Add the production card-search loader on its own database connection/worker; preserve existing announce-card search behavior. Load a metadata snapshot once, apply filters away from the render thread, and ignore outdated query generations.
+Follow the milestone 2 plan and shared contracts for schema version, request bounds, page sizes, expected revisions, missing-card results, and the server catalog. Reuse the editor's local `DeckList` rather than serializing UI objects. Add the production card-search loader on its own database connection/worker; preserve existing announce-card search behavior. Load a metadata snapshot once, apply filters away from the render thread, and ignore outdated query generations.
 
 Keep collection state changes server-owned. Store copies by passcode; save any well-formed draft, validate before activation, and clear invalid active selection after edits. Persist through player save/clone. Full collection and deck contents go only to their owner. Saving and activation remain separate operations.
 
@@ -71,3 +76,5 @@ Run the full JUnit suite and the existing/new `group:duelcraft` UI scenarios, wi
 Order: 1 -> 2 -> 3 -> 4 -> 5 -> 6. Build production entry points only after their server operations exist. Binder/mat visual assets can be prepared during those stages, but this roadmap does not authorize a separate art/design expansion.
 
 Defer pack economy, trading screens, crafting/progression balance, banlist management, public matchmaking, spectators, match mode/sideboarding, cosmetic card variants, and cloud/global collections. These are not necessary to integrate the approved interaction model.
+
+The user confirmed the planned legality scope and will handle card acquisition later. Acquisition is intentionally outside these plans, not an unresolved prerequisite. Deposited-only ownership, Side ownership checks for single duels, and passcode as the primary key are also confirmed in the design and implementation contracts.

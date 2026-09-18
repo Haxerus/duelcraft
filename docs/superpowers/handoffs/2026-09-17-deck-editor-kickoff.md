@@ -1,3 +1,5 @@
+> **Historical M1 handoff — completed.** Use the implementation through `2030dae` in `codex/deck-editor-m1`, including the approved dark duel-UI styling. See [M1 results](../reports/2026-09-17-deck-editor-m1.md). Continue with [milestone 2](../plans/2026-09-17-player-collections-milestone-2.md); do not recreate the sample editor.
+
 # Kickoff prompt
 
 Paste the following into a new implementation session in the Duelcraft project:
