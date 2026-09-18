@@ -149,6 +149,7 @@ final class CollectionController {
         button("saved-lists").setOnClick(event -> element("lists-dialog").setDisplay(true));
         button("lists-close").setOnClick(event -> element("lists-dialog").setDisplay(false));
         ((TextField) element("list-name")).setTextResponder(lists::rename);
+        ((Selector<UUID>) element("list-picker")).dialog.style(style -> style.zIndex(95));
         ((Selector<UUID>) element("list-picker")).setOnValueChanged(target -> {
             if (target != null && !target.equals(lists.id())) lists.navigate(() -> lists.select(target));
         });

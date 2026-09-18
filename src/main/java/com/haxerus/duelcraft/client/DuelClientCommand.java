@@ -1,6 +1,11 @@
 package com.haxerus.duelcraft.client;
 
 import com.haxerus.duelcraft.core.DeckLoader;
+import com.haxerus.duelcraft.DuelcraftClient;
+import com.haxerus.duelcraft.client.collection.CollectionScreen;
+import com.haxerus.duelcraft.collection.CollectionCommand;
+import com.haxerus.duelcraft.collection.CollectionReply;
+import net.neoforged.fml.loading.FMLEnvironment;
 import com.haxerus.duelcraft.core.DeckRegistry;
 import com.haxerus.duelcraft.server.DuelDeckPayload;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -24,6 +29,10 @@ public final class DuelClientCommand {
     private DuelClientCommand() { }
 
     public static void register(RegisterClientCommandsEvent event) {
+        if (!FMLEnvironment.production) {
+            event.getDispatcher().register(Commands.literal("duel")
+                    .then(Commands.literal("collection").executes(DuelClientCommand::collection)));
+        }
         event.getDispatcher().register(
                 Commands.literal("duel")
                         .then(Commands.literal("show")
@@ -50,6 +59,23 @@ public final class DuelClientCommand {
 
     private static DeckRegistry decks() {
         return DeckRegistry.open(Minecraft.getInstance().gameDirectory.toPath().resolve("duelcraft/decks"));
+    }
+
+    private static int collection(CommandContext<CommandSourceStack> ctx) {
+        var minecraft = Minecraft.getInstance();
+        var player = minecraft.player;
+        DuelcraftClient.getCollectionClient().request(new CollectionCommand.Open()).whenCompleteAsync((reply, error) -> {
+            if (minecraft.player != player || player == null) return;
+            if (error == null && reply instanceof CollectionReply.Opened) {
+                minecraft.setScreen(CollectionScreen.create());
+            } else {
+                var message = error == null && reply instanceof CollectionReply.Rejected rejected
+                        ? Component.translatable("duelcraft.collection.error_" + rejected.error().name().toLowerCase(Locale.ROOT), "")
+                        : Component.literal("Collection access failed; try again.");
+                player.sendSystemMessage(message);
+            }
+        }, minecraft::execute);
+        return 1;
     }
 
     private static int deckList(CommandContext<CommandSourceStack> ctx) {
