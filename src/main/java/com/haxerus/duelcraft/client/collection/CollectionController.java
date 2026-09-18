@@ -2,7 +2,8 @@ package com.haxerus.duelcraft.client.collection;
 
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.carddata.CardStringHelper;
-import com.haxerus.duelcraft.collection.DeckList;
+import com.haxerus.duelcraft.collection.CollectionCommand;
+import com.haxerus.duelcraft.collection.CollectionReply;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
@@ -21,7 +22,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.IntFunction;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -30,10 +36,14 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 final class CollectionController {
     private final UI ui;
     private final DeckEditorModel model;
-    private final List<CardInfo> cards;
+    private List<CardInfo> cards;
     private final Map<Integer, CardInfo> byCode = new HashMap<>();
     private final IntFunction<ResourceLocation> textures;
-    private final Consumer<DeckList> saveDraft;
+    private final SavedDeckController lists;
+    private final CollectionQuery search;
+    private long queryGeneration;
+    private boolean disposed;
+    private String catalogState = "";
     private final Runnable close;
     private final CollectionCardGrid collection;
     private int selectedCode;
@@ -54,14 +64,23 @@ final class CollectionController {
     private List<CardInfo> results = List.of();
 
     CollectionController(UI ui, DeckEditorModel model, List<CardInfo> cards,
-            IntFunction<ResourceLocation> textures, Consumer<DeckList> saveDraft, Runnable close) {
+            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search,
+            Function<CollectionCommand, CompletionStage<CollectionReply>> request,
+            Supplier<CompletionStage<ClientCollectionState.View>> refresh, Executor client, Runnable close) {
         this.ui = ui;
         this.model = model;
         this.cards = List.copyOf(cards);
         this.textures = textures;
-        this.saveDraft = saveDraft;
+        this.search = search;
+        lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
         this.close = close;
         for (var entry : Map.of("editor-title", "title", "sample-label", "sample", "editor-status", "unavailable").entrySet()) {
+            ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
+        }
+        for (var entry : Map.of("lists-title", "lists", "list-name-label", "list_name",
+                "list-supported-checks", "supported_checks", "list-save-first", "save_first",
+                "delete-title", "delete_confirm", "delete-copy", "delete_copy",
+                "close-title", "save_changes", "close-copy", "save_changes_copy").entrySet()) {
             ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
         }
         cards.forEach(card -> byCode.put(card.code(), card));
@@ -69,7 +88,7 @@ final class CollectionController {
         collection = new CollectionCardGrid(textures, this::selectCard);
         collection.setId("collection-results");
         element("collection-results-host").addChild(collection);
-        button("save-deck").setOnClick(event -> save());
+        button("save-deck").setOnClick(event -> lists.save());
         button("add-card").setOnClick(event -> edit(true));
         button("remove-card").setOnClick(event -> edit(false));
         for (var section : DeckEditorModel.Section.values()) {
@@ -107,13 +126,14 @@ final class CollectionController {
         element("collection-ownership").getStyle().tooltips(Component.literal("Missing: this draft needs more than you own."),
                 Component.literal("Extras: owned copies beyond this draft's requirement."));
         createFilters();
-        button("close-save").setOnClick(event -> { if (save()) close.run(); });
-        button("close-discard").setOnClick(event -> close.run());
-        button("close-cancel").setOnClick(event -> element("close-dialog").setDisplay(false));
-        for (String id : List.of("deposit-cards", "withdraw-card", "activate-deck")) {
-            element(id).setActive(false).getStyle()
+        button("close-save").setOnClick(event -> lists.save());
+        button("close-discard").setOnClick(event -> lists.discardNavigation());
+        button("close-cancel").setOnClick(event -> lists.cancelNavigation());
+        for (String unavailable : List.of("deposit-cards", "withdraw-card")) {
+            element(unavailable).setActive(false).getStyle()
                     .tooltips(Component.translatable("duelcraft.collection.unavailable"));
         }
+        configureLists();
         element("close-dialog").setDisplay(false);
         showFilters(false);
         refreshDecks();
@@ -121,6 +141,99 @@ final class CollectionController {
         refreshInspector(true);
         refreshResults(true);
         refreshChips();
+        lifecycleChanged();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void configureLists() {
+        button("saved-lists").setOnClick(event -> element("lists-dialog").setDisplay(true));
+        button("lists-close").setOnClick(event -> element("lists-dialog").setDisplay(false));
+        ((TextField) element("list-name")).setTextResponder(lists::rename);
+        ((Selector<UUID>) element("list-picker")).setOnValueChanged(target -> {
+            if (target != null && !target.equals(lists.id())) lists.navigate(() -> lists.select(target));
+        });
+        button("list-new").setOnClick(event -> lists.navigate(lists::newDraft));
+        button("list-rename").setOnClick(event -> lists.save());
+        button("list-duplicate").setOnClick(event -> { lists.duplicate(); lists.save(); });
+        button("list-delete").setOnClick(event -> element("delete-dialog").setDisplay(true));
+        button("delete-confirm").setOnClick(event -> {
+            element("delete-dialog").setDisplay(false);
+            lists.delete();
+        });
+        button("delete-cancel").setOnClick(event -> element("delete-dialog").setDisplay(false));
+        button("activate-deck").setText(Component.translatable("duelcraft.collection.activate"));
+        button("activate-deck").setOnClick(event -> lists.activate());
+        button("list-activate").setOnClick(event -> lists.activate());
+        button("list-clear-active").setOnClick(event -> lists.clearActive());
+        button("list-refresh").setOnClick(event -> lists.refresh());
+        element("lists-dialog").setDisplay(false);
+        element("delete-dialog").setDisplay(false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void lifecycleChanged() {
+        if (disposed) return;
+        var selector = (Selector<UUID>) element("list-picker");
+        var ids = lists.summaries().stream().map(CollectionReply.Summary::id).toList();
+        selector.setCandidates(ids).setCandidateUIProvider(UIElementProvider.text(id -> {
+            var summary = lists.summaries().stream().filter(value -> value.id().equals(id)).findFirst().orElse(null);
+            if (summary == null) return Component.translatable("duelcraft.collection.unsaved_list", lists.name());
+            return Component.literal(summary.name()).append(id.equals(lists.activeId())
+                    ? Component.translatable("duelcraft.collection.active_suffix") : Component.empty());
+        }));
+        selector.setValue(lists.id(), false);
+        ((TextField) element("list-name")).setText(lists.name(), false);
+        element("list-name").setActive(!lists.pending());
+        element("list-picker").setActive(!lists.pending() && lists.ready());
+        for (String id : List.of("save-deck", "list-new", "list-rename", "list-duplicate", "close-save", "close-discard", "close-cancel")) {
+            element(id).setActive(!lists.pending() && lists.ready());
+        }
+        element("list-delete").setActive(!lists.pending() && lists.ready() && lists.stored());
+        element("list-clear-active").setActive(!lists.pending() && lists.activeId() != null);
+        element("list-refresh").setActive(!lists.pending());
+        element("close-dialog").setDisplay(lists.needsDecision());
+        ((TextElement) element("sample-label")).setText(Component.literal(lists.name()));
+        ((TextElement) element("list-active-status")).setText(Component.translatable("duelcraft.collection." +
+                (lists.id().equals(lists.activeId()) ? "active" : "not_active")));
+        if (!lists.status().isEmpty()) ((TextElement) element("editor-status")).setText(
+                Component.translatable("duelcraft.collection." + lists.status(), failureDetail()));
+        refreshDecks();
+        refreshInspector(true);
+        refreshResults(false);
+    }
+
+    private Component failureDetail() {
+        String detail = lists.detail();
+        for (String code : List.of("STALE", "BUSY", "INELIGIBLE", "NOT_FOUND", "DATA_UNAVAILABLE", "INVALID")) {
+            if (detail.startsWith(code)) return Component.translatable("duelcraft.collection.error_" +
+                    code.toLowerCase(Locale.ROOT), detail.substring(code.length()));
+        }
+        return Component.literal(detail);
+    }
+
+    void initializeCollections() { lists.newDraft(); lists.refresh(); }
+
+    void setCatalog(List<CardInfo> cards, boolean failed) {
+        if (disposed) return;
+        this.cards = List.copyOf(cards);
+        byCode.clear();
+        cards.forEach(card -> byCode.put(card.code(), card));
+        if (selectedCode == 0 && !cards.isEmpty()) selectedCode = cards.getFirst().code();
+        catalogState = failed ? "catalog_failed" : cards.isEmpty() ? "catalog_empty" : "";
+        lifecycleChanged();
+    }
+
+    void catalogLoading() {
+        catalogState = "catalog_loading";
+        refreshResults(false);
+    }
+
+    void dispose() {
+        if (disposed) return;
+        disposed = true;
+        queryGeneration++;
+        lists.dispose();
+        search.close();
     }
 
     private UIElement element(String id) {
@@ -166,18 +279,20 @@ final class CollectionController {
 
     private void refreshInspector(boolean changedCard) {
         var card = byCode.get(selectedCode);
-        button("add-card").setActive(card != null);
-        button("remove-card").setActive(card != null && sectionCodes(selectedSection).contains(selectedCode));
+        button("add-card").setActive(!lists.pending() && card != null);
+        button("remove-card").setActive(!lists.pending() && sectionCodes(selectedSection).contains(selectedCode));
         for (var section : DeckEditorModel.Section.values()) {
             var target = element("section-" + section.name().toLowerCase(Locale.ROOT));
             if (section == selectedSection) target.addClass("selected");
             else target.removeClass("selected");
         }
         if (card == null) {
-            text("inspector-name", "Select a card");
-            return;
+            element("inspector-art").clearAllChildren();
+            text("inspector-name", selectedCode == 0 ? "Select a card" : "Passcode " + selectedCode);
+            text("inspector-stats", "");
+            ((TextElement) element("inspector-description")).setText(Component.translatable("duelcraft.collection.unknown_card"));
         }
-        if (changedCard) {
+        if (card != null && changedCard) {
             element("inspector-art").clearAllChildren();
             element("inspector-art").addChild(new CollectionCardGrid.CardTile(card, textures, () -> {})
                     .addClass("inspector-card"));
@@ -200,7 +315,7 @@ final class CollectionController {
     }
 
     private void edit(boolean add) {
-        if (selectedCode == 0) return;
+        if (selectedCode == 0 || lists.pending()) return;
         if (add) model.add(selectedSection, selectedCode);
         else if (!model.remove(selectedSection, selectedCode)) return;
         if (selectedSection == DeckEditorModel.Section.SIDE) sideOpen = true;
@@ -225,7 +340,7 @@ final class CollectionController {
             var codes = sectionCodes(section);
             for (int index = 0; index < codes.size(); index++) {
                 int code = codes.get(index);
-                var card = byCode.getOrDefault(code, new CardInfo(code, "Unknown card", "No sample metadata.", 0, 0, 0, 0, 0, 0));
+                var card = byCode.getOrDefault(code, new CardInfo(code, "Passcode " + code, "Metadata unavailable.", 0, 0, 0, 0, 0, 0));
                 var tile = new CollectionCardGrid.CardTile(card, textures, () -> {
                     selectedSection = section;
                     selectCard(code);
@@ -253,7 +368,12 @@ final class CollectionController {
         if (draft.requiredCopies().values().stream().anyMatch(count -> count > 3)) warnings.add("More than 3 copies");
         if (missing > 0) warnings.add(missing + " missing");
         text("deck-summary", "Main " + draft.main().size() + " · Extra " + draft.extra().size()
-                + " · Side " + draft.side().size() + (model.dirty() ? " · Unsaved changes" : " · Sample draft"));
+                + " · Side " + draft.side().size() + (lists.dirty() ? " · Unsaved changes" : " · Saved list"));
+        for (String id : List.of("activate-deck", "list-activate")) {
+            element(id).setActive(!lists.pending() && lists.ready() && lists.stored() && !lists.dirty());
+            element(id).getStyle().tooltips(Component.translatable("duelcraft.collection." +
+                    (lists.dirty() ? "save_first" : "supported_checks")));
+        }
         text("deck-warnings", warnings.isEmpty() ? "Drafts may be saved without owning every card." : String.join(" · ", warnings));
     }
 
@@ -280,35 +400,26 @@ final class CollectionController {
     }
 
     private void refreshResults(boolean reset) {
-        var found = CardSearch.search(cards, query, filters, model.owned(), model.draft());
-        boolean changed = !found.equals(results);
-        if (changed) {
-            results = found;
-            collection.showCards(results);
-        }
-        collection.setPresentation(selectedCode, code -> model.owned().getOrDefault(code, 0L)
-                + " / " + model.draft().requiredCopies().getOrDefault(code, 0));
-        if (reset || changed) collection.scrollToTop();
-        text("result-count", results.size() + " cards · owned / in list");
-        element("collection-empty").setDisplay(results.isEmpty());
-    }
-
-    private boolean save() {
-        try {
-            saveDraft.accept(model.draft());
-            model.markSaved();
-            refreshSummary();
-            text("editor-status", "Sample draft saved in memory. Missing copies remain marked.");
-            return true;
-        } catch (RuntimeException failure) {
-            text("editor-status", "Save failed: " + (failure.getMessage() == null ? "try again" : failure.getMessage()) + ". Your draft is retained.");
-            return false;
-        }
+        long generation = ++queryGeneration;
+        search.submit(cards, query, filters, model.owned(), model.draft(), found -> {
+            if (disposed || generation != queryGeneration) return;
+            boolean changed = !found.equals(results);
+            if (changed) {
+                results = found;
+                collection.showCards(results);
+            }
+            collection.setPresentation(selectedCode, code -> model.owned().getOrDefault(code, 0L)
+                    + " / " + model.draft().requiredCopies().getOrDefault(code, 0));
+            if (reset || changed) collection.scrollToTop();
+            text("result-count", results.size() + " cards · owned / in list");
+            element("collection-empty").setDisplay(results.isEmpty());
+            ((TextElement) element("collection-empty")).setText(Component.translatable("duelcraft.collection." +
+                    (catalogState.isEmpty() ? "no_matches" : catalogState)));
+        });
     }
 
     void requestClose() {
-        if (model.dirty()) element("close-dialog").setDisplay(true);
-        else close.run();
+        lists.navigate(close);
     }
 
     private void showFilters(boolean open) {

@@ -23,7 +23,10 @@ public final class CollectionLayoutScenario implements UIScenario {
         s.openScreen("sample collection", ctx -> {
             var model = ctx.put("model", CollectionFixture.model(false));
             return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
-                    draft -> ctx.put("saved", draft));
+                    CollectionFixture.LIST_ID, (name, draft) -> {
+                        ctx.put("saved", draft);
+                        return CollectionFixture.saved(name, draft);
+                    }, CollectionFixture.query());
         }).awaitModularUI().ticks(3);
         for (var id : new String[]{"collection-root", "collection-canvas", "editor-header", "save-deck",
                 "editor-body", "card-inspector", "card-details-scroll", "card-edit-controls", "add-card",

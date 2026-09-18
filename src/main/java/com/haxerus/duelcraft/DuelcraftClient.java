@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.client.ClientPayloadHandler;
 import com.haxerus.duelcraft.client.collection.CollectionCatalog;
 import com.haxerus.duelcraft.client.collection.CollectionClient;
+import com.haxerus.duelcraft.client.collection.CollectionScreen;
 import com.haxerus.duelcraft.client.carddata.CardDatabase;
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.core.data.CardData;
@@ -46,6 +47,7 @@ public class DuelcraftClient {
 
     /** Leaving the server drops any duel screen state, so a rejoin cannot resume a dead duel. */
     private static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        if (Minecraft.getInstance().screen instanceof CollectionScreen screen) screen.disconnect();
         collectionClient.disconnect();
         LDLibDuelScreen.close();
     }

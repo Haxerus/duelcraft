@@ -21,6 +21,14 @@
         #editor-title { height: 22; }
         #save-deck { width: 182; height: 36; }
         #sample-label { width: 230; text-wrap: wrap; adaptive-height: true; text-color: #AAAAAA; }
+        #saved-lists { width: 110; }
+        #lists-dialog, #delete-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
+        #delete-dialog { z-index: 110; }
+        #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #lists-panel .row button { flex: 1; min-width: 0; }
+        #list-picker, #list-name { width: 100%; }
+        #delete-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #delete-panel button { flex: 1; }
         #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
         #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: built-in(ui-gdp:RECT); }
         #card-details-scroll { flex: 1; min-height: 0; }
@@ -102,6 +110,7 @@
                     <label id="deck-summary" />
                 </element>
                 <label id="sample-label">duelcraft.collection.sample</label>
+                <button id="saved-lists" text="duelcraft.collection.lists" />
                 <button id="save-deck" text="duelcraft.collection.save" />
             </element>
             <element id="editor-body">
@@ -186,10 +195,43 @@
                 <button id="card-density" text="Cards: Standard" />
             </element>
             <label id="editor-status">duelcraft.collection.unavailable</label>
+            <element id="lists-dialog">
+                <element id="lists-panel">
+                    <label id="lists-title" class="heading">duelcraft.collection.lists</label>
+                    <selector id="list-picker" />
+                    <label id="list-name-label">duelcraft.collection.list_name</label>
+                    <text-field id="list-name" />
+                    <label id="list-active-status" />
+                    <element class="row">
+                        <button id="list-new" text="duelcraft.collection.new" />
+                        <button id="list-rename" text="duelcraft.collection.rename" />
+                        <button id="list-duplicate" text="duelcraft.collection.duplicate" />
+                        <button id="list-delete" text="duelcraft.collection.delete" />
+                    </element>
+                    <element class="row">
+                        <button id="list-activate" text="duelcraft.collection.activate" />
+                        <button id="list-clear-active" text="duelcraft.collection.clear_active" />
+                        <button id="list-refresh" text="duelcraft.collection.refresh" />
+                        <button id="lists-close" text="duelcraft.collection.done" />
+                    </element>
+                    <label id="list-supported-checks" class="wrap muted">duelcraft.collection.supported_checks</label>
+                    <label id="list-save-first" class="wrap muted">duelcraft.collection.save_first</label>
+                </element>
+            </element>
+            <element id="delete-dialog">
+                <element id="delete-panel">
+                    <label id="delete-title" class="heading">duelcraft.collection.delete_confirm</label>
+                    <label id="delete-copy" class="wrap">duelcraft.collection.delete_copy</label>
+                    <element class="row">
+                        <button id="delete-confirm" text="duelcraft.collection.delete" />
+                        <button id="delete-cancel" text="duelcraft.collection.cancel" />
+                    </element>
+                </element>
+            </element>
             <element id="close-dialog">
                 <element id="close-panel">
-                    <label class="heading">Save changes to the sample draft?</label>
-                    <label class="wrap">Saving keeps the list in memory for this sample session.</label>
+                    <label id="close-title" class="heading">duelcraft.collection.save_changes</label>
+                    <label id="close-copy" class="wrap">duelcraft.collection.save_changes_copy</label>
                     <element class="row">
                         <button id="close-save" text="Save" />
                         <button id="close-discard" text="Discard" />

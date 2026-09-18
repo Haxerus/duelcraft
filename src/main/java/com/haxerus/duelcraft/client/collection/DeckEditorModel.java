@@ -11,7 +11,8 @@ public final class DeckEditorModel {
 
     private DeckList draft;
     private DeckList saved;
-    private final Map<Integer, Long> owned;
+    private Map<Integer, Long> owned;
+    private boolean frozen;
 
     public DeckEditorModel(DeckList initial, Map<Integer, Long> owned) {
         draft = initial;
@@ -21,14 +22,21 @@ public final class DeckEditorModel {
 
     public DeckList draft() { return draft; }
     public Map<Integer, Long> owned() { return owned; }
+    public void replaceOwnership(Map<Integer, Long> counts) { owned = Map.copyOf(counts); }
+    void setFrozen(boolean frozen) { this.frozen = frozen; }
+    void load(DeckList cards) { draft = cards; saved = cards; }
+    void acknowledge(DeckList cards) { saved = cards; }
+    void discard() { draft = saved; }
 
     public void add(Section section, int code) {
+        requireEditable();
         var cards = new ArrayList<>(cards(section));
         cards.add(code);
         replace(section, cards);
     }
 
     public boolean remove(Section section, int code) {
+        requireEditable();
         var cards = new ArrayList<>(cards(section));
         if (!cards.remove(Integer.valueOf(code))) return false;
         replace(section, cards);
@@ -57,4 +65,7 @@ public final class DeckEditorModel {
 
     public boolean dirty() { return !draft.equals(saved); }
     public void markSaved() { saved = draft; }
+    private void requireEditable() {
+        if (frozen) throw new IllegalStateException("Wait for the pending collection operation");
+    }
 }

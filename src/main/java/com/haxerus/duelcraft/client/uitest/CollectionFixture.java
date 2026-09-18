@@ -2,12 +2,17 @@ package com.haxerus.duelcraft.client.uitest;
 
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.collection.DeckEditorModel;
+import com.haxerus.duelcraft.client.collection.CollectionQuery;
+import com.haxerus.duelcraft.client.collection.CardSearch;
+import com.haxerus.duelcraft.collection.SavedDeck;
 import com.haxerus.duelcraft.collection.DeckList;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
@@ -15,6 +20,13 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 /** Sample data only: no database, image service, inventory, or server state. */
 public final class CollectionFixture {
     public static final int FIRST = 10001;
+    public static final UUID LIST_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    public static CompletableFuture<SavedDeck> saved(String name, DeckList cards) {
+        return CompletableFuture.completedFuture(new SavedDeck(LIST_ID, name, cards));
+    }
+    public static CollectionQuery query() {
+        return (cards, text, filters, counts, draft, apply) -> apply.accept(CardSearch.search(cards, text, filters, counts, draft));
+    }
     private CollectionFixture() {}
 
     public static List<CardInfo> cards() {

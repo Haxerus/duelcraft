@@ -29,7 +29,8 @@ public final class CollectionOverflowScenario implements UIScenario {
     public void define(ScenarioBuilder s) {
         s.openScreen("full sample deck", ctx -> {
             var model = ctx.put("model", CollectionFixture.model(true));
-            return CollectionScreen.create(model, CollectionFixture.cards(), code -> null, draft -> ctx.put("saved", draft));
+            return CollectionScreen.create(model, CollectionFixture.cards(), code -> null, CollectionFixture.LIST_ID,
+                    (name, draft) -> { ctx.put("saved", draft); return CollectionFixture.saved(name, draft); }, CollectionFixture.query());
         }).awaitModularUI().ticks(3)
          .click("#card-density").ticks(2)
          .click("#section-side").ticks(2);
@@ -121,7 +122,8 @@ public final class CollectionOverflowScenario implements UIScenario {
          .openScreen("16000-card catalog", ctx -> {
              var requested = ctx.put("textures", new HashSet<Integer>());
              return CollectionScreen.create(new DeckEditorModel(new DeckList(List.of(), List.of(), List.of()), Map.of()),
-                     CollectionFixture.largeCatalog(), code -> { requested.add(code); return null; }, draft -> {});
+                     CollectionFixture.largeCatalog(), code -> { requested.add(code); return null; }, CollectionFixture.LIST_ID,
+                     CollectionFixture::saved, CollectionFixture.query());
          }).awaitModularUI().ticks(4)
          .check("16000 cards mount bounded rows", CollectionOverflowScenario::boundedRows)
          .check("texture requests limited to mounted cards and inspector", ctx ->

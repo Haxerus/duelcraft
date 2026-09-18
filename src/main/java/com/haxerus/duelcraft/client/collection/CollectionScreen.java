@@ -2,6 +2,9 @@ package com.haxerus.duelcraft.client.collection;
 
 import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.collection.DeckList;
+import com.haxerus.duelcraft.DuelcraftClient;
+import com.haxerus.duelcraft.collection.CollectionCommand;
+import com.haxerus.duelcraft.collection.CollectionReply;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
@@ -10,10 +13,17 @@ import com.lowdragmc.lowdraglib2.math.Size;
 import com.lowdragmc.lowdraglib2.utils.XmlUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.IntFunction;
 
 /** Independent fixed-canvas host; resizing keeps the editor and its draft alive. */
@@ -24,21 +34,56 @@ public final class CollectionScreen extends ModularUIScreen {
     private final CollectionController controller;
 
     private CollectionScreen(ModularUI ui, DeckEditorModel model, List<CardInfo> cards,
-            IntFunction<ResourceLocation> textures, Consumer<DeckList> saveDraft) {
+            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search,
+            Function<CollectionCommand, CompletionStage<CollectionReply>> request,
+            Supplier<CompletionStage<ClientCollectionState.View>> refresh, Executor client) {
         super(ui, Component.translatable("duelcraft.collection.title"));
         canvas = ui.ui.selectId("collection-canvas").findFirst().orElseThrow();
-        controller = new CollectionController(ui.ui, model, cards, textures, saveDraft, super::onClose);
+        controller = new CollectionController(ui.ui, model, cards, textures, id, saveDraft, search, request, refresh, client, super::onClose);
     }
 
     public static CollectionScreen create(DeckEditorModel model, List<CardInfo> cards,
-            IntFunction<ResourceLocation> textures, Consumer<DeckList> saveDraft) {
+            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search) {
+        return create(model, cards, textures, id, saveDraft, search,
+                command -> CompletableFuture.failedFuture(new IllegalStateException("Sample list actions unavailable")),
+                () -> CompletableFuture.completedFuture(new ClientCollectionState.View(0, model.owned(), List.of(), null)), Runnable::run);
+    }
+
+    /** Real private collection; routing to this screen is supplied by the later management milestone. */
+    public static CollectionScreen create() {
+        Executor client = Minecraft.getInstance()::execute;
+        var connection = DuelcraftClient.getCollectionClient();
+        var worker = new CollectionSearchWorker(client);
+        CollectionQuery search = new CollectionQuery() {
+            @Override public void submit(List<CardInfo> cards, String text, CardSearch.Filters filters,
+                    Map<Integer, Long> counts, DeckList draft, java.util.function.Consumer<List<CardInfo>> apply) {
+                worker.submit(cards, text, filters, counts, draft, apply);
+            }
+            @Override public void close() { worker.close(); }
+        };
+        var model = new DeckEditorModel(new DeckList(List.of(), List.of(), List.of()), Map.of());
+        var screen = create(model, List.of(), code -> {
+            var images = DuelcraftClient.getCardImageManager();
+            return images == null ? null : images.getCardTexture(code);
+        }, UUID.randomUUID(), null, search, connection::request, connection::refresh, client);
+        screen.controller.catalogLoading();
+        screen.controller.initializeCollections();
+        DuelcraftClient.getCollectionCatalog().whenCompleteAsync((cards, error) ->
+                screen.controller.setCatalog(error == null ? cards : List.of(), error != null), client);
+        return screen;
+    }
+
+    private static CollectionScreen create(DeckEditorModel model, List<CardInfo> cards,
+            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search,
+            Function<CollectionCommand, CompletionStage<CollectionReply>> request,
+            Supplier<CompletionStage<ClientCollectionState.View>> refresh, Executor client) {
         var location = ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/collection_screen.xml");
         var document = XmlUtils.loadXml(location);
         if (document == null) throw new IllegalStateException("Failed to load " + location);
         var parsed = UI.of(document);
         var ui = UI.of(parsed.rootElement, parsed.stylesheets,
                 size -> Size.of(DESIGN_WIDTH, DESIGN_HEIGHT));
-        return new CollectionScreen(ModularUI.of(ui), model, cards, textures, saveDraft);
+        return new CollectionScreen(ModularUI.of(ui), model, cards, textures, id, saveDraft, search, request, refresh, client);
     }
 
     @Override
@@ -54,6 +99,14 @@ public final class CollectionScreen extends ModularUIScreen {
     public void onClose() {
         controller.requestClose();
     }
+
+    @Override public void removed() {
+        controller.dispose();
+        super.removed();
+    }
+
+    /** Logout invalidates private callbacks before Minecraft replaces the screen. */
+    public void disconnect() { controller.dispose(); }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {

@@ -13,6 +13,16 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DeckEditorModelTest {
+    @Test void ownershipRefreshPreservesDraftAndAcknowledgedBaseline() {
+        var model = new DeckEditorModel(empty(), Map.of());
+        model.add(DeckEditorModel.Section.MAIN, 1);
+        model.replaceOwnership(Map.of(1, 2L));
+        assertTrue(model.dirty());
+        assertEquals(List.of(1), model.draft().main());
+        assertEquals(0, model.missing(1));
+        model.remove(DeckEditorModel.Section.MAIN, 1);
+        assertFalse(model.dirty());
+    }
     private static DeckList empty() {
         return new DeckList(List.of(), List.of(), List.of());
     }

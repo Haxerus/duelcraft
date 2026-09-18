@@ -201,12 +201,13 @@ public final class CollectionSearchScenario implements UIScenario {
             ctx.put("initial", model.draft());
             ctx.put("failSave", false);
             ctx.put("saveCalls", 0);
-            return CollectionScreen.create(model, CollectionFixture.cards(), code -> null, snapshot -> {
+            return CollectionScreen.create(model, CollectionFixture.cards(), code -> null, CollectionFixture.LIST_ID, (listName, snapshot) -> {
                 ctx.put("attempted", snapshot);
                 ctx.put("saveCalls", ctx.<Integer>get("saveCalls") + 1);
                 if (ctx.<Boolean>get("failSave")) throw new IllegalStateException("Sample save failure");
                 ctx.put("saved", snapshot);
-            });
+                return CollectionFixture.saved(listName, snapshot);
+            }, CollectionFixture.query());
         }).awaitModularUI().ticks(2);
     }
 
