@@ -4,12 +4,26 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CollectionAttachmentTest {
+    @ParameterizedTest
+    @MethodSource("com.haxerus.duelcraft.collection.PlayerCollectionDataTest#malformedIntegerTags")
+    void corruptIntegerFieldsRemainUnreadableAndPreserveRawNbt(CompoundTag raw) {
+        var expected = raw.copy();
+        var unreadable = CollectionAttachment.SERIALIZER.read(null, raw, null);
+        assertTrue(unreadable.data().isEmpty());
+        raw.putString("laterMutation", "must not leak");
+        var written = CollectionAttachment.SERIALIZER.write(unreadable, null);
+        assertEquals(expected, written);
+        assertTrue(CollectionAttachment.SERIALIZER.read(null, written, null).data().isEmpty());
+    }
+
     @Test void validDataSurvivesSerializerCopy() {
         var original = new PlayerCollectionData(4, Map.of(1, 1000L), Map.of(), null);
         var encoded = CollectionAttachment.SERIALIZER.write(CollectionAttachment.valid(original), null);

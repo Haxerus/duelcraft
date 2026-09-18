@@ -2,11 +2,8 @@ package com.haxerus.duelcraft.collection;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
-import com.mojang.serialization.DynamicOps;
-import com.mojang.serialization.codecs.PrimitiveCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import org.jetbrains.annotations.Nullable;
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,32 +12,20 @@ import java.util.UUID;
 
 public record PlayerCollectionData(long revision, Map<Integer, Long> counts,
                                    Map<UUID, SavedDeck> decks, @Nullable UUID activeDeckId) {
-    // Codec.LONG coerces floating-point values with longValue(), which can silently saturate overflow.
-    private static final Codec<Long> EXACT_LONG = new PrimitiveCodec<>() {
-        @Override public <T> DataResult<Long> read(DynamicOps<T> ops, T input) {
-            return ops.getNumberValue(input).flatMap(number -> {
-                try {
-                    return DataResult.success(new BigDecimal(number.toString()).longValueExact());
-                } catch (ArithmeticException | NumberFormatException exception) {
-                    return DataResult.error(() -> "Expected a signed 64-bit integer");
-                }
-            });
-        }
-        @Override public <T> T write(DynamicOps<T> ops, Long value) { return ops.createLong(value); }
-    };
     private record Count(int code, long count) {
         private static final Codec<Count> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-                Codec.intRange(1, Integer.MAX_VALUE).fieldOf("code").forGetter(Count::code),
-                EXACT_LONG.validate(count -> count > 0 ? DataResult.success(count)
+                CollectionCodecs.PASSCODE.fieldOf("code").forGetter(Count::code),
+                CollectionCodecs.LONG.validate(count -> count > 0 ? DataResult.success(count)
                         : DataResult.error(() -> "Collection counts must be positive"))
                         .fieldOf("count").forGetter(Count::count)
         ).apply(instance, Count::new));
     }
     private record Stored(int schema, long revision, List<Count> counts, List<SavedDeck> decks, Optional<UUID> activeDeckId) {
         private static final Codec<Stored> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-                Codec.intRange(CollectionLimits.SCHEMA_VERSION, CollectionLimits.SCHEMA_VERSION)
+                CollectionCodecs.INT.validate(schema -> schema == CollectionLimits.SCHEMA_VERSION
+                                ? DataResult.success(schema) : DataResult.error(() -> "Unsupported collection schema"))
                         .fieldOf("schema").forGetter(Stored::schema),
-                EXACT_LONG.fieldOf("revision").forGetter(Stored::revision),
+                CollectionCodecs.LONG.fieldOf("revision").forGetter(Stored::revision),
                 Count.CODEC.listOf().fieldOf("counts").forGetter(Stored::counts),
                 SavedDeck.CODEC.listOf().fieldOf("decks").forGetter(Stored::decks),
                 SavedDeck.UUID_CODEC.optionalFieldOf("activeDeckId").forGetter(Stored::activeDeckId)

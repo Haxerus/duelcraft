@@ -17,9 +17,9 @@ public record SavedDeck(UUID id, String name, DeckList cards) {
         }
     }, UUID::toString);
     private static final Codec<DeckList> CARDS_CODEC = RecordCodecBuilder.<DeckList>create(instance -> instance.group(
-            Codec.intRange(1, Integer.MAX_VALUE).listOf(0, CollectionLimits.DRAFT_CARDS).fieldOf("main").forGetter(DeckList::main),
-            Codec.intRange(1, Integer.MAX_VALUE).listOf(0, CollectionLimits.DRAFT_CARDS).fieldOf("extra").forGetter(DeckList::extra),
-            Codec.intRange(1, Integer.MAX_VALUE).listOf(0, CollectionLimits.DRAFT_CARDS).fieldOf("side").forGetter(DeckList::side)
+            CollectionCodecs.PASSCODE.listOf(0, CollectionLimits.DRAFT_CARDS).fieldOf("main").forGetter(DeckList::main),
+            CollectionCodecs.PASSCODE.listOf(0, CollectionLimits.DRAFT_CARDS).fieldOf("extra").forGetter(DeckList::extra),
+            CollectionCodecs.PASSCODE.listOf(0, CollectionLimits.DRAFT_CARDS).fieldOf("side").forGetter(DeckList::side)
     ).apply(instance, DeckList::new)).validate(cards -> total(cards) <= CollectionLimits.DRAFT_CARDS
             ? DataResult.success(cards) : DataResult.error(() -> "Draft exceeds the 512-card editor limit"));
     public static final Codec<SavedDeck> CODEC = RecordCodecBuilder.create(instance -> instance.group(

@@ -3,14 +3,19 @@ package com.haxerus.duelcraft.collection;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.LongTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -132,6 +137,29 @@ class PlayerCollectionDataTest {
         tag = encode(data);
         tag.putString("activeDeckId", "invalid");
         reject(tag);
+    }
+
+    @ParameterizedTest
+    @MethodSource("malformedIntegerTags")
+    void codecRejectsFractionalAndOverflowingSchemaAndPasscodes(CompoundTag tag) {
+        reject(tag);
+    }
+
+    static Stream<CompoundTag> malformedIntegerTags() {
+        return Stream.of("schema", "code", "main", "extra", "side").flatMap(field ->
+                Stream.of(DoubleTag.valueOf(1.5), LongTag.valueOf(4294967297L)).map(number -> {
+                    var tag = encode(new PlayerCollectionData(0, Map.of(1, 1L), Map.of(ID, draft()), null));
+                    if (field.equals("schema")) {
+                        tag.put(field, number);
+                    } else if (field.equals("code")) {
+                        tag.getList("counts", Tag.TAG_COMPOUND).getCompound(0).put(field, number);
+                    } else {
+                        var cards = new ListTag();
+                        cards.add(number);
+                        tag.getList("decks", Tag.TAG_COMPOUND).getCompound(0).getCompound("cards").put(field, cards);
+                    }
+                    return tag;
+                }));
     }
 
     private static SavedDeck draft() {
