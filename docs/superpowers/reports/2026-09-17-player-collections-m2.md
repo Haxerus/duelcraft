@@ -1,6 +1,6 @@
 # Milestone 2 — persistent collections and saved lists
 
-Implementation branch: `codex/player-collections`, worktree `.superpowers/worktrees/deck-editor`. Baseline was the approved M1 reconciled onto main, not the abandoned duplicate editor work. Milestone verification is recorded here; root's independent broad review follows this handoff. No merge or push is included.
+Implementation branch: `codex/player-collections`, worktree `.superpowers/worktrees/deck-editor`. Baseline was the approved M1 reconciled onto main, not the abandoned duplicate editor work. All task reviews, the whole-branch review and the scoped final-fix review are complete as of 2026-09-18. No merge or push is included.
 
 ## Delivered behavior
 
@@ -66,8 +66,16 @@ The focused real-widget `collection_eligibility` scenario failed before the deta
 
 Inspected all three final `green-scroll` captures: `16_owned-placement-rejection.png` identifies owned Fusion passcode 10066 and the move to Extra; `36_saved-active-cleared.png` explains the successful Save and cleared activation; `56_shortage-and-omitted-problems.png` shows the bottom of the bounded scroller with missing passcode/count and the omission notice. Reasons fit inside the modal; the large report is not concatenated into the status line. The scenario uses the existing private injection factory without production test instrumentation. No native, server, protocol, privacy or retained-world source changed, and none of those unchanged runtime journeys was rerun.
 
-The minor privacy audit expansion remains explicitly deferred: initial/intermediate foreign revisions are not comprehensively audited, with no observed production leak. Earlier exact-content and finite idle-window evidence remains valid within its stated scope. Existing startup/shutdown and dropdown warnings remain documented above. This fix addresses the review findings; independent scoped re-review and milestone acceptance are still pending with root. No merge/push or next milestone is included.
+The minor privacy audit expansion remains explicitly deferred: initial/intermediate foreign revisions are not comprehensively audited, with no observed production leak. Earlier exact-content and finite idle-window evidence remains valid within its stated scope. Existing startup/shutdown and dropdown warnings remain documented above. The scoped re-review approved this fix and M2 acceptance; no new blocking findings remained. No merge/push or next milestone is included.
 
 ## Remaining milestones
 
-M3 physical card items/deposit/withdrawal and conservation, M4 authoritative preparation/YDK import and legacy removal, M5 player home/binder/mat/lobby, and M6 release validation remain. M2 exposes the real editor only through a development command; production entry points follow in M5. The legacy raw upload/deck command paths still bypass collection ownership until M4, so this intermediate branch is not a collection-enforced release. No M3 transfers were implemented. Root must complete independent broad review before state/acknowledgement acceptance and the next milestone.
+M3 physical card items/deposit/withdrawal and conservation, M4 authoritative preparation/YDK import and legacy removal, M5 player home/binder/mat/lobby, and M6 release validation remain. M2 exposes the real editor only through a development command; production entry points follow in M5. The legacy raw upload/deck command paths still bypass collection ownership until M4, so this intermediate branch is not a collection-enforced release. No M3 transfers were implemented. M2 state and acknowledgement acceptance is complete; M3–M6 implementation has not started.
+
+## Final review and verification — 2026-09-18
+
+Whole-branch review covered `bc2fcba..2e68f5f`; scoped re-review approved the consolidated fix `2e68f5f..2381c3f`. The eligibility-feedback omission and screenshot wording are resolved. The documented privacy receipt-audit coverage gap remains nonblocking and deferred. No additional production issue was found.
+
+After the final production change, a fresh `gradlew.bat test --console=plain` on `2381c3f` completed BUILD SUCCESSFUL in 20s with the normal native prerequisites: **850 tests across 51 suites, zero failures, errors or skips**. The reviewer independently summed these XML results. Current full-suite evidence is `build/evidence/collection-m2/final-full-test/`; the earlier 846-test evidence remains separately preserved. The final feedback scenario passed 23/23 checks, including a 64-issue scroll, in addition to the unchanged earlier runtime evidence.
+
+M2 is ready for integration on `codex/player-collections`. The branch and worktree remain local and unmerged. Development history, all review reports and the complete chronological ruling ledger are preserved under `build/evidence/collection-m2/development-history/`. The two remaining implementation decisions beyond the summary above were to wire the actual M1 asynchronous lifecycle/unknown-passcode seams (avoiding lost drafts), and to require exact integer decoding instead of NBT numeric coercion (preserving corrupt data for recovery). The ledger also retains the repeated confirmation that revision 10 is acceptable disposable fixture metadata; no player-owned saved or active state was fabricated.

@@ -10,7 +10,7 @@
 
 **Spec:** [Product design](../specs/2026-09-15-player-interaction-design.md) and [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md). Dependency: completed [milestone 1](2026-09-15-deck-editor-milestone-1.md), implemented through `2030dae` in `codex/deck-editor-m1` and reconciled onto current main. Its actual model/controller/scenario interfaces are the starting point; see the [M1 report](../reports/2026-09-17-deck-editor-m1.md).
 
-**Implementation verification:** Tasks 1–5 are implemented and individually reviewed through 5B, with 5C lifecycle/full-suite evidence recorded in the [M2 report](../reports/2026-09-17-player-collections-m2.md). Independent broad review remains pending; no M3 work or merge/push is included.
+**Implementation verification:** Tasks 1–5, the whole-branch review and the final scoped fix review are complete, with 850 final unit/JNI tests and lifecycle evidence recorded in the [M2 report](../reports/2026-09-17-player-collections-m2.md). M2 is ready for integration; no M3 work or merge/push is included.
 
 ## Global constraints
 
