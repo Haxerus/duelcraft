@@ -1,0 +1,102 @@
+// Adapted from LDLib2 gradle/ldlib2-mptest.gradle (LDLib2 2.2.39.a), for ModDevGradle.
+// Uses the upstream coordinator and isolated disposable game directories.
+def ldMpOutDir = layout.buildDirectory.dir('ldlib2-mptest').get().asFile.absolutePath
+def ldMpHub = (project.findProperty('ldMpHub') ?: '').toString()
+
+// Pinned upstream Hub logs loopback but binds wildcard. Compile its exact source with only
+// the IPv4 bind corrected; this override is confined to the coordinator task's classpath.
+configurations { ldMpPinnedSources { transitive = false } }
+dependencies { ldMpPinnedSources 'com.lowdragmc.ldlib2:ldlib2-neoforge-1.21.1:2.2.39.a:sources' }
+def ldMpSourceJar = configurations.ldMpPinnedSources.singleFile
+def ldMpRuntime = files(configurations.runtimeClasspath.filter {
+    it.name.contains('gson') || it.name.startsWith('ldlib2')
+})
+def ldMpGeneratedSource = layout.buildDirectory.file('generated/ldlib2-mptest/MPTestOrchestrator.java').get().asFile
+def ldMpLoopbackClasses = layout.buildDirectory.dir('classes/ldlib2-mptest-loopback')
+def prepareMpLoopback = tasks.register('prepareMpLoopback') {
+    inputs.file(ldMpSourceJar)
+    outputs.file(ldMpGeneratedSource)
+    doLast {
+        if (ldMpSourceJar.name != 'ldlib2-neoforge-1.21.1-2.2.39.a-sources.jar') {
+            throw new GradleException('MP loopback source override requires pinned LDLib2 2.2.39.a')
+        }
+        def source
+        new java.util.zip.ZipFile(ldMpSourceJar).withCloseable { zip ->
+            def entry = zip.getEntry('com/lowdragmc/lowdraglib2/uitest/mp/MPTestOrchestrator.java')
+            if (entry == null) throw new GradleException('Pinned MPTestOrchestrator source missing')
+            source = zip.getInputStream(entry).withCloseable { it.getText('UTF-8') }
+        }
+        def original = 'new ServerSocket(0)'
+        if (source.count(original) != 1) throw new GradleException('Pinned MP hub bind source changed; review before updating')
+        ldMpGeneratedSource.parentFile.mkdirs()
+        ldMpGeneratedSource.setText(source.replace(original,
+                'new ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))'), 'UTF-8')
+    }
+}
+def compileMpLoopback = tasks.register('compileMpLoopback', JavaCompile) {
+    dependsOn prepareMpLoopback
+    source ldMpGeneratedSource
+    destinationDirectory = ldMpLoopbackClasses
+    classpath = ldMpRuntime
+    javaCompiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+neoForge.runs {
+    mpServer {
+        server()
+        gameDirectory = project.file('runs/mpServer')
+        programArgument '--nogui'
+        systemProperty 'ldlib2.mptest.role', 'server'
+        systemProperty 'ldlib2.mptest.out', "$ldMpOutDir/server"
+        systemProperty 'ldlib2.mptest.hub', ldMpHub
+    }
+    ['A', 'B'].each { role ->
+        create("mpClient$role") {
+            client()
+            gameDirectory = project.file("runs/mpClient$role")
+            programArguments.addAll '--username', "LDTest$role", '--width', '1280', '--height', '720'
+            systemProperty 'ldlib2.mptest.role', role
+            systemProperty 'ldlib2.mptest.out', "$ldMpOutDir/client$role"
+            systemProperty 'ldlib2.mptest.hub', ldMpHub
+        }
+    }
+}
+
+// The coordinator prepares server.properties before launching this fresh child build.
+def ldMpServerProperties = project.file('runs/mpServer/server.properties')
+tasks.named('runMpServer').configure {
+    doFirst {
+        def propertiesFile = ldMpServerProperties
+        def settings = new Properties()
+        if (propertiesFile.exists()) propertiesFile.withInputStream { settings.load(it) }
+        settings.setProperty('server-ip', '127.0.0.1')
+        propertiesFile.parentFile.mkdirs()
+        propertiesFile.withOutputStream { settings.store(it, 'Isolated LDLib2 MP test server') }
+    }
+}
+
+tasks.register('runMpTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs LDLib2 dedicated-server scenarios with separate A/B clients.'
+    dependsOn 'classes', compileMpLoopback
+    classpath = files(ldMpLoopbackClasses, sourceSets.main.output, ldMpRuntime)
+    mainClass = 'com.lowdragmc.lowdraglib2.uitest.mp.MPTestOrchestrator'
+    args '--projectDir', project.projectDir.absolutePath, '--out', ldMpOutDir,
+            '--selection', (project.findProperty('ldMpTest') ?: 'group:duelcraft').toString(),
+            '--clients', (project.findProperty('ldMpClients') ?: 'A,B').toString()
+    ignoreExitValue = true
+    finalizedBy 'verifyMpTest'
+}
+
+tasks.register('verifyMpTest') {
+    group = 'verification'
+    description = 'Checks the upstream merged multiplayer report.'
+    doLast {
+        def reportFile = new File(ldMpOutDir, 'report.json')
+        if (!reportFile.exists()) throw new GradleException("No LDLib2 MP report: $reportFile; inspect role gradle.log files.")
+        def report = new groovy.json.JsonSlurper().parse(reportFile)
+        logger.lifecycle("LDLib2 MP: ${report.totals.passed}/${report.totals.scenarios} scenarios, " +
+                "${report.totals.checks - report.totals.checksFailed}/${report.totals.checks} checks passed")
+        if (report.status != 'PASS') throw new GradleException("LDLib2 MP ${report.status}: $reportFile")
+    }
+}

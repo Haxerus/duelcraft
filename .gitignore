@@ -37,6 +37,7 @@ src/main/resources/natives/
 
 ### Minecraft Modding ###
 run/
+runs/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/
