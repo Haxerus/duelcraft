@@ -42,7 +42,7 @@ $releaseJars = @(Get-ChildItem -LiteralPath build/libs -Filter '*.jar' | Where-O
 if ($releaseJars.Count -ne 1) { throw 'Identify the intended runtime JAR before testing.' }
 Get-FileHash -Algorithm SHA256 -LiteralPath $releaseJars[0].FullName
 ```
-- [ ] Use the same candidate JAR/server configuration on both clients and dedicated server. Check protocol version is the implemented compatible version (planned4); verify an older version fails with a clear incompatibility message. Do not distribute/publish the artifact as part of verification.
+- [ ] Use the same candidate JAR on both clients and dedicated server. Record the effective server setting and test hook installation per run; test both ownership settings without a companion and a companion restriction under both settings. Restart between configuration/addon changes. Check protocol version is the implemented compatible version (planned4); verify an older version fails with a clear incompatibility message. Do not distribute/publish the artifact as part of verification.
 - [ ] Record failures as blockers, fix within the owning milestone, and rerun the affected checks. Commit the populated initial report with `docs: record interaction release candidate` when it describes a real candidate, not empty checkboxes presented as evidence.
 
 ## Task 2: Automated correctness and UI matrix
@@ -73,15 +73,15 @@ Use a fresh run-name if that destination exists; do not recursively delete old e
 | Sequence | Expected result |
 | --- | --- |
 | Alice/Bob join with no binder/mat; J -> Collection/Duels | Both menus available; no item requirement |
-| Alice saves list with missing cards | Draft survives close/reopen; activation rejected with shortages |
+| Alice saves legal list with missing cards | Draft survives close/reopen; default ownership off permits activation, ownership on rejects with shortages |
 | Grant20 canonical copies, deposit20, withdraw5 | Physical5, collection15; aggregate20; no cards dropped |
 | Fill main inventory, request withdrawal | No inventory/count/revision change; capacity message |
 | Deposit a normal card beside a customized unsupported card | Supported copies stored; unsupported stack preserved and reported |
 | Create two lists referencing same copies | Both save; selection does not consume or reserve copies |
-| Activate valid list; withdraw one required copy | Active selection cleared, saved list unchanged |
-| Deposit missing copy again | List eligible again but not auto-selected |
+| Activate valid list; withdraw one required copy | Ownership off/no hook preserves selection; ownership on clears it; saved list unchanged in both cases |
+| Deposit missing copy again | Ownership shortage resolved; companion restrictions still apply; cleared lists are not auto-selected |
 | Two players use the same binder/mat type or same placed mat | Each sees only their own data; blocks own no collection |
-| Send invite; sender withdraws required copy; target accepts | Acceptance rejected; no preparation/live duel created |
+| Send invite; sender withdraws required copy; target accepts | Ownership on rejects acceptance; ownership off/no hook permits it if otherwise eligible |
 | Accept valid invitation, then send transfer/save/clear through stale UI and commands | BUSY; no mutation throughout RPS/first selection/start/live duel |
 | RPS tie, then winner chooses second | New round ID; correct first player; seeded shuffle identity preserved |
 | Disconnect/cancel/timeout during preparation | Both locks released, no orphan duel, saved data intact |
@@ -91,11 +91,15 @@ Use a fresh run-name if that destination exists; do not recursively delete old e
 | Send old flow/round action after new preparation begins | Old action rejected; current flow intact |
 | Death/respawn, End return, dimension change, logout/rejoin, server restart | Deposited collection and saved lists retained; physical cards follow normal inventory rules |
 | Alice attempts Bob's snapshot/list ID through test payload harness | No other-player data returned or mutated |
+| Restart with ownership enabled or a restrictive companion added | Previously active unowned/denied list cannot bypass current policy; list/counts preserved |
+| Restart with ownership disabled or companion removed | Current policy governs next use; no automatic reactivation or collection credit |
+| Companion approves an illegal/unowned deck with core ownership enabled | Core rejection still wins |
+| Companion denies or throws during final startup recheck | No duel starts; private explanation, safe cleanup, no inventory/count change |
 | Local YDK import includes Side and unknown ID | List saved with Side/placeholder; no cards granted; activation rejected appropriately |
 
 - [ ] Execute each sequence against the same release candidate JAR and record pass/fail plus evidence. Use operator give solely for seeding physical test cards. Test forged/stale requests through a dev-only fixture; do not ship a client-accessible generic mutation console.
 - [ ] Test an engine-start failure with an injected dev test failure at the start boundary: both players leave STARTING, partial sessions close, client screens clear failed-start state, and a later valid invite works. Remove or keep the injection strictly DEV_ONLY.
-- [ ] Complete a real duel through at least one normal win condition, plus concede/disconnect paths. Exercise a solo duel with human-owned list and server AI deck. Full core simulation behavior is covered by existing tests; this task proves the new entry-to-exit integration.
+- [ ] Complete a real duel through at least one normal win condition, plus concede/disconnect paths. Exercise solo with an empty human collection under default ownership off, and with an owned list under ownership on; server AI content needs no collection. Verify companion denial/failure prevents human startup under both settings. Full core simulation behavior is covered by existing tests; this task proves the new entry-to-exit integration.
 - [ ] Record human feedback on inspector readability, deck-grid density, filter discoverability, and keyboard focus. Make bounded layout fixes with corresponding screenshot/bounds updates; do not redesign the information architecture without a concrete finding.
 - [ ] Commit the procedure and actual outcomes as `test: document dedicated-server interaction acceptance`. List incomplete checks explicitly if players/server access are unavailable; release sign-off remains incomplete until they run.
 
@@ -111,7 +115,7 @@ rg -n 'setData|replaceCounts|CollectionCommand|isBusy|isPreparing' src/main/java
 ```
 
 For each remaining start/mutation caller, identify the authenticated player, busy gate, revision/eligibility gate, and owner of the resulting state. Search results are an audit aid, not proof on their own. Old unsafe handlers/types must be removed or fail-closed, never quietly left registered. Do not remove the legitimate core Deck model, AI deck registry, or native engine code.
-- [ ] Document the J key/rebinding, home/binder/mat routes, deposit/withdraw semantics and unsupported stacks, draft versus active list, missing-card messages, preparation locks, save acknowledgement, Side storage without match play, same-world/server ownership, and limitations of current legality checks. Explain that physical cards must be deposited before use.
+- [ ] Document the J key/rebinding, home/binder/mat routes, deposit/withdraw semantics and unsupported stacks, draft versus active list, missing-card messages, preparation locks, save acknowledgement, Side storage without match play, same-world/server ownership, and limitations of current legality checks. Explain `requireCardOwnership=false` as the standalone default, how to enable the SERVER setting and restart, and that physical cards must be deposited to satisfy enabled ownership. Withdrawals always require stored copies; deck use never creates cards. Document the optional companion restriction hook and its denial/failure contract separately from acquisition content.
 - [ ] Document YDK import and updated command semantics, matching client/server protocol, and upgrade behavior: old local YDK files remain available to import, but import grants no ownership. Do not auto-credit collection counts from old deck files. Explain admin test-card grant permissions and that acquisition recipes/economy are separate work.
 - [ ] Update stale testing/scenario counts only after checking actual registration. Keep source-version/engine protocol material unchanged unless this integration changed that contract; preserve concurrent wiki edits. Replace handoff statements saying later plans still need writing with links to the completed plans.
 - [ ] Validate Markdown links and resource JSON/XML loading, run `git diff --check`, and review the final diff for unrelated edits. Commit `docs: explain collection and duel interaction flows`.

@@ -8,12 +8,12 @@
 
 **Tech Stack:** Minecraft 1.21.1, NeoForge 21.1.224, Java 21, LDLib2 2.2.39.a, JUnit 5.
 
-**Spec:** [Design](../specs/2026-09-15-player-interaction-design.md), [contracts](../specs/2026-09-17-player-interaction-contracts.md). Dependency: [milestone 2](2026-09-17-player-collections-milestone-2.md).
+**Spec:** [Design](../specs/2026-09-15-player-interaction-design.md), [contracts](../specs/2026-09-17-player-interaction-contracts.md). Dependency: [milestone 2](2026-09-17-player-collections-milestone-2.md) and its [policy follow-up](2026-09-19-deck-use-policy-follow-up.md).
 
 ## Global constraints
 
 - Use the term **collection**.
-- Withdrawing enough cards to invalidate the active deck clears that selection and explains why. Preserve the saved list.
+- Withdrawal revalidates the active deck under configured ownership and companion restrictions. A shortage alone clears selection only when `requireCardOwnership=true`. Preserve the saved list.
 - Prevent collection transfers and deck changes during a duel, in both the interface and server handlers.
 - Depositing never auto-activates a deck. Server-only state owns quantities.
 - Follow the contracts' accessible slots, canonical components, amount bounds, and all-or-nothing selected transfers. No pack economy, loot/recipes, or cosmetic variants.
@@ -90,8 +90,8 @@ assertEquals(5, deposit.moved());
 The conservation assertion and exact resulting quantities must both pass.
 - [ ] Run `./gradlew.bat test --tests '*InventoryTransferPlanTest' --tests '*CardTransferServiceTest'` for intended failures.
 - [ ] Simulate deposits in ascending main-slot order then offhand. Selected amount must all exist as eligible stacks or return INSUFFICIENT_CARDS; use checked count addition before any mutation. For withdraw, check stored amount, fill same-code stacks to64 then empty main slots; fail without changes if capacity is short. For DepositAll, sum supported stacks with checked arithmetic and remove only that supported subset.
-- [ ] Implement the real adapter: snapshot accessible ItemStacks; reject busy/unreadable/stale first; classify canonical and unsupported stacks; run planner; call `CollectionService.replaceCounts` with planned counts; if both succeed apply slot replacements and attachment in the same server-thread call, mark inventory changed and broadcast container changes. Do no asynchronous work between validation and commit. Preserve untouched ItemStack objects/components, including offhand and unsupported custom cards. Never use partial `Inventory.add` followed by dropping a remainder.
-- [ ] Add table tests for exact capacity, partial-stack capacity, amounts0/negative/4097, overflow at Long.MAX_VALUE, unknown owned withdrawals, mixed-code stacks, offhand deposit, offhand not used for withdraw, unsupported components, empty bulk deposit, and repeated original-revision request. Check active selection clears only when needed, and failure does not increment revision. Run targeted tests; commit `feat: transact inventory cards with collections`.
+- [ ] Implement the real adapter: snapshot accessible ItemStacks; reject busy/unreadable/stale first; classify canonical and unsupported stacks; run planner; call `CollectionService.replaceCounts` with authenticated owner context and planned counts, so the shared policy evaluates proposed post-withdrawal state; if both succeed apply slot replacements and attachment in the same server-thread call, mark inventory changed and broadcast container changes. Do no asynchronous work between validation and commit. Preserve untouched ItemStack objects/components, including offhand and unsupported custom cards. Never use partial `Inventory.add` followed by dropping a remainder.
+- [ ] Add table tests for exact capacity, partial-stack capacity, amounts0/negative/4097, overflow at Long.MAX_VALUE, unknown owned withdrawals, mixed-code stacks, offhand deposit, offhand not used for withdraw, unsupported components, empty bulk deposit, and repeated original-revision request. Test ownership off/no hook preserves an otherwise legal selection after a shortage; ownership on/no hook clears it; an independent companion denial clears it under either setting. A throwing hook leaves both inventory and attachment unchanged. Failure does not increment revision; actual stored ownership is always required to withdraw. Run targeted tests; commit `feat: transact inventory cards with collections`.
 
 ## Task 3: Transfer packets and editor controls
 
@@ -102,7 +102,7 @@ The conservation assertion and exact resulting quantities must both pass.
 - [ ] Test decoding rejects invalid amount/code before allocating data, and round-trip all three operations. At the handler seam, replay accepted withdrawal with its original revision and assert one inventory change total.
 - [ ] Run the targeted protocol/handler tests to expose missing commands/semantics.
 - [ ] Add selected-code Deposit/Withdraw amounts with a positive numeric field, owned/carried counts clearly distinguished, and Deposit carried cards. Disable request controls until the pending response resolves. Refresh inventory-derived carried counts from Minecraft's authoritative inventory sync and stored counts via a new collection snapshot after Changed; never optimistic-credit cards.
-- [ ] Translate capacity/busy/stale/missing/unsupported errors. On successful invalidation show "Active deck cleared: required cards were withdrawn" plus shortages; retain its list in the picker. DepositAll shows moved and skipped counts. If no supported cards can move, return INSUFFICIENT_CARDS without a revision increment and explain that no eligible carried cards were found.
+- [ ] Translate capacity/busy/stale/missing/unsupported errors. On shortage-driven invalidation with ownership required, show "Active deck cleared: required cards were withdrawn" plus shortages. For a companion denial show its actual reason; when ownership is optional, show shortages neutrally without an invalidation warning; retain its list in the picker. DepositAll shows moved and skipped counts. If no supported cards can move, return INSUFFICIENT_CARDS without a revision increment and explain that no eligible carried cards were found.
 - [ ] Test rejection preserves draft, selected card, scroll offsets, and collection counts; success refreshes owned/in-list indicators without changing the card list. Commit `feat: connect collection transfer controls` after targeted tests pass.
 
 ## Task 4: Real inventory scenarios and development card grant
@@ -112,10 +112,10 @@ The conservation assertion and exact resulting quantities must both pass.
 **Interfaces:** `/duel card give <player> <passcode> <count>` requires permission level2, known playable code and count1–4096. Simulate capacity through the same planner using temporary counts for the requested grant, then apply only inventory changes; it must never alter collection directly or silently drop overflow. Reject while target busy. It is a development/admin source of physical cards, not a player-accessible progression system.
 
 - [ ] Write a command permission test where a nonoperator cannot execute give and an operator with insufficient target capacity gets failure and no items. Ensure direct transfer packets provide no equivalent grant.
-- [ ] In the disposable-world scenario snapshot attachment/inventory, seed physical canonical stacks server-side, deposit20 through the UI, and withdraw5. Assert physical/stored counts: start20/0 -> deposit20 gives0/20 -> withdraw5 gives5/15. Save a draft requiring16 copies for an ownership indicator check; use a separate valid 40-card fixture for active-deck invalidation. Restore snapshot in teardown.
+- [ ] In the disposable-world scenario snapshot attachment/inventory, seed physical canonical stacks server-side, deposit20 through the UI, and withdraw5. Assert physical/stored counts: start20/0 -> deposit20 gives0/20 -> withdraw5 gives5/15. Save a draft requiring16 copies for an ownership indicator check; use a separate valid 40-card fixture to verify retained activation with ownership off and invalidation with ownership on, both without a companion. Add a companion-denial case under each setting. Restore snapshot in teardown.
 - [ ] Fill main inventory, attempt withdraw and assert0 moved; free one slot, retry with the refreshed revision and assert exact quantity. Test main/offhand mixed deposit, unsupported custom-named card staying intact, and a BUSY transfer during an existing test duel/roll. Read each server assertion through harness `.server`/`.waitUntilServer` operations.
 - [ ] Run `./gradlew.bat test`, `./gradlew.bat runClient -PldTest=collection_transfers`, and the collection persistence scenarios. Verify actual restart preserves the combined inventory/collection result, and two-player transfer isolation on a dedicated server. Record measured results; commit `test: verify physical collection transfers`.
 
 ## Completion
 
-Players can transfer real physical cards through the editor, with conservation and active-selection behavior verified. Collection-backed duels and removal of the legacy ownership bypass remain milestone 4. No public collection-enforced release before that cutover.
+Players can transfer real physical cards through the editor, with conservation and active-selection behavior verified. Collection-backed duels and removal of legacy paths that bypass shared deck-use policy remain milestone 4. No public collection-enforced release before that cutover.

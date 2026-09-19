@@ -2,13 +2,27 @@
 
 This document resolves shared implementation choices for milestones 2–6 of the [design](2026-09-15-player-interaction-design.md). Engineering choices remain implementation defaults unless identified as user-confirmed. The [roadmap](../plans/2026-09-15-player-interaction-roadmap.md) indexes the executable plans.
 
-User clarification on 2026-09-17 confirms deposited-only ownership, Main+Extra+Side ownership checks even for single duels, passcode as the primary key with separate ownership per passcode, and the currently planned legality scope. The user will handle acquisition later; it is not an open question or prerequisite for this integration.
+User clarification on 2026-09-17 confirms deposited-only ownership, Main+Extra+Side ownership checks even for single duels, passcode as the primary key with separate ownership per passcode, and the currently planned legality scope. The 2026-09-19 decision makes ownership enforcement a core server setting, default false; a companion may add restrictions and supplies acquisition/progression. The counting rules apply when ownership is required. Companion content is not a prerequisite for this integration.
 
 ## Baseline and execution
 
 Milestone 1 is complete in `codex/deck-editor-m1` through `2030dae`, including the user's approved dark styling matching the duel UI; see its [report](../reports/2026-09-17-deck-editor-m1.md). Its five implementation commits have been reconciled onto main `bc2fcba` in `codex/player-collections`; all 720 unit tests pass at that baseline. Later milestones must extend this actual editor, preserving its dark styling and existing engine/cache improvements. Minecraft 1.21.1, NeoForge 21.1.224, Java 21, and LDLib2 2.2.39.a remain the relevant versions. The browser prototype's light palette is superseded.
 
 All Java paths below start at `src/main/java/com/haxerus/duelcraft/`. Matching unit tests live under `src/test/java/com/haxerus/duelcraft/`. Implement milestones in order. Retain their independent review/test boundaries; do not run all six as an unreviewed change.
+
+## Current deck-use policy contract (2026-09-19)
+
+The [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) supersedes unconditional ownership enforcement and the earlier companion-owned enforcement proposal. Implement the [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) before M3. Original M2 completion evidence remains historical; the revised policy is pending.
+
+- Register a dedicated SERVER config for `requireCardOwnership`, default `false`, rather than using a client's COMMON preference. Capture the effective value for the running server; changes require restart, including integrated-world reopening. Do not move unrelated existing COMMON configuration.
+- Core legality remains mandatory. Missing copies are always calculated for display; they deny use only when ownership is required. An optional companion hook adds a denial, never an exemption. Multiple listeners cannot undo an earlier denial. A hook failure denies that evaluation with a generic player-facing reason and server log, not a permissive fallback.
+- `Report.eligible()` means `problems.isEmpty() && !moreProblems && (!ownershipRequired || missing.isEmpty()) && restrictionReason == null`. The report is authoritative for the evaluated list only. `restrictionReason` is a nonblank server-provided display string of at most 256 characters, or null. Bound its encoding with the existing 24 KiB packet budget. Exact hook/registration names are engineering choices in the follow-up, not user-approved API signatures.
+- Hook input identifies the authenticated owner and supplies the candidate immutable DeckList, deposited-count map, and selected DuelRule. For Save/replaceCounts, evaluate proposed contents/counts before committing; do not let a hook reread stale attachment counts. The hook is synchronous and has no mutation, card-consumption, reservation, or network side effects.
+- Apply one policy evaluator to activation, active-list revalidation, preparation acceptance, final startup, commands, packets, and human solo play. Core busy/revision/authentication gates remain outside addon control. An ordinary policy denial after a valid edit/transfer clears activation and preserves the mutation/list; a hook execution failure rejects the mutation without inventory or attachment changes because eligibility could not be evaluated.
+- Send the effective ownership requirement in Opened and evaluated reports; client settings never authorize actions. Clear connection-specific policy state on disconnect. Distinguish neutral missing-copy information from actual legality/ownership/companion denials. Do not cache companion approval as permanent permission.
+- Revalidate persisted active selection under current config/catalog/hooks on login or before its next use, and again before engine startup. Removing a restriction never auto-activates a previously cleared list. Policy changes do not migrate collection storage or create cards. Withdrawals always verify actual quantities and capacity.
+
+The service signatures below describe the original M2 operations. Update their owner/policy context in the follow-up as one change with their callers; preserve the documented operation semantics. Historical reports and original task evidence do not prove the new config or hook works.
 
 ## Models and storage (milestone 2)
 
@@ -24,7 +38,8 @@ public record PlayerCollectionData(long revision, Map<Integer, Long> counts,
 }
 // collection/DeckEligibility.java (nested Issue/Report types)
 public record Issue(String key, int code, int actual, int limit) {}
-public record Report(List<Issue> problems, Map<Integer, Integer> missing, boolean moreProblems) {
+public record Report(List<Issue> problems, Map<Integer, Integer> missing, boolean moreProblems,
+        boolean ownershipRequired, @Nullable String restrictionReason) {
     public boolean eligible();
 }
 ```
@@ -33,15 +48,15 @@ public record Report(List<Issue> problems, Map<Integer, Integer> missing, boolea
 
 Serialize `PlayerCollectionData` through a NeoForge attachment `duelcraft:collection` with `copyOnDeath()`. Do not register automatic entity tracking sync. Schema version 1 stores revision, positive passcode/count pairs, saved lists, and optional active ID. Counts are positive signed 64-bit integers; absent means zero. Omit zero entries. Use checked arithmetic. The collection and number of saved decks have no gameplay capacity limit. Active ID must refer to a stored list or decode fails. Codec tests reject invalid versions/records; never silently rewrite failed loads as empty player data. At the load boundary, preserve malformed attachment NBT and deny management access with an error until repaired; document the serializer wrapper in milestone 2.
 
-Draft storage/transport accepts 0–512 cards **in total across all three sections** and positive passcodes, including unknown IDs and over-limit decks. This is a request/storage bound, not a rule declaring those drafts playable. UI describes a rejected oversized import as exceeding the editor's draft limit. Existing game legality remains 40–60 Main, <=15 Extra, <=15 Side and <=3 copies per exact passcode across all sections. Save bypasses gameplay/ownership eligibility. Activation checks both. Renaming preserves activation; save/delete/withdraw clears selection if it becomes invalid. Depositing never auto-activates.
+Draft storage/transport accepts 0–512 cards **in total across all three sections** and positive passcodes, including unknown IDs and over-limit decks. This is a request/storage bound, not a rule declaring those drafts playable. UI describes a rejected oversized import as exceeding the editor's draft limit. Existing game legality remains 40–60 Main, <=15 Extra, <=15 Side and <=3 copies per exact passcode across all sections. Save bypasses gameplay/ownership eligibility. Activation checks supported legality, ownership only when configured, and companion restrictions. Renaming preserves an otherwise eligible activation; save/delete/withdraw clears selection if it becomes invalid. Depositing never auto-activates.
 
-Ownership counts include Main+Extra+Side even for single duels and only deposited cards. Carried inventory cards must first be deposited. Passcode is the primary key; each passcode has separate ownership. Do not model alternate artwork as an identity or substitute/group passcodes for ownership. The user approved the planned ownership, size, copy-count, known-card and placement checks. Banlists, alias-group limits, full Rush/Speed-specific deck rules, and match sideboarding are not included; UI must describe the supported checks accurately.
+Ownership counts include Main+Extra+Side even for single duels and only deposited cards. Carried inventory cards must first be deposited to satisfy enabled ownership enforcement. Passcode is the primary key; each passcode has separate ownership. Do not model alternate artwork as an identity or substitute/group passcodes for ownership. The user approved the planned ownership, size, copy-count, known-card and placement checks. Banlists, alias-group limits, full Rush/Speed-specific deck rules, and match sideboarding are not included; UI must describe the supported checks accurately.
 
 ## Card facts and query data (milestone 2)
 
 Create `core/data/CardCatalog.java` with `record Facts(int code, int type)` and `static Map<Integer, Facts> load(Path database) throws SQLException`. Read `SELECT id,type FROM datas` once using a dedicated read-only JDBC connection and close it. Use the existing managed snapshot from `CardData.load()`. Do not import client classes or change native engine callbacks/scripts. Java already manages/merges the database; this adds a host-policy metadata read, deliberately avoiding a new JNI metadata API.
 
-`DeckEligibility.check(DeckList list, Map<Integer,Long> counts, Map<Integer,CardCatalog.Facts> facts, DuelRule rule)` returns a `Report`. Retain `DeckValidator` structural behavior through the list's engine snapshot, add Side counts/copy aggregation, known-ID and type checks. Reject tokens and cards without a playable Monster/Spell/Trap category. Extra requires Fusion/Synchro/Xyz/Link monsters; Main forbids these Extra-only types. Side accepts playable cards of either placement. A rule parameter documents preparation context; do not claim checks it does not implement.
+The original `DeckEligibility.check(DeckList list, Map<Integer,Long> counts, Map<Integer,CardCatalog.Facts> facts, DuelRule rule)` combines legality and missing-copy calculation. The follow-up makes the ownership requirement explicit and routes final permission through the shared server policy; never infer denial solely from a nonempty missing map. Retain `DeckValidator` structural behavior through the list's engine snapshot, add Side counts/copy aggregation, known-ID and type checks. Reject tokens and cards without a playable Monster/Spell/Trap category. Extra requires Fusion/Synchro/Xyz/Link monsters; Main forbids these Extra-only types. Side accepts playable cards of either placement. A rule parameter documents preparation context; do not claim checks it does not implement.
 
 The client uses a separate `client/collection/CollectionCatalog` read of names/text/stats into `List<CardInfo>` on a single worker. Keep announce-card JDBC access untouched. `client/collection/CollectionSearchWorker` runs milestone 1's pure search on immutable snapshots, debounces text input by 150 ms, and ignores superseded generations. No SQL, sorting of the entire catalog, or network fetches in a render callback. Unknown saved IDs show a passcode placeholder and can be removed/saved.
 
@@ -64,7 +79,7 @@ public Change replaceCounts(PlayerCollectionData before, long expectedRevision, 
         Map<Integer,Long> counts); // SERVER-INTERNAL, never accept this map from the client
 ```
 
-Construct `CollectionService(Map<Integer,CardCatalog.Facts> facts)`. Activation uses current supported checks with MR5 as the existing default; preparation rechecks using the selected `DuelRule`. `Change.eligibility` is nonnull, with empty lists/maps when not applicable. On an invalidating successful mutation it describes why activation was cleared. Busy comes from `DuelManager.isBusy` and later includes STARTING as well as RPS/live play. Read management data can be denied while busy; mutations must always be denied. Milestone 2 temporarily adds this guard to the legacy deck upload/clear paths; milestone 4 removes their ownership bypass entirely.
+The original M2 constructor was `CollectionService(Map<Integer,CardCatalog.Facts> facts)`. The pending policy follow-up adds an explicit policy dependency and authenticated owner context to operations that can revalidate an active list; retain the revision/busy gates and immutable transformation boundary. Activation uses current supported checks with MR5 as the existing default; preparation rechecks using the selected `DuelRule`. `Change.eligibility` is nonnull, with empty lists/maps and no restriction reason when not applicable. Its ownership flag reflects the effective setting; a neutral report for an unevaluated draft does not certify playability. On an invalidating successful mutation it describes why activation was cleared. Busy comes from `DuelManager.isBusy` and later includes STARTING as well as RPS/live play. Read management data can be denied while busy; mutations must always be denied. Milestone 2 temporarily adds this guard to the legacy deck upload/clear paths; milestone 4 removes their ability to bypass shared deck-use policy entirely.
 
 ## Network contract (milestones 2–3)
 
@@ -87,7 +102,7 @@ Commands, as nested records of `CollectionCommand`:
 
 | Record | Fields |
 | --- | --- |
-| Opened | `UUID snapshotId, long revision, int countPages, int deckPages, @Nullable UUID activeId` |
+| Opened | `UUID snapshotId, long revision, int countPages, int deckPages, @Nullable UUID activeId, boolean ownershipRequired` |
 | Counts | `UUID snapshotId, long revision, int index, Map<Integer,Long> entries` |
 | Decks | `UUID snapshotId, long revision, int index, List<Summary> entries` |
 | Deck | `long revision, SavedDeck deck` |
@@ -100,7 +115,7 @@ One snapshot per authenticated player, captured from immutable state, with count
 
 Capture a snapshot on Open; pull one page at a time; refresh its 30-second idle expiry on each page read. New Open replaces that player's snapshot. A mutation invalidates it; a late page gets STALE. Validate snapshot ownership, page kind/index, unique keys/IDs, declared sizes, exact completion, and matching revision. Grow assembly only as bounded pages arrive; do not allocate an array from an untrusted advertised total. Publish the new client snapshot only after all pages arrive. Zero-page snapshots still complete. Request IDs plus a client connection generation prevent replies from previous connections replacing state. Clear pending reads and complete pending saves exceptionally on disconnect. Never automatically replay a failed mutation; refresh and let the player retry.
 
-Use NeoForge's default MAIN handler thread (verified in pinned `PayloadRegistrar`). Check busy/revision and apply state/inventory synchronously there. Bump network registrar from `2` to `3` in milestone 2; milestone 4 removes old payload semantics and bumps to `4`. Milestone 3/5 additions ship as the same in-development release; bump again if they are released separately.
+Use NeoForge's default MAIN handler thread (verified in pinned `PayloadRegistrar`). Check busy/revision and apply state/inventory synchronously there. Original milestone 2 bumped the network registrar from `2` to `3`. The policy follow-up changes Opened/Report wire shapes: bump the current version and reject incompatible clients. Milestone 4 removes old payload semantics and bumps the then-current version again; do not reuse a hardcoded `4`. Milestone 3/5 additions ship as the same in-development release; bump again if they are released separately.
 
 ## Inventory semantics (milestone 3)
 
@@ -114,13 +129,13 @@ Simulate on copies of accessible inventory slots and counts; on success apply th
 
 One outstanding invitation per participant; no silent replacement. Pending invitations do not lock editing. The sender must have an eligible active list; the target may choose theirs before acceptance. On accept, validate both current lists, capture immutable snapshots, invalidate invitations involving either participant, and lock both through RPS, first choice, STARTING, and live play. Cancel/expiry/logout/start failure releases both. Use invitation/roll IDs on GUI actions so an old button cannot answer a new invitation or RPS round. Do not reveal the opponent's chosen hand before both submit.
 
-Retain the existing 60-second timeout per invitation and each first-turn step, with a fresh round ID on ties. Host rule/options are fixed when invited. Defaults remain MR5, 8000 LP, hand 5, draw 1; bounds match commands: LP1–99999, hand0–20, draw0–10. An omitted seed is generated server-side. Server AI decks need no player collection; the human's solo deck does.
+Retain the existing 60-second timeout per invitation and each first-turn step, with a fresh round ID on ties. Host rule/options are fixed when invited. Defaults remain MR5, 8000 LP, hand 5, draw 1; bounds match commands: LP1–99999, hand0–20, draw0–10. An omitted seed is generated server-side. Server AI decks remain server content without a player collection. Human solo decks use the same setting and companion restrictions as multiplayer.
 
 One `DuelcraftScreens` route coordinator serves home key, binder, and mat. A server reply resolves HOME/COLLECTION/LOBBY requests to management, preparation, or the live duel. Binding default: J, remappable in Minecraft Controls. Consume it only with player/world present and no other screen open. A placed mat holds no inventories/player data and grants no permissions unavailable via the hotkey.
 
 Management Save becomes `CompletionStage<SavedDeck>` in M2. Freeze draft edits while saving and clear dirty state only after success for that submitted draft. Failure preserves edits. Home/lobby navigation honors Save/Discard/Cancel. A server-enforced preparation transition suspends unsaved edits locally rather than discarding them; resume after cancel/end in the same connection. Disconnect clears that local state; do not invent durable offline drafts.
 
-Normal `/duel deck set <localName>` becomes local YDK import/save, then an activation attempt; failure to activate retains the imported list. Retain `/duel deck list` as local files, `/duel deck get` as authoritative selection, `/duel deck clear` through service checks. Add UI import in the saved-list picker. No normal-player raw upload bypass remains. Do not add unrestricted debug duels; a permission-level-2 card-grant command is sufficient for development.
+Normal `/duel deck set <localName>` becomes local YDK import/save, then an activation attempt; failure to activate retains the imported list. Retain `/duel deck list` as local files, `/duel deck get` as authoritative selection, `/duel deck clear` through service checks. Add UI import in the saved-list picker. No normal-player raw upload bypass remains. Default ownership-optional play is a normal player path. No special debug bypass of legality or installed restrictions is needed; keep the permission-level-2 card grant for physical transfer tests.
 
 ## Requirement coverage
 
@@ -128,8 +143,8 @@ Normal `/duel deck set <localName>` becomes local YDK import/save, then an activ
 | --- | --- |
 | Ender Chest-like private collection | M2 tasks1/3/5: attachment, owner-only pages, clone/rejoin/restart |
 | Save unowned/incomplete drafts; reuse copies across lists | M2 task2 pure policy, task4 acknowledged list UI |
-| Active selection requires cards and supported legality | M2 task2; M4 task3 rechecks at actual duel startup |
-| Withdrawal invalidates selection without deleting list | M3 tasks2/3/4 conservation and UI checks |
+| Active selection follows legality, configured ownership, and companion restrictions | M2 policy follow-up; M4 task3 rechecks at actual duel startup |
+| Withdrawal revalidates selection without deleting list; shortages alone matter only when ownership is required | M2 policy follow-up; M3 tasks2/3/4 conservation and UI checks |
 | Physical storage without slot limits | M2 counts/schema/paging; M3 canonical card items and transfers |
 | No mutation while preparing/dueling | M2 gates; M4 tasks2–5 full lock, failure cleanup, legacy removal |
 | Existing seed/first-player behavior | M4 task2 challenger/accepter snapshots and task3 shuffle regression |

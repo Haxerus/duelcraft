@@ -14,7 +14,7 @@
 
 - Use the term **collection**.
 - Support the hotkey, binder, and mat through the same server policies and player data.
-- Players need not carry either item.
+- Players need not carry either item. All routes use the core ownership setting (default false) and optional companion restrictions; clients cannot override them.
 - Keep the existing duel UI/input behavior. The new home/lobby screens are management screens; closing them is not surrender.
 - No public matchmaking, spectators, match mode, or collection inventory attached to a block. Crafting/acquisition recipes remain separate content work.
 
@@ -92,7 +92,7 @@ Create the controller with an explicit `Consumer<PreparationCommand>` sink and c
 | Live | Transition to existing duel screen |
 
 Defaults/bounds come from DuelSettings and contract. Invalid text input disables Invite and identifies the field. UI selection accepts only online nonself UUIDs; server validates again. Pending-invite settings remain immutable; to change them cancel and resend.
-- [ ] Preserve the user's unsaved invitation form when opening collection for deck selection, but re-read current authoritative preparation view on return. Display all own activation problems; show only generic readiness for the opponent. Countdown derives from server-provided remaining time and local receipt time; reaching zero requests a view instead of locally manufacturing cancellation.
+- [ ] Preserve the user's unsaved invitation form when opening collection for deck selection, but re-read current authoritative preparation view on return. Display server-provided ownership mode and actual own activation/companion denials; present missing-copy counts neutrally when ownership is optional; show only generic readiness for the opponent. Countdown derives from server-provided remaining time and local receipt time; reaching zero requests a view instead of locally manufacturing cancellation.
 - [ ] Closing the lobby returns to world/home without cancelling; pending invites expire normally. Explicit Cancel cancels the displayed flow ID only. Notifications expose an Open invitation action; they do not forcibly replace a dirty editor for an unaccepted invite. Accepted preparation must suspend management and route both players.
 - [ ] Add fixture scenarios for each state, long names, invalid options, expired invite, declined invite, offline target, stale response, RPS tie and winner/loser. Assert no opponent choice/list data appears. Run `./gradlew.bat test --tests '*DuelLobbyControllerTest'` and `./gradlew.bat runClient -PldTest=duel_lobby`; capture/screens inspect before committing `feat: add private duel lobby interface`.
 
@@ -122,8 +122,8 @@ Use vanilla wool textures (e.g. green/brown) for the initial mat model; no new i
 
 **Create:** `client/uitest/DuelcraftJourneyScenario.java` (DEV_ONLY `duelcraft_journey`); extend existing network/UI scenarios for navigation state. **Modify:** only behavior surfaced by failing scenarios; maintain model/packet contracts.
 
-- [ ] Add deterministic integrated-server coverage for hotkey -> empty collection -> create/save draft -> deposit -> activate -> lobby form -> collection back navigation. Verify ordinary interaction requires no chat commands and selection/count indicators survive screen changes.
-- [ ] Run a two-client dedicated-server journey: grant physical fixture cards as operator, deposit and activate independently, invite via home, accept via mat UI, finish RPS/first choice, complete or concede a duel, return home, withdraw and observe active invalidation. Repeat collection entry with binder. Use the same installed JAR on server/clients; no integrated-server fixture access in this manual check.
+- [ ] Add deterministic integrated-server coverage for hotkey -> empty collection -> create/save legal draft -> activate -> lobby form -> collection back navigation with default ownership off and no companion, without any grant or deposit. Repeat with ownership on/no companion: save succeeds, activation fails with shortages until deposit. Verify ordinary interaction requires no chat commands and selection/count indicators survive screen changes.
+- [ ] Run a two-client dedicated-server journey with ownership off/no companion, starting from empty collections without granting cards. Repeat with core ownership on/no companion: grant physical fixture cards as operator, deposit and activate independently, invite via home, accept via mat UI, finish RPS/first choice, complete or concede a duel, return home, withdraw and observe active invalidation. Repeat collection entry with binder. Verify an independent test companion restriction denies use via home/binder/mat under either setting, with the actual private denial reason. Use the same installed JAR on server/clients; no integrated-server fixture access in this manual check.
 - [ ] Test accepted preparation during dirty editing, save reply arriving during forced route, late management reply after duel start, closing/reopening lobby, target disconnect, and post-result home entry. No unsaved draft loss within the connection and no stale response replacing the duel screen.
 - [ ] Run `./gradlew.bat test`, `./gradlew.bat runClient -PldTest=group:duelcraft`, and GUI scale/window checks from milestone 1 for all new screens. Record actual results and commit `test: verify Duelcraft player entry journeys`.
 

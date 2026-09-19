@@ -18,11 +18,21 @@ The layout and behavior below are the implementation contract. The browser proto
 - Support physical cards and deposits/withdrawals into storage without a slot or gameplay capacity limit.
 - Saved decks are card lists. Saving a draft does not require owning its cards or satisfying duel legality.
 - Multiple lists can reference the same owned copies. Saving or activating a list does not consume or reserve cards.
-- Activation and duel preparation require enough copies and a valid deck under the supported rules.
-- Withdrawing enough cards to invalidate the active deck clears that selection and explains why. Preserve the saved list.
+- Activation and duel preparation require supported legality, enough deposited copies when `requireCardOwnership=true`, and no denial from an installed companion restriction hook.
+- After withdrawal, revalidate the active deck under the current policy. A shortage clears selection only when ownership is required; preserve the saved list and explain any policy denial.
 - Prevent collection transfers and deck changes during a duel, in both the interface and server handlers.
 - Support the hotkey, binder, and mat through the same server policies and player data.
 - Determine final readability, density, and minimum comfortable window size through in-game playtesting.
+
+## Deck-use policy (decision amended 2026-09-19)
+
+Duelcraft owns a server-authoritative `requireCardOwnership` setting, default `false`. It applies equally to multiplayer and human solo decks. Enabling it requires deposited Main + Extra + Side copies by exact passcode; disabling it permits otherwise eligible lists without crediting collection counts or creating physical cards. Withdrawals always require actual stored copies, regardless of deck-use policy.
+
+The companion owns acquisition, packs, rewards, progression, and optional additional deck-use restrictions. Its server hook can deny use with an explanation but cannot override Duelcraft's legality, enabled ownership checks, authentication, or busy-state checks. An absent hook adds no restriction; a failed installed check does not grant permission. Core collection and transfer functionality works without the companion.
+
+Evaluate restrictions against the authenticated player and immutable candidate deck/collection state, including proposed post-mutation counts. Recheck at activation, active-list revalidation, acceptance, and immediately before startup. Checks must not mutate, consume, or reserve cards. Configuration changes take effect after a server restart; companion hot-swapping is outside scope. Persisted active IDs are revalidated under the current setting/hooks when next used, including after restart.
+
+See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [pending implementation follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md). This updates the design; it does not claim the new policy is implemented.
 
 ## Technical baseline inspected
 
@@ -64,7 +74,7 @@ Use one server-persisted player attachment for collection counts, saved lists, a
 
 Confirmed ownership and card-identity rules (user clarification, 2026-09-17):
 
-- Only deposited collection copies satisfy activation. Carried card items become usable through Deposit; silently counting inventory cards would make dropping/trading items invalidate decks outside collection operations.
+- When ownership is required, only deposited collection copies satisfy activation. Carried card items satisfy that requirement through Deposit; silently counting inventory cards would make dropping/trading items invalidate decks outside collection operations.
 - Key ownership by exact card passcode, using a nonnegative `long` count with checked arithmetic. This has no gameplay capacity limit, although machine representations remain finite.
 - Include Main + Extra + Side when checking copies needed by a list, including for single duels. Single duels pass Main/Extra to the engine; saving Side does not introduce match mode or sideboarding.
 - The card passcode is the primary key. Each passcode has separate ownership. Do not introduce alternate-art identities, ownership equivalence, or passcode substitution.
@@ -85,7 +95,7 @@ The ownership and identity rules above are user-confirmed. The edit/delete/react
 | Live duel | Locked for both players | Duel result, surrender, or disconnect cleanup |
 | After duel | Allowed | Normal management flow |
 
-Lock from acceptance through first-turn selection because the existing roll captures the decks at that point. Under server-thread serialization, validate both players, capture immutable lists, and enter the busy state as one operation. Retain the lock during the transition from roll to duel; avoid a separate asynchronous unlock/start interval. Before constructing the engine session, confirm the prepared state still belongs to those players and that required cards remain present.
+Lock from acceptance through first-turn selection because the existing roll captures the decks at that point. Under server-thread serialization, validate both players, capture immutable lists, and enter the busy state as one operation. Retain the lock during the transition from roll to duel; avoid a separate asynchronous unlock/start interval. Before constructing the engine session, confirm the prepared state still belongs to those players and that current legality, configured ownership enforcement, and companion restrictions still permit use.
 
 Reject stale packets and legacy command mutations while busy. The client follows server state, closes management UI when preparation takes over, and offers return to the live duel instead of editing. A pending invitation alone does not lock either player.
 
@@ -107,9 +117,9 @@ Activation returns actionable missing-card counts and supported legality problem
 
 For the collection release, add authoritative known-card/type facts for activation and card-item validation. The milestone 2 plan chooses a small common/server catalog loaded once from the existing managed merged database, independent of client presentation classes. This adds a Java host-policy read of the managed database; it does not move engine callbacks or scripts out of C++. It avoids adding a JNI metadata API; the shared implementation contracts describe the chosen boundary.
 
-The user confirmed the planned validation scope: preserve the current structural rule behavior, add Side size/copy checks, reject unknown cards/tokens and wrong Main/Extra placement before activation, and enforce collection ownership. Show the implemented validation scope honestly. Banlist selection and format-specific rules beyond existing support remain outside this integration; do not invent a default banlist.
+The user confirmed the planned validation scope: preserve the current structural rule behavior, add Side size/copy checks, reject unknown cards/tokens and wrong Main/Extra placement before activation, and enforce collection ownership when the core server setting requires it. Show the implemented validation scope honestly. Banlist selection and format-specific rules beyond existing support remain outside this integration; do not invent a default banlist.
 
-Retain YDK import as a list operation, including Side; importing grants no cards. Route normal `/duel deck set`, challenge, accept, and solo-player preparation through the ownership policy. Server AI decks remain content, not a player collection. Remove the old upload bypass when the new path ships. If unrestricted engine testing remains necessary, give it an explicit operator/dev-only path rather than a normal player exception.
+Retain YDK import as a list operation, including Side; importing grants no cards. Route normal `/duel deck set`, challenge, accept, and solo-player preparation through the shared deck-use policy. Server AI decks remain content, not a player collection. Remove the old upload bypass when the new path ships. With ownership enforcement disabled and no companion denial, normal players can use legal lists without owning cards. This is the standalone default, not an operator-only testing exception.
 
 ## Editor and navigation
 
@@ -124,7 +134,7 @@ Layout baseline:
 - Collection: four columns. Virtualize rows; mount only visible rows plus overscan. Keep data/search state outside mounted widgets.
 - Selected card stays selected through scrolling and filtering. Reflow does not discard the draft or silently reset independent scroll positions.
 - Inspector has explicit Add/Remove and destination controls. Saving acknowledges success; leaving an unsaved draft offers Save/Discard/Cancel.
-- Owned and in-list counts are distinct. A missing-copy indicator remains readable without relying only on color.
+- Owned and in-list counts are distinct. A missing-copy indicator remains readable without relying only on color. Show shortages as neutral collection information when ownership is optional; do not mix them into blocking legality errors. Display the server-provided ownership requirement and denial reasons. Show shortages as neutral collection information when ownership is optional; do not mix them into blocking legality errors. Display the server-provided ownership requirement and denial reasons.
 
 Search matches name, effect text, or exact passcode. Exact passcode/name matches rank first before the chosen stable sort. Filters cover ownership, Monster/Spell/Trap, summoning/subtypes, card properties, race, attribute, Level/Rank/Link rating, Pendulum scales, and ATK/DEF. OR within alternative subtype/attribute choices; AND across filter groups and explicitly required properties. Ignore inapplicable stats rather than treating Link arrows as DEF or unknown ATK as zero. Define "Missing" as a shortage in the current draft and "Extras" as owned copies beyond that draft's requirement; do not imply copies are reserved by other saved lists.
 
@@ -134,6 +144,6 @@ Use readable labels/tooltips, keyboard focus, and remappable input. Hotkey input
 
 See [integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md) and [first editor milestone plan](../plans/2026-09-15-deck-editor-milestone-1.md).
 
-Acceptance at release: two players on a dedicated server can deposit real cards, save missing-card drafts, activate eligible lists, invalidate selection by withdrawal, invite and complete a duel through either entry path, and retain their private collections after reconnect/restart. Attempts through stale screens, legacy uploads, or commands cannot alter preparation/live-duel cards. Each stage also retains the existing duel UI and engine regression suite.
+Acceptance at release: two players on a dedicated server can deposit real cards, save missing-card drafts, activate eligible lists, observe policy-dependent withdrawal invalidation, invite and complete a duel through either entry path, and retain their private collections after reconnect/restart. Attempts through stale screens, legacy uploads, or commands cannot alter preparation/live-duel cards. Also verify the default journey from an empty collection to a legal duel without grants/deposits, ownership-enforced play without any companion installed, and companion denial under either setting. Each stage also retains the existing duel UI and engine regression suite.
 
 No implementation or new runtime validation is claimed by this design document.
