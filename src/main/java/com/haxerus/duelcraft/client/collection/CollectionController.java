@@ -57,6 +57,7 @@ final class CollectionController {
     private boolean largeCards;
     private boolean sideOpen;
     private boolean filtersOpen;
+    private boolean alternateFormats;
     private String query = "";
     private CardSearch.Filters filters = CardSearch.Filters.ALL;
     private CardSearch.Ownership ownership = CardSearch.Ownership.ALL;
@@ -120,6 +121,12 @@ final class CollectionController {
             refreshPanes();
         });
         button("toggle-filters").setOnClick(event -> showFilters(!filtersOpen));
+        button("alternate-formats").setOnClick(event -> {
+            alternateFormats = !alternateFormats;
+            applyOrdering();
+        });
+        button("alternate-formats").getStyle().tooltips(Component.literal(
+                "Include Anime, pre-errata, video game, custom, Speed and Rush cards."));
         button("filter-apply").setOnClick(event -> {
             if (applyFilters()) showFilters(false);
         });
@@ -533,7 +540,7 @@ final class CollectionController {
     private void applyOrdering() {
         filters = new CardSearch.Filters(filters.categoryAny(), filters.subtypeAny(), filters.requiredProperties(),
                 filters.raceAny(), filters.attributeAny(), filters.measure(), filters.measureRange(), filters.atkRange(),
-                filters.defRange(), filters.scaleRange(), ownership, sort);
+                filters.defRange(), filters.scaleRange(), ownership, sort, alternateFormats);
         refreshResults(true);
         refreshChips();
     }
@@ -574,7 +581,7 @@ final class CollectionController {
         try {
             filters = new CardSearch.Filters((int) mask("category"), (int) mask("subtype"),
                     (int) mask("property"), mask("race"), (int) mask("attribute"), measure,
-                    range("measure"), range("atk"), range("def"), range("scale"), ownership, sort);
+                    range("measure"), range("atk"), range("def"), range("scale"), ownership, sort, alternateFormats);
             refreshResults(true);
             refreshChips();
             return true;
@@ -603,6 +610,7 @@ final class CollectionController {
         choices.values().forEach(choice -> choice.button().removeClass("selected"));
         query = "";
         filters = CardSearch.Filters.ALL;
+        alternateFormats = false;
         ownership = CardSearch.Ownership.ALL;
         sort = CardSearch.Sort.NAME;
         measure = CardSearch.Measure.ANY;
@@ -666,6 +674,9 @@ final class CollectionController {
     }
 
     private void refreshChips() {
+        button("alternate-formats").setText("Alternate formats: " + (alternateFormats ? "On" : "Off"));
+        if (alternateFormats) button("alternate-formats").addClass("selected");
+        else button("alternate-formats").removeClass("selected");
         var chips = (ScrollerView) element("active-filters");
         chips.clearAllScrollViewChildren();
         if (!query.isBlank()) addChip(chips, "query", query, () -> {

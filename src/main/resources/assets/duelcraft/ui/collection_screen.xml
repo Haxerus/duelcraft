@@ -10,7 +10,7 @@
         #toggle-side, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
         #list-delete, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
-        #delete-cancel, #close-save, #close-discard, #close-cancel {
+        #delete-cancel, #close-save, #close-discard, #close-cancel, #alternate-formats {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
         button text { font-size: 12; text-color: #ffffff; }
@@ -63,7 +63,8 @@
         .large .deck-card { width: 70; height: 103; }
         .card-tile { padding-all: 2; flex-shrink: 0; background: built-in(ui-gdp:RECT_RD_DARK); }
         .card-art { width: 100%; height: 100%; justify-content: center; align-items: center; overflow: hidden; background: built-in(ui-gdp:RECT); }
-        .card-placeholder { width: 100%; text-wrap: wrap; adaptive-height: true; horizontal-align: center; font-size: 10; text-color: #DDDDDD; padding-all: 3; }
+        .card-placeholder { width: 100%; height: 100%; background: sprite(duelcraft:textures/card_back.png); }
+        .inspector-card .card-placeholder { width: 68%; }
         .card-tile.selected { overlay: built-in(ui-gdp:RECT_RD_T_SOLID); }
         .mode-button.selected, .filter-choice.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
         .selector-option { height: 18; flex-shrink: 0; font-size: 12; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
@@ -72,6 +73,7 @@
         #collection-search { flex: 1; min-width: 0; }
         #toggle-filters { width: 104; }
         #collection-options selector { flex: 1; min-width: 0; }
+        #alternate-formats { height: 26; }
         #active-filters { height: 48; flex-shrink: 0; }
         #active-filters .__scroller_view_view-container__ { flex-direction: row; flex-wrap: wrap; gap-all: 4; }
         .filter-chip { height: 24; padding-horizontal: 4; }
@@ -109,7 +111,9 @@
         #eligibility-scroll .__scroller_view_view-container__ { gap-all: 10; }
         scroller-view { scroller-view-mode: vertical; scroller-vertical-display: always; scroller-horizontal-display: never; adaptive-height: false; adaptive-width: false; }
         .__scroller_view_view-port__ { padding-all: 3; background: rect(#00000000); }
-        .__scroller_view_vertical-scroller__ { width: 10; }
+        .__scroller_view_vertical-scroller__ { width: 12; }
+        .__scroller_view_horizontal-scroller__ { height: 12; }
+        .__scroller_head_button__, .__scroller_tail_button__ { width: 12; height: 12; flex-shrink: 0; }
         #close-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 100; }
         #close-panel { width: 460; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #close-panel label { text-color: #ffffff; }
@@ -177,6 +181,7 @@
                         <selector id="card-sort" />
                     </element>
                     <scroller-view id="active-filters" />
+                    <button id="alternate-formats" class="mode-button" text="Alternate formats: Off" />
                     <element id="browse-results">
                         <label id="result-count" />
                         <element id="collection-results-host" />

@@ -22,14 +22,14 @@ public final class CollectionCatalog {
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database.toAbsolutePath(), config.toProperties());
              var statement = connection.createStatement();
              var rows = statement.executeQuery("""
-                     SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute
+                     SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute, d.ot
                      FROM datas d JOIN texts t ON d.id = t.id
                      """)) {
             while (rows.next()) {
                 int code = rows.getInt("id");
                 cards.add(new CardInfo(code, Objects.requireNonNullElse(rows.getString("name"), Integer.toString(code)),
                         Objects.requireNonNullElse(rows.getString("desc"), ""), rows.getInt("type"),
-                        rows.getInt("atk"), rows.getInt("def"), rows.getInt("level"), rows.getLong("race"), rows.getInt("attribute")));
+                        rows.getInt("atk"), rows.getInt("def"), rows.getInt("level"), rows.getLong("race"), rows.getInt("attribute"), rows.getInt("ot")));
             }
         }
         return List.copyOf(cards);

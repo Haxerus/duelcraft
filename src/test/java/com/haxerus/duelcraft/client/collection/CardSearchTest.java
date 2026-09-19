@@ -20,6 +20,34 @@ import static org.junit.jupiter.api.Assertions.*;
 class CardSearchTest {
     private static final DeckList EMPTY = new DeckList(List.of(), List.of(), List.of());
 
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {4, 8, 16, 32, 64, 512, 1024, 3 | 64})
+    void alternateFormatsRequireOptInEvenForOwnedExactPasscodes(int scope) {
+        var card = new CardInfo(99, "Unusual", "", TYPE_MONSTER, 0, 0, 1, 1, 1, scope);
+        var normal = new Filters(0, 0, 0, 0, 0, Measure.ANY,
+                null, null, null, null, Ownership.OWNED, Sort.NAME, false);
+        var alternate = new Filters(0, 0, 0, 0, 0, Measure.ANY,
+                null, null, null, null, Ownership.OWNED, Sort.NAME, true);
+        assertTrue(CardSearch.search(List.of(card), "99", normal, Map.of(99, 1L), EMPTY).isEmpty());
+        assertEquals(List.of(card), CardSearch.search(List.of(card), "99", alternate, Map.of(99, 1L), EMPTY));
+        assertTrue(CardSearch.search(List.of(card), "99", alternate, Map.of(), EMPTY).isEmpty());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 1, 2, 3, 256, 259})
+    void standardAndPrereleaseScopesRemainVisible(int scope) {
+        var card = new CardInfo(99, "Standard", "", TYPE_MONSTER, 0, 0, 1, 1, 1, scope);
+        assertEquals(List.of(card), search(List.of(card), "", Filters.ALL));
+    }
+
+    @Test void hiddenCardsAndTokensStayExcludedWhenAlternateFormatsAreEnabled() {
+        var hidden = new CardInfo(99, "Hidden", "", TYPE_MONSTER, 0, 0, 1, 1, 1, 4096 | 3);
+        var token = new CardInfo(100, "Token", "", TYPE_MONSTER | TYPE_TOKEN, 0, 0, 1, 1, 1, 4);
+        var alternate = new Filters(0, 0, 0, 0, 0, Measure.ANY,
+                null, null, null, null, Ownership.ALL, Sort.NAME, true);
+        assertTrue(search(List.of(hidden, token), "", alternate).isEmpty());
+    }
+
     private static CardInfo card(int code, String name, int type, int atk, int def, int level) {
         return new CardInfo(code, name, "Draw two cards.", type, atk, def, level, RACE_DRAGON, ATTRIBUTE_LIGHT);
     }

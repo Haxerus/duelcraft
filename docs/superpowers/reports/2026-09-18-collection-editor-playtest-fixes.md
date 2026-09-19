@@ -28,3 +28,11 @@ Root inspected the open dropdown at 1920×1080 and saved-list modal at 1280×720
 Evidence lives under ignored `build/playtest-fixes/`, including green scale/overflow reports, earlier failures, review notes, the implementation report and final full-test XML/HTML. See the implementation report for individual run details and evidence limitations.
 
 No M3 work, persistence changes, physical transfers or duel-enforcement changes are included. The branch remains local and unmerged.
+
+## Follow-up polish
+
+Further manual feedback increased scrollbar arrows and tracks to explicit 12-pixel dimensions: the previous correction had restored LDLib's undersized 5-pixel defaults. Missing artwork now uses the bundled card back instead of name/passcode text. Hover tooltips retain identification, and the square inspector centers a portrait card back until cropped artwork arrives.
+
+The default-off **Alternate formats** toggle uses `datas.ot`, now retained by both client metadata readers. It follows EDOPro `data_manager.h` and `DeckBuilder::CheckCardProperties`: ordinary scope is OCG/TCG/prerelease (`0x103`); enabling the toggle includes other scopes such as Anime, pre-errata, video game, custom, Speed and Rush. Tokens and hidden (`0x1000`) entries remain excluded. This changes search visibility only; saved lists and ownership are untouched. Sorting and advanced filtering retain the toggle, while Clear all resets it.
+
+Verification: **873 tests / 51 suites, zero failures, errors or skips** with normal native prerequisites (40 seconds). Both updated widget scenarios passed together: **50/50 checks**, at 1280×720/GUI2 and 1920×1080/GUI3 (46-second Gradle run). The initial visual run failed only because the new size assertion included hidden, unlaid-out scrollers; the corrected assertion checks laid-out controls. Root inspected the card-back fallback screenshots at both sizes. Independent code review found no issues. Evidence is in ignored `build/playtest-polish/`, including full unit XML, the initial visual report and the final combined report/screenshots/log.

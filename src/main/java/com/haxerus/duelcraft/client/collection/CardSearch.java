@@ -9,6 +9,9 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class CardSearch {
+    // EDOPro data_manager.h / DeckBuilder::CheckCardProperties: OCG, TCG, prerelease.
+    private static final int SCOPE_OFFICIAL = 0x1 | 0x2 | 0x100;
+    private static final int SCOPE_HIDDEN = 0x1000;
     private CardSearch() {}
 
     public enum Ownership { ALL, OWNED, MISSING, EXTRAS }
@@ -18,7 +21,14 @@ public final class CardSearch {
     public record Filters(int categoryAny, int subtypeAny, int requiredProperties,
                           long raceAny, int attributeAny, Measure measure,
                           Range measureRange, Range atkRange, Range defRange, Range scaleRange,
-                          Ownership ownership, Sort sort) {
+                          Ownership ownership, Sort sort, boolean alternateFormats) {
+        public Filters(int categoryAny, int subtypeAny, int requiredProperties,
+                       long raceAny, int attributeAny, Measure measure,
+                       Range measureRange, Range atkRange, Range defRange, Range scaleRange,
+                       Ownership ownership, Sort sort) {
+            this(categoryAny, subtypeAny, requiredProperties, raceAny, attributeAny, measure,
+                    measureRange, atkRange, defRange, scaleRange, ownership, sort, false);
+        }
         // Zero masks and null ranges are unrestricted.
         public static final Filters ALL = new Filters(0, 0, 0, 0, 0,
                 Measure.ANY, null, null, null, null, Ownership.ALL, Sort.NAME);
@@ -37,6 +47,8 @@ public final class CardSearch {
                 .thenComparing(sort).thenComparingInt(CardInfo::code);
         return cards.stream()
                 .filter(card -> (card.type() & com.haxerus.duelcraft.core.OcgConstants.TYPE_TOKEN) == 0)
+                .filter(card -> (card.scope() & SCOPE_HIDDEN) == 0)
+                .filter(card -> filters.alternateFormats() || (card.scope() & ~SCOPE_OFFICIAL) == 0)
                 .filter(card -> matchTier(card, text) < 3)
                 .filter(card -> matches(card, filters, owned.getOrDefault(card.code(), 0L),
                         required.getOrDefault(card.code(), 0)))

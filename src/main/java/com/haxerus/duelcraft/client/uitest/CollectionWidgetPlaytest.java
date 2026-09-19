@@ -37,9 +37,12 @@ final class CollectionWidgetPlaytest {
               var full = ResourceLocation.fromNamespaceAndPath("duelcraft", "textures/card_back.png");
               var art = ResourceLocation.withDefaultNamespace("textures/block/diamond_block.png");
               var model = CollectionFixture.model(false);
-              var screen = CollectionScreen.create(model, CollectionFixture.cards(),
-                      code -> { fullCalls.add(code); return full; },
-                      code -> { artCalls.add(code); return art; },
+              var cards = new java.util.ArrayList<>(CollectionFixture.cards());
+              cards.add(new com.haxerus.duelcraft.client.carddata.CardInfo(90000, "Anime sample", "",
+                      1, 0, 0, 1, 1, 1, 4));
+              var screen = CollectionScreen.create(model, cards,
+                      code -> { fullCalls.add(code); return code == 10003 ? null : full; },
+                      code -> { artCalls.add(code); return code == 10003 ? null : art; },
                       CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
               Object controller = ctx.getField(screen, "controller");
               SavedDeckController lists = ctx.getField(controller, "lists");
@@ -59,8 +62,17 @@ final class CollectionWidgetPlaytest {
           .check("inspector uses its distinct cropped-art supplier", ctx ->
                   ctx.<HashSet<Integer>>get("artCalls").contains(CollectionFixture.FIRST)
                           && ctx.<HashSet<Integer>>get("fullCalls").contains(CollectionFixture.FIRST))
-          .check("collection scroller arrows retain compact internal dimensions", CollectionWidgetPlaytest::compactScrollers)
+          .check("collection scroller arrows have usable square dimensions", CollectionWidgetPlaytest::compactScrollers)
+          .checkTextContains("#result-count", "80 cards")
+          .click("#alternate-formats").ticks(2)
+          .checkTextContains("#result-count", "81 cards")
+          .checkClass("#alternate-formats", "selected")
+          .click("#alternate-formats").ticks(2)
+          .checkTextContains("#result-count", "80 cards")
           .click("#collection-card-10003").ticks(2)
+          .checkVisible("#collection-card-10003 .card-placeholder")
+          .checkVisible("#inspector-art .card-placeholder")
+          .hoverAt(-100, -100).screenshot("card-back-fallback-scale" + guiScale)
           .checkClass("#collection-card-10003", "selected")
           .checkClass("#section-deck", "selected")
           .click("#collection-ownership")
@@ -130,8 +142,10 @@ final class CollectionWidgetPlaytest {
     }
 
     private static boolean compact(Scroller scroller, boolean horizontal) {
+        // Hidden/unopened scrollers have no laid-out buttons yet.
+        if (scroller.getSizeWidth() == 0 || scroller.getSizeHeight() == 0) return true;
         float head = horizontal ? scroller.headButton.getSizeWidth() : scroller.headButton.getSizeHeight();
         float tail = horizontal ? scroller.tailButton.getSizeWidth() : scroller.tailButton.getSizeHeight();
-        return head <= 6 && tail <= 6;
+        return Math.abs(head - 12) < .1f && Math.abs(tail - 12) < .1f;
     }
 }

@@ -81,8 +81,7 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
             this.textures = textures;
             noText();
             addClass("card-tile");
-            placeholder = new Label().setText(Component.literal(card.name() + "\n#" + card.code()))
-                    .addClass("card-placeholder");
+            placeholder = new UIElement().addClass("card-placeholder");
             image.addChild(placeholder);
             addChild(image);
             getStyle().tooltips(Component.literal(card.name()), Component.literal("#" + card.code()));

@@ -15,8 +15,15 @@ public record CardInfo(
         int def,
         int level,
         long race,
-        int attribute
+        int attribute,
+        int scope
 ) {
+    /** Existing synthetic card metadata defaults to the ordinary OCG/TCG pool. */
+    public CardInfo(int code, String name, String desc, int type, int atk, int def,
+                    int level, long race, int attribute) {
+        this(code, name, desc, type, atk, def, level, race, attribute, 3);
+    }
+
     /** Monster level or Xyz rank (lower 8 bits of level field). */
     public int levelOrRank() {
         return level & 0xFF;

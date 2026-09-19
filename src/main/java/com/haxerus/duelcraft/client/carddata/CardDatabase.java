@@ -30,13 +30,13 @@ public class CardDatabase implements AutoCloseable {
     }
 
     private static final String QUERY = """
-            SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute
+            SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute, d.ot
             FROM datas d JOIN texts t ON d.id = t.id
             WHERE d.id = ?
             """;
 
     private static final String SEARCH_SELECT = """
-            SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute, d.alias, d.setcode
+            SELECT d.id, t.name, t.desc, d.type, d.atk, d.def, d.level, d.race, d.attribute, d.ot, d.alias, d.setcode
             FROM datas d JOIN texts t ON d.id = t.id
             """;
     /** Indexed point lookup, so a passcode hit never depends on the name scan. */
@@ -215,7 +215,8 @@ public class CardDatabase implements AutoCloseable {
                 rs.getInt("def"),
                 rs.getInt("level"),
                 rs.getLong("race"),
-                rs.getInt("attribute")
+                rs.getInt("attribute"),
+                rs.getInt("ot")
         );
     }
 
