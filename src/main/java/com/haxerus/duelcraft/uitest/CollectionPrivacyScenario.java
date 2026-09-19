@@ -106,16 +106,16 @@ public final class CollectionPrivacyScenario implements MPScenario {
             var current = registry.get(net.minecraft.network.ConnectionProtocol.PLAY).values().stream()
                     .map(net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent::new).toList();
             var ours = current.stream().filter(c -> c.id().getNamespace().equals("duelcraft")).toList();
-            sc.check("real request and reply channels registered as mandatory current version 5", ours.size() == 8
-                    && ours.stream().allMatch(c -> c.version().equals("5") && !c.optional())
+            sc.check("real request and reply channels registered as mandatory current version 6", ours.size() == 8
+                    && ours.stream().allMatch(c -> c.version().equals("6") && !c.optional())
                     && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.collection.CollectionRequestPayload.TYPE.id()))
                     && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.collection.CollectionReplyPayload.TYPE.id())));
             var compatible = net.neoforged.neoforge.network.negotiation.NetworkComponentNegotiator.negotiate(current, current);
             sc.check("registered current channel pair negotiates successfully", compatible.success());
             var prior = current.stream().map(c -> c.id().getNamespace().equals("duelcraft")
-                    ? new net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent(c.id(), "4", c.flow(), c.optional()) : c).toList();
+                    ? new net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent(c.id(), "5", c.flow(), c.optional()) : c).toList();
             var incompatible = net.neoforged.neoforge.network.negotiation.NetworkComponentNegotiator.negotiate(current, prior);
-            sc.check("prior wire 4 rejected on every Duelcraft channel: " + incompatible.failureReasons(), !incompatible.success()
+            sc.check("prior wire 5 rejected on every Duelcraft channel: " + incompatible.failureReasons(), !incompatible.success()
                     && incompatible.failureReasons().keySet().equals(ours.stream().map(c -> c.id()).collect(java.util.stream.Collectors.toSet()))
                     && incompatible.failureReasons().values().stream().allMatch(c -> c.toString().contains("failure.version.mismatch")));
         } catch (ReflectiveOperationException exception) {

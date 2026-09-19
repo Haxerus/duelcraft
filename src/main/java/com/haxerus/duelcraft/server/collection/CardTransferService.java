@@ -40,7 +40,13 @@ public final class CardTransferService {
         if (expectedRevision != before.revision()) return rejected(CollectionError.STALE, before.revision());
         var slots = snapshot(owner);
         var plan = InventoryTransferPlan.plan(slots, before.counts(), depositableCodes, kind, code, amount);
-        if (plan.error() != CollectionError.NONE) return rejected(plan.error(), before.revision());
+        if (plan.error() != CollectionError.NONE) {
+            if (plan.error() == CollectionError.INSUFFICIENT_CARDS && kind == InventoryTransferPlan.Kind.DEPOSIT
+                    && slots.stream().anyMatch(slot -> CardItem.code(owner.slot(slot.index())).orElse(0) == code
+                    && (slot.code() == -1 || !depositableCodes.contains(code))))
+                return rejected(CollectionError.UNSUPPORTED_CARDS, before.revision());
+            return rejected(plan.error(), before.revision());
+        }
         int skipped = plan.skipped();
         if (kind == InventoryTransferPlan.Kind.DEPOSIT_ALL) {
             for (var slot : slots) {

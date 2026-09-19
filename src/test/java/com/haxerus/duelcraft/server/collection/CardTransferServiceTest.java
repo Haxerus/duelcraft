@@ -11,6 +11,13 @@ import static com.haxerus.duelcraft.server.collection.InventoryTransferPlan.Kind
 import static org.junit.jupiter.api.Assertions.*;
 
 class CardTransferServiceTest {
+    @Test void selectedCustomizedCardExplainsRejectionWithoutStrippingComponents() {
+        var owner = new Owner(); var named = CardItem.stack(7, 3);
+        named.set(DataComponents.CUSTOM_NAME, Component.literal("Keep me")); owner.slots[0] = named;
+        var reply = (CollectionReply.Rejected) service(false, null).apply(owner, 0, DEPOSIT, 7, 1);
+        assertEquals(CollectionError.UNSUPPORTED_CARDS, reply.error());
+        assertSame(named, owner.slots[0]); assertEquals(PlayerCollectionData.empty(), owner.data);
+    }
     static class Owner implements CardTransferService.Owner {
         final UUID id = UUID.randomUUID();
         PlayerCollectionData data = PlayerCollectionData.empty();

@@ -31,6 +31,7 @@ public final class SavedDeckController {
     private boolean decision;
     private String status = "";
     private String detail = "";
+    private int transferred, skipped;
     private DeckEligibility.Report eligibility = EMPTY;
 
     public SavedDeckController(DeckEditorModel model, UUID id, String name, DeckSaveHandler saveHandler,
@@ -62,6 +63,8 @@ public final class SavedDeckController {
     public String status() { return status; }
     public String detail() { return detail; }
     public DeckEligibility.Report eligibility() { return eligibility; }
+    public int transferred() { return transferred; }
+    public int skipped() { return skipped; }
 
     public void rename(String name) {
         requireEditable();
@@ -226,6 +229,39 @@ public final class SavedDeckController {
 
     public void clearActive() { mutate(new CollectionCommand.ClearActive(revision), false); }
     public void delete() { mutate(new CollectionCommand.Delete(revision, id), true); }
+
+    public void transfer(CollectionCommand command) {
+        if (pending || disposed || !ready) return;
+        UUID previouslyActive = activeId;
+        eligibility = EMPTY;
+        detail = "";
+        status = "transferring";
+        readToken++;
+        setPending(true);
+        changed.run();
+        try {
+            request.apply(command).whenCompleteAsync((reply, error) -> {
+                if (disposed) return;
+                if (error != null) fail(error);
+                else if (reply instanceof CollectionReply.Changed ack) {
+                    applyAcknowledgement(ack);
+                    transferred = ack.transferred(); skipped = ack.skipped();
+                    status = previouslyActive != null && activeId == null
+                            ? command instanceof CollectionCommand.Withdraw && eligibility.ownershipRequired()
+                                    && !eligibility.missing().isEmpty() && eligibility.restrictionReason() == null
+                                    ? "withdraw_active_cleared" : "active_cleared"
+                            : "transfer_done";
+                } else reject(reply);
+                refresh.get().whenCompleteAsync((view, refreshError) -> {
+                    if (disposed) return;
+                    if (refreshError == null) applyView(view); else refreshFailed(refreshError);
+                    setPending(false);
+                    changed.run();
+                    if (navigation != null) navigate(navigation);
+                }, client);
+            }, client);
+        } catch (RuntimeException error) { setPending(false); fail(error); }
+    }
 
     private void mutate(CollectionCommand command, boolean delete) {
         if (pending || disposed || !ready) return;

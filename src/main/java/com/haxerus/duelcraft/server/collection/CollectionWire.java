@@ -22,6 +22,9 @@ final class CollectionWire {
                 case CollectionCommand.Delete delete -> { buf.writeByte(4); revision(buf, delete.expectedRevision()); buf.writeUUID(delete.id()); }
                 case CollectionCommand.Activate activate -> { buf.writeByte(5); revision(buf, activate.expectedRevision()); buf.writeUUID(activate.id()); }
                 case CollectionCommand.ClearActive clear -> { buf.writeByte(6); revision(buf, clear.expectedRevision()); }
+                case CollectionCommand.Deposit deposit -> { buf.writeByte(7); revision(buf, deposit.expectedRevision()); positive(buf, deposit.code()); amount(buf, deposit.amount()); }
+                case CollectionCommand.Withdraw withdraw -> { buf.writeByte(8); revision(buf, withdraw.expectedRevision()); positive(buf, withdraw.code()); amount(buf, withdraw.amount()); }
+                case CollectionCommand.DepositAll all -> { buf.writeByte(9); revision(buf, all.expectedRevision()); }
             }
         });
     }
@@ -36,6 +39,9 @@ final class CollectionWire {
             case 4 -> new CollectionCommand.Delete(revision(buf), buf.readUUID());
             case 5 -> new CollectionCommand.Activate(revision(buf), buf.readUUID());
             case 6 -> new CollectionCommand.ClearActive(revision(buf));
+            case 7 -> new CollectionCommand.Deposit(revision(buf), positive(buf), amount(buf));
+            case 8 -> new CollectionCommand.Withdraw(revision(buf), positive(buf), amount(buf));
+            case 9 -> new CollectionCommand.DepositAll(revision(buf));
             default -> throw invalid("Unknown collection command");
         };
         complete(buf); return new CollectionRequestPayload(id, command);
@@ -70,8 +76,7 @@ final class CollectionWire {
                 case CollectionReply.Changed changed -> {
                     buf.writeByte(4); revision(buf, changed.revision()); optionalId(buf, changed.activeId());
                     buf.writeBoolean(changed.saved() != null); if (changed.saved() != null) deck(buf, changed.saved());
-                    if (changed.transferred() != 0) throw invalid("Transfers are not supported");
-                    number(buf, changed.transferred()); report(buf, changed.eligibility());
+                    size(buf, changed.transferred(), 4096); size(buf, changed.skipped(), 4096); report(buf, changed.eligibility());
                 }
                 case CollectionReply.Rejected rejected -> {
                     buf.writeByte(5); if (rejected.error() == CollectionError.NONE) throw invalid("Rejection requires an error");
@@ -111,8 +116,8 @@ final class CollectionWire {
             case 3 -> new CollectionReply.Deck(revision(buf), deck(buf));
             case 4 -> {
                 long revision = revision(buf); var active = optionalId(buf); var saved = buf.readBoolean() ? deck(buf) : null;
-                int transferred = number(buf); if (transferred != 0) throw invalid("Transfers are not supported");
-                yield new CollectionReply.Changed(revision, active, saved, transferred, report(buf));
+                int transferred = size(buf, 4096), skipped = size(buf, 4096);
+                yield new CollectionReply.Changed(revision, active, saved, transferred, skipped, report(buf));
             }
             case 5 -> {
                 var error = tag(buf, CollectionError.values()); if (error == CollectionError.NONE) throw invalid("Rejection requires an error");
@@ -147,6 +152,8 @@ final class CollectionWire {
     private static long revision(FriendlyByteBuf buf) { long revision = buf.readVarLong(); if (revision < 0) throw invalid("Negative revision"); return revision; }
     private static void revision(FriendlyByteBuf buf, long revision) { if (revision < 0) throw invalid("Negative revision"); buf.writeVarLong(revision); }
     private static int positive(FriendlyByteBuf buf) { int number = number(buf); if (number == 0) throw invalid("Passcode/count must be positive"); return number; }
+    private static int amount(FriendlyByteBuf buf) { int value = positive(buf); if (value > 4096) throw invalid("Transfer amount exceeds 4096"); return value; }
+    private static void amount(FriendlyByteBuf buf, int value) { if (value > 4096) throw invalid("Transfer amount exceeds 4096"); positive(buf, value); }
     private static void positive(FriendlyByteBuf buf, int number) { if (number <= 0) throw invalid("Passcode/count must be positive"); buf.writeVarInt(number); }
     private static long positiveLong(FriendlyByteBuf buf) { long value = revision(buf); if (value == 0) throw invalid("Count must be positive"); return value; }
     private static void positiveLong(FriendlyByteBuf buf, long value) { if (value <= 0) throw invalid("Count must be positive"); buf.writeVarLong(value); }

@@ -9,7 +9,7 @@ class CollectionHandlerTest {
     private static CollectionService service(Map<Integer, com.haxerus.duelcraft.core.data.CardCatalog.Facts> facts) {
         return new CollectionService(facts, new DeckUsePolicy(true, null));
     }
-    static class Sender implements CollectionPayloadHandler.Sender {
+    static class Sender extends CardTransferServiceTest.Owner implements CollectionPayloadHandler.Sender {
         final UUID owner = UUID.randomUUID();
         PlayerCollectionData data = PlayerCollectionData.empty();
         boolean busy; int writes; final List<CollectionReplyPayload> replies = new ArrayList<>();
@@ -18,6 +18,16 @@ class CollectionHandlerTest {
         public boolean busy() { return busy; }
         public void persist(PlayerCollectionData value) { data = value; writes++; }
         public void reply(CollectionReplyPayload value) { replies.add(value); }
+    }
+    @Test void withdrawalReplayAtAuthenticatedHandlerMovesExactlyOnce() {
+        var handler = new CollectionPayloadHandler(service(CollectionTestData.facts()), new CollectionSnapshotStore());
+        var sender = new Sender();
+        sender.data = new PlayerCollectionData(0, Map.of(7, 20L), Map.of(), null);
+        var command = new CollectionCommand.Withdraw(0, 7, 5);
+        assertInstanceOf(CollectionReply.Changed.class, send(handler, sender, command));
+        assertEquals(CollectionError.STALE, ((CollectionReply.Rejected) send(handler, sender, command)).error());
+        assertEquals(Map.of(7, 15L), sender.data.counts());
+        assertEquals(5, sender.slots[0].getCount()); assertEquals(1, sender.writes); assertEquals(1, sender.syncs);
     }
     static CollectionReply send(CollectionPayloadHandler handler, Sender sender, CollectionCommand command) {
         var request = UUID.randomUUID(); handler.handle(new CollectionRequestPayload(request, command), sender, 0);

@@ -2,7 +2,7 @@ package com.haxerus.duelcraft.collection;
 
 import java.util.UUID;
 
-/** Whitelisted management operations; ownership replacements and transfers are server-internal. */
+/** Whitelisted requests; clients never supply replacement counts or inventory contents. */
 public sealed interface CollectionCommand {
     enum PageKind { COUNTS, DECKS }
     record Open() implements CollectionCommand {}
@@ -12,4 +12,7 @@ public sealed interface CollectionCommand {
     record Delete(long expectedRevision, UUID id) implements CollectionCommand {}
     record Activate(long expectedRevision, UUID id) implements CollectionCommand {}
     record ClearActive(long expectedRevision) implements CollectionCommand {}
+    record Deposit(long expectedRevision, int code, int amount) implements CollectionCommand {}
+    record Withdraw(long expectedRevision, int code, int amount) implements CollectionCommand {}
+    record DepositAll(long expectedRevision) implements CollectionCommand {}
 }

@@ -8,6 +8,29 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CollectionPayloadTest {
+    @Test void transfersRoundTripAndRejectInvalidAmountsAndCodes() {
+        for (var command : List.of(new CollectionCommand.Deposit(2, 7, 4096),
+                new CollectionCommand.Withdraw(3, 8, 1), new CollectionCommand.DepositAll(4))) {
+            var buffer = Unpooled.buffer();
+            try {
+                var payload = new CollectionRequestPayload(ID, command);
+                CollectionRequestPayload.STREAM_CODEC.encode(buffer, payload);
+                assertEquals(payload, CollectionRequestPayload.STREAM_CODEC.decode(buffer));
+            } finally { buffer.release(); }
+        }
+        for (int tag : new int[]{7, 8}) {
+            for (int amount : new int[]{0, -1, 4097})
+                badRequest(buf -> { buf.writeByte(tag); buf.writeVarLong(0); buf.writeVarInt(7); buf.writeVarInt(amount); });
+            for (int code : new int[]{0, -1})
+                badRequest(buf -> { buf.writeByte(tag); buf.writeVarLong(0); buf.writeVarInt(code); buf.writeVarInt(1); });
+        }
+        var buffer = Unpooled.buffer();
+        try {
+            var payload = new CollectionReplyPayload(ID, new CollectionReply.Changed(5, null, null, 20, 7, REPORT));
+            CollectionReplyPayload.STREAM_CODEC.encode(buffer, payload);
+            assertEquals(payload, CollectionReplyPayload.STREAM_CODEC.decode(buffer));
+        } finally { buffer.release(); }
+    }
     static final UUID ID = UUID.randomUUID();
     static final SavedDeck DECK = new SavedDeck(ID, "Draft", new DeckList(List.of(1), List.of(2), List.of(3)));
     static final DeckEligibility.Report REPORT = new DeckEligibility.Report(List.of(new DeckEligibility.Issue("missing", 1, 2, 3)), Map.of(1, 2), true, true, "Era locked");

@@ -43,6 +43,8 @@ final class CollectionController {
     private final IntFunction<ResourceLocation> textures;
     private final IntFunction<ResourceLocation> art;
     private final SavedDeckController lists;
+    private final CardTransferController transfers;
+    private int carried = -1;
     private DeckEligibility.Report displayedEligibility;
     private final CollectionQuery search;
     private long queryGeneration;
@@ -82,6 +84,7 @@ final class CollectionController {
         this.art = art;
         this.search = search;
         lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
+        transfers = new CardTransferController(lists);
         this.close = close;
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
         ((TextElement) element("inspector-empty-prompt")).setText(Component.translatable("duelcraft.collection.select_card"));
@@ -156,10 +159,14 @@ final class CollectionController {
         button("close-save").setOnClick(event -> lists.save());
         button("close-discard").setOnClick(event -> lists.discardNavigation());
         button("close-cancel").setOnClick(event -> lists.cancelNavigation());
-        for (String unavailable : List.of("deposit-cards", "withdraw-card")) {
-            element(unavailable).setActive(false).getStyle()
-                    .tooltips(Component.translatable("duelcraft.collection.unavailable"));
-        }
+        button("deposit-cards").setOnClick(event -> transfers.depositAll());
+        button("deposit-card").setOnClick(event -> transfers.deposit(selectedCode));
+        button("withdraw-card").setOnClick(event -> transfers.withdraw(selectedCode));
+        ((TextField) element("transfer-amount")).setText("1", false).setTextResponder(value -> {
+            transfers.amount(value);
+            refreshTransfers();
+        });
+        element("transfer-amount").getStyle().tooltips(Component.translatable("duelcraft.collection.amount_help"));
         configureLists();
         installSelectorAlignment();
         button("eligibility-details").setText(Component.translatable("duelcraft.collection.details"));
@@ -234,10 +241,12 @@ final class CollectionController {
         ((TextElement) element("list-active-status")).setText(Component.translatable("duelcraft.collection." +
                 (lists.id().equals(lists.activeId()) ? "active" : "not_active")));
         if (!lists.status().isEmpty()) ((TextElement) element("editor-status")).setText(
-                Component.translatable("duelcraft.collection." + lists.status(), failureDetail()));
+                "transfer_done".equals(lists.status())
+                        ? Component.translatable("duelcraft.collection.transfer_done", lists.transferred(), lists.skipped())
+                        : Component.translatable("duelcraft.collection." + lists.status(), failureDetail()));
         refreshEligibility();
         refreshDecks();
-        refreshInspector(true);
+        refreshInspector(false);
         refreshResults(false);
     }
 
@@ -254,6 +263,7 @@ final class CollectionController {
         }
         ((TextElement) element("eligibility-summary")).setText(Component.translatable("duelcraft.collection." +
                 ("saved_active_cleared".equals(lists.status()) ? "saved_active_cleared"
+                        : "withdraw_active_cleared".equals(lists.status()) ? "withdraw_active_cleared"
                         : "active_cleared".equals(lists.status()) ? "active_cleared" : "eligibility_rejected")));
         if (report.restrictionReason() != null) {
             var row = new Label().setText(Component.translatable("duelcraft.collection.restriction_reason",
@@ -286,7 +296,7 @@ final class CollectionController {
 
     private Component failureDetail() {
         String detail = lists.detail();
-        for (String code : List.of("STALE", "BUSY", "INELIGIBLE", "NOT_FOUND", "DATA_UNAVAILABLE", "INVALID")) {
+        for (String code : List.of("STALE", "BUSY", "INELIGIBLE", "NOT_FOUND", "DATA_UNAVAILABLE", "INVALID", "INVENTORY_FULL", "INSUFFICIENT_CARDS", "UNSUPPORTED_CARDS")) {
             if (detail.startsWith(code)) return Component.translatable("duelcraft.collection.error_" +
                     code.toLowerCase(Locale.ROOT), detail.substring(code.length()));
         }
@@ -361,6 +371,7 @@ final class CollectionController {
     }
 
     private void refreshInspector(boolean changedCard) {
+        refreshTransfers();
         var card = byCode.get(selectedCode);
         button("add-card").setActive(!lists.pending() && card != null);
         button("remove-card").setActive(!lists.pending() && canRemoveSelected());
@@ -429,6 +440,28 @@ final class CollectionController {
         refreshResults(false);
         text("editor-status", (add ? "Added one card to " : "Removed one card from ")
                 + title(editMode.name()) + ". Draft only; ownership is unchanged.");
+    }
+
+    void refreshTransfers() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        int count = 0;
+        if (player != null && selectedCode > 0) {
+            for (int i = 0; i <= 40; i++) {
+                if (i >= 36 && i != 40) continue;
+                var stack = player.getInventory().getItem(i);
+                if (com.haxerus.duelcraft.item.CardItem.isCanonical(stack)
+                        && com.haxerus.duelcraft.item.CardItem.code(stack).orElse(0) == selectedCode) count += stack.getCount();
+            }
+        }
+        if (count != carried) {
+            carried = count;
+            ((TextElement) element("inspector-carried")).setText(Component.translatable("duelcraft.collection.carried", count));
+        }
+        boolean ready = player != null && lists.ready() && !lists.pending();
+        element("deposit-cards").setActive(ready);
+        element("transfer-amount").setActive(ready);
+        element("deposit-card").setActive(ready && selectedCode > 0 && transfers.valid());
+        element("withdraw-card").setActive(ready && selectedCode > 0 && transfers.valid());
     }
 
     private boolean canRemoveSelected() {

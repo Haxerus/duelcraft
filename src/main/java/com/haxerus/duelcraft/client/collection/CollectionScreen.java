@@ -149,6 +149,7 @@ public final class CollectionScreen extends ModularUIScreen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        controller.refreshTransfers();
         super.render(graphics, mouseX, mouseY, partialTick);
         controller.afterLayout();
     }

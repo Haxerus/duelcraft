@@ -8,19 +8,17 @@ import java.util.*;
 
 /** Authenticated synchronous boundary. NeoForge's default MAIN handler owns all reads and writes. */
 public final class CollectionPayloadHandler {
-    public interface Sender {
-        UUID id();
-        Optional<PlayerCollectionData> data();
-        boolean busy();
-        void persist(PlayerCollectionData data);
+    public interface Sender extends CardTransferService.Owner {
         void reply(CollectionReplyPayload payload);
     }
     private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false, false, null);
     private final CollectionService service;
     private final CollectionSnapshotStore snapshots;
+    private final CardTransferService transfers;
 
     public CollectionPayloadHandler(CollectionService service, CollectionSnapshotStore snapshots) {
         this.service = service; this.snapshots = snapshots;
+        transfers = new CardTransferService(service, service.depositableCodes());
     }
 
     public static void handle(CollectionRequestPayload payload, IPayloadContext context) {
@@ -30,12 +28,16 @@ public final class CollectionPayloadHandler {
             context.reply(new CollectionReplyPayload(payload.requestId(), new CollectionReply.Rejected(CollectionError.DATA_UNAVAILABLE, 0, EMPTY)));
             return;
         }
+        var owner = CardTransferService.owner(player);
         manager.collectionHandler().handle(payload, new Sender() {
             public UUID id() { return player.getUUID(); }
             public Optional<PlayerCollectionData> data() { return player.getData(CollectionAttachments.COLLECTION).data(); }
             public boolean busy() { return manager.isBusy(player); }
             public void persist(PlayerCollectionData data) { player.setData(CollectionAttachments.COLLECTION, CollectionAttachment.valid(data)); }
             public void reply(CollectionReplyPayload reply) { context.reply(reply); }
+            public net.minecraft.world.item.ItemStack slot(int index) { return owner.slot(index); }
+            public void slot(int index, net.minecraft.world.item.ItemStack stack) { owner.slot(index, stack); }
+            public void inventoryChanged() { owner.inventoryChanged(); }
         }, System.currentTimeMillis());
     }
 
@@ -48,6 +50,9 @@ public final class CollectionPayloadHandler {
         if (busy) { reject(payload, sender, CollectionError.BUSY, before.revision(), service.emptyReport()); return; }
         CollectionReply reply;
         switch (payload.command()) {
+            case CollectionCommand.Deposit deposit -> reply = transfers.apply(sender, deposit.expectedRevision(), InventoryTransferPlan.Kind.DEPOSIT, deposit.code(), deposit.amount());
+            case CollectionCommand.Withdraw withdraw -> reply = transfers.apply(sender, withdraw.expectedRevision(), InventoryTransferPlan.Kind.WITHDRAW, withdraw.code(), withdraw.amount());
+            case CollectionCommand.DepositAll all -> reply = transfers.apply(sender, all.expectedRevision(), InventoryTransferPlan.Kind.DEPOSIT_ALL, 0, 0);
             case CollectionCommand.Open ignored -> {
                 var change = service.revalidateActive(before, sender.id(), com.haxerus.duelcraft.core.DuelRule.MR5);
                 if (!change.success()) {
@@ -98,6 +103,7 @@ public final class CollectionPayloadHandler {
                 }
             }
         }
+        if (reply instanceof CollectionReply.Changed) snapshots.invalidate(sender.id());
         sender.reply(new CollectionReplyPayload(payload.requestId(), reply));
     }
 

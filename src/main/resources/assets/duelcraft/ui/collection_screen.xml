@@ -6,7 +6,7 @@
         #collection-root { width: 1280; height: 720; }
         #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         label, text { font-size: 12; text-color: #FFFFFF; text-shadow: true; }
-        #saved-lists, #save-deck, #withdraw-card, #section-deck, #section-side, #add-card, #remove-card,
+        #saved-lists, #save-deck, #withdraw-card, #deposit-card, #section-deck, #section-side, #add-card, #remove-card,
         #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
         #list-delete, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
@@ -45,7 +45,9 @@
         #inspector-name { font-size: 16; text-color: #FFFF00; }
         #inspector-stats { text-color: #CCCCCC; }
         #inspector-description { font-size: 13; }
-        #inspector-owned, #inspector-used, #inspector-missing { height: 18; }
+        #inspector-owned, #inspector-used, #inspector-missing, #inspector-carried { height: 18; }
+        #transfer-amount { width: 70; }
+        #transfer-actions button { flex: 1; min-width: 0; }
         #inspector-missing.warning { text-color: #FFDD55; }
         #inspector-missing.neutral { text-color: #AAAAAA; }
         #card-edit-controls { flex-shrink: 0; gap-all: 4; }
@@ -147,12 +149,17 @@
                         <label id="inspector-name" class="wrap" />
                         <label id="inspector-stats" class="wrap" />
                         <text id="inspector-description" class="wrap" />
-                        <button id="withdraw-card" text="Withdraw · unavailable" />
                     </scroller-view>
                     <element id="card-edit-controls">
                         <label id="inspector-owned" />
+                        <label id="inspector-carried" />
                         <label id="inspector-used" />
                         <label id="inspector-missing" />
+                        <element class="row"><label class="grow" text="duelcraft.collection.amount" /><text-field id="transfer-amount" /></element>
+                        <element id="transfer-actions" class="row">
+                            <button id="deposit-card" text="duelcraft.collection.deposit" />
+                            <button id="withdraw-card" text="duelcraft.collection.withdraw" />
+                        </element>
                         <element class="row">
                             <button id="section-deck" class="mode-button" text="Deck" />
                             <button id="section-side" class="mode-button" text="Side" />
@@ -215,7 +222,7 @@
                 </element>
             </element>
             <element id="editor-footer">
-                <button id="deposit-cards" text="Deposit · unavailable" />
+                <button id="deposit-cards" text="duelcraft.collection.deposit_all" />
                 <button id="activate-deck" text="Activate · unavailable" />
                 <element id="deck-feedback">
                     <label id="deck-warnings" />

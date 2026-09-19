@@ -36,6 +36,14 @@ public final class CollectionService {
         return policy.ownershipRequired();
     }
 
+    public java.util.Set<Integer> depositableCodes() {
+        return facts.values().stream().filter(card -> card.code() > 0
+                && (card.type() & com.haxerus.duelcraft.core.OcgConstants.TYPE_TOKEN) == 0
+                && (card.type() & (com.haxerus.duelcraft.core.OcgConstants.TYPE_MONSTER
+                | com.haxerus.duelcraft.core.OcgConstants.TYPE_SPELL | com.haxerus.duelcraft.core.OcgConstants.TYPE_TRAP)) != 0)
+                .map(CardCatalog.Facts::code).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     public Change save(PlayerCollectionData before, long expectedRevision, boolean busy, UUID owner, SavedDeck deck) {
         var rejection = gate(before, expectedRevision, busy);
         if (rejection != null) return rejection;

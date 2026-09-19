@@ -164,6 +164,14 @@ public final class CollectionClient {
                     && nextRevision(activate.expectedRevision(), changed.revision()) && changed.saved() == null;
             case CollectionCommand.ClearActive clear -> reply instanceof CollectionReply.Changed changed
                     && nextRevision(clear.expectedRevision(), changed.revision()) && changed.saved() == null;
+            case CollectionCommand.Deposit deposit -> reply instanceof CollectionReply.Changed changed
+                    && nextRevision(deposit.expectedRevision(), changed.revision()) && changed.saved() == null
+                    && changed.transferred() == deposit.amount() && changed.skipped() == 0;
+            case CollectionCommand.Withdraw withdraw -> reply instanceof CollectionReply.Changed changed
+                    && nextRevision(withdraw.expectedRevision(), changed.revision()) && changed.saved() == null
+                    && changed.transferred() == withdraw.amount() && changed.skipped() == 0;
+            case CollectionCommand.DepositAll all -> reply instanceof CollectionReply.Changed changed
+                    && nextRevision(all.expectedRevision(), changed.revision()) && changed.saved() == null && changed.transferred() > 0;
         };
     }
 
