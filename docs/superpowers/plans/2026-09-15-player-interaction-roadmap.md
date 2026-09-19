@@ -8,16 +8,16 @@ This roadmap covers the complete integration. Milestone 1 is complete through `2
 | --- | --- |
 | 1. Sample-data editor — complete | [Editor](2026-09-15-deck-editor-milestone-1.md) |
 | 2. Persistence and saved lists — complete and reviewed | [Personal collections](2026-09-17-player-collections-milestone-2.md) |
-| 3. Physical cards and transfers | [Inventory transfers](2026-09-17-card-transfers-milestone-3.md) |
+| 3. Physical cards and transfers — complete | [Inventory transfers](2026-09-17-card-transfers-milestone-3.md) |
 | 4. Duel preparation and import | [Authoritative preparation](2026-09-17-duel-preparation-milestone-4.md) |
 | 5. Home, binder, mat and lobby | [Player entry points](2026-09-17-player-entry-points-milestone-5.md) |
 | 6. Release validation | [Tests and documentation](2026-09-17-interaction-release-milestone-6.md) |
 
-Read the [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md) alongside each plan. They settle storage/packet bounds, operation signatures, acknowledged saving, inventory scope, and preparation rules. Milestone 2's [verification report](../reports/2026-09-17-player-collections-m2.md) records 850 final unit/JNI tests, real editor/respawn, dedicated two-player privacy and retained-world rejoin/distinct-JVM restart evidence. Independent whole-branch and final-fix reviews are complete. Milestones 3–6 remain; no physical transfers begin before M2 state/acknowledgement acceptance. Legacy upload/deck-command paths do not yet enforce shared deck-use policy; M4 still owns that cutover. This intermediate branch is not a release with complete policy enforcement.
+Read the [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md) alongside each plan. They settle storage/packet bounds, operation signatures, acknowledged saving, inventory scope, and preparation rules. Milestone 2's [verification report](../reports/2026-09-17-player-collections-m2.md) records 850 final unit/JNI tests, real editor/respawn, dedicated two-player privacy and retained-world rejoin/distinct-JVM restart evidence. Independent whole-branch and final-fix reviews are complete. M3 transfers are now complete following M2 state/acknowledgement acceptance; milestones 4–6 remain. Legacy upload/deck-command paths do not yet enforce shared deck-use policy; M4 still owns that cutover. This intermediate branch is not a release with complete policy enforcement.
 
 ## Policy amendment before further implementation
 
-Decision 2026-09-19: core `requireCardOwnership=false` server setting plus an optional companion restriction hook. See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [M2 policy follow-up](2026-09-19-deck-use-policy-follow-up.md). Original M2 and subsequent editor fixes exist in `codex/player-collections`; M3–M6 have not started. The follow-up now has 902 passing unit/JNI tests, four retained-world JVM phases (60 checks), and dedicated A/B privacy runs under both settings (61 checks each), plus separate editor captures; see the [follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md). Final independent review is complete; M3 may proceed. Preserve the M1/M2 reports as evidence for their original behavior.
+Decision 2026-09-19: core `requireCardOwnership=false` server setting plus an optional companion restriction hook. See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [M2 policy follow-up](2026-09-19-deck-use-policy-follow-up.md). Original M2 and subsequent editor fixes exist in `codex/player-collections`; M3 is now complete; M4–M6 have not started. The follow-up now has 902 passing unit/JNI tests, four retained-world JVM phases (60 checks), and dedicated A/B privacy runs under both settings (61 checks each), plus separate editor captures; see the [follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md). The follow-up passed independent review before M3 implementation. Preserve the M1/M2 reports as evidence for their original behavior.
 
 Core owns collections, transfers, legality, and optional ownership enforcement. The companion supplies acquisition/progression and may deny additional deck use. Verify settings off/on without a companion and a test companion restriction under both settings. No companion development is required to complete integration.
 
@@ -41,6 +41,8 @@ Keep collection state changes server-owned. Store copies by passcode; save any w
 
 ## 3. Physical cards and inventory transfers
 
+**Complete 2026-09-19:** [M3 report and manual checks](../reports/2026-09-19-card-transfers-m3.md). Verification: 930 unit/JNI tests, 274 UI checks, 56 dedicated-player checks and 23 retained-world lifecycle checks. Protocol 6. M4 is the next unstarted checkpoint.
+
 Create `item/CardItem`, the passcode data component registration, and `server/collection/CardTransferService`. Register cards in `Duelcraft`, add item definition/model/lang resources, and connect the editor transfer controls to authoritative operations. Add explicit amount selection, Deposit carried cards, capacity errors, and status updates without rebuilding the entire editor.
 
 Implement inventory checks and collection updates as one server-thread operation. First inspect stacks/capacity, then apply the matching removal/addition and count delta. Reject transfer requests during preparation or a duel. Revalidate the active selection against planned post-transfer state. A shortage alone clears it only with core ownership enforcement enabled; companion denials also apply. Permit full-stack deposits and counts above vanilla stack limits in the collection. Keep normal withdrawal all-or-nothing for the requested amount.
@@ -55,7 +57,7 @@ Add `server/DuelPreparationService` to share challenge, accept, cancel, and read
 
 Update `DuelCommand`, `ServerPayloadHandler`, `DuelClientCommand`, and existing deck-upload tests together. Replace normal raw upload activation with YDK list import plus server activation; retain Main/Extra/Side in the import parser while preserving `DeckLoader` callers that only need engine decks. The Side list stays out of single-duel engine input. The human's solo deck follows the same deck-use policy; the AI's deck does not require a player collection.
 
-Replace session-only `playerCurrentDeck` as the authoritative selection. Pending invites contain participants/options and expiry, not access to the other player's list. Reject old/stale mutation paths while busy. If protocol shapes break compatibility, bump the then-current network version (the M2 policy follow-up ends at `5`) and update setup instructions for matching clients/servers.
+Replace session-only `playerCurrentDeck` as the authoritative selection. Pending invites contain participants/options and expiry, not access to the other player's list. Reject old/stale mutation paths while busy. If protocol shapes break compatibility, bump the then-current network version (M3 ends at `6`) and update setup instructions for matching clients/servers.
 
 **Exit:** request-sequence tests cover withdrawal between invite and accept, editing an active list, activation during first-turn selection, stale uploads during a duel, cancellation/disconnect, and immutable prepared decks. Existing seed/seat/shuffle behavior stays unchanged. Dedicated-server two-player duels use collections without manual deck commands.
 

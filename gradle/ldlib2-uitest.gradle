@@ -19,6 +19,34 @@ def ldTestOutDirFile = file(ldTestOutDir)
 // (it would need a live Project). A plain boolean local serializes fine.
 def ldTestEnabled = project.hasProperty('ldTest')
 
+if (project.hasProperty('collectionTransferLifecycle')) {
+    def phase = project.property('collectionTransferLifecycle').toString()
+    if (!(phase in ['seed', 'verify']) || ldTestEnabled || project.hasProperty('collectionLifecycle') || project.hasProperty('collectionPolicyLifecycle')) {
+        throw new GradleException('collectionTransferLifecycle requires seed|verify alone')
+    }
+    def transferDir = project.file('run-collection-transfer-lifecycle')
+    neoForge.runs.matching { it.name == 'client' }.configureEach { run ->
+        run.gameDirectory = transferDir
+        run.systemProperty 'duelcraft.uitest.collectionTransferLifecycle', phase
+        run.programArguments.addAll '--username', 'TransferTest', '--width', '1280', '--height', '720'
+        if (phase == 'verify') run.programArguments.addAll '--quickPlaySingleplayer', 'collection_m3_transfers_20260919'
+    }
+    tasks.register('verifyCollectionTransferLifecycle') {
+        doLast {
+            def failure = new File(transferDir, 'collection-lifecycle-failure.txt')
+            if (failure.exists()) throw new GradleException(failure.text)
+            def phases = phase == 'seed' ? ['seed', 'rejoin'] : ['verify']
+            phases.each { name ->
+                def evidence = new File(transferDir, "lifecycle-evidence/$name")
+                def report = new groovy.json.JsonSlurper().parse(new File(evidence, 'report.json'))
+                if (report.status != 'PASS' || !report.finishedAt) throw new GradleException('Incomplete transfer lifecycle evidence')
+                logger.lifecycle("Transfer lifecycle $name: ${report.totals.checks - report.totals.checksFailed}/${report.totals.checks} checks")
+            }
+        }
+    }
+    tasks.matching { it.name == 'runClient' }.configureEach { finalizedBy 'verifyCollectionTransferLifecycle' }
+}
+
 // Retained-world phases deliberately use the interactive runner, never its fresh-world mode.
 if (project.hasProperty('collectionLifecycle')) {
     def phase = project.property('collectionLifecycle').toString()
@@ -45,6 +73,7 @@ if (project.hasProperty('ldTest')) {
     // System properties rather than program arguments: Minecraft's argument parser owns the
     // command line and rejects what it does not recognise.
     neoForge.runs.matching { it.name == 'client' }.configureEach { run ->
+        if (project.hasProperty('collectionTransferUi')) run.gameDirectory = project.file('run-collection-m3-ui')
         run.systemProperty 'ldlib2.uitest.run', project.property('ldTest')
         run.systemProperty 'ldlib2.uitest.out', ldTestOutDir
         run.systemProperty 'ldlib2.uitest.exclude', project.findProperty('ldTestExclude') ?: ''

@@ -315,6 +315,7 @@ public final class SavedDeckController {
     private void reject(CollectionReply reply) { fail(rejection(reply)); }
     private RuntimeException rejection(CollectionReply reply) {
         if (reply instanceof CollectionReply.Rejected rejected) {
+            if (rejected.error() == CollectionError.BUSY) ready = false;
             eligibility = rejected.eligibility();
             String reason = rejected.eligibility().restrictionReason();
             if (reason == null && rejected.eligibility().ownershipRequired()
@@ -336,6 +337,8 @@ public final class SavedDeckController {
 
     private void refreshFailed(Throwable error) {
         if ("Collection refresh superseded".equals(root(error).getMessage())) return;
+        if (root(error) instanceof CollectionClient.RefreshRejectedException rejected
+                && rejected.error() == CollectionError.BUSY) ready = false;
         status = "refresh_failed";
         detail = root(error).getMessage() == null ? "Try again" : root(error).getMessage();
         changed.run();

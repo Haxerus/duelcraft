@@ -155,7 +155,7 @@
                         <label id="inspector-carried" />
                         <label id="inspector-used" />
                         <label id="inspector-missing" />
-                        <element class="row"><label class="grow" text="duelcraft.collection.amount" /><text-field id="transfer-amount" /></element>
+                        <element class="row"><label id="transfer-amount-label" class="grow" /><text-field id="transfer-amount" /></element>
                         <element id="transfer-actions" class="row">
                             <button id="deposit-card" text="duelcraft.collection.deposit" />
                             <button id="withdraw-card" text="duelcraft.collection.withdraw" />

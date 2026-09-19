@@ -7,6 +7,14 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CardTransferControllerTest {
+    @Test void ownedUnknownPasscodesRemainDiscoverableWithoutASavedList() {
+        var cards = CardSearch.search(List.of(), "2147483647", CardSearch.Filters.ALL,
+                Map.of(Integer.MAX_VALUE, 5L), new DeckList(List.of(), List.of(), List.of()));
+        assertEquals(1, cards.size()); assertEquals(Integer.MAX_VALUE, cards.getFirst().code());
+        assertEquals(0, cards.getFirst().type());
+        assertTrue(CardSearch.search(List.of(), "7", CardSearch.Filters.ALL, Map.of(),
+                new DeckList(List.of(), List.of(), List.of())).isEmpty());
+    }
     final DeckEditorModel model = new DeckEditorModel(new DeckList(List.of(7), List.of(), List.of()), Map.of(7, 20L));
     final CompletableFuture<CollectionReply> reply = new CompletableFuture<>();
     final CompletableFuture<ClientCollectionState.View> snapshot = new CompletableFuture<>();
@@ -51,5 +59,18 @@ class CardTransferControllerTest {
         }
         assertTrue(requests.isEmpty());
         form.amount("4096"); assertTrue(form.valid());
+    }
+
+    @Test void busyReplyLocksFurtherRequestsUntilAnAuthoritativeOpenSucceeds() {
+        lists.applyView(new ClientCollectionState.View(4, Map.of(7, 20L), List.of(), null));
+        var form = new CardTransferController(lists);
+        form.withdraw(7);
+        reply.complete(new CollectionReply.Rejected(CollectionError.BUSY, 4,
+                new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
+        snapshot.completeExceptionally(new IllegalStateException("Still busy"));
+        assertFalse(lists.ready()); assertFalse(lists.pending());
+        form.withdraw(7); assertEquals(1, requests.size());
+        lists.applyView(new ClientCollectionState.View(4, Map.of(7, 20L), List.of(), null));
+        assertTrue(lists.ready());
     }
 }

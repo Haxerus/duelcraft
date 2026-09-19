@@ -23,6 +23,7 @@ import java.nio.file.*;
 public final class CollectionLifecycleLauncher {
     static final String WORLD = "collection_m2_retained_20260917";
     static final String POLICY_WORLD = "collection_policy_followup_20260919";
+    static final String TRANSFER_WORLD = "collection_m3_transfers_20260919";
     static String stage;
     private static int step;
     private static long started;
@@ -42,9 +43,11 @@ public final class CollectionLifecycleLauncher {
     public static void tick(ClientTickEvent.Post event) {
         String phase = System.getProperty("duelcraft.uitest.collectionLifecycle");
         boolean policy = System.getProperty("duelcraft.uitest.collectionPolicyLifecycle") != null;
+        boolean transfer = System.getProperty("duelcraft.uitest.collectionTransferLifecycle") != null;
+        if (transfer) phase = System.getProperty("duelcraft.uitest.collectionTransferLifecycle");
         if (policy) phase = System.getProperty("duelcraft.uitest.collectionPolicyLifecycle");
         if (FMLEnvironment.production || phase == null || step == 9) return;
-        String world = policy ? POLICY_WORLD : WORLD;
+        String world = transfer ? TRANSFER_WORLD : policy ? POLICY_WORLD : WORLD;
         boolean fresh = phase.equals(policy ? "default" : "seed");
         var mc = Minecraft.getInstance();
         try {
@@ -53,7 +56,8 @@ public final class CollectionLifecycleLauncher {
                 if (!(policy ? java.util.List.of("default", "ownership", "restricted", "removed") : java.util.List.of("seed", "verify")).contains(phase)) throw new IllegalStateException("Invalid lifecycle phase");
                 Path expectedDirectory = Path.of(System.getProperty("duelcraft.uitest.lifecycleDirectory", mc.gameDirectory.toString())).toAbsolutePath().normalize();
                 if (!mc.gameDirectory.toPath().toAbsolutePath().normalize().equals(expectedDirectory)
-                        || !expectedDirectory.getFileName().toString().equals(policy ? "run-collection-policy-lifecycle" : "run-collection-lifecycle")) {
+                        || !expectedDirectory.getFileName().toString().equals(transfer ? "run-collection-transfer-lifecycle"
+                        : policy ? "run-collection-policy-lifecycle" : "run-collection-lifecycle")) {
                     throw new IllegalStateException("Requires isolated lifecycle gameDirectory");
                 }
                 if (System.getProperty("ldlib2.uitest.run") != null) throw new IllegalStateException("Automatic fresh-world runner forbidden");
@@ -114,7 +118,7 @@ public final class CollectionLifecycleLauncher {
                     throw new IllegalStateException("Logout did not clear private client snapshot");
                 }
                 step = 4;
-                mc.createWorldOpenFlows().openWorld(WORLD, () -> fail(mc, new IllegalStateException("Retained rejoin failed")));
+                mc.createWorldOpenFlows().openWorld(world, () -> fail(mc, new IllegalStateException("Retained rejoin failed")));
             } else if (step == 4 && ready(mc)) {
                 step = 5;
                 stage = "rejoin";
@@ -132,7 +136,8 @@ public final class CollectionLifecycleLauncher {
     }
     private static Path report() { return Minecraft.getInstance().gameDirectory.toPath().resolve("ldlib2-uitest/report.json"); }
     private static void launch(boolean policy) {
-        String error = UITestRunner.runInteractive(policy ? "collection_policy_lifecycle" : "collection_retained_world");
+        String error = UITestRunner.runInteractive(System.getProperty("duelcraft.uitest.collectionTransferLifecycle") != null
+                ? "collection_transfer_restart" : policy ? "collection_policy_lifecycle" : "collection_retained_world");
         if (error != null) throw new IllegalStateException(error);
     }
     private static boolean finished() throws IOException {

@@ -160,6 +160,7 @@ final class CollectionController {
         button("close-discard").setOnClick(event -> lists.discardNavigation());
         button("close-cancel").setOnClick(event -> lists.cancelNavigation());
         button("deposit-cards").setOnClick(event -> transfers.depositAll());
+        ((TextElement) element("transfer-amount-label")).setText(Component.translatable("duelcraft.collection.amount"));
         button("deposit-card").setOnClick(event -> transfers.deposit(selectedCode));
         button("withdraw-card").setOnClick(event -> transfers.withdraw(selectedCode));
         ((TextField) element("transfer-amount")).setText("1", false).setTextResponder(value -> {
@@ -313,6 +314,7 @@ final class CollectionController {
         cards.forEach(card -> byCode.put(card.code(), card));
         catalogState = failed ? "catalog_failed" : cards.isEmpty() ? "catalog_empty" : "";
         lifecycleChanged();
+        refreshInspector(true);
     }
 
     void catalogLoading() {

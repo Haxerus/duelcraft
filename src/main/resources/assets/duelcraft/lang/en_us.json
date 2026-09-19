@@ -1,4 +1,5 @@
 {
+  "duelcraft.card.granted": "Gave physical cards to %s.",
   "duelcraft.collection.deposit": "Deposit",
   "duelcraft.collection.withdraw": "Withdraw",
   "duelcraft.collection.deposit_all": "Deposit carried cards",

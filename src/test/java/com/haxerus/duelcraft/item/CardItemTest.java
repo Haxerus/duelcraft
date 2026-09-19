@@ -48,5 +48,18 @@ class CardItemTest {
             assertThrows(IllegalArgumentException.class, () -> component.streamCodec().decode(buffer));
         } finally { buffer.release(); }
     }
+
+    @Test void registeredStackRoundTripsThroughPlayerStorageAndInventorySync() {
+        var registries = net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(net.minecraft.core.registries.BuiltInRegistries.REGISTRY);
+        var ops = net.minecraft.resources.RegistryOps.create(NbtOps.INSTANCE, registries);
+        var original = CardItem.stack(89631139, 20);
+        var loaded = ItemStack.CODEC.parse(ops, ItemStack.CODEC.encodeStart(ops, original).getOrThrow()).getOrThrow();
+        assertTrue(ItemStack.matches(original, loaded));
+        var buffer = new net.minecraft.network.RegistryFriendlyByteBuf(Unpooled.buffer(), registries);
+        try {
+            ItemStack.STREAM_CODEC.encode(buffer, original);
+            assertTrue(ItemStack.matches(original, ItemStack.STREAM_CODEC.decode(buffer)));
+        } finally { buffer.release(); }
+    }
 }
 

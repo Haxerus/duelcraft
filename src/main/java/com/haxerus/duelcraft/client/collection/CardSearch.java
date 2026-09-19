@@ -45,7 +45,10 @@ public final class CardSearch {
         };
         var order = Comparator.comparingInt((CardInfo card) -> matchTier(card, text))
                 .thenComparing(sort).thenComparingInt(CardInfo::code);
-        return cards.stream()
+        var known = cards.stream().map(CardInfo::code).collect(java.util.stream.Collectors.toSet());
+        var unknownOwned = owned.keySet().stream().filter(code -> !known.contains(code))
+                .map(code -> new CardInfo(code, "Passcode " + code, "", 0, 0, 0, 0, 0, 0));
+        return java.util.stream.Stream.concat(cards.stream(), unknownOwned)
                 .filter(card -> (card.type() & com.haxerus.duelcraft.core.OcgConstants.TYPE_TOKEN) == 0)
                 .filter(card -> (card.scope() & SCOPE_HIDDEN) == 0)
                 .filter(card -> filters.alternateFormats() || (card.scope() & ~SCOPE_OFFICIAL) == 0)

@@ -92,6 +92,7 @@ public class Duelcraft {
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.addListener(DuelCommand::register);
+        NeoForge.EVENT_BUS.addListener(com.haxerus.duelcraft.server.CardGrantCommand::onRegister);
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);

@@ -1,12 +1,12 @@
 # Collection and deck editor implementation handoff
 
-Updated 2026-09-19. This replaces the original M1 startup handoff. **Implement M3 next.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans.
+Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented and verified. M4–M6 remain later checkpoints; none has started.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
 
 ## Workspace and starting point
 
 - Implementation worktree: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor`
 - Branch: `codex/player-collections`
-- Latest implementation commit: `b407f7b` (`Polish deck editor feedback and add type sorting`). The handoff/kickoff documentation commit follows it.
+- Pre-M3 baseline: `b407f7b` (`Polish deck editor feedback and add type sorting`), followed by handoff commit `00b76ba`. The M3 completion addendum below records subsequent work; inspect current HEAD before editing.
 - Main checkout: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft`. It is not the implementation starting point. Work directly in the existing worktree; do not restart from main or the old `deck-editor-m1` worktree.
 - This handoff and its [kickoff prompt](2026-09-17-deck-editor-kickoff.md) live in the implementation worktree. Use the absolute worktree paths when opening them from a fresh session.
 - Check `git status`, branch, and HEAD before editing. The polish is committed; preserve any later user changes. No merge or push has been requested.
@@ -17,10 +17,14 @@ Read in this order:
 2. This handoff and the [ownership amendment](2026-09-18-optional-ownership-amendment.md).
 3. [Design specification](../specs/2026-09-15-player-interaction-design.md) and [implementation contracts](../specs/2026-09-17-player-interaction-contracts.md).
 4. [Integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md).
-5. [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md), the next executable task list.
+5. Completed [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md) and its [verification report](../reports/2026-09-19-card-transfers-m3.md). M4 is the next checkpoint and requires a separate implementation request.
 6. [M2 policy follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md), for verified policy behavior and runtime test setup.
 
 The ownership amendment supersedes older unconditional ownership language. The implemented dark Minecraft UI and subsequent user feedback supersede the early HTML prototype's visual styling. Consult current source for API details; plan snippets are contracts, not code to paste unchanged.
+
+## M3 completion addendum
+
+M3 commits begin with `1cc975c` (item), `9157898` (atomic service), and `f77f0e9` (packets/editor); the final task adds grant/runtime fixtures and review fixes. Final verification passed 930 unit/JNI tests, 86 scale2 UI checks, 188 scale3 UI checks, 28 dedicated checks per ownership mode, and 23 retained-world/restart checks. Evidence: `build/evidence/collection-m3/`. The original worktree and earlier evidence/worlds are preserved. No merge or push. The next checkpoint is M4, which has not started.
 
 ## Completed work
 
@@ -52,18 +56,18 @@ The ownership amendment supersedes older unconditional ownership language. The i
 
 | Milestone | Status and implementation plan |
 | --- | --- |
-| M3: Physical cards and transfers | **Next, not implemented.** [Plan](../plans/2026-09-17-card-transfers-milestone-3.md): canonical passcode card item; inventory transaction planner/service; transfer packets and editor controls; restricted card-grant command and real inventory scenarios. |
+| M3: Physical cards and transfers | **Complete, verified.** [Report](../reports/2026-09-19-card-transfers-m3.md). [Plan](../plans/2026-09-17-card-transfers-milestone-3.md): canonical passcode card item; inventory transaction planner/service; transfer packets and editor controls; restricted card-grant command and real inventory scenarios. |
 | M4: Duel preparation and import | Not implemented. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
 | M5: Player entry points | Not implemented. [Plan](../plans/2026-09-17-player-entry-points-milestone-5.md): Home/hotkey, binder, mat, private lobby and state-aware navigation. |
 | M6: Release validation | Not implemented. [Plan](../plans/2026-09-17-interaction-release-milestone-6.md): full UI/runtime matrix, dedicated two-player acceptance, compatibility and documentation audit. |
 
-Implement and verify M3 before beginning M4. Its four tasks include conservation/capacity/revision tests, real inventory UI flows, retained-world restart checks, and dedicated-player isolation. Use the existing `CollectionService` and shared policy rather than adding another ownership ledger or restriction system. Follow the contracts for accessible slots, canonical components, amount bounds, and all-or-nothing transfers.
+M3 completed all four tasks, including conservation/capacity/revision tests, real inventory UI flows, retained-world restart checks, and dedicated-player isolation. Transfers use the existing `CollectionService` and shared policy. Preserve the contracts for accessible slots, canonical components, amount bounds, and all-or-nothing transfers.
 
-M3 changes the request/reply protocol; inspect the current registration (version `5` at this handoff) and bump it for incompatible payload changes. Connect the currently unavailable transfer controls without rebuilding the editor. Reuse the existing card-back texture for the initial physical item.
+M3 bumped the request/reply protocol from `5` to `6`; clients and servers must match. Transfer controls are connected in the existing editor. The physical item reuses the existing card-back texture.
 
-At M3 completion, update its checkboxes, record exact verification evidence, and provide manual checks. Keep M4–M6 as separate milestone checkpoints. M2 completion does not certify legacy duel-start routes: actual collection-backed duel enforcement and bypass removal belong to M4. No public collection-enforced release before that cutover.
+M3 checkboxes, exact verification evidence and manual checks are complete. Keep M4–M6 as separate milestone checkpoints. M3 completion does not certify legacy duel-start routes: actual collection-backed duel enforcement and bypass removal belong to M4. No public collection-enforced release before that cutover.
 
-## Verification at this handoff
+## Historical pre-M3 verification baseline
 
 Final polish verification on 2026-09-19:
 
@@ -88,7 +92,7 @@ $env:GRADLE_USER_HOME = 'C:/Users/haxer/.gradle'
 
 Use the shared Gradle cache; do not create a worktree-local `.gradle-user`. Native DLLs/build setup are already present here. Tests use the configured EDOPro data (`C:/ProjectIgnis/expansions/cards.cdb`, `C:/ProjectIgnis/script`, `C:/ProjectIgnis/script/official`). A separate fresh worktree needs the submodule/native setup in AGENTS.md; reusing this one avoids that setup.
 
-The current development entry point is `/duel collection`. Deposit/withdraw controls remain unavailable until M3. The production hotkey, binder, and mat belong to M5.
+The current development entry point is `/duel collection`. M3 connects Deposit/Withdraw/Deposit carried cards and adds the level-2 `/duel card give <player> <passcode> <count>` command. Current channel protocol is 6. The production hotkey, binder, and mat belong to M5.
 
 LDLib2 source is `C:/Users/haxer/Documents/Programming/Modding/LDLib2`, not a sibling of this nested worktree. UI guidance: `docs/ldlib2-ui-guide.md` and `docs/ui-wiring-guide.md`. For engine-related changes, begin with `docs/engine-wiki/README.md`.
 

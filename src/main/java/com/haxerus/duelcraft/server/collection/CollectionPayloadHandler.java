@@ -21,6 +21,8 @@ public final class CollectionPayloadHandler {
         transfers = new CardTransferService(service, service.depositableCodes());
     }
 
+    public Set<Integer> depositableCodes() { return service.depositableCodes(); }
+
     public static void handle(CollectionRequestPayload payload, IPayloadContext context) {
         var player = (ServerPlayer) context.player();
         var manager = DuelManager.get();
