@@ -27,7 +27,7 @@ public final class CollectionLayoutScenario implements UIScenario {
                         ctx.put("saved", draft);
                         return CollectionFixture.saved(name, draft);
                     }, CollectionFixture.query());
-        }).awaitModularUI().ticks(3);
+        }).awaitModularUI().ticks(3).click("#main-card-0").ticks(2);
         for (var id : new String[]{"collection-root", "collection-canvas", "editor-header", "save-deck",
                 "editor-body", "card-inspector", "card-details-scroll", "card-edit-controls", "add-card",
                 "remove-card", "section-deck", "section-side", "main-header", "main-grid", "extra-header", "extra-grid", "side-header",

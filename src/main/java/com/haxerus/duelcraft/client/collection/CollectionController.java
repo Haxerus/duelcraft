@@ -84,6 +84,7 @@ final class CollectionController {
         lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
         this.close = close;
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
+        ((TextElement) element("inspector-empty-prompt")).setText(Component.translatable("duelcraft.collection.select_card"));
         for (var entry : Map.of("lists-title", "lists", "list-name-label", "list_name",
                 "list-supported-checks", "supported_checks", "list-save-first", "save_first",
                 "delete-title", "delete_confirm", "delete-copy", "delete_copy",
@@ -91,7 +92,6 @@ final class CollectionController {
             ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
         }
         cards.forEach(card -> byCode.put(card.code(), card));
-        selectedCode = cards.isEmpty() ? 0 : cards.getFirst().code();
         collection = new CollectionCardGrid(textures, code -> {
             selectedStoredSection = null;
             selectCard(code);
@@ -279,7 +279,6 @@ final class CollectionController {
         this.cards = List.copyOf(cards);
         byCode.clear();
         cards.forEach(card -> byCode.put(card.code(), card));
-        if (selectedCode == 0 && !cards.isEmpty()) selectedCode = cards.getFirst().code();
         catalogState = failed ? "catalog_failed" : cards.isEmpty() ? "catalog_empty" : "";
         lifecycleChanged();
     }
@@ -343,6 +342,11 @@ final class CollectionController {
         var card = byCode.get(selectedCode);
         button("add-card").setActive(!lists.pending() && card != null);
         button("remove-card").setActive(!lists.pending() && canRemoveSelected());
+        boolean selected = selectedCode != 0;
+        element("inspector-empty").setDisplay(!selected);
+        element("card-details-scroll").setDisplay(selected);
+        element("card-edit-controls").setDisplay(selected);
+        if (!selected) return;
         for (var mode : EditMode.values()) {
             var target = element("section-" + mode.name().toLowerCase(Locale.ROOT));
             if (mode == editMode) target.addClass("selected");
@@ -350,7 +354,7 @@ final class CollectionController {
         }
         if (card == null) {
             element("inspector-art").clearAllChildren();
-            text("inspector-name", selectedCode == 0 ? "Select a card" : "Passcode " + selectedCode);
+            text("inspector-name", "Passcode " + selectedCode);
             text("inspector-stats", "");
             ((TextElement) element("inspector-description")).setText(Component.translatable("duelcraft.collection.unknown_card"));
         }

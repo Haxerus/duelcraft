@@ -11,6 +11,7 @@
   "duelcraft.configuration.magicNumberIntroduction": "Magic Number Text",
   "duelcraft.configuration.magicNumber": "Magic Number",
   "duelcraft.collection.title": "Collection and deck editor",
+  "duelcraft.collection.select_card": "Select a card to inspect.",
   "duelcraft.collection.save": "Save list",
   "duelcraft.collection.unavailable": "Card transfers are not available yet.",
   "duelcraft.collection.lists": "Saved lists",

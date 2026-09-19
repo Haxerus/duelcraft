@@ -35,6 +35,9 @@
         #delete-panel button { flex: 1; }
         #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
         #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: built-in(ui-gdp:RECT); }
+        #inspector-empty { flex: 1; min-height: 0; align-items: center; justify-content: center; gap-all: 16; }
+        #inspector-empty-back { width: 118; height: 172; flex-shrink: 0; background: sprite(duelcraft:textures/card_back.png); overlay: rect(#66000000); }
+        #inspector-empty-prompt { width: 100%; text-wrap: wrap; adaptive-height: true; horizontal-align: center; text-color: #AAAAAA; }
         #card-details-scroll { flex: 1; min-height: 0; }
         #card-details-scroll .__scroller_view_view-container__ { gap-all: 8; }
         #inspector-art { height: 192; align-items: center; flex-shrink: 0; }
@@ -130,6 +133,10 @@
             </element>
             <element id="editor-body">
                 <element id="card-inspector">
+                    <element id="inspector-empty">
+                        <element id="inspector-empty-back" />
+                        <label id="inspector-empty-prompt" />
+                    </element>
                     <scroller-view id="card-details-scroll">
                         <element id="inspector-art" />
                         <label id="inspector-name" class="wrap" />

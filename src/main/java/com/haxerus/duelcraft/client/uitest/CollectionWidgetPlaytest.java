@@ -59,6 +59,24 @@ final class CollectionWidgetPlaytest {
               return Math.abs(lists.width() - save.width()) < 1 && Math.abs(lists.height() - save.height()) < 1
                       && Math.abs(lists.y() - save.y()) < 1;
           })
+          .checkVisible("#inspector-empty")
+          .checkText("#inspector-empty-prompt", "Select a card to inspect.")
+          .checkHidden("#card-details-scroll")
+          .checkHidden("#card-edit-controls")
+          .check("no arbitrary card inspected on open", ctx -> ctx.<HashSet<Integer>>get("artCalls").isEmpty()
+                  && ctx.count(".card-tile.selected") == 0)
+          .step("remember inspector bounds", ctx -> ctx.put("inspectorBounds", ctx.el("#card-inspector").bounds()))
+          .hoverAt(-100, -100).screenshot("unselected-inspector-scale" + guiScale)
+          .click("#main-card-0").ticks(2)
+          .checkHidden("#inspector-empty")
+          .checkVisible("#card-details-scroll")
+          .checkVisible("#card-edit-controls")
+          .check("selecting a card preserves the panel dimensions", ctx -> {
+              ElementBounds before = ctx.get("inspectorBounds");
+              var after = ctx.el("#card-inspector").bounds();
+              return before.x() == after.x() && before.y() == after.y()
+                      && before.width() == after.width() && before.height() == after.height();
+          })
           .check("inspector uses its distinct cropped-art supplier", ctx ->
                   ctx.<HashSet<Integer>>get("artCalls").contains(CollectionFixture.FIRST)
                           && ctx.<HashSet<Integer>>get("fullCalls").contains(CollectionFixture.FIRST))

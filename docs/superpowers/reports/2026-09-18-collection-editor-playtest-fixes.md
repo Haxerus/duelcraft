@@ -29,6 +29,12 @@ Evidence lives under ignored `build/playtest-fixes/`, including green scale/over
 
 No M3 work, persistence changes, physical transfers or duel-enforcement changes are included. The branch remains local and unmerged.
 
+## Unselected inspector
+
+Opening the editor now leaves the card selection empty, including after asynchronous catalog loading. The inspector shows a subdued, centered card back and the localized prompt “Select a card to inspect.” Its details, ownership messages and card actions remain hidden until the player selects a deck or collection card. Panel bounds remain stable. Explicitly selected unknown saved passcodes still show missing-metadata information and remain removable.
+
+The new widget checks reproduced the original automatic selection before implementation. Independent review identified a literal XML translation key; the prompt now uses `Component.translatable` and has an exact-text assertion. Final verification passed **89/89 checks across three scenarios**: both screen sizes and the real saved-deck journey, including the late-loaded catalog. Layout, overflow and unknown saved-card removal also passed in the preceding batch. The runtime fixture now chooses a card visible under the default format filter. The final unselected screenshot was visually inspected. Reports, screenshots and logs are retained under `build/inspector-empty/`.
+
 ## Header cleanup
 
 The deck-list name now supplies the prominent left-aligned heading and follows list switching and renaming. Removed the branding eyebrow, duplicate gray name label, repeated header section counts and redundant Add to / remove from caption. Section counts, save state and useful search/status text remain; long names use hover scrolling. Existing scenario references now target the heading. The layout and saved-list scenarios passed **54/54 checks** together; screenshots of the main view and renamed heading were inspected. Evidence is under `build/header-polish/ui-green/`.

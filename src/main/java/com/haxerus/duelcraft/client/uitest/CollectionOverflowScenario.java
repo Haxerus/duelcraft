@@ -33,6 +33,7 @@ public final class CollectionOverflowScenario implements UIScenario {
             return CollectionScreen.create(model, CollectionFixture.cards(), code -> null, CollectionFixture.LIST_ID,
                     (name, draft) -> { ctx.put("saved", draft); return CollectionFixture.saved(name, draft); }, CollectionFixture.query());
         }).awaitModularUI().ticks(3)
+         .click("#main-card-0").ticks(2)
          .click("#card-density").ticks(2)
          .click("#section-side").ticks(2);
         CollectionLayoutScenario.bounds(s);

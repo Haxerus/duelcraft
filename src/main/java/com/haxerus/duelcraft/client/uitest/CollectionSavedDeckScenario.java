@@ -1,6 +1,7 @@
 package com.haxerus.duelcraft.client.uitest;
 
 import com.haxerus.duelcraft.DuelcraftClient;
+import com.haxerus.duelcraft.client.collection.CardSearch;
 import com.haxerus.duelcraft.collection.*;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
@@ -21,14 +22,16 @@ public final class CollectionSavedDeckScenario implements UIScenario {
             sc.player().setData(CollectionAttachments.COLLECTION, CollectionAttachment.valid(new PlayerCollectionData(20, Map.of(), Map.of(), null)));
         }).waitUntil("real catalog ready", ctx -> DuelcraftClient.getCollectionCatalog().toCompletableFuture().isDone())
           .step("choose real Main and Extra catalog cards", ctx -> {
-              var cards = DuelcraftClient.getCollectionCatalog().toCompletableFuture().join();
+              var cards = CardSearch.search(DuelcraftClient.getCollectionCatalog().toCompletableFuture().join(),
+                      "", CardSearch.Filters.ALL, Map.of(), new DeckList(List.of(), List.of(), List.of()));
               ctx.put("mainCode", cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
                       && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) == 0).findFirst().orElseThrow().code());
               ctx.put("extraCode", cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
                       && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) != 0).findFirst().orElseThrow().code());
           });
         CollectionRuntimeFixture.open(s);
-        s.step("search real Main passcode", ctx -> ctx.el("#collection-search").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class)
+        s.checkVisible("#inspector-empty").checkHidden("#card-edit-controls")
+         .step("search real Main passcode", ctx -> ctx.el("#collection-search").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class)
                     .setText(String.valueOf(ctx.<Integer>get("mainCode")), true))
          .waitUntil("real Main search result mounted", ctx -> ctx.elOpt("#collection-card-" + ctx.<Integer>get("mainCode")).isPresent())
          .step("select real Main search card", ctx -> CollectionLayoutScenario.press(ctx, "#collection-card-" + ctx.<Integer>get("mainCode")))
