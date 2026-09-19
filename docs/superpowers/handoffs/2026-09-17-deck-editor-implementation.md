@@ -1,6 +1,6 @@
 # Collection and deck editor implementation handoff
 
-Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 is authorized and in progress using subagent-driven development; M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
+Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 implementation and required checks are complete; final independent review is pending. M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
 
 ## Workspace and starting point
 
@@ -17,14 +17,20 @@ Read in this order:
 2. This handoff and the [ownership amendment](2026-09-18-optional-ownership-amendment.md).
 3. [Design specification](../specs/2026-09-15-player-interaction-design.md) and [implementation contracts](../specs/2026-09-17-player-interaction-contracts.md).
 4. [Integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md).
-5. Completed [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md) and its [verification report](../reports/2026-09-19-card-transfers-m3.md). M4 is now authorized: [executable preparation plan](../plans/2026-09-17-duel-preparation-milestone-4.md).
+5. Completed [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md) and its [verification report](../reports/2026-09-19-card-transfers-m3.md). M4: [executable preparation plan](../plans/2026-09-17-duel-preparation-milestone-4.md).
 6. [M2 policy follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md), for verified policy behavior and runtime test setup.
 
 The ownership amendment supersedes older unconditional ownership language. The implemented dark Minecraft UI and subsequent user feedback supersede the early HTML prototype's visual styling. Consult current source for API details; plan snippets are contracts, not code to paste unchanged.
 
 ## M3 completion addendum
 
-M3 commits begin with `1cc975c` (item), `9157898` (atomic service), and `f77f0e9` (packets/editor); the final task adds grant/runtime fixtures and review fixes. Final verification passed 930 unit/JNI tests, 86 scale2 UI checks, 188 scale3 UI checks, 28 dedicated checks per ownership mode, and 23 retained-world/restart checks. Evidence: `build/evidence/collection-m3/`. The original worktree and earlier evidence/worlds are preserved. No merge or push. The next checkpoint is M4, which has not started.
+M3 commits begin with `1cc975c` (item), `9157898` (atomic service), and `f77f0e9` (packets/editor); the final task adds grant/runtime fixtures and review fixes. Final verification passed 930 unit/JNI tests, 86 scale2 UI checks, 188 scale3 UI checks, 28 dedicated checks per ownership mode, and 23 retained-world/restart checks. Evidence: `build/evidence/collection-m3/`. The original worktree and earlier evidence/worlds are preserved. No merge or push. The user accepted all M3 manual checks and authorized M4; its implementation and required checks are complete, with final review pending. See the [M4 verification report](../reports/2026-09-19-duel-preparation-m4.md).
+
+## M4 completion evidence
+
+Implementation commits: `55e6da2`, `f6862dc`, `279245d`, `d015de4`, `2175879`, `cc71703`. The final suite passed **1,007 unit/JNI tests** with no failures/errors/skips. Task 5 passed **286 runtime checks** across native solo, dedicated policy checks under both ownership modes, migrated transfer/command scenarios and five separate restart JVMs. Earlier import/editor runs and review-fix evidence are listed in the [M4 report and manual checklist](../reports/2026-09-19-duel-preparation-m4.md). Evidence root: `build/evidence/collection-m4/`. Protocol is **7**. M2/M3 retained worlds and the ordinary development ownership config are preserved.
+
+M4 supplies command-driven preparation, persistent collection-backed selection and Main/Extra/Side import. M5 still owns Home/hotkey, binder, mat and lobby screens. M6 owns the release-validation checkpoint. M4 manual acceptance remains for the user; no M5 work, merge or push was performed.
 
 ## Completed work
 
@@ -57,7 +63,7 @@ M3 commits begin with `1cc975c` (item), `9157898` (atomic service), and `f77f0e9
 | Milestone | Status and implementation plan |
 | --- | --- |
 | M3: Physical cards and transfers | **Complete, verified.** [Report](../reports/2026-09-19-card-transfers-m3.md). [Plan](../plans/2026-09-17-card-transfers-milestone-3.md): canonical passcode card item; inventory transaction planner/service; transfer packets and editor controls; restricted card-grant command and real inventory scenarios. |
-| M4: Duel preparation and import | Not implemented. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
+| M4: Duel preparation and import | Implemented and verified; final review pending. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
 | M5: Player entry points | Not implemented. [Plan](../plans/2026-09-17-player-entry-points-milestone-5.md): Home/hotkey, binder, mat, private lobby and state-aware navigation. |
 | M6: Release validation | Not implemented. [Plan](../plans/2026-09-17-interaction-release-milestone-6.md): full UI/runtime matrix, dedicated two-player acceptance, compatibility and documentation audit. |
 
@@ -65,7 +71,7 @@ M3 completed all four tasks, including conservation/capacity/revision tests, rea
 
 M3 bumped the request/reply protocol from `5` to `6`; clients and servers must match. Transfer controls are connected in the existing editor. The physical item reuses the existing card-back texture.
 
-M3 checkboxes, exact verification evidence and manual checks are complete. Keep M4–M6 as separate milestone checkpoints. M3 completion does not certify legacy duel-start routes: actual collection-backed duel enforcement and bypass removal belong to M4. No public collection-enforced release before that cutover.
+M3 checkboxes, exact verification evidence and manual checks are complete. Keep M4–M6 as separate milestone checkpoints. M4 replaces legacy duel-start/upload authority with collection-backed preparation and bumps protocol to 7. See the M4 report for current verification and the remaining M5/M6 checkpoints.
 
 ## Historical pre-M3 verification baseline
 
@@ -92,7 +98,7 @@ $env:GRADLE_USER_HOME = 'C:/Users/haxer/.gradle'
 
 Use the shared Gradle cache; do not create a worktree-local `.gradle-user`. Native DLLs/build setup are already present here. Tests use the configured EDOPro data (`C:/ProjectIgnis/expansions/cards.cdb`, `C:/ProjectIgnis/script`, `C:/ProjectIgnis/script/official`). A separate fresh worktree needs the submodule/native setup in AGENTS.md; reusing this one avoids that setup.
 
-The current development entry point is `/duel collection`. M3 connects Deposit/Withdraw/Deposit carried cards and adds the level-2 `/duel card give <player> <passcode> <count>` command. Current channel protocol is 6. The production hotkey, binder, and mat belong to M5.
+The current development entry point is `/duel collection`. M3 connects Deposit/Withdraw/Deposit carried cards and adds the level-2 `/duel card give <player> <passcode> <count>` command. Current channel protocol is 7. The production hotkey, binder, and mat belong to M5.
 
 LDLib2 source is `C:/Users/haxer/Documents/Programming/Modding/LDLib2`, not a sibling of this nested worktree. UI guidance: `docs/ldlib2-ui-guide.md` and `docs/ui-wiring-guide.md`. For engine-related changes, begin with `docs/engine-wiki/README.md`.
 
