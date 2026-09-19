@@ -1,6 +1,8 @@
 # Collection and deck editor implementation handoff
 
-Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 is complete, verified and independently reviewed; its manual acceptance is pending. M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
+Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 is complete, verified and independently reviewed. The user reported no playtest issues and confirmed rejoin persistence and ownership invalidation; two-player manual acceptance remains pending. M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
+
+QA follow-up: `codex/qa-m4` packages the reviewed checkpoint for Windows x64 friend testing, with the existing collection command enabled in packaged clients. Main `bc2fcba` was already included; `codex/player-collections` remains at `45b7460`. See the [QA installation and test guide](../../qa-m4.md). This is separate from M5 implementation.
 
 ## Workspace and starting point
 

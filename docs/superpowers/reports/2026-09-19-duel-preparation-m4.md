@@ -1,6 +1,8 @@
 # M4 collection-backed duel preparation verification
 
-Status: complete, verified and independently reviewed on `codex/player-collections` in the existing `.superpowers/worktrees/deck-editor` worktree. Started from clean `0fbe8c8`; user accepted all M3 manual playtests with no issues and authorized M4 with subagent-driven development. M5/M6 remain later checkpoints. No merge or push.
+Status: complete, verified and independently reviewed on `codex/player-collections` in the existing `.superpowers/worktrees/deck-editor` worktree. Started from clean `0fbe8c8`; user accepted all M3 manual playtests with no issues and authorized M4 with subagent-driven development. M5/M6 remain later checkpoints. No merge or push occurred during M4 implementation.
+
+User playtest follow-up (2026-09-19): no issues found. Saved and active decks persisted after leaving/rejoining; enabling ownership correctly cleared a missing active selection on rejoin. The user ran the DEV failure scenario and noticed no visual issue, but it completed too quickly for detailed manual inspection. Two-player checks were not manually tested because another player was unavailable; retain the automated dedicated evidence separately. The user requested a QA branch combining current main with M4 and a distributable build for testing with friends. UI entry points and command-interface changes remain M5 work.
 
 ## Completed task 1: YDK imports
 
@@ -58,7 +60,7 @@ All task reviews and the final whole-M4 review passed with no remaining Critical
 
 Two nonblocking observations remain: the synchronous STARTING probe checks collection data but not physical inventory, and intentional fault diagnostics make logs noisy. BUSY rejection occurs before command dispatch or inventory access. Other multiplayer busy phases compare all 41 slots; the solo probe checks the attachment and fixture slot-0 count. The decision is to retain these as test-quality follow-ups: the costs are a narrower STARTING regression assertion and less readable logs, not a known production mutation defect.
 
-The local dedicated harness uses offline-mode identities. It verifies connection-derived isolation, not online-account authentication or a new multi-machine LAN/tunnel test. Older-version rejection is simulated against registered channels; native cleanup is exercised without independent leak measurement. These are explicit evidence limits, not claimed passes. Manual M4 user acceptance remains pending. M5/M6 have not started.
+The local dedicated harness uses offline-mode identities. It verifies connection-derived isolation, not online-account authentication or a new multi-machine LAN/tunnel test. Older-version rejection is simulated against registered channels; native cleanup is exercised without independent leak measurement. These are explicit evidence limits, not claimed passes. The user reported no issues in the follow-up above; two-player manual acceptance remains pending. M5/M6 have not started.
 
 Earlier M2/M3 evidence and retained worlds remain separate. M3 retained-world hashes captured before this milestone are in `build/evidence/collection-m4/m3-world-baseline-hashes.json`.
 
@@ -71,7 +73,7 @@ Tasks 3/4 are implemented and reviewed as one integration block: Task3 needs Tas
 The lifecycle API also exposes startFinished(UUID, boolean) for the final solo status after releasing its startup guard and clear() for shutdown. A package-private, production-guarded one-shot session decorator permits DEV tests to fail after real native allocation while preserving production startup/cleanup. The factory stays fixed and the decorator is consumed before creation. If this test boundary needs revision, the cost is limited service/fixture changes.
 
 
-## Manual playtest checklist (pending M4 acceptance)
+## Manual playtest checklist (user follow-up above; two-player acceptance pending)
 
 Use matching client/server builds (protocol 7) and keep existing M2/M3 test worlds separate. The default core SERVER setting is requireCardOwnership=false; restart after changing it.
 

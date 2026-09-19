@@ -6,7 +6,6 @@ import com.haxerus.duelcraft.client.collection.CollectionClient;
 import com.haxerus.duelcraft.client.collection.DeckImportService;
 import com.haxerus.duelcraft.collection.CollectionReply;
 import com.haxerus.duelcraft.client.interaction.PreparationRouting;
-import net.neoforged.fml.loading.FMLEnvironment;
 import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.core.DeckRegistry;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -29,10 +28,9 @@ public final class DuelClientCommand {
     private DuelClientCommand() { }
 
     public static void register(RegisterClientCommandsEvent event) {
-        if (!FMLEnvironment.production) {
-            event.getDispatcher().register(Commands.literal("duel")
-                    .then(Commands.literal("collection").executes(DuelClientCommand::collection)));
-        }
+        // QA entry point until the M5 screens provide player-facing navigation.
+        event.getDispatcher().register(Commands.literal("duel")
+                .then(Commands.literal("collection").executes(DuelClientCommand::collection)));
         event.getDispatcher().register(
                 Commands.literal("duel")
                         .then(Commands.literal("show")
