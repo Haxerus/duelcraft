@@ -1,6 +1,6 @@
 # Collection and deck editor implementation handoff
 
-Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented and verified. M4–M6 remain later checkpoints; none has started.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
+Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 is authorized and in progress using subagent-driven development; M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
 
 ## Workspace and starting point
 
@@ -17,7 +17,7 @@ Read in this order:
 2. This handoff and the [ownership amendment](2026-09-18-optional-ownership-amendment.md).
 3. [Design specification](../specs/2026-09-15-player-interaction-design.md) and [implementation contracts](../specs/2026-09-17-player-interaction-contracts.md).
 4. [Integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md).
-5. Completed [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md) and its [verification report](../reports/2026-09-19-card-transfers-m3.md). M4 is the next checkpoint and requires a separate implementation request.
+5. Completed [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md) and its [verification report](../reports/2026-09-19-card-transfers-m3.md). M4 is now authorized: [executable preparation plan](../plans/2026-09-17-duel-preparation-milestone-4.md).
 6. [M2 policy follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md), for verified policy behavior and runtime test setup.
 
 The ownership amendment supersedes older unconditional ownership language. The implemented dark Minecraft UI and subsequent user feedback supersede the early HTML prototype's visual styling. Consult current source for API details; plan snippets are contracts, not code to paste unchanged.

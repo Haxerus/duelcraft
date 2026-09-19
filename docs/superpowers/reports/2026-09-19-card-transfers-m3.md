@@ -1,5 +1,7 @@
 # M3 physical cards and collection transfers
 
+User acceptance: the user completed the manual playtest list, reported no issues, and authorized M4 with subagent-driven development on 2026-09-19.
+
 Completed on 2026-09-19 in `.superpowers/worktrees/deck-editor`, branch `codex/player-collections`, starting from clean `00b76ba`. M4–M6 remain later checkpoints. No merge or push was performed.
 
 ## Implementation
