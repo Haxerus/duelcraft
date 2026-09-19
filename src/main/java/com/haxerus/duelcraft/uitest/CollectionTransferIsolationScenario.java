@@ -102,7 +102,7 @@ public final class CollectionTransferIsolationScenario implements MPScenario {
         var view = preparation.view(id, System.currentTimeMillis());
         if (view.flowId() != null) preparation.cancel(id, view.flowId(), System.currentTimeMillis());
     }
-    private static CollectionReply exchange(net.minecraft.server.level.ServerPlayer player, CollectionCommand command) {
+    public static CollectionReply exchange(net.minecraft.server.level.ServerPlayer player, CollectionCommand command) {
         var owner = CardTransferService.owner(player);
         var reply = new CollectionReply[1];
         DuelManager.get().collectionHandler().handle(new com.haxerus.duelcraft.server.collection.CollectionRequestPayload(UUID.randomUUID(), command),

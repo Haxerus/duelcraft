@@ -225,4 +225,20 @@ class DuelStartPolicyTest {
         }
     }
 
+    @Test void failedRealManagerStartupAllowsSubsequentSuccessfulAttempt() {
+        var f = new Fixture(false);
+        var flow = f.ready();
+        f.failure = "setup";
+        assertEquals(PreparationResult.START_FAILED, f.manager.preparation().first(f.a, flow, true, NOW).code());
+        f.assertNoOwnership();
+        f.failure = "";
+        flow = f.ready();
+        assertEquals(PreparationResult.OK, f.manager.preparation().first(f.a, flow, true, NOW).code());
+        assertEquals(2, f.allocations);
+        assertEquals(1, f.closes);
+        f.manager.forfeit(f.a);
+        assertEquals(2, f.closes);
+        f.assertNoOwnership();
+    }
+
 }

@@ -106,6 +106,8 @@ public final class CollectionPrivacyScenario implements MPScenario {
             var current = registry.get(net.minecraft.network.ConnectionProtocol.PLAY).values().stream()
                     .map(net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent::new).toList();
             var ours = current.stream().filter(c -> c.id().getNamespace().equals("duelcraft")).toList();
+            sc.check("legacy raw deck upload has no dispatch registration", ours.stream().noneMatch(c ->
+                    c.id().equals(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("duelcraft", "duel_deck"))));
             sc.check("real request and reply channels registered as mandatory current version 7", ours.size() == 9
                     && ours.stream().allMatch(c -> c.version().equals("7") && !c.optional())
                     && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.PreparationRequestPayload.TYPE.id()))

@@ -181,3 +181,31 @@ tasks.register('prepareCollectionPolicyOwnershipRequired') {
         config.text = original.replace('requireCardOwnership = false', 'requireCardOwnership = true')
     }
 }
+
+// M4 owns a distinct retained world: prior M2/M3 archives and worlds are never opened.
+if (project.hasProperty('collectionM4Lifecycle')) {
+    def phase = project.property('collectionM4Lifecycle').toString()
+    if (!(phase in ['default', 'ownership', 'throwing', 'restricted', 'removed']) || ldTestEnabled
+            || project.hasProperty('collectionLifecycle') || project.hasProperty('collectionPolicyLifecycle') || project.hasProperty('collectionTransferLifecycle')) {
+        throw new GradleException('collectionM4Lifecycle requires one isolated M4 phase')
+    }
+    def retainedDir = project.file('run-collection-m4-lifecycle')
+    neoForge.runs.matching { it.name == 'client' }.configureEach { run ->
+        run.gameDirectory = retainedDir
+        run.systemProperty 'duelcraft.uitest.collectionM4Lifecycle', phase
+        run.programArguments.addAll '--username', 'M4LoginTest', '--width', '1280', '--height', '720'
+        if (phase != 'default') run.programArguments.addAll '--quickPlaySingleplayer', 'collection_m4_login_20260919'
+    }
+    tasks.register('verifyCollectionM4Lifecycle') {
+        doLast {
+            def failure = new File(retainedDir, 'collection-m4-failure.txt')
+            if (failure.exists()) throw new GradleException(failure.text)
+            def evidence = new File(retainedDir, "lifecycle-evidence/$phase")
+            def report = new groovy.json.JsonSlurper().parse(new File(evidence, 'report.json'))
+            def manifest = new groovy.json.JsonSlurper().parse(new File(evidence, 'collection-m4-phase.json'))
+            if (report.status != 'PASS' || !report.finishedAt || manifest.phase != phase) throw new GradleException('Incomplete M4 lifecycle evidence')
+            logger.lifecycle("M4 lifecycle $phase: ${report.totals.checks - report.totals.checksFailed}/${report.totals.checks} checks, PID ${manifest.pid}, UUID ${manifest.playerUuid}")
+        }
+    }
+    tasks.matching { it.name == 'runClient' }.configureEach { finalizedBy 'verifyCollectionM4Lifecycle' }
+}

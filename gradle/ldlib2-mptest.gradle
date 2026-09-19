@@ -46,6 +46,7 @@ def compileMpLoopback = tasks.register('compileMpLoopback', JavaCompile) {
 neoForge.runs {
     mpServer {
         server()
+        jvmArguments.addAll '-Xmx1536m', '-XX:ActiveProcessorCount=2'
         gameDirectory = project.file('runs/mpServer')
         programArgument '--nogui'
         systemProperty 'ldlib2.mptest.role', 'server'
@@ -56,6 +57,7 @@ neoForge.runs {
     ['A', 'B'].each { role ->
         create("mpClient$role") {
             client()
+            jvmArguments.addAll '-Xmx1536m', '-XX:ActiveProcessorCount=2'
             gameDirectory = project.file("runs/mpClient$role")
             programArguments.addAll '--username', "LDTest$role", '--width', '1280', '--height', '720'
             systemProperty 'ldlib2.mptest.role', role

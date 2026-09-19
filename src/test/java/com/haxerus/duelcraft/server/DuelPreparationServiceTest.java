@@ -475,4 +475,46 @@ class DuelPreparationServiceTest {
         assertEquals(List.of(OK, STALE), host.notifications.get(host.alice));
         assertEquals(List.of(OK, STALE), host.notifications.get(host.outsider));
     }
+
+    @Test
+    void acceptedSaveAndWithdrawalPreserveExactStateUntilCancel() {
+        UUID flow = accept();
+        var before = host.collections.get(host.alice);
+        var edited = new SavedDeck(host.deck(host.alice).id(), "Changed", host.deck(host.alice).cards());
+        var save = host.collectionService.save(before, before.revision(), service.isPreparing(host.alice), host.alice, edited);
+        var withdraw = host.collectionService.replaceCounts(before, before.revision(), service.isPreparing(host.alice), host.alice, Map.of());
+        assertEquals(com.haxerus.duelcraft.collection.CollectionError.BUSY, save.error());
+        assertEquals(com.haxerus.duelcraft.collection.CollectionError.BUSY, withdraw.error());
+        assertEquals(before, save.data());
+        assertEquals(before, withdraw.data());
+        service.cancel(host.alice, flow, 2);
+        assertTrue(host.collectionService.save(before, before.revision(), service.isPreparing(host.alice), host.alice, edited).success());
+        assertTrue(host.collectionService.replaceCounts(before, before.revision(), service.isPreparing(host.alice), host.alice, Map.of()).success());
+    }
+
+    @Test
+    void duplicateAcceptAndFirstRequestsProduceExactlyOneStart() {
+        UUID flow = accept();
+        assertEquals(STALE, service.accept(host.bob, flow, 2).code());
+        var round = service.view(host.alice, 2).roundId();
+        service.hand(host.alice, flow, round, Hand.ROCK, 3);
+        service.hand(host.bob, flow, round, Hand.SCISSORS, 4);
+        assertEquals(OK, service.first(host.alice, flow, true, 5).code());
+        assertEquals(STALE, service.first(host.alice, flow, true, 6).code());
+        assertEquals(1, host.starts.size());
+    }
+
+    @Test
+    void delayedHandAndOldDeadlineCannotMutateReplacementFlow() {
+        UUID old = accept();
+        UUID oldRound = service.view(host.alice, 1).roundId();
+        service.cancel(host.alice, old, 2);
+        assertEquals(OK, service.invite(host.alice, host.bob, DuelRule.MR5, 8L, PlayerOptions.standard(), 50000).code());
+        var fresh = service.view(host.alice, 50000);
+        assertEquals(STALE, service.hand(host.alice, old, oldRound, Hand.ROCK, 50001).code());
+        service.expire(60001);
+        assertEquals(fresh.flowId(), service.view(host.alice, 60001).flowId());
+        assertEquals(fresh.revision(), service.view(host.alice, 60001).revision());
+        assertTrue(host.starts.isEmpty());
+    }
 }

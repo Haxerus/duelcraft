@@ -42,6 +42,7 @@ run-collection-lifecycle/
 run-collection-policy-lifecycle/
 run-collection-m3-ui/
 run-collection-transfer-lifecycle/
+run-collection-m4-lifecycle/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/
