@@ -12,17 +12,28 @@ import net.minecraft.network.chat.Component;
 /** Minimal chat-lobby routing; a suspended editor belongs to this connection only. */
 public final class PreparationRouting {
     private static CollectionScreen suspended;
+    private static long editorGeneration;
     private PreparationRouting() {}
+    /** Invalidates collection-open refreshes that started before preparation or disconnect. */
+    public static long editorGeneration() { return editorGeneration; }
+
+    public static boolean managementBlocked() {
+        var view = com.haxerus.duelcraft.DuelcraftClient.preparation().view();
+        return LDLibDuelScreen.isDuelLive() || (view != null
+                && view.mode() != PreparationView.Mode.IDLE && view.mode() != PreparationView.Mode.INVITED);
+    }
+
     public static void suspendEditor() {
+        editorGeneration++;
         var mc = Minecraft.getInstance();
         if (mc.screen instanceof CollectionScreen screen) {
-            if (suspended != null && suspended != screen) suspended.disconnect();
-            suspended = screen; screen.suspend(); mc.setScreen(null);
+            if (suspended == null) suspended = screen;
+            if (suspended == screen) screen.suspend();
+            mc.setScreen(null);
         }
     }
     public static boolean restoreEditor() {
-        var view = com.haxerus.duelcraft.DuelcraftClient.preparation().view();
-        if (view != null && view.mode() != PreparationView.Mode.IDLE && view.mode() != PreparationView.Mode.INVITED) return false;
+        if (managementBlocked()) return false;
         if (suspended == null) return false;
         var screen = suspended; suspended = null; screen.resume(); Minecraft.getInstance().setScreen(screen); return true;
     }
@@ -36,5 +47,5 @@ public final class PreparationRouting {
             if (mc.player != null) mc.player.sendSystemMessage(Component.literal("Duel could not start. Check your active deck and try again."));
         } else if (mode == PreparationView.Mode.IDLE && !(mc.screen instanceof DuelScreen)) restoreEditor();
     }
-    public static void disconnect() { if (suspended != null) suspended.disconnect(); suspended = null; }
+    public static void disconnect() { editorGeneration++; if (suspended != null) suspended.disconnect(); suspended = null; }
 }

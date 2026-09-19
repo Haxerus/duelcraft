@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.client.collection.CollectionScreen;
 import com.haxerus.duelcraft.client.collection.CollectionClient;
 import com.haxerus.duelcraft.client.collection.DeckImportService;
 import com.haxerus.duelcraft.collection.CollectionReply;
+import com.haxerus.duelcraft.client.interaction.PreparationRouting;
 import net.neoforged.fml.loading.FMLEnvironment;
 import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.core.DeckRegistry;
@@ -62,10 +63,16 @@ public final class DuelClientCommand {
 
     private static int collection(CommandContext<CommandSourceStack> ctx) {
         var minecraft = Minecraft.getInstance();
-        if (com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()) return 1;
+        if (PreparationRouting.managementBlocked()) {
+            ctx.getSource().sendFailure(Component.literal("Collection editing is unavailable during duel preparation or a duel."));
+            return 1;
+        }
+        if (PreparationRouting.restoreEditor()) return 1;
+        long generation = PreparationRouting.editorGeneration();
         var player = minecraft.player;
         DuelcraftClient.getCollectionClient().refresh().whenCompleteAsync((view, error) -> {
-            if (minecraft.player != player || player == null) return;
+            if (minecraft.player != player || player == null
+                    || generation != PreparationRouting.editorGeneration() || PreparationRouting.managementBlocked()) return;
             if (error == null) {
                 minecraft.setScreen(CollectionScreen.create(view));
             } else {
