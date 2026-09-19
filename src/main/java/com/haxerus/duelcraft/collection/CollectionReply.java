@@ -20,6 +20,11 @@ public sealed interface CollectionReply {
     }
     record Deck(long revision, SavedDeck deck) implements CollectionReply {}
     record Changed(long revision, @Nullable UUID activeId, @Nullable SavedDeck saved, int transferred,
-                   DeckEligibility.Report eligibility) implements CollectionReply {}
+                   int skipped, DeckEligibility.Report eligibility) implements CollectionReply {
+        public Changed(long revision, @Nullable UUID activeId, @Nullable SavedDeck saved, int transferred,
+                       DeckEligibility.Report eligibility) {
+            this(revision, activeId, saved, transferred, 0, eligibility);
+        }
+    }
     record Rejected(CollectionError error, long revision, DeckEligibility.Report eligibility) implements CollectionReply {}
 }

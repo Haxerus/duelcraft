@@ -69,7 +69,7 @@ public CollectionReply apply(ServerPlayer player, long expectedRevision,
 
 No-op/error results retain input values, moved0; immutable copies protect against caller mutation. Withdrawal uses only slots0–35. Deposit counts skipped canonical unknown stacks, and the adapter counts unsupported card stacks separately for DepositAll. Noncard occupied slots are not reported as skipped cards.
 
-- [ ] Write pure conservation/capacity tests before implementation:
+- [x] Write pure conservation/capacity tests before implementation:
 
 ```java
 var slots = IntStream.range(0, 36).mapToObj(i -> new InventoryTransferPlan.Slot(i, -1, 64)).toList();
@@ -88,10 +88,10 @@ assertEquals(5, deposit.moved());
 ```
 
 The conservation assertion and exact resulting quantities must both pass.
-- [ ] Run `./gradlew.bat test --tests '*InventoryTransferPlanTest' --tests '*CardTransferServiceTest'` for intended failures.
-- [ ] Simulate deposits in ascending main-slot order then offhand. Selected amount must all exist as eligible stacks or return INSUFFICIENT_CARDS; use checked count addition before any mutation. For withdraw, check stored amount, fill same-code stacks to64 then empty main slots; fail without changes if capacity is short. For DepositAll, sum supported stacks with checked arithmetic and remove only that supported subset.
-- [ ] Implement the real adapter: snapshot accessible ItemStacks; reject busy/unreadable/stale first; classify canonical and unsupported stacks; run planner; call `CollectionService.replaceCounts` with authenticated owner context and planned counts, so the shared policy evaluates proposed post-withdrawal state; if both succeed apply slot replacements and attachment in the same server-thread call, mark inventory changed and broadcast container changes. Do no asynchronous work between validation and commit. Preserve untouched ItemStack objects/components, including offhand and unsupported custom cards. Never use partial `Inventory.add` followed by dropping a remainder.
-- [ ] Add table tests for exact capacity, partial-stack capacity, amounts0/negative/4097, overflow at Long.MAX_VALUE, unknown owned withdrawals, mixed-code stacks, offhand deposit, offhand not used for withdraw, unsupported components, empty bulk deposit, and repeated original-revision request. Test ownership off/no hook preserves an otherwise legal selection after a shortage; ownership on/no hook clears it; an independent companion denial clears it under either setting. A throwing hook leaves both inventory and attachment unchanged. Failure does not increment revision; actual stored ownership is always required to withdraw. Run targeted tests; commit `feat: transact inventory cards with collections`.
+- [x] Run `./gradlew.bat test --tests '*InventoryTransferPlanTest' --tests '*CardTransferServiceTest'` for intended failures.
+- [x] Simulate deposits in ascending main-slot order then offhand. Selected amount must all exist as eligible stacks or return INSUFFICIENT_CARDS; use checked count addition before any mutation. For withdraw, check stored amount, fill same-code stacks to64 then empty main slots; fail without changes if capacity is short. For DepositAll, sum supported stacks with checked arithmetic and remove only that supported subset.
+- [x] Implement the real adapter: snapshot accessible ItemStacks; reject busy/unreadable/stale first; classify canonical and unsupported stacks; run planner; call `CollectionService.replaceCounts` with authenticated owner context and planned counts, so the shared policy evaluates proposed post-withdrawal state; if both succeed apply slot replacements and attachment in the same server-thread call, mark inventory changed and broadcast container changes. Do no asynchronous work between validation and commit. Preserve untouched ItemStack objects/components, including offhand and unsupported custom cards. Never use partial `Inventory.add` followed by dropping a remainder.
+- [x] Add table tests for exact capacity, partial-stack capacity, amounts0/negative/4097, overflow at Long.MAX_VALUE, unknown owned withdrawals, mixed-code stacks, offhand deposit, offhand not used for withdraw, unsupported components, empty bulk deposit, and repeated original-revision request. Test ownership off/no hook preserves an otherwise legal selection after a shortage; ownership on/no hook clears it; an independent companion denial clears it under either setting. A throwing hook leaves both inventory and attachment unchanged. Failure does not increment revision; actual stored ownership is always required to withdraw. Run targeted tests; commit `feat: transact inventory cards with collections`.
 
 ## Task 3: Transfer packets and editor controls
 
