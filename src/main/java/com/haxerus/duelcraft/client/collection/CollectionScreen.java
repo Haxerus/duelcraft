@@ -74,7 +74,7 @@ public final class CollectionScreen extends ModularUIScreen {
     }
 
     /** Real private collection; routing to this screen is supplied by the later management milestone. */
-    public static CollectionScreen create() {
+    public static CollectionScreen create(ClientCollectionState.View initialView) {
         Executor client = Minecraft.getInstance()::execute;
         var connection = DuelcraftClient.getCollectionClient();
         var worker = new CollectionSearchWorker(client);
@@ -97,7 +97,7 @@ public final class CollectionScreen extends ModularUIScreen {
         var screen = createWithArt(model, List.of(), textures, art, UUID.randomUUID(), null, search,
                 connection::request, connection::refresh, client);
         screen.controller.catalogLoading();
-        screen.controller.initializeCollections();
+        screen.controller.initializeCollections(initialView);
         DuelcraftClient.getCollectionCatalog().whenCompleteAsync((cards, error) ->
                 screen.controller.setCatalog(error == null ? cards : List.of(), error != null), client);
         return screen;

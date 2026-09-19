@@ -42,6 +42,8 @@ public final class CollectionPrivacyClient {
         var expected = CollectionPrivacyScenario.expected(role, changed);
         var view = DuelcraftClient.getCollectionClient().state().view();
         return view != null && view.revision() == expected.revision() && view.counts().equals(expected.counts())
+                && view.ownershipRequired() == System.getProperty("duelcraft.uitest.mpOwnership", "default").equals("required")
+                && view.clearedActivation() == null
                 && Objects.equals(view.activeId(), expected.activeDeckId())
                 && view.summaries().size() == expected.decks().size()
                 && view.summaries().stream().allMatch(summary -> {
@@ -81,7 +83,9 @@ public final class CollectionPrivacyClient {
                 && changed.revision() == revision + 1 && deck.equals(changed.saved()) && changed.activeId() == null);
         request(b, "send own Activate packet", ctx -> new CollectionCommand.Activate(revision + 1, deck.id()));
         b.check("own Activate acknowledgement UUID revision and eligibility", ctx -> reply(ctx) instanceof CollectionReply.Changed changed
-                && changed.revision() == revision + 2 && deck.id().equals(changed.activeId()) && changed.eligibility().eligible());
+                && changed.revision() == revision + 2 && deck.id().equals(changed.activeId()) && changed.eligibility().eligible()
+                && changed.eligibility().ownershipRequired() == System.getProperty("duelcraft.uitest.mpOwnership", "default").equals("required")
+                && changed.eligibility().restrictionReason() == null);
     }
     public static void mark(ScenarioBuilder b) {
         b.step("record boundary receipt count", ctx -> ctx.put("receiptMark", receipts(ctx).size()));

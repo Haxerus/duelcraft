@@ -2,6 +2,8 @@
 // Uses the upstream coordinator and isolated disposable game directories.
 def ldMpOutDir = layout.buildDirectory.dir('ldlib2-mptest').get().asFile.absolutePath
 def ldMpHub = (project.findProperty('ldMpHub') ?: '').toString()
+def ldMpOwnership = (project.findProperty('ldMpOwnership') ?: System.getenv('DUELCRAFT_MP_OWNERSHIP') ?: 'default').toString()
+if (!(ldMpOwnership in ['default', 'required'])) throw new GradleException('ldMpOwnership must be default|required')
 
 // Pinned upstream Hub logs loopback but binds wildcard. Compile its exact source with only
 // the IPv4 bind corrected; this override is confined to the coordinator task's classpath.
@@ -49,6 +51,7 @@ neoForge.runs {
         systemProperty 'ldlib2.mptest.role', 'server'
         systemProperty 'ldlib2.mptest.out', "$ldMpOutDir/server"
         systemProperty 'ldlib2.mptest.hub', ldMpHub
+        systemProperty 'duelcraft.uitest.mpOwnership', ldMpOwnership
     }
     ['A', 'B'].each { role ->
         create("mpClient$role") {
@@ -58,14 +61,21 @@ neoForge.runs {
             systemProperty 'ldlib2.mptest.role', role
             systemProperty 'ldlib2.mptest.out', "$ldMpOutDir/client$role"
             systemProperty 'ldlib2.mptest.hub', ldMpHub
+            systemProperty 'duelcraft.uitest.mpOwnership', ldMpOwnership
         }
     }
 }
 
 // The coordinator prepares server.properties before launching this fresh child build.
 def ldMpServerProperties = project.file('runs/mpServer/server.properties')
+def ldMpOwnershipConfig = project.file('runs/mpServer/world/serverconfig/duelcraft-server.toml')
 tasks.named('runMpServer').configure {
     doFirst {
+        if (ldMpOwnershipConfig.exists()) throw new GradleException('MP ownership fixture requires fresh disposable world config')
+        if (ldMpOwnership == 'required') {
+            ldMpOwnershipConfig.parentFile.mkdirs()
+            ldMpOwnershipConfig.text = '[ownership]\nrequireCardOwnership = true\n'
+        }
         def propertiesFile = ldMpServerProperties
         def settings = new Properties()
         if (propertiesFile.exists()) propertiesFile.withInputStream { settings.load(it) }
@@ -81,6 +91,7 @@ tasks.register('runMpTest', JavaExec) {
     dependsOn 'classes', compileMpLoopback
     classpath = files(ldMpLoopbackClasses, sourceSets.main.output, ldMpRuntime)
     mainClass = 'com.lowdragmc.lowdraglib2.uitest.mp.MPTestOrchestrator'
+    environment 'DUELCRAFT_MP_OWNERSHIP', ldMpOwnership
     args '--projectDir', project.projectDir.absolutePath, '--out', ldMpOutDir,
             '--selection', (project.findProperty('ldMpTest') ?: 'group:duelcraft').toString(),
             '--clients', (project.findProperty('ldMpClients') ?: 'A,B').toString()

@@ -22,6 +22,7 @@ import java.nio.file.*;
 @EventBusSubscriber(modid = Duelcraft.MODID, value = Dist.CLIENT)
 public final class CollectionLifecycleLauncher {
     static final String WORLD = "collection_m2_retained_20260917";
+    static final String POLICY_WORLD = "collection_policy_followup_20260919";
     static String stage;
     private static int step;
     private static long started;
@@ -40,23 +41,46 @@ public final class CollectionLifecycleLauncher {
     @SubscribeEvent
     public static void tick(ClientTickEvent.Post event) {
         String phase = System.getProperty("duelcraft.uitest.collectionLifecycle");
+        boolean policy = System.getProperty("duelcraft.uitest.collectionPolicyLifecycle") != null;
+        if (policy) phase = System.getProperty("duelcraft.uitest.collectionPolicyLifecycle");
         if (FMLEnvironment.production || phase == null || step == 9) return;
+        String world = policy ? POLICY_WORLD : WORLD;
+        boolean fresh = phase.equals(policy ? "default" : "seed");
         var mc = Minecraft.getInstance();
         try {
             if (started == 0) {
                 started = System.currentTimeMillis();
-                if (!phase.equals("seed") && !phase.equals("verify")) throw new IllegalStateException("Invalid lifecycle phase");
-                if (!mc.gameDirectory.toPath().toAbsolutePath().normalize().getFileName().toString().equals("run-collection-lifecycle")) {
+                if (!(policy ? java.util.List.of("default", "ownership", "restricted", "removed") : java.util.List.of("seed", "verify")).contains(phase)) throw new IllegalStateException("Invalid lifecycle phase");
+                Path expectedDirectory = Path.of(System.getProperty("duelcraft.uitest.lifecycleDirectory", mc.gameDirectory.toString())).toAbsolutePath().normalize();
+                if (!mc.gameDirectory.toPath().toAbsolutePath().normalize().equals(expectedDirectory)
+                        || !expectedDirectory.getFileName().toString().equals(policy ? "run-collection-policy-lifecycle" : "run-collection-lifecycle")) {
                     throw new IllegalStateException("Requires isolated lifecycle gameDirectory");
                 }
                 if (System.getProperty("ldlib2.uitest.run") != null) throw new IllegalStateException("Automatic fresh-world runner forbidden");
-                boolean exists = mc.getLevelSource().levelExists(WORLD);
-                if (phase.equals("seed") ? exists || Files.exists(manifest()) : !exists || !Files.exists(manifest())) {
+                boolean exists = mc.getLevelSource().levelExists(world);
+                if (fresh ? exists || Files.exists(manifest()) : !exists || !Files.exists(manifest())) {
                     throw new IllegalStateException("Seed requires absent save/manifest; verify requires both existing");
                 }
                 if (Files.exists(report())) throw new IllegalStateException("Archive old interactive report before launching");
+                if (Files.exists(mc.gameDirectory.toPath().resolve("collection-lifecycle-failure.txt"))) throw new IllegalStateException("Archive failed lifecycle attempt before launching");
                 if (phase.equals("verify") && !readManifest().get("phase").getAsString().equals("rejoined")) {
                     throw new IllegalStateException("Verify requires completed seed and same-JVM rejoin");
+                }
+                if (policy && !fresh) {
+                    String previous = switch (phase) { case "ownership" -> "default"; case "restricted" -> "ownership"; default -> "restricted"; };
+                    var manifest = readManifest();
+                    var priorReport = JsonParser.parseString(Files.readString(mc.gameDirectory.toPath()
+                            .resolve("lifecycle-evidence").resolve(previous).resolve("report.json"))).getAsJsonObject();
+                    if (!manifest.get("phase").getAsString().equals(previous)
+                            || !manifest.get("world").getAsString().equals(world)
+                            || !priorReport.get("status").getAsString().equals("PASS") || !priorReport.has("finishedAt")
+                            || ProcessHandle.of(manifest.get("pid").getAsLong()).map(ProcessHandle::isAlive).orElse(false)) {
+                        throw new IllegalStateException("Policy stage requires passed previous phase and stopped PID");
+                    }
+                }
+                if (policy && fresh && (Files.exists(mc.gameDirectory.toPath().resolve("config/duelcraft-server.toml"))
+                        || Files.exists(mc.gameDirectory.toPath().resolve("saves").resolve(world).resolve("serverconfig/duelcraft-server.toml")))) {
+                    throw new IllegalStateException("Default policy requires absent SERVER config");
                 }
             }
             if (System.currentTimeMillis() - started > 240000) {
@@ -67,19 +91,19 @@ public final class CollectionLifecycleLauncher {
                     onboarding.onClose(); // Continue only this disposable client's first-launch onboarding.
                     return;
                 }
-                if (phase.equals("seed")) {
+                if (fresh) {
                     if (!(mc.screen instanceof TitleScreen) || mc.getOverlay() != null) return;
                     step = 1; // World creation pumps nested client frames.
-                    WorldBootstrap.createFreshLevel(mc, WORLD);
+                    WorldBootstrap.createFreshLevel(mc, world);
                 } else step = 1;
             }
             if (step == 1 && ready(mc)) {
                 step = 2;
                 stage = phase;
-                launch();
+                launch(policy);
             } else if (step == 2 && finished()) {
                 archive(stage);
-                if (phase.equals("seed")) {
+                if (!policy && phase.equals("seed")) {
                     step = 3; // Disconnect pumps frames while the integrated server saves/stops.
                     mc.level.disconnect();
                     mc.disconnect(new GenericMessageScreen(Component.translatable("menu.savingLevel")));
@@ -94,7 +118,7 @@ public final class CollectionLifecycleLauncher {
             } else if (step == 4 && ready(mc)) {
                 step = 5;
                 stage = "rejoin";
-                launch();
+                launch(false);
             } else if (step == 5 && finished()) {
                 archive(stage);
                 step = 9;
@@ -107,8 +131,8 @@ public final class CollectionLifecycleLauncher {
         return mc.level != null && mc.player != null && mc.getSingleplayerServer() != null && mc.getOverlay() == null;
     }
     private static Path report() { return Minecraft.getInstance().gameDirectory.toPath().resolve("ldlib2-uitest/report.json"); }
-    private static void launch() {
-        String error = UITestRunner.runInteractive("collection_retained_world");
+    private static void launch(boolean policy) {
+        String error = UITestRunner.runInteractive(policy ? "collection_policy_lifecycle" : "collection_retained_world");
         if (error != null) throw new IllegalStateException(error);
     }
     private static boolean finished() throws IOException {
@@ -129,6 +153,9 @@ public final class CollectionLifecycleLauncher {
             }
         }
         Files.copy(manifest(), target.resolve("collection-phase.json"), StandardCopyOption.REPLACE_EXISTING);
+        if (System.getProperty("duelcraft.uitest.collectionPolicyLifecycle") != null) {
+            Files.copy(source.getParent().resolve("config/duelcraft-server.toml"), target.resolve("duelcraft-server.toml"));
+        }
         Files.delete(report()); // A previous completed report must never finish the next phase.
     }
     private static void fail(Minecraft mc, Exception exception) {

@@ -109,3 +109,46 @@ tasks.configureEach { task ->
         task.dependsOn 'ldlib2CleanUiTestReport'
     }
 }
+
+// Policy follow-up reuses the retained-world launcher with a separate, never-reseeded save.
+if (project.hasProperty('collectionPolicyLifecycle')) {
+    def phase = project.property('collectionPolicyLifecycle').toString()
+    if (!(phase in ['default', 'ownership', 'restricted', 'removed']) || ldTestEnabled || project.hasProperty('collectionLifecycle')) {
+        throw new GradleException('collectionPolicyLifecycle requires default|ownership|restricted|removed alone')
+    }
+    def policyDir = project.file('run-collection-policy-lifecycle')
+    neoForge.runs.matching { it.name == 'client' }.configureEach { run ->
+        run.gameDirectory = policyDir
+        run.systemProperty 'duelcraft.uitest.collectionPolicyLifecycle', phase
+        run.systemProperty 'duelcraft.uitest.lifecycleDirectory', policyDir.absolutePath
+        run.programArguments.addAll '--username', 'PolicyTest', '--width', '1280', '--height', '720'
+        if (phase != 'default') run.programArguments.addAll '--quickPlaySingleplayer', 'collection_policy_followup_20260919'
+    }
+    tasks.register('verifyCollectionPolicyLifecycle') {
+        doLast {
+            def failure = new File(policyDir, 'collection-lifecycle-failure.txt')
+            if (failure.exists()) throw new GradleException(failure.text)
+            def evidence = new File(policyDir, "lifecycle-evidence/$phase")
+            def report = new groovy.json.JsonSlurper().parse(new File(evidence, 'report.json'))
+            def manifest = new groovy.json.JsonSlurper().parse(new File(evidence, 'collection-phase.json'))
+            if (report.status != 'PASS' || !report.finishedAt || manifest.phase != phase) throw new GradleException('Incomplete policy lifecycle evidence')
+            logger.lifecycle("Policy lifecycle $phase: ${report.totals.checks - report.totals.checksFailed}/${report.totals.checks} checks")
+        }
+    }
+    tasks.matching { it.name == 'runClient' }.configureEach { finalizedBy 'verifyCollectionPolicyLifecycle' }
+}
+
+def policyLifecycleDir = project.file('run-collection-policy-lifecycle').toPath().toAbsolutePath().normalize()
+tasks.register('prepareCollectionPolicyOwnershipRequired') {
+    doLast {
+        if (policyLifecycleDir.fileName.toString() != 'run-collection-policy-lifecycle') throw new GradleException('Unexpected policy directory')
+        def manifest = new groovy.json.JsonSlurper().parse(policyLifecycleDir.resolve('collection-phase.json').toFile())
+        def report = new groovy.json.JsonSlurper().parse(policyLifecycleDir.resolve('lifecycle-evidence/default/report.json').toFile())
+        if (manifest.phase != 'default' || manifest.world != 'collection_policy_followup_20260919' || report.status != 'PASS'
+                || ProcessHandle.of(manifest.pid as long).map { it.isAlive() }.orElse(false)) throw new GradleException('Requires passed default stage and stopped JVM')
+        def config = policyLifecycleDir.resolve('config/duelcraft-server.toml').toFile()
+        def original = config.text
+        if (!original.contains('[ownership]') || original.count('requireCardOwnership = false') != 1) throw new GradleException('Unexpected generated SERVER config')
+        config.text = original.replace('requireCardOwnership = false', 'requireCardOwnership = true')
+    }
+}

@@ -264,4 +264,17 @@ class CollectionClientTest {
         assertSame(previous, h.client.state().view());
         assertEquals(3, ((CollectionReply.Changed) save.join()).revision());
     }
+    @Test void openingRefreshPreservesClearanceAndTypedAccessFailure() {
+        var h = new Harness();
+        var result = h.client.refresh().toCompletableFuture();
+        var report = new DeckEligibility.Report(List.of(), Map.of(7, 1), false, true, null);
+        h.reply(0, new CollectionReply.Opened(UUID.randomUUID(), 3, 0, 0, null, true, report));
+        assertEquals(report, result.join().clearedActivation());
+        assertEquals(1, h.sent.size());
+        var denied = h.client.refresh().toCompletableFuture();
+        h.reply(1, new CollectionReply.Rejected(CollectionError.BUSY, 3, EMPTY));
+        var cause = assertThrows(CompletionException.class, denied::join).getCause();
+        assertEquals(CollectionError.BUSY, assertInstanceOf(CollectionClient.RefreshRejectedException.class, cause).error());
+        assertEquals(2, h.sent.size());
+    }
 }

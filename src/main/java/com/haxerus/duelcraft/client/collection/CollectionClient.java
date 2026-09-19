@@ -9,6 +9,14 @@ import java.util.function.*;
 
 /** Client-thread requests and private snapshots. Failed mutations are never replayed. */
 public final class CollectionClient {
+    public static final class RefreshRejectedException extends IllegalStateException {
+        private final CollectionError error;
+        private RefreshRejectedException(CollectionReply.Rejected reply) {
+            super("Collection refresh rejected: " + reply.error());
+            error = reply.error();
+        }
+        public CollectionError error() { return error; }
+    }
     private static final long TIMEOUT_MS = 10000;
     private static final ScheduledExecutorService TIMEOUTS = Executors.newSingleThreadScheduledExecutor(task -> {
         var thread = new Thread(task, "DuelcraftCollectionTimeout");
@@ -185,6 +193,7 @@ public final class CollectionClient {
                 if (refreshing != result) return;
                 if (error != null) { finishRefresh(result, error); return; }
                 try {
+                    if (reply instanceof CollectionReply.Rejected rejected) throw new RefreshRejectedException(rejected);
                     if (!(reply instanceof CollectionReply.Opened opened)) throw new IllegalStateException("Collection refresh rejected: " + reply);
                     if (opened.revision() < requiredRevision) throw new IllegalStateException("Collection snapshot is outdated");
                     refreshingRevision = opened.revision();

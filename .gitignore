@@ -39,6 +39,7 @@ src/main/resources/natives/
 run/
 runs/
 run-collection-lifecycle/
+run-collection-policy-lifecycle/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/

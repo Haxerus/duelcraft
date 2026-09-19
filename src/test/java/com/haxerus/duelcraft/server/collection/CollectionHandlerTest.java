@@ -86,4 +86,37 @@ class CollectionHandlerTest {
             assertEquals(CollectionError.STALE, ((CollectionReply.Rejected) send(handler, sender, command)).error());
         }
         assertEquals(5, sender.writes); assertEquals(5, sender.data.revision());
-    }}
+    }
+    @Test void openClearsIneligibleActiveOnceAndExplainsPrivately() {
+        var handler = new CollectionPayloadHandler(service(CollectionTestData.facts()), new CollectionSnapshotStore());
+        var alice = new Sender(); var bob = new Sender();
+        var deck = CollectionTestData.deck(UUID.randomUUID());
+        alice.data = new PlayerCollectionData(7, Map.of(), Map.of(deck.id(), deck), deck.id());
+        var opened = (CollectionReply.Opened) send(handler, alice, new CollectionCommand.Open());
+        assertNull(opened.activeId()); assertEquals(8, opened.revision()); assertEquals(1, alice.writes);
+        assertNotNull(opened.clearedActivation()); assertFalse(opened.clearedActivation().eligible());
+        assertEquals(deck.cards().requiredCopies(), opened.clearedActivation().missing());
+        assertEquals(Map.of(deck.id(), deck), alice.data.decks()); assertEquals(Map.of(), alice.data.counts());
+        assertTrue(bob.replies.isEmpty()); assertEquals(PlayerCollectionData.empty(), bob.data);
+        var again = (CollectionReply.Opened) send(handler, alice, new CollectionCommand.Open());
+        assertNull(again.clearedActivation()); assertEquals(8, again.revision()); assertEquals(1, alice.writes);
+    }
+    @Test void openEvaluationFailureRejectsWithoutChangingAttachment() {
+        var handler = new CollectionPayloadHandler(new CollectionService(CollectionTestData.facts(),
+                new DeckUsePolicy(false, context -> { throw new IllegalStateException("fixture failure"); })), new CollectionSnapshotStore());
+        var sender = new Sender(); var deck = CollectionTestData.deck(UUID.randomUUID());
+        var before = new PlayerCollectionData(7, Map.of(), Map.of(deck.id(), deck), deck.id()); sender.data = before;
+        var rejected = assertInstanceOf(CollectionReply.Rejected.class, send(handler, sender, new CollectionCommand.Open()));
+        assertEquals(CollectionError.DATA_UNAVAILABLE, rejected.error()); assertEquals(7, rejected.revision());
+        assertSame(before, sender.data); assertEquals(0, sender.writes);
+    }
+    @Test void eligibleOpenRetainsActiveWithoutWriteOrClearance() {
+        var handler = new CollectionPayloadHandler(new CollectionService(CollectionTestData.facts(),
+                new DeckUsePolicy(false, null)), new CollectionSnapshotStore());
+        var sender = new Sender(); var deck = CollectionTestData.deck(UUID.randomUUID());
+        var before = new PlayerCollectionData(7, Map.of(), Map.of(deck.id(), deck), deck.id()); sender.data = before;
+        var opened = (CollectionReply.Opened) send(handler, sender, new CollectionCommand.Open());
+        assertEquals(deck.id(), opened.activeId()); assertNull(opened.clearedActivation());
+        assertSame(before, sender.data); assertEquals(0, sender.writes);
+    }
+}

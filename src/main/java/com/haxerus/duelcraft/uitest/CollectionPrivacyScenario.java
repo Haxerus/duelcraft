@@ -38,6 +38,9 @@ public final class CollectionPrivacyScenario implements MPScenario {
     @Override public void configure(MPScenarioOptions options) { options.clients("A", "B").tags("collection", "privacy", "network"); }
     @Override public void define(MPScenarioBuilder s) {
         s.server("capture and seed distinct private attachments", sc -> {
+            sc.check("effective SERVER ownership mode matches requested fixture", com.haxerus.duelcraft.ServerConfig.requireCardOwnership()
+                    == System.getProperty("duelcraft.uitest.mpOwnership", "default").equals("required"));
+            verifyWireNegotiation(sc);
             sc.check("two distinct dedicated players", sc.players().size() == 2 && sc.player("A") != sc.player("B"));
             for (var role : List.of("A", "B")) {
                 var player = sc.player(role);
@@ -90,5 +93,33 @@ public final class CollectionPrivacyScenario implements MPScenario {
                          ? player.getData(CollectionAttachments.COLLECTION) == original : !player.hasData(CollectionAttachments.COLLECTION));
              }
          });
+    }
+
+    /** Exercise the pinned negotiation path using the real runtime registrations, without changing them. */
+    @SuppressWarnings("unchecked")
+    private static void verifyWireNegotiation(ServerContext sc) {
+        try {
+            var field = net.neoforged.neoforge.network.registration.NetworkRegistry.class.getDeclaredField("PAYLOAD_REGISTRATIONS");
+            field.setAccessible(true);
+            var registry = (Map<net.minecraft.network.ConnectionProtocol, Map<net.minecraft.resources.ResourceLocation,
+                    net.neoforged.neoforge.network.registration.PayloadRegistration<?>>>) field.get(null);
+            var current = registry.get(net.minecraft.network.ConnectionProtocol.PLAY).values().stream()
+                    .map(net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent::new).toList();
+            var ours = current.stream().filter(c -> c.id().getNamespace().equals("duelcraft")).toList();
+            sc.check("real request and reply channels registered as mandatory current version 5", ours.size() == 8
+                    && ours.stream().allMatch(c -> c.version().equals("5") && !c.optional())
+                    && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.collection.CollectionRequestPayload.TYPE.id()))
+                    && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.collection.CollectionReplyPayload.TYPE.id())));
+            var compatible = net.neoforged.neoforge.network.negotiation.NetworkComponentNegotiator.negotiate(current, current);
+            sc.check("registered current channel pair negotiates successfully", compatible.success());
+            var prior = current.stream().map(c -> c.id().getNamespace().equals("duelcraft")
+                    ? new net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent(c.id(), "4", c.flow(), c.optional()) : c).toList();
+            var incompatible = net.neoforged.neoforge.network.negotiation.NetworkComponentNegotiator.negotiate(current, prior);
+            sc.check("prior wire 4 rejected on every Duelcraft channel: " + incompatible.failureReasons(), !incompatible.success()
+                    && incompatible.failureReasons().keySet().equals(ours.stream().map(c -> c.id()).collect(java.util.stream.Collectors.toSet()))
+                    && incompatible.failureReasons().values().stream().allMatch(c -> c.toString().contains("failure.version.mismatch")));
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Pinned NeoForge registry unavailable", exception);
+        }
     }
 }

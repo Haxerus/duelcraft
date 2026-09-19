@@ -283,6 +283,7 @@ final class CollectionController {
     }
 
     void initializeCollections() { lists.newDraft(); lists.refresh(); }
+    void initializeCollections(ClientCollectionState.View view) { lists.newDraft(); lists.applyView(view); }
 
     void setCatalog(List<CardInfo> cards, boolean failed) {
         if (disposed) return;

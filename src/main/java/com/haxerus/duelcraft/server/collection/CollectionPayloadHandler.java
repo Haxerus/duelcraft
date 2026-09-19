@@ -48,8 +48,20 @@ public final class CollectionPayloadHandler {
         if (busy) { reject(payload, sender, CollectionError.BUSY, before.revision(), service.emptyReport()); return; }
         CollectionReply reply;
         switch (payload.command()) {
-            case CollectionCommand.Open ignored -> reply = snapshots.open(sender.id(), before, now,
-                    service.ownershipRequired(), null);
+            case CollectionCommand.Open ignored -> {
+                var change = service.revalidateActive(before, sender.id(), com.haxerus.duelcraft.core.DuelRule.MR5);
+                if (!change.success()) {
+                    reply = new CollectionReply.Rejected(change.error(), before.revision(), change.eligibility());
+                } else {
+                    boolean cleared = !change.data().equals(before);
+                    if (cleared) {
+                        sender.persist(change.data());
+                        snapshots.invalidate(sender.id());
+                    }
+                    reply = snapshots.open(sender.id(), change.data(), now, service.ownershipRequired(),
+                            cleared ? change.eligibility() : null);
+                }
+            }
             case CollectionCommand.Page page -> {
                 reply = snapshots.page(sender.id(), page, now);
                 long capturedRevision = switch (reply) {

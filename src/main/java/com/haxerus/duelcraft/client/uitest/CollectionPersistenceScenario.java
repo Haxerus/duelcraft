@@ -38,6 +38,10 @@ public final class CollectionPersistenceScenario implements UIScenario {
                      new PlayerCollectionData(10, counts, Map.of(owned.id(), owned, other.id(), other), null)));
          });
         CollectionRuntimeFixture.open(s);
+        s.check("default snapshot ownership optional and no cleared activation", ctx -> {
+            var view = DuelcraftClient.getCollectionClient().state().view();
+            return !view.ownershipRequired() && view.clearedActivation() == null;
+        });
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
         CollectionRuntimeFixture.discardNewDraft(s);

@@ -3,8 +3,7 @@ package com.haxerus.duelcraft.client;
 import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.DuelcraftClient;
 import com.haxerus.duelcraft.client.collection.CollectionScreen;
-import com.haxerus.duelcraft.collection.CollectionCommand;
-import com.haxerus.duelcraft.collection.CollectionReply;
+import com.haxerus.duelcraft.client.collection.CollectionClient;
 import net.neoforged.fml.loading.FMLEnvironment;
 import com.haxerus.duelcraft.core.DeckRegistry;
 import com.haxerus.duelcraft.server.DuelDeckPayload;
@@ -64,12 +63,12 @@ public final class DuelClientCommand {
     private static int collection(CommandContext<CommandSourceStack> ctx) {
         var minecraft = Minecraft.getInstance();
         var player = minecraft.player;
-        DuelcraftClient.getCollectionClient().request(new CollectionCommand.Open()).whenCompleteAsync((reply, error) -> {
+        DuelcraftClient.getCollectionClient().refresh().whenCompleteAsync((view, error) -> {
             if (minecraft.player != player || player == null) return;
-            if (error == null && reply instanceof CollectionReply.Opened) {
-                minecraft.setScreen(CollectionScreen.create());
+            if (error == null) {
+                minecraft.setScreen(CollectionScreen.create(view));
             } else {
-                var message = error == null && reply instanceof CollectionReply.Rejected rejected
+                var message = error instanceof CollectionClient.RefreshRejectedException rejected
                         ? Component.translatable("duelcraft.collection.error_" + rejected.error().name().toLowerCase(Locale.ROOT), "")
                         : Component.literal("Collection access failed; try again.");
                 player.sendSystemMessage(message);
