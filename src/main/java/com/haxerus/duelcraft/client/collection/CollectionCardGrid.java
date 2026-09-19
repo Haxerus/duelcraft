@@ -30,6 +30,7 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
             var row = new UIElement().addClass("collection-row");
             for (var card : cards) {
                 var tile = new CardTile(card, textures, () -> selectCard.accept(card.code()));
+                tile.refreshTexture();
                 tile.setId("collection-card-" + card.code());
                 tile.addClass("collection-card");
                 if (card.code() == selectedCode) tile.addClass("selected");
@@ -88,6 +89,16 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
             setOnClick(event -> select.run());
         }
 
+        void refreshTexture() {
+            var available = textures.apply(card.code());
+            if (available != null && !available.equals(texture)) {
+                texture = available;
+                image.lss("background", "sprite(" + available + ")");
+                placeholder.setDisplay(false);
+                addClass("texture-ready");
+            }
+        }
+
         @Override
         public void screenTick() {
             super.screenTick();
@@ -98,12 +109,7 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
                         && (getPositionY() + getSizeHeight() <= scroll.viewPort.getPositionY()
                         || getPositionY() >= scroll.viewPort.getPositionY() + scroll.viewPort.getSizeHeight())) return;
             }
-            var available = textures.apply(card.code());
-            if (available != null && !available.equals(texture)) {
-                texture = available;
-                image.lss("background", "sprite(" + available + ")");
-                placeholder.setDisplay(false);
-            }
+            refreshTexture();
         }
     }
 }

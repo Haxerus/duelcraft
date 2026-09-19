@@ -51,6 +51,17 @@ class CardSearchTest {
         assertTrue(search(List.of(card), "999999999999999999999", Filters.ALL).isEmpty());
     }
 
+    @Test void tokensNeverAppearEvenForExactPasscodeOrOwnedQueries() {
+        var token = card(1234, "Token", TYPE_MONSTER | TYPE_TOKEN, 0, 0, 1);
+        var regular = card(5678, "Regular", TYPE_MONSTER, 0, 0, 1);
+        assertTrue(CardSearch.search(List.of(token, regular), "1234", Filters.ALL,
+                Map.of(1234, 1L), EMPTY).isEmpty());
+        var owned = new Filters(0, 0, 0, 0, 0, Measure.ANY,
+                null, null, null, null, Ownership.OWNED, Sort.NAME);
+        assertEquals(List.of(regular), CardSearch.search(List.of(token, regular), "", owned,
+                Map.of(1234, 1L, 5678, 1L), EMPTY));
+    }
+
     @Test void percentAndUnderscoreAreLiteralText() {
         var literal = card(1, "100%_Magic", TYPE_SPELL, 0, 0, 0);
         var other = card(2, "100XXMagic", TYPE_SPELL, 0, 0, 0);

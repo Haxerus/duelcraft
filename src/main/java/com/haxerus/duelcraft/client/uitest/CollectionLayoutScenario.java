@@ -30,7 +30,7 @@ public final class CollectionLayoutScenario implements UIScenario {
         }).awaitModularUI().ticks(3);
         for (var id : new String[]{"collection-root", "collection-canvas", "editor-header", "save-deck",
                 "editor-body", "card-inspector", "card-details-scroll", "card-edit-controls", "add-card",
-                "remove-card", "main-header", "main-grid", "extra-header", "extra-grid", "side-header",
+                "remove-card", "section-deck", "section-side", "main-header", "main-grid", "extra-header", "extra-grid", "side-header",
                 "side-grid", "collection-search", "collection-results", "filter-panel", "filter-apply",
                 "editor-footer", "card-density", "editor-status"}) s.checkExists("#" + id);
         bounds(s);

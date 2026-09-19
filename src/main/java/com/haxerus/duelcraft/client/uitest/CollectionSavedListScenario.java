@@ -19,7 +19,7 @@ public final class CollectionSavedListScenario implements UIScenario {
 
     @Override public void define(ScenarioBuilder s) {
         s.openScreen("saved passcode placeholders", ctx -> {
-            var model = ctx.put("model", new DeckEditorModel(new DeckList(List.of(99999999), List.of(), List.of()), Map.of()));
+            var model = ctx.put("model", new DeckEditorModel(new DeckList(List.of(99999999, 10066), List.of(), List.of()), Map.of()));
             ctx.put("attempts", new ArrayList<CompletableFuture<SavedDeck>>());
             return CollectionScreen.create(model, CollectionFixture.cards(), code -> null, CollectionFixture.LIST_ID,
                     (name, cards) -> {
@@ -35,7 +35,15 @@ public final class CollectionSavedListScenario implements UIScenario {
                  ctx.el("#remove-card").element().isActive() && !ctx.el("#add-card").element().isActive())
          .screenshot("collection-unknown-passcode")
          .click("#remove-card").ticks(2)
-         .checkCount("#main-grid .card-tile", 0)
+         .click("#main-card-0").checkTextContains("#inspector-name", "Sample 66")
+         .click("#add-card").ticks(2)
+         .checkCount("#main-grid .card-tile", 1).checkCount("#extra-grid .card-tile", 1)
+         .click("#remove-card").ticks(2)
+         .check("adding a misplaced Fusion routes to Extra while removal targets its clicked Main copy", ctx ->
+                 ctx.<DeckEditorModel>get("model").draft().main().isEmpty()
+                         && ctx.<DeckEditorModel>get("model").draft().extra().equals(List.of(10066)))
+         .click("#extra-card-0").click("#remove-card").ticks(2)
+         .checkCount("#main-grid .card-tile", 0).checkCount("#extra-grid .card-tile", 0)
          .click("#save-deck").ticks(2)
          .check("save keeps dirty state until acknowledgement", ctx -> ctx.<DeckEditorModel>get("model").dirty())
          .check("pending save freezes mutations and keeps search", ctx ->

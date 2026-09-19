@@ -12,6 +12,7 @@ import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import org.lwjgl.glfw.GLFW;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.HashSet;
 import java.util.List;
@@ -44,7 +45,7 @@ public final class CollectionOverflowScenario implements UIScenario {
                  .verticalScroller.setNormalizedValue(1, true)).ticks(2)
          .step("remember Side pixels", ctx -> ctx.put("sideBeforeCollapse", pixels(ctx, "side-grid")))
          .click("#toggle-side").ticks(2)
-         .click("#extra-card-0").click("#section-main").click("#add-card").ticks(2)
+         .click("#extra-card-0").click("#section-deck").click("#add-card").ticks(2)
          .click("#remove-card").ticks(2)
          .click("#toggle-side").ticks(2)
          .check("editing Main preserves collapsed Side scroll", ctx -> ctx.<Float>get("sideBeforeCollapse") > 0
@@ -121,13 +122,29 @@ public final class CollectionOverflowScenario implements UIScenario {
                  ctx.get("originalWidth"), ctx.get("originalHeight"))).ticks(6)
          .openScreen("16000-card catalog", ctx -> {
              var requested = ctx.put("textures", new HashSet<Integer>());
+             var cached = ResourceLocation.fromNamespaceAndPath("duelcraft", "textures/card_back.png");
              return CollectionScreen.create(new DeckEditorModel(new DeckList(List.of(), List.of(), List.of()), Map.of()),
-                     CollectionFixture.largeCatalog(), code -> { requested.add(code); return null; }, CollectionFixture.LIST_ID,
+                     CollectionFixture.largeCatalog(), code -> { requested.add(code); return cached; }, CollectionFixture.LIST_ID,
                      CollectionFixture::saved, CollectionFixture.query());
          }).awaitModularUI().ticks(4)
          .check("16000 cards mount bounded rows", CollectionOverflowScenario::boundedRows)
          .check("texture requests limited to mounted cards and inspector", ctx ->
                  ctx.<HashSet<Integer>>get("textures").size() <= grid(ctx).getMountedItemCount() * 4 + 1)
+         .step("hover catalog before wheel input", ctx -> {
+             var bounds = ctx.el("#collection-results").bounds();
+             ctx.input().moveTo(bounds.center().x, bounds.center().y);
+         })
+         .step("wheel remount paints cached textures before the next tick", ctx -> {
+             var bounds = ctx.el("#collection-results").bounds();
+             var before = ctx.query("#collection-results .collection-card").nth(0).one().element();
+             ctx.input().scroll(bounds.center().x, bounds.center().y, -8);
+             ctx.check("wheel changes virtual offset and remounts rows", offset(ctx, "collection-results") > 0
+                     && ctx.count("#collection-results .collection-card") > 0
+                     && before != ctx.query("#collection-results .collection-card").nth(0).one().element());
+             ctx.check("every remounted card already has its cached texture",
+                     ctx.count("#collection-results .collection-card")
+                             == ctx.count("#collection-results .collection-card.texture-ready"));
+         })
          .step("scroll catalog near end", ctx -> grid(ctx).verticalScroller.setNormalizedValue(1, true))
          .ticks(4)
          .check("last catalog rows stay bounded", CollectionOverflowScenario::boundedRows)

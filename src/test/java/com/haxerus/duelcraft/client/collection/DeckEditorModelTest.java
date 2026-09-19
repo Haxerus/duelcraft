@@ -11,8 +11,42 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 class DeckEditorModelTest {
+    @ParameterizedTest
+    @ValueSource(ints = {
+            TYPE_MONSTER | TYPE_FUSION,
+            TYPE_MONSTER | TYPE_SYNCHRO,
+            TYPE_MONSTER | TYPE_XYZ,
+            TYPE_MONSTER | TYPE_LINK
+    })
+    void deckAddRoutesExtraDeckKindsToExtra(int type) {
+        var model = new DeckEditorModel(empty(), Map.of());
+        model.addToDeck(type, 10);
+        assertEquals(new DeckList(List.of(), List.of(10), List.of()), model.draft());
+    }
+
+    @Test void pendulumAloneRoutesToMain() {
+        var model = new DeckEditorModel(empty(), Map.of());
+        model.addToDeck(TYPE_MONSTER | TYPE_PENDULUM, 10);
+        assertEquals(new DeckList(List.of(10), List.of(), List.of()), model.draft());
+    }
+
+    @Test void deckRemovalHonorsClickedStoredSectionEvenWhenMisplaced() {
+        var model = new DeckEditorModel(new DeckList(List.of(10), List.of(10), List.of()), Map.of());
+        assertTrue(model.removeFromDeck(TYPE_MONSTER | TYPE_FUSION, 10, DeckEditorModel.Section.MAIN));
+        assertEquals(new DeckList(List.of(), List.of(10), List.of()), model.draft());
+    }
+
+    @Test void collectionDeckRemovalPrefersNaturalSectionThenFallsBack() {
+        var model = new DeckEditorModel(new DeckList(List.of(10), List.of(10), List.of()), Map.of());
+        assertTrue(model.removeFromDeck(TYPE_MONSTER | TYPE_FUSION, 10, null));
+        assertEquals(new DeckList(List.of(10), List.of(), List.of()), model.draft());
+        assertTrue(model.removeFromDeck(TYPE_MONSTER | TYPE_FUSION, 10, null));
+        assertEquals(empty(), model.draft());
+    }
+
     @Test void ownershipRefreshPreservesDraftAndAcknowledgedBaseline() {
         var model = new DeckEditorModel(empty(), Map.of());
         model.add(DeckEditorModel.Section.MAIN, 1);

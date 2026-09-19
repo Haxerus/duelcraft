@@ -36,6 +36,7 @@ public final class CardSearch {
         var order = Comparator.comparingInt((CardInfo card) -> matchTier(card, text))
                 .thenComparing(sort).thenComparingInt(CardInfo::code);
         return cards.stream()
+                .filter(card -> (card.type() & com.haxerus.duelcraft.core.OcgConstants.TYPE_TOKEN) == 0)
                 .filter(card -> matchTier(card, text) < 3)
                 .filter(card -> matches(card, filters, owned.getOrDefault(card.code(), 0L),
                         required.getOrDefault(card.code(), 0)))

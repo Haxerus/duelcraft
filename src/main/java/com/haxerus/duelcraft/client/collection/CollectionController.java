@@ -13,6 +13,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -40,6 +41,7 @@ final class CollectionController {
     private List<CardInfo> cards;
     private final Map<Integer, CardInfo> byCode = new HashMap<>();
     private final IntFunction<ResourceLocation> textures;
+    private final IntFunction<ResourceLocation> art;
     private final SavedDeckController lists;
     private DeckEligibility.Report displayedEligibility;
     private final CollectionQuery search;
@@ -49,7 +51,9 @@ final class CollectionController {
     private final Runnable close;
     private final CollectionCardGrid collection;
     private int selectedCode;
-    private DeckEditorModel.Section selectedSection = DeckEditorModel.Section.MAIN;
+    private enum EditMode { DECK, SIDE }
+    private EditMode editMode = EditMode.DECK;
+    private DeckEditorModel.Section selectedStoredSection;
     private boolean largeCards;
     private boolean sideOpen;
     private boolean filtersOpen;
@@ -66,13 +70,15 @@ final class CollectionController {
     private List<CardInfo> results = List.of();
 
     CollectionController(UI ui, DeckEditorModel model, List<CardInfo> cards,
-            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search,
+            IntFunction<ResourceLocation> textures, IntFunction<ResourceLocation> art, UUID id,
+            DeckSaveHandler saveDraft, CollectionQuery search,
             Function<CollectionCommand, CompletionStage<CollectionReply>> request,
             Supplier<CompletionStage<ClientCollectionState.View>> refresh, Executor client, Runnable close) {
         this.ui = ui;
         this.model = model;
         this.cards = List.copyOf(cards);
         this.textures = textures;
+        this.art = art;
         this.search = search;
         lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
         this.close = close;
@@ -87,16 +93,20 @@ final class CollectionController {
         }
         cards.forEach(card -> byCode.put(card.code(), card));
         selectedCode = cards.isEmpty() ? 0 : cards.getFirst().code();
-        collection = new CollectionCardGrid(textures, this::selectCard);
+        collection = new CollectionCardGrid(textures, code -> {
+            selectedStoredSection = null;
+            selectCard(code);
+        });
         collection.setId("collection-results");
         element("collection-results-host").addChild(collection);
         button("save-deck").setOnClick(event -> lists.save());
         button("add-card").setOnClick(event -> edit(true));
         button("remove-card").setOnClick(event -> edit(false));
-        for (var section : DeckEditorModel.Section.values()) {
-            button("section-" + section.name().toLowerCase(Locale.ROOT)).setOnClick(event -> {
-                selectedSection = section;
-                if (section == DeckEditorModel.Section.SIDE) sideOpen = true;
+        for (var mode : EditMode.values()) {
+            button("section-" + mode.name().toLowerCase(Locale.ROOT)).setOnClick(event -> {
+                editMode = mode;
+                selectedStoredSection = null;
+                if (mode == EditMode.SIDE) sideOpen = true;
                 refreshPanes();
                 refreshInspector(false);
             });
@@ -136,6 +146,7 @@ final class CollectionController {
                     .tooltips(Component.translatable("duelcraft.collection.unavailable"));
         }
         configureLists();
+        installSelectorAlignment();
         button("eligibility-details").setText(Component.translatable("duelcraft.collection.details"));
         button("eligibility-details").setOnClick(event -> element("eligibility-dialog").setDisplay(true));
         button("eligibility-close").setText(Component.translatable("duelcraft.collection.done"));
@@ -184,12 +195,13 @@ final class CollectionController {
         if (disposed) return;
         var selector = (Selector<UUID>) element("list-picker");
         var ids = lists.summaries().stream().map(CollectionReply.Summary::id).toList();
-        selector.setCandidates(ids).setCandidateUIProvider(UIElementProvider.text(id -> {
+        UIElementProvider<UUID> options = UIElementProvider.text(id -> {
             var summary = lists.summaries().stream().filter(value -> value.id().equals(id)).findFirst().orElse(null);
-            if (summary == null) return Component.translatable("duelcraft.collection.unsaved_list", lists.name());
-            return Component.literal(summary.name()).append(id.equals(lists.activeId())
-                    ? Component.translatable("duelcraft.collection.active_suffix") : Component.empty());
-        }));
+            return summary == null ? Component.translatable("duelcraft.collection.unsaved_list", lists.name())
+                    : Component.literal(summary.name()).append(id.equals(lists.activeId())
+                            ? Component.translatable("duelcraft.collection.active_suffix") : Component.empty());
+        });
+        selector.setCandidates(ids).setCandidateUIProvider(id -> options.apply(id).addClass("selector-option"));
         selector.setValue(lists.id(), false);
         ((TextField) element("list-name")).setText(lists.name(), false);
         element("list-name").setActive(!lists.pending());
@@ -293,8 +305,9 @@ final class CollectionController {
     @SuppressWarnings("unchecked")
     private <T extends Enum<T>> void configureSelector(String id, List<T> values, T initial, Consumer<T> changed) {
         var selector = (Selector<T>) element(id);
-        selector.setCandidates(values).setValue(initial, false).setCandidateUIProvider(UIElementProvider.text(
-                value -> Component.literal(title(value.name()))));
+        UIElementProvider<T> options = UIElementProvider.text(value -> Component.literal(title(value.name())));
+        selector.setCandidates(values).setValue(initial, false).setCandidateUIProvider(value ->
+                options.apply(value).addClass("selector-option"));
         selector.setValue(initial, false).setOnValueChanged(changed);
     }
 
@@ -324,10 +337,10 @@ final class CollectionController {
     private void refreshInspector(boolean changedCard) {
         var card = byCode.get(selectedCode);
         button("add-card").setActive(!lists.pending() && card != null);
-        button("remove-card").setActive(!lists.pending() && sectionCodes(selectedSection).contains(selectedCode));
-        for (var section : DeckEditorModel.Section.values()) {
-            var target = element("section-" + section.name().toLowerCase(Locale.ROOT));
-            if (section == selectedSection) target.addClass("selected");
+        button("remove-card").setActive(!lists.pending() && canRemoveSelected());
+        for (var mode : EditMode.values()) {
+            var target = element("section-" + mode.name().toLowerCase(Locale.ROOT));
+            if (mode == editMode) target.addClass("selected");
             else target.removeClass("selected");
         }
         if (card == null) {
@@ -338,7 +351,7 @@ final class CollectionController {
         }
         if (card != null && changedCard) {
             element("inspector-art").clearAllChildren();
-            element("inspector-art").addChild(new CollectionCardGrid.CardTile(card, textures, () -> {})
+            element("inspector-art").addChild(new CollectionCardGrid.CardTile(card, art, () -> {})
                     .addClass("inspector-card"));
             text("inspector-name", card.name());
             text("inspector-stats", CardStringHelper.typeLine(card) + "\n" + CardStringHelper.atkDefLine(card));
@@ -360,16 +373,33 @@ final class CollectionController {
 
     private void edit(boolean add) {
         if (selectedCode == 0 || lists.pending()) return;
-        if (add) model.add(selectedSection, selectedCode);
-        else if (!model.remove(selectedSection, selectedCode)) return;
-        if (selectedSection == DeckEditorModel.Section.SIDE) sideOpen = true;
+        var card = byCode.get(selectedCode);
+        if (add) {
+            if (card == null) return;
+            if (editMode == EditMode.DECK) model.addToDeck(card.type(), selectedCode);
+            else model.add(DeckEditorModel.Section.SIDE, selectedCode);
+        } else if (editMode == EditMode.SIDE) {
+            if (!model.remove(DeckEditorModel.Section.SIDE, selectedCode)) return;
+        } else if (!model.removeFromDeck(card == null ? 0 : card.type(), selectedCode, selectedStoredSection)) {
+            return;
+        }
+        if (editMode == EditMode.SIDE) sideOpen = true;
         refreshDecks();
         refreshPanes();
         refreshInspector(false);
         // Requery ownership filters, but keep the scroll position if membership/order is unchanged.
         refreshResults(false);
         text("editor-status", (add ? "Added one card to " : "Removed one card from ")
-                + title(selectedSection.name()) + ". Draft only; ownership is unchanged.");
+                + title(editMode.name()) + ". Draft only; ownership is unchanged.");
+    }
+
+    private boolean canRemoveSelected() {
+        if (editMode == EditMode.SIDE) return model.draft().side().contains(selectedCode);
+        if (selectedStoredSection == DeckEditorModel.Section.MAIN
+                || selectedStoredSection == DeckEditorModel.Section.EXTRA) {
+            return sectionCodes(selectedStoredSection).contains(selectedCode);
+        }
+        return model.draft().main().contains(selectedCode) || model.draft().extra().contains(selectedCode);
     }
 
     private void refreshDecks() {
@@ -386,7 +416,8 @@ final class CollectionController {
                 int code = codes.get(index);
                 var card = byCode.getOrDefault(code, new CardInfo(code, "Passcode " + code, "Metadata unavailable.", 0, 0, 0, 0, 0, 0));
                 var tile = new CollectionCardGrid.CardTile(card, textures, () -> {
-                    selectedSection = section;
+                    editMode = section == DeckEditorModel.Section.SIDE ? EditMode.SIDE : EditMode.DECK;
+                    selectedStoredSection = section;
                     selectCard(code);
                 });
                 tile.setId(id + "-card-" + index);
@@ -430,6 +461,31 @@ final class CollectionController {
             grid.verticalScroller.setNormalizedValue(extent == 0 ? 0 : Math.min(1, entry.getValue() / extent));
         }
         pendingScrollOffsets.clear();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void installSelectorAlignment() {
+        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-picker")) {
+            var selector = (Selector<Object>) element(id);
+            // Pinned LDLib clamps root-hosted dialogs against the screen with unscaled layout coordinates.
+            var listeners = selector.dialog.getBubbleListeners(UIEvents.LAYOUT_CHANGED);
+            listeners.forEach(listener -> selector.dialog.removeEventListener(UIEvents.LAYOUT_CHANGED, listener));
+            selector.dialog.addEventListener(UIEvents.LAYOUT_CHANGED, event -> alignSelectorDialog(selector));
+        }
+    }
+
+    private void alignSelectorDialog(Selector<?> selector) {
+        var dialog = selector.dialog;
+        var root = ui.rootElement;
+        float width = Math.max(selector.getSizeWidth(), 50);
+        float left = Math.clamp(selector.getPositionX() - root.getPositionX(), 0,
+                Math.max(0, root.getSizeWidth() - width));
+        float top = Math.clamp(selector.getPositionY() + selector.getSizeHeight() - root.getPositionY(), 0,
+                Math.max(0, root.getSizeHeight() - dialog.getSizeHeight()));
+        if (Math.abs(dialog.getPositionX() - root.getPositionX() - left) < .1f
+                && Math.abs(dialog.getPositionY() - root.getPositionY() - top) < .1f
+                && Math.abs(dialog.getSizeWidth() - width) < .1f) return;
+        dialog.layout(layout -> layout.left(left).top(top).width(width));
     }
 
     private void refreshPanes() {

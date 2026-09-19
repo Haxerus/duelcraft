@@ -8,6 +8,8 @@ import com.lowdragmc.lowdraglib2.uitest.*;
 import java.util.*;
 import org.lwjgl.glfw.GLFW;
 
+import static com.haxerus.duelcraft.core.OcgConstants.*;
+
 /** Real widgets, authenticated save/read/activation packets and server-confirmed snapshots. */
 @LDLRegisterClient(name = "collection_saved_decks", group = "duelcraft", registry = UIScenario.REGISTRY,
         environment = RegistrationEnvironment.DEV_ONLY)
@@ -18,17 +20,27 @@ public final class CollectionSavedDeckScenario implements UIScenario {
             CollectionRuntimeFixture.capture(sc);
             sc.player().setData(CollectionAttachments.COLLECTION, CollectionAttachment.valid(new PlayerCollectionData(20, Map.of(), Map.of(), null)));
         }).waitUntil("real catalog ready", ctx -> DuelcraftClient.getCollectionCatalog().toCompletableFuture().isDone())
-          .step("choose real catalog card", ctx -> ctx.put("code", DuelcraftClient.getCollectionCatalog().toCompletableFuture().join().getFirst().code()));
+          .step("choose real Main and Extra catalog cards", ctx -> {
+              var cards = DuelcraftClient.getCollectionCatalog().toCompletableFuture().join();
+              ctx.put("mainCode", cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
+                      && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) == 0).findFirst().orElseThrow().code());
+              ctx.put("extraCode", cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
+                      && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) != 0).findFirst().orElseThrow().code());
+          });
         CollectionRuntimeFixture.open(s);
-        s.focus("#collection-search").step("type real passcode", ctx -> {
-            for (char digit : String.valueOf(ctx.<Integer>get("code")).toCharArray()) ctx.input().charTyped(digit, 0);
-        })
-         .waitUntil("real search result mounted", ctx -> ctx.elOpt("#collection-card-" + ctx.<Integer>get("code")).isPresent())
-         .step("select real search card", ctx -> CollectionLayoutScenario.press(ctx, "#collection-card-" + ctx.<Integer>get("code")))
-         .step("release selected card", CollectionLayoutScenario::release).ticks(2)
-         .click("#add-card").click("#section-extra").click("#add-card")
-         .click("#section-side").click("#add-card")
-         .checkTextContains("#inspector-missing", "3");
+        s.step("search real Main passcode", ctx -> ctx.el("#collection-search").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class)
+                    .setText(String.valueOf(ctx.<Integer>get("mainCode")), true))
+         .waitUntil("real Main search result mounted", ctx -> ctx.elOpt("#collection-card-" + ctx.<Integer>get("mainCode")).isPresent())
+         .step("select real Main search card", ctx -> CollectionLayoutScenario.press(ctx, "#collection-card-" + ctx.<Integer>get("mainCode")))
+         .step("release selected Main card", CollectionLayoutScenario::release).ticks(2)
+         .click("#add-card")
+         .step("search real Extra passcode", ctx -> ctx.el("#collection-search").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class)
+                    .setText(String.valueOf(ctx.<Integer>get("extraCode")), true))
+         .waitUntil("real Extra search result mounted", ctx -> ctx.elOpt("#collection-card-" + ctx.<Integer>get("extraCode")).isPresent())
+         .step("select real Extra search card", ctx -> CollectionLayoutScenario.press(ctx, "#collection-card-" + ctx.<Integer>get("extraCode")))
+         .step("release selected Extra card", CollectionLayoutScenario::release).ticks(2)
+         .click("#add-card").click("#section-side").click("#add-card")
+         .checkTextContains("#inspector-missing", "2");
         CollectionRuntimeFixture.press(s, "#saved-lists");
         s.typeInto("#list-name", "Runtime unowned draft");
         CollectionRuntimeFixture.press(s, "#lists-close");
@@ -45,10 +57,12 @@ public final class CollectionSavedDeckScenario implements UIScenario {
          .step("record exact server-confirmed saved fixture", ctx -> ctx.attach("saved-state", ctx.<PlayerCollectionData>get("expected").toString()))
          .checkServer("unowned draft name and all sections saved exactly", sc -> {
              var data = CollectionRuntimeFixture.data(sc);
-             int code = sc.get("code");
+             int mainCode = sc.get("mainCode");
+             int extraCode = sc.get("extraCode");
              return data.counts().isEmpty() && data.activeDeckId() == null && data.decks().size() == 1
                      && data.decks().values().iterator().next().name().equals("Runtime unowned draft")
-                     && data.decks().values().iterator().next().cards().equals(new DeckList(List.of(code), List.of(code), List.of(code)));
+                     && data.decks().values().iterator().next().cards().equals(
+                             new DeckList(List.of(mainCode), List.of(extraCode), List.of(extraCode)));
          }).hoverAt(-100, -100).screenshot("collection-real-save-acknowledged")
          .key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
          .check("acknowledged Save permits close", ctx -> !(ctx.screen() instanceof com.haxerus.duelcraft.client.collection.CollectionScreen));
@@ -63,8 +77,11 @@ public final class CollectionSavedDeckScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkCount("#main-grid .card-tile", 1).checkCount("#extra-grid .card-tile", 1)
          .click("#toggle-side").checkCount("#side-grid .card-tile", 1)
-         .click("#main-card-0").checkTextContains("#inspector-missing", "3")
-         .click("#activate-deck")
+         .click("#main-card-0").checkTextContains("#inspector-missing", "1")
+         .step("activate with one real mouse gesture", ctx -> {
+             CollectionLayoutScenario.press(ctx, "#activate-deck");
+             CollectionLayoutScenario.release(ctx);
+         })
          .waitUntil("activation shortage visible", ctx -> ctx.el("#editor-status").text().contains("missing copies"))
          .checkTextContains("#deck-warnings", "3 missing")
          .checkServer("rejected activation leaves saved state unchanged", sc -> CollectionRuntimeFixture.data(sc).equals(sc.<PlayerCollectionData>get("expected")))

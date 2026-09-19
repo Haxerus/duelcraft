@@ -6,7 +6,13 @@
         #collection-root { width: 1280; height: 720; }
         #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         label, text { font-size: 12; text-color: #FFFFFF; text-shadow: true; }
-        button { height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT); }
+        #saved-lists, #save-deck, #withdraw-card, #section-deck, #section-side, #add-card, #remove-card,
+        #toggle-side, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
+        #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
+        #list-delete, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
+        #delete-cancel, #close-save, #close-discard, #close-cancel {
+            height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
+        }
         button text { font-size: 12; text-color: #ffffff; }
         selector text, selector label { text-color: #ffffff; }
         text-field, selector { height: 30; flex-shrink: 0; }
@@ -19,9 +25,8 @@
         #header-title { flex: 1; gap-all: 3; }
         #header-title label { height: 14; }
         #editor-title { height: 22; }
-        #save-deck { width: 182; height: 36; }
+        #saved-lists, #save-deck { width: 146; height: 36; }
         #sample-label { width: 230; text-wrap: wrap; adaptive-height: true; text-color: #AAAAAA; }
-        #saved-lists { width: 110; }
         #lists-dialog, #delete-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
         #delete-dialog { z-index: 110; }
         #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
@@ -33,8 +38,8 @@
         #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: built-in(ui-gdp:RECT); }
         #card-details-scroll { flex: 1; min-height: 0; }
         #card-details-scroll .__scroller_view_view-container__ { gap-all: 8; }
-        #inspector-art { height: 174; align-items: center; flex-shrink: 0; }
-        .inspector-card { width: 118; height: 172; }
+        #inspector-art { height: 192; align-items: center; flex-shrink: 0; }
+        .inspector-card { width: 192; height: 192; }
         #inspector-name { font-size: 16; text-color: #FFFF00; }
         #inspector-stats { text-color: #CCCCCC; }
         #inspector-description { font-size: 13; }
@@ -59,7 +64,9 @@
         .card-tile { padding-all: 2; flex-shrink: 0; background: built-in(ui-gdp:RECT_RD_DARK); }
         .card-art { width: 100%; height: 100%; justify-content: center; align-items: center; overflow: hidden; background: built-in(ui-gdp:RECT); }
         .card-placeholder { width: 100%; text-wrap: wrap; adaptive-height: true; horizontal-align: center; font-size: 10; text-color: #DDDDDD; padding-all: 3; }
-        .selected { overlay: rect(#6600FF00); }
+        .card-tile.selected { overlay: built-in(ui-gdp:RECT_RD_T_SOLID); }
+        .mode-button.selected, .filter-choice.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
+        .selector-option { height: 18; flex-shrink: 0; font-size: 12; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
         .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; background: rect(#CCFFAA00); }
         #collection-pane { width: 348; flex-shrink: 0; min-height: 0; gap-all: 6; }
         #collection-search { flex: 1; min-width: 0; }
@@ -135,9 +142,8 @@
                         <label id="inspector-missing" />
                         <label>Add to / remove from</label>
                         <element class="row">
-                            <button id="section-main" text="Main" />
-                            <button id="section-extra" text="Extra" />
-                            <button id="section-side" text="Side" />
+                            <button id="section-deck" class="mode-button" text="Deck" />
+                            <button id="section-side" class="mode-button" text="Side" />
                         </element>
                         <element class="row">
                             <button id="add-card" text="+1 Add" />

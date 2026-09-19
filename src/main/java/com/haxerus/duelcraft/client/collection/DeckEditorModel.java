@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static com.haxerus.duelcraft.core.OcgConstants.*;
+
 public final class DeckEditorModel {
     public enum Section { MAIN, EXTRA, SIDE }
 
@@ -67,5 +69,21 @@ public final class DeckEditorModel {
     public void markSaved() { saved = draft; }
     private void requireEditable() {
         if (frozen) throw new IllegalStateException("Wait for the pending collection operation");
+    }
+
+    public void addToDeck(int type, int code) {
+        add(naturalSection(type), code);
+    }
+
+    public boolean removeFromDeck(int type, int code, Section storedSection) {
+        if (storedSection == Section.MAIN || storedSection == Section.EXTRA) {
+            return remove(storedSection, code);
+        }
+        Section natural = naturalSection(type);
+        return remove(natural, code) || remove(natural == Section.MAIN ? Section.EXTRA : Section.MAIN, code);
+    }
+
+    static Section naturalSection(int type) {
+        return (type & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) != 0 ? Section.EXTRA : Section.MAIN;
     }
 }

@@ -43,7 +43,7 @@ public final class CollectionSearchScenario implements UIScenario {
          .checkTextContains("#inspector-used", "1")
          .checkTextContains("#inspector-missing", "1")
          .checkTextContains("#inspector-description", "Draw two cards.")
-         .click("#section-main")
+         .click("#section-deck")
          .click("#add-card").ticks(2)
          .checkCount("#main-grid .card-tile", 41)
          .checkTextContains("#main-count", "41")
@@ -181,7 +181,7 @@ public final class CollectionSearchScenario implements UIScenario {
 
         open(s, "dirty-close Save");
         s.click("#collection-card-10001")
-         .click("#section-main")
+         .click("#section-deck")
          .click("#add-card").ticks(2)
          .step("remember close-save snapshot", ctx -> ctx.put("expected", model(ctx).draft()))
          .key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
