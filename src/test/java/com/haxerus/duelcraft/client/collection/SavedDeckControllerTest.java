@@ -7,6 +7,21 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SavedDeckControllerTest {
+    @Test void importedDraftUsesProvidedIdentityAndCardsUntilAcknowledgedSave() {
+        var importedId = UUID.randomUUID();
+        var importedCards = new DeckList(List.of(1), List.of(2), List.of(3));
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null));
+
+        c.importDraft(new SavedDeck(importedId, "Imported", importedCards));
+
+        assertEquals(importedId, c.id());
+        assertEquals("Imported", c.name());
+        assertEquals(importedCards, model.draft());
+        assertTrue(c.dirty());
+        assertFalse(c.stored());
+    }
+
     @Test void optionalOwnershipAllowsServerApprovedUnownedActivationWithoutDenial() {
         var c = productionController();
         c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null, false, null));

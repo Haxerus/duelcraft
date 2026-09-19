@@ -9,7 +9,7 @@
         #saved-lists, #save-deck, #withdraw-card, #deposit-card, #section-deck, #section-side, #add-card, #remove-card,
         #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
-        #list-delete, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
+        #list-delete, #list-import, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
         #delete-cancel, #close-save, #close-discard, #close-cancel, #alternate-formats {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
@@ -30,7 +30,7 @@
         #delete-dialog { z-index: 110; }
         #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #lists-panel .row button { flex: 1; min-width: 0; }
-        #list-picker, #list-name { width: 100%; }
+        #list-picker, #list-name, #list-import-picker { width: 100%; }
         #delete-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #delete-panel button { flex: 1; }
         #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
@@ -246,6 +246,11 @@
                 <element id="lists-panel">
                     <label id="lists-title" class="heading">duelcraft.collection.lists</label>
                     <selector id="list-picker" />
+                    <label id="list-import-label">duelcraft.collection.import_local</label>
+                    <element class="row">
+                        <selector id="list-import-picker" class="grow" />
+                        <button id="list-import" text="duelcraft.collection.import" />
+                    </element>
                     <label id="list-name-label">duelcraft.collection.list_name</label>
                     <text-field id="list-name" />
                     <label id="list-active-status" />

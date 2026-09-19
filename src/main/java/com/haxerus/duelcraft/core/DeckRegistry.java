@@ -1,5 +1,8 @@
 package com.haxerus.duelcraft.core;
 
+import com.haxerus.duelcraft.collection.DeckList;
+import com.haxerus.duelcraft.collection.DeckListLoader;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -43,10 +46,19 @@ public record DeckRegistry(Path dir) {
 
     /** Loads {@code <name>.ydk} from the registry directory, re-reading on every call. */
     public Deck load(String name) throws IOException {
-        Path file = dir.resolve(name + EXT);
-        if (!Files.isRegularFile(file)) {
-            throw new IOException("Deck file not found: " + file);
+        return loadList(name).toDuelDeck();
+    }
+
+    /** Loads a complete list selected from {@link #listDeckNames()}, without following it outside this directory. */
+    public DeckList loadList(String name) throws IOException {
+        if (name == null || !listDeckNames().contains(name)) {
+            throw new IOException("Deck file is not listed in " + dir + ": " + name);
         }
-        return DeckLoader.loadFromFile(file);
+        Path root = dir.toRealPath();
+        Path file = dir.resolve(name + EXT).toRealPath();
+        if (!root.equals(file.getParent())) {
+            throw new IOException("Deck file resolves outside " + dir + ": " + name);
+        }
+        return DeckListLoader.loadFromFile(file);
     }
 }

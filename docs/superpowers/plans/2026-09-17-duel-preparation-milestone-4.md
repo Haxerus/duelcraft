@@ -26,7 +26,7 @@ Java paths start at `src/main/java/com/haxerus/duelcraft/`; tests at `src/test/j
 
 **Interfaces:** `DeckListLoader.parseYdk(String)` and `.loadFromFile(Path)` return `DeckList`. Existing `DeckLoader.parseYdk` and `.loadFromFile` delegate and convert with `.toDuelDeck()` while retaining `DeckLoader.DeckParseException` and line-number behavior. Unknown positive IDs and invalid gameplay sizes may import within total512 bound.
 
-- [ ] Add a failing preservation test:
+- [x] Add a failing preservation test:
 
 ```java
 var list = DeckListLoader.parseYdk("#main\n1\n#extra\n2\n!side\n3\n");
@@ -34,10 +34,10 @@ assertEquals(List.of(3), list.side());
 assertEquals(new Deck(List.of(1), List.of(2)), DeckLoader.parseYdk("#main\n1\n#extra\n2\n!side\n3\n"));
 ```
 
-- [ ] Run `./gradlew.bat test --tests '*DeckListLoaderTest' --tests '*DeckLoaderTest'`.
-- [ ] Move parsing into DeckListLoader without changing BOM/comments/error behavior; retain Side instead of dropping it. List import resolves only `.ydk` files listed within the client deck directory, rejects traversal/outside paths, and creates a new SavedDeck UUID without touching ownership. Add UI Import selection from that directory; no server file picker or upload of local paths.
-- [ ] Wire UI Import -> Save draft; `/duel deck set <name>` -> Save imported draft -> Activate only after Save acknowledgement with the returned revision. Missing cards block activation only when core ownership is required. Any blocking legality/ownership/companion denial leaves a saved inactive list and a clear reason; default legal imports can activate with an empty collection. Keep local list completion/quoted filenames. Delay removal of the old packet until task 4 so this task can build, but route the updated client through new commands immediately.
-- [ ] Test same-named imports preserve independent IDs, malformed input shows the line, 513-card input is rejected as an import limit, and source-file deletion after save cannot change the list. Commit `feat: import complete YDK deck lists` after tests pass.
+- [x] Run `./gradlew.bat test --tests '*DeckListLoaderTest' --tests '*DeckLoaderTest'`.
+- [x] Move parsing into DeckListLoader without changing BOM/comments/error behavior; retain Side instead of dropping it. List import resolves only `.ydk` files listed within the client deck directory, rejects traversal/outside paths, and creates a new SavedDeck UUID without touching ownership. Add UI Import selection from that directory; no server file picker or upload of local paths.
+- [x] Wire UI Import -> Save draft; `/duel deck set <name>` -> Save imported draft -> Activate only after Save acknowledgement with the returned revision. Missing cards block activation only when core ownership is required. Any blocking legality/ownership/companion denial leaves a saved inactive list and a clear reason; default legal imports can activate with an empty collection. Keep local list completion/quoted filenames. Delay removal of the old packet until task 4 so this task can build, but route the updated client through new commands immediately.
+- [x] Test same-named imports preserve independent IDs, malformed input shows the line, 513-card input is rejected as an import limit, and source-file deletion after save cannot change the list. Commit `feat: import complete YDK deck lists` after tests pass.
 
 ## Task 2: Pure preparation state machine
 

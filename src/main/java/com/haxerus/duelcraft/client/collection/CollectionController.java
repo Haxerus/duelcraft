@@ -5,6 +5,8 @@ import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.collection.CollectionCommand;
 import com.haxerus.duelcraft.collection.CollectionReply;
 import com.haxerus.duelcraft.collection.DeckEligibility;
+import com.haxerus.duelcraft.core.DeckLoader;
+import com.haxerus.duelcraft.core.DeckRegistry;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
@@ -16,8 +18,11 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -43,6 +48,7 @@ final class CollectionController {
     private final IntFunction<ResourceLocation> textures;
     private final IntFunction<ResourceLocation> art;
     private final SavedDeckController lists;
+    private final DeckImportService imports;
     private final CardTransferController transfers;
     private int carried = -1;
     private DeckEligibility.Report displayedEligibility;
@@ -50,6 +56,7 @@ final class CollectionController {
     private long queryGeneration;
     private boolean disposed;
     private String catalogState = "";
+    private boolean importsAvailable;
     private final Runnable close;
     private final CollectionCardGrid collection;
     private int selectedCode;
@@ -84,6 +91,8 @@ final class CollectionController {
         this.art = art;
         this.search = search;
         lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
+        imports = new DeckImportService(DeckRegistry.open(Minecraft.getInstance().gameDirectory.toPath()
+                .resolve("duelcraft/decks")));
         transfers = new CardTransferController(lists);
         this.close = close;
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
@@ -188,7 +197,12 @@ final class CollectionController {
 
     @SuppressWarnings("unchecked")
     private void configureLists() {
-        button("saved-lists").setOnClick(event -> element("lists-dialog").setDisplay(true));
+        var importPicker = (Selector<String>) element("list-import-picker");
+        importPicker.dialog.style(style -> style.zIndex(95));
+        button("saved-lists").setOnClick(event -> {
+            refreshImportPicker(importPicker);
+            element("lists-dialog").setDisplay(true);
+        });
         button("lists-close").setOnClick(event -> element("lists-dialog").setDisplay(false));
         ((TextField) element("list-name")).setTextResponder(lists::rename);
         ((Selector<UUID>) element("list-picker")).dialog.style(style -> style.zIndex(95));
@@ -198,6 +212,18 @@ final class CollectionController {
         button("list-new").setOnClick(event -> lists.navigate(lists::newDraft));
         button("list-rename").setOnClick(event -> lists.save());
         button("list-duplicate").setOnClick(event -> { lists.duplicate(); lists.save(); });
+        button("list-import").setOnClick(event -> {
+            String name = importPicker.getValue();
+            if (name == null) return;
+            lists.navigate(() -> {
+                try {
+                    lists.importDraft(imports.load(name));
+                    lists.save();
+                } catch (IOException | UncheckedIOException | DeckLoader.DeckParseException | IllegalArgumentException error) {
+                    lists.importFailed(error);
+                }
+            });
+        });
         button("list-delete").setOnClick(event -> element("delete-dialog").setDisplay(true));
         button("delete-confirm").setOnClick(event -> {
             element("delete-dialog").setDisplay(false);
@@ -211,6 +237,22 @@ final class CollectionController {
         button("list-refresh").setOnClick(event -> lists.refresh());
         element("lists-dialog").setDisplay(false);
         element("delete-dialog").setDisplay(false);
+    }
+
+    private void refreshImportPicker(Selector<String> picker) {
+        try {
+            var names = imports.names();
+            var options = UIElementProvider.<String>text(Component::literal);
+            picker.setCandidates(names).setCandidateUIProvider(name -> options.apply(name).addClass("selector-option"));
+            picker.setValue(names.isEmpty() ? null : names.getFirst(), false);
+            importsAvailable = !names.isEmpty();
+            element("list-import").setActive(importsAvailable && !lists.pending());
+        } catch (UncheckedIOException error) {
+            picker.setCandidates(List.of()).setValue(null, false);
+            importsAvailable = false;
+            element("list-import").setActive(false);
+            lists.importFailed(error);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -230,6 +272,8 @@ final class CollectionController {
         element("list-name").setActive(!lists.pending());
         element("sort-deck").setActive(!lists.pending());
         element("list-picker").setActive(!lists.pending() && lists.ready());
+        element("list-import-picker").setActive(!lists.pending());
+        element("list-import").setActive(importsAvailable && !lists.pending());
         for (String id : List.of("save-deck", "list-new", "list-rename", "list-duplicate", "close-save")) {
             element(id).setActive(!lists.pending() && lists.ready());
         }

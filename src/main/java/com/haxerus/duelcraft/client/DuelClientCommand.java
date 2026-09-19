@@ -1,12 +1,13 @@
 package com.haxerus.duelcraft.client;
 
-import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.DuelcraftClient;
 import com.haxerus.duelcraft.client.collection.CollectionScreen;
 import com.haxerus.duelcraft.client.collection.CollectionClient;
+import com.haxerus.duelcraft.client.collection.DeckImportService;
+import com.haxerus.duelcraft.collection.CollectionReply;
 import net.neoforged.fml.loading.FMLEnvironment;
+import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.core.DeckRegistry;
-import com.haxerus.duelcraft.server.DuelDeckPayload;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.client.Minecraft;
@@ -14,7 +15,6 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -94,13 +94,56 @@ public final class DuelClientCommand {
     private static int deckSet(CommandContext<CommandSourceStack> ctx) {
         String name = StringArgumentType.getString(ctx, "name");
         try {
-            var deck = decks().load(name);
-            PacketDistributor.sendToServer(new DuelDeckPayload(name, deck));
-            return 1; // The server acknowledges only after validation.
+            var imports = new DeckImportService(decks());
+            var deck = imports.load(name);
+            var minecraft = Minecraft.getInstance();
+            var player = minecraft.player;
+            var collection = DuelcraftClient.getCollectionClient();
+            collection.refresh().thenCompose(view ->
+                    imports.saveThenActivate(view.revision(), deck, collection::request))
+                    .whenCompleteAsync((result, error) -> {
+                        if (minecraft.player != player || player == null) return;
+                        if (error != null) {
+                            player.sendSystemMessage(Component.literal("Cannot import local deck '" + name
+                                    + "': " + root(error).getMessage()));
+                        } else if (result.activated()) {
+                            player.sendSystemMessage(Component.literal("Imported and activated local deck '" + name + "'."));
+                        } else if (result.saved() != null) {
+                            player.sendSystemMessage(Component.literal("Imported local deck '" + name
+                                    + "', but it remains inactive: " + explain(result.activation())));
+                        } else {
+                            player.sendSystemMessage(Component.literal("Cannot import local deck '" + name
+                                    + "': " + explain(result.activation())));
+                        }
+                    }, minecraft::execute);
+            ctx.getSource().sendSuccess(() -> Component.literal("Importing local deck '" + name + "'…"), false);
+            return 1;
         } catch (IOException | UncheckedIOException | DeckLoader.DeckParseException | IllegalArgumentException e) {
             ctx.getSource().sendFailure(Component.literal("Cannot set local deck '" + name + "': " + e.getMessage()));
             return 0;
         }
+    }
+
+    private static String explain(CollectionReply reply) {
+        if (!(reply instanceof CollectionReply.Rejected rejected)) return "unexpected server acknowledgement";
+        var report = rejected.eligibility();
+        if (report.restrictionReason() != null) return report.restrictionReason();
+        if (report.ownershipRequired() && !report.missing().isEmpty()) {
+            int missing = report.missing().values().stream().mapToInt(Integer::intValue).sum();
+            return missing + " deposited card cop" + (missing == 1 ? "y is" : "ies are") + " missing";
+        }
+        if (!report.problems().isEmpty()) {
+            return report.problems().size() + " supported legality problem"
+                    + (report.problems().size() == 1 ? "" : "s");
+        }
+        return rejected.error().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    private static Throwable root(Throwable error) {
+        while (error instanceof java.util.concurrent.CompletionException && error.getCause() != null) {
+            error = error.getCause();
+        }
+        return error;
     }
 
     private static int show(CommandContext<CommandSourceStack> ctx) {

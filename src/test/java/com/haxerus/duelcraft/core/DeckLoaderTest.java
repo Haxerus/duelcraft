@@ -40,6 +40,12 @@ class DeckLoaderTest {
     }
 
     @Test
+    void delegatesCompleteParsingAndProjectsToDuelDeck() {
+        assertEquals(new Deck(List.of(1), List.of(2)),
+                DeckLoader.parseYdk("#main\n1\n#extra\n2\n!side\n3\n"));
+    }
+
+    @Test
     void toleratesBlankLinesAndWhitespace() {
         String ydk = """
                 #main

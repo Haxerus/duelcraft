@@ -95,6 +95,22 @@ public final class SavedDeckController {
         changed.run();
     }
 
+    public void importDraft(SavedDeck imported) {
+        requireEditable();
+        eligibility = EMPTY;
+        readToken++;
+        id = imported.id();
+        name = imported.name();
+        savedName = name;
+        stored = false;
+        model.load(imported.cards());
+        changed.run();
+    }
+
+    public void importFailed(Throwable error) {
+        if (!disposed) fail(error);
+    }
+
     public void applyView(ClientCollectionState.View view) {
         if (disposed || view.revision() < revision) return;
         revision = view.revision();

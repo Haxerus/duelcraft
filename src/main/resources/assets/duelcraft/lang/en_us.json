@@ -32,6 +32,8 @@
   "duelcraft.collection.save": "Save list",
   "duelcraft.collection.unavailable": "Card transfers are not available yet.",
   "duelcraft.collection.lists": "Saved lists",
+  "duelcraft.collection.import_local": "Import a local .ydk list",
+  "duelcraft.collection.import": "Import",
   "duelcraft.collection.list_name": "List name · 1–128 printable characters",
   "duelcraft.collection.new": "New",
   "duelcraft.collection.rename": "Save / Rename",
