@@ -49,7 +49,18 @@ public final class CollectionEligibilityScenario implements UIScenario {
             }
         }).awaitModularUI().ticks(3)
          .checkTextContains("#deck-shortages", "Ownership optional")
-         .checkClass("#main-card-0 .missing-copy", "neutral")
+         .checkHidden("#deck-warnings")
+         .check("ownership feedback spans the available footer space", ctx -> {
+             var feedback = ctx.el("#deck-feedback").bounds();
+             var text = ctx.el("#deck-shortages").bounds();
+             return Math.abs(text.center().x - feedback.center().x) < 1
+                     && Math.abs(text.width() - feedback.width()) < 1;
+         });
+        CollectionRuntimeFixture.press(s, "#saved-lists");
+        s.checkTextContains("#list-supported-checks", "Activation does not require deposited copies.")
+         .hoverAt(-100, -100).screenshot("optional-ownership-help");
+        CollectionRuntimeFixture.press(s, "#lists-close");
+        s.checkClass("#main-card-0 .missing-copy", "neutral")
          .click("#main-card-0")
          .checkClass("#inspector-missing", "neutral")
          .click("#activate-deck")
@@ -64,8 +75,12 @@ public final class CollectionEligibilityScenario implements UIScenario {
                  ctx.<SavedDeckController>get("lists").applyView(new ClientCollectionState.View(
                          5, ctx.<DeckEditorModel>get("model").owned(), List.of(), null, true, null)))
          .ticks(3)
-         .checkTextContains("#deck-shortages", "Ownership required")
-         .check("required shortage uses warning treatment", ctx ->
+         .checkTextContains("#deck-shortages", "Ownership required");
+        CollectionRuntimeFixture.press(s, "#saved-lists");
+        s.checkTextContains("#list-supported-checks", "Activation requires deposited copies")
+         .hoverAt(-100, -100).screenshot("required-ownership-help");
+        CollectionRuntimeFixture.press(s, "#lists-close");
+        s.check("required shortage uses warning treatment", ctx ->
                  !ctx.el("#main-card-0 .missing-copy").element().hasClass("neutral"))
          .click("#activate-deck")
          .step("server rejects required-ownership shortage", ctx -> reply(ctx, new CollectionReply.Rejected(

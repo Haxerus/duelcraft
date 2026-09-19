@@ -3,8 +3,10 @@ package com.haxerus.duelcraft.client.collection;
 import com.haxerus.duelcraft.collection.DeckList;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntUnaryOperator;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -43,6 +45,20 @@ public final class DeckEditorModel {
         if (!cards.remove(Integer.valueOf(code))) return false;
         replace(section, cards);
         return true;
+    }
+
+    public void sortByType(IntUnaryOperator cardType) {
+        requireEditable();
+        Comparator<Integer> order = Comparator.comparingInt(code -> typeOrder(cardType.applyAsInt(code)));
+        draft = new DeckList(draft.main().stream().sorted(order).toList(),
+                draft.extra().stream().sorted(order).toList(), draft.side().stream().sorted(order).toList());
+    }
+
+    private static int typeOrder(int type) {
+        if ((type & TYPE_MONSTER) != 0) return (type & TYPE_NORMAL) != 0 ? 0 : 1;
+        if ((type & TYPE_SPELL) != 0) return 2;
+        if ((type & TYPE_TRAP) != 0) return 3;
+        return 4;
     }
 
     private List<Integer> cards(Section section) {

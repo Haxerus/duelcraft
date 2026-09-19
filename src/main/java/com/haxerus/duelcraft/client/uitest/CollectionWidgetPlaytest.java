@@ -36,7 +36,7 @@ final class CollectionWidgetPlaytest {
               var artCalls = ctx.put("artCalls", new HashSet<Integer>());
               var full = ResourceLocation.fromNamespaceAndPath("duelcraft", "textures/card_back.png");
               var art = ResourceLocation.withDefaultNamespace("textures/block/diamond_block.png");
-              var model = CollectionFixture.model(false);
+              var model = ctx.put("model", CollectionFixture.model(false));
               var cards = new java.util.ArrayList<>(CollectionFixture.cards());
               cards.add(new com.haxerus.duelcraft.client.carddata.CardInfo(90000, "Anime sample", "",
                       1, 0, 0, 1, 1, 1, 4));
@@ -109,6 +109,15 @@ final class CollectionWidgetPlaytest {
           .step("choose Saved list through its real popup row", ctx -> choose(ctx, "list-picker", CollectionFixture.LIST_ID))
           .hoverAt(-100, -100).screenshot("collection-playtest-scale" + guiScale)
           .step("close Saved lists with real mouse input", ctx -> click(ctx, "lists-close")).ticks(2)
+          .click("#sort-deck").ticks(2)
+          .check("Sort deck groups cards without moving sections", ctx -> {
+              var model = ctx.<com.haxerus.duelcraft.client.collection.DeckEditorModel>get("model");
+              return model.dirty() && model.draft().main().subList(0, 2).equals(List.of(10001, 10003))
+                      && model.draft().main().size() == 40 && model.draft().extra().size() == 5
+                      && model.draft().side().isEmpty();
+          })
+          .checkText("#deck-summary", "Unsaved changes")
+          .hoverAt(-100, -100).screenshot("sorted-deck-scale" + guiScale)
           .teardown("restore viewport", ctx -> {
               ctx.mc().setScreen(null);
               GLFW.glfwSetWindowSize(ctx.mc().getWindow().getWindow(), ctx.get("originalWidth"), ctx.get("originalHeight"));

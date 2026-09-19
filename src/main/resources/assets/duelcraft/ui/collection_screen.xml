@@ -7,7 +7,7 @@
         #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         label, text { font-size: 12; text-color: #FFFFFF; text-shadow: true; }
         #saved-lists, #save-deck, #withdraw-card, #section-deck, #section-side, #add-card, #remove-card,
-        #toggle-side, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
+        #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
         #list-delete, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
         #delete-cancel, #close-save, #close-discard, #close-cancel, #alternate-formats {
@@ -58,7 +58,7 @@
         #side-section { height: 32; flex-shrink: 0; }
         .section-header { height: 30; flex-shrink: 0; flex-direction: row; align-items: center; padding-horizontal: 8; background: built-in(ui-gdp:RECT); }
         .section-header label { flex: 1; }
-        #toggle-side { width: 90; height: 24; }
+        #toggle-side, #sort-deck { width: 90; height: 24; }
         .deck-grid { flex: 1; min-height: 0; }
         .deck-grid .__scroller_view_view-container__ { display: grid; grid-template-columns: repeat(10, 54px); grid-auto-rows: 79px; gap-all: 4; justify-content: space_between; align-content: flex_start; }
         .large .deck-grid .__scroller_view_view-container__ { grid-template-columns: repeat(8, 70px); grid-auto-rows: 103px; }
@@ -71,7 +71,7 @@
         .card-tile.selected { overlay: built-in(ui-gdp:RECT_RD_T_SOLID); }
         .mode-button.selected, .filter-choice.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
         .selector-option { height: 18; flex-shrink: 0; font-size: 12; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
-        .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; background: rect(#CCFFAA00); }
+        .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; vertical-align: center; background: rect(#CCFFAA00); }
         .missing-copy.neutral { text-color: #FFFFFF; background: rect(#B0555555); }
         #collection-pane { width: 348; flex-shrink: 0; min-height: 0; gap-all: 6; }
         #collection-search { flex: 1; min-width: 0; }
@@ -104,7 +104,8 @@
         #editor-footer { height: 36; flex-shrink: 0; flex-direction: row; align-items: center; gap-all: 8; }
         #card-density { width: 158; }
         #card-density text { adaptive-width: false; width: 100%; }
-        #deck-warnings, #deck-shortages { flex: 1; min-width: 0; font-size: 11; text-wrap: wrap; adaptive-height: true; }
+        #deck-feedback { flex: 1; min-width: 0; gap-all: 2; }
+        #deck-warnings, #deck-shortages { width: 100%; font-size: 11; text-wrap: wrap; adaptive-height: true; horizontal-align: center; }
         #deck-warnings, #deck-shortages.warning { text-color: #FFDD55; }
         #deck-shortages.neutral { text-color: #AAAAAA; }
         #editor-status { height: 18; flex-shrink: 0; font-size: 12; }
@@ -164,7 +165,7 @@
                 </element>
                 <element id="deck-sections">
                     <element id="main-section" class="deck-section">
-                        <element id="main-header" class="section-header"><label id="main-count" /></element>
+                        <element id="main-header" class="section-header"><label id="main-count" /><button id="sort-deck" /></element>
                         <scroller-view id="main-grid" class="deck-grid" />
                     </element>
                     <element id="extra-section" class="deck-section">
@@ -216,8 +217,10 @@
             <element id="editor-footer">
                 <button id="deposit-cards" text="Deposit · unavailable" />
                 <button id="activate-deck" text="Activate · unavailable" />
-                <label id="deck-warnings" />
-                <label id="deck-shortages" />
+                <element id="deck-feedback">
+                    <label id="deck-warnings" />
+                    <label id="deck-shortages" />
+                </element>
                 <button id="card-density" text="Cards: Standard" />
             </element>
             <element id="status-row" class="row">
@@ -251,7 +254,7 @@
                         <button id="list-refresh" text="duelcraft.collection.refresh" />
                         <button id="lists-close" text="duelcraft.collection.done" />
                     </element>
-                    <label id="list-supported-checks" class="wrap muted">duelcraft.collection.supported_checks</label>
+                    <label id="list-supported-checks" class="wrap muted" />
                     <label id="list-save-first" class="wrap muted">duelcraft.collection.save_first</label>
                 </element>
             </element>

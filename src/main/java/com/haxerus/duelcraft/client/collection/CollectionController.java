@@ -86,7 +86,7 @@ final class CollectionController {
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
         ((TextElement) element("inspector-empty-prompt")).setText(Component.translatable("duelcraft.collection.select_card"));
         for (var entry : Map.of("lists-title", "lists", "list-name-label", "list_name",
-                "list-supported-checks", "supported_checks", "list-save-first", "save_first",
+                "list-save-first", "save_first",
                 "delete-title", "delete_confirm", "delete-copy", "delete_copy",
                 "close-title", "save_changes", "close-copy", "save_changes_copy").entrySet()) {
             ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
@@ -99,6 +99,16 @@ final class CollectionController {
         collection.setId("collection-results");
         element("collection-results-host").addChild(collection);
         button("save-deck").setOnClick(event -> lists.save());
+        button("sort-deck").setText(Component.translatable("duelcraft.collection.sort_deck"));
+        button("sort-deck").getStyle().tooltips(Component.translatable("duelcraft.collection.sort_deck_help"));
+        button("sort-deck").setOnClick(event -> {
+            if (lists.pending()) return;
+            model.sortByType(code -> {
+                var card = byCode.get(code);
+                return card == null ? 0 : card.type();
+            });
+            refreshDecks();
+        });
         button("add-card").setOnClick(event -> edit(true));
         button("remove-card").setOnClick(event -> edit(false));
         for (var mode : EditMode.values()) {
@@ -210,6 +220,7 @@ final class CollectionController {
         selector.setValue(lists.id(), false);
         ((TextField) element("list-name")).setText(lists.name(), false);
         element("list-name").setActive(!lists.pending());
+        element("sort-deck").setActive(!lists.pending());
         element("list-picker").setActive(!lists.pending() && lists.ready());
         for (String id : List.of("save-deck", "list-new", "list-rename", "list-duplicate", "close-save")) {
             element(id).setActive(!lists.pending() && lists.ready());
@@ -478,6 +489,9 @@ final class CollectionController {
                             : lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
         }
         text("deck-warnings", String.join(" · ", warnings));
+        element("deck-warnings").setDisplay(!warnings.isEmpty());
+        ((TextElement) element("list-supported-checks")).setText(Component.translatable("duelcraft.collection." +
+                (lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
         var shortages = element("deck-shortages");
         String key = lists.ownershipRequired()
                 ? (missing > 0 ? "ownership_required_missing" : "ownership_required")

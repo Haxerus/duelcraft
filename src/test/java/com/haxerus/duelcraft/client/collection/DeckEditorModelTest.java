@@ -14,6 +14,33 @@ import static org.junit.jupiter.api.Assertions.*;
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 class DeckEditorModelTest {
+    @Test void sortGroupsTypesStablyWithinEachSectionWithoutChangingCopies() {
+        var types = Map.of(1, TYPE_MONSTER | TYPE_NORMAL, 2, TYPE_MONSTER | TYPE_EFFECT,
+                3, TYPE_SPELL, 4, TYPE_TRAP, 5, TYPE_MONSTER | TYPE_EFFECT,
+                6, TYPE_MONSTER | TYPE_FUSION, 7, TYPE_MONSTER | TYPE_NORMAL | TYPE_PENDULUM);
+        var initial = new DeckList(List.of(4, 5, 3, 1, 2, 7, 5, 99), List.of(6, 6), List.of(3, 6, 4, 1));
+        var model = new DeckEditorModel(initial, Map.of(1, 1L));
+
+        model.sortByType(code -> types.getOrDefault(code, 0));
+
+        assertEquals(new DeckList(List.of(1, 7, 5, 2, 5, 3, 4, 99), List.of(6, 6), List.of(1, 6, 3, 4)), model.draft());
+        assertEquals(initial.requiredCopies(), model.draft().requiredCopies());
+        assertEquals(Map.of(1, 1L), model.owned());
+        assertTrue(model.dirty());
+        model.markSaved();
+        model.sortByType(code -> types.getOrDefault(code, 0));
+        assertFalse(model.dirty());
+    }
+
+    @Test void sortCannotChangeAFrozenDraft() {
+        var initial = new DeckList(List.of(4, 1), List.of(), List.of());
+        var model = new DeckEditorModel(initial, Map.of());
+        model.setFrozen(true);
+        assertThrows(IllegalStateException.class, () -> model.sortByType(code -> code == 4 ? TYPE_TRAP : TYPE_MONSTER | TYPE_NORMAL));
+        assertEquals(initial, model.draft());
+        assertFalse(model.dirty());
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {
             TYPE_MONSTER | TYPE_FUSION,
