@@ -54,6 +54,13 @@ class DeckUsePolicyTest {
         assertEquals("Era locked", required.restrictionReason());
     }
 
+    @Test void directRestrictionUsesFallbackWhenNonblankReasonIsBlankAfterBounding() {
+        var reason = " ".repeat(DeckUsePolicy.MAX_RESTRICTION_REASON_LENGTH) + "denied";
+        var report = new DeckUsePolicy(false, ignored -> reason)
+                .check(context(LEGAL, Map.of()), FACTS);
+        assertEquals(DeckUsePolicy.INVALID_REASON_FALLBACK, report.restrictionReason());
+    }
+
     @Test void approvingRestrictionCannotRescueCoreOrOwnershipFailures() {
         var policy = new DeckUsePolicy(true, ignored -> null);
         var cases = new ArrayList<DeckList>();
@@ -95,6 +102,12 @@ class DeckUsePolicyTest {
         invalidBus.addListener(DeckUseCheckEvent.class, event -> event.deny("  "));
         assertEquals(DeckUseCheckEvent.INVALID_REASON_FALLBACK,
                 DeckUseCheckEvent.restriction(invalidBus).denial(context(LEGAL, Map.of())));
+
+        var boundedBlankBus = BusBuilder.builder().build();
+        boundedBlankBus.addListener(DeckUseCheckEvent.class,
+                event -> event.deny(" ".repeat(DeckUsePolicy.MAX_RESTRICTION_REASON_LENGTH) + "denied"));
+        assertEquals(DeckUseCheckEvent.INVALID_REASON_FALLBACK,
+                DeckUseCheckEvent.restriction(boundedBlankBus).denial(context(LEGAL, Map.of())));
     }
 
     @Test void eventListenerFailureBecomesAPolicyEvaluationFailure() {

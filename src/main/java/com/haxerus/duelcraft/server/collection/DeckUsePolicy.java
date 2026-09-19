@@ -70,8 +70,8 @@ public final class DeckUsePolicy {
 
     public static @Nullable String normalizeRestrictionReason(@Nullable String reason) {
         if (reason == null) return null;
-        if (reason.isBlank()) return INVALID_REASON_FALLBACK;
-        return reason.length() <= MAX_RESTRICTION_REASON_LENGTH
+        var bounded = reason.length() <= MAX_RESTRICTION_REASON_LENGTH
                 ? reason : reason.substring(0, MAX_RESTRICTION_REASON_LENGTH);
+        return bounded.isBlank() ? INVALID_REASON_FALLBACK : bounded;
     }
 }
