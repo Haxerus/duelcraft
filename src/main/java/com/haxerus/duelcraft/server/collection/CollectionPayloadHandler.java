@@ -15,7 +15,7 @@ public final class CollectionPayloadHandler {
         void persist(PlayerCollectionData data);
         void reply(CollectionReplyPayload payload);
     }
-    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false);
+    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false, false, null);
     private final CollectionService service;
     private final CollectionSnapshotStore snapshots;
 
@@ -42,10 +42,10 @@ public final class CollectionPayloadHandler {
     /** Same boundary logic used by the authenticated context adapter above. */
     public void handle(CollectionRequestPayload payload, Sender sender, long now) {
         var data = sender.data();
-        if (data.isEmpty()) { reject(payload, sender, CollectionError.DATA_UNAVAILABLE, 0, EMPTY); return; }
+        if (data.isEmpty()) { reject(payload, sender, CollectionError.DATA_UNAVAILABLE, 0, service.emptyReport()); return; }
         var before = data.orElseThrow();
         boolean busy = sender.busy();
-        if (busy) { reject(payload, sender, CollectionError.BUSY, before.revision(), EMPTY); return; }
+        if (busy) { reject(payload, sender, CollectionError.BUSY, before.revision(), service.emptyReport()); return; }
         CollectionReply reply;
         switch (payload.command()) {
             case CollectionCommand.Open ignored -> reply = snapshots.open(sender.id(), before, now);
@@ -58,19 +58,21 @@ public final class CollectionPayloadHandler {
                 };
                 if (capturedRevision != before.revision()) {
                     snapshots.invalidate(sender.id());
-                    reply = new CollectionReply.Rejected(CollectionError.STALE, before.revision(), EMPTY);
+                    reply = new CollectionReply.Rejected(CollectionError.STALE, before.revision(), service.emptyReport());
                 }
-                if (reply instanceof CollectionReply.Rejected rejected) reply = new CollectionReply.Rejected(rejected.error(), before.revision(), rejected.eligibility());
+                if (reply instanceof CollectionReply.Rejected rejected) {
+                    reply = new CollectionReply.Rejected(rejected.error(), before.revision(), service.emptyReport());
+                }
             }
             case CollectionCommand.ReadDeck read -> {
                 var deck = before.decks().get(read.id());
-                reply = deck == null ? new CollectionReply.Rejected(CollectionError.NOT_FOUND, before.revision(), EMPTY) : new CollectionReply.Deck(before.revision(), deck);
+                reply = deck == null ? new CollectionReply.Rejected(CollectionError.NOT_FOUND, before.revision(), service.emptyReport()) : new CollectionReply.Deck(before.revision(), deck);
             }
             default -> {
                 var change = switch (payload.command()) {
-                    case CollectionCommand.Save save -> service.save(before, save.expectedRevision(), busy, save.deck());
+                    case CollectionCommand.Save save -> service.save(before, save.expectedRevision(), busy, sender.id(), save.deck());
                     case CollectionCommand.Delete delete -> service.delete(before, delete.expectedRevision(), busy, delete.id());
-                    case CollectionCommand.Activate activate -> service.activate(before, activate.expectedRevision(), busy, activate.id());
+                    case CollectionCommand.Activate activate -> service.activate(before, activate.expectedRevision(), busy, sender.id(), activate.id());
                     case CollectionCommand.ClearActive clear -> service.clearActive(before, clear.expectedRevision(), busy);
                     default -> throw new IllegalStateException("Not a collection mutation");
                 };

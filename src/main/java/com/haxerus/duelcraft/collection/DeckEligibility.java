@@ -8,20 +8,26 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.annotations.Nullable;
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /** Supported host checks; rule-specific forbidden types and banlists are not implemented. */
 public final class DeckEligibility {
     public record Issue(String key, int code, int actual, int limit) {}
 
-    public record Report(List<Issue> problems, Map<Integer, Integer> missing, boolean moreProblems) {
+    public record Report(List<Issue> problems, Map<Integer, Integer> missing, boolean moreProblems,
+                         boolean ownershipRequired, @Nullable String restrictionReason) {
         public Report {
             problems = List.copyOf(problems);
             missing = Map.copyOf(missing);
+            if (restrictionReason != null && (restrictionReason.isBlank() || restrictionReason.length() > 256)) {
+                throw new IllegalArgumentException("Restriction reason must contain 1-256 characters");
+            }
         }
 
         public boolean eligible() {
-            return problems.isEmpty() && missing.isEmpty() && !moreProblems;
+            return problems.isEmpty() && !moreProblems
+                    && (!ownershipRequired || missing.isEmpty()) && restrictionReason == null;
         }
     }
 
@@ -67,7 +73,8 @@ public final class DeckEligibility {
             if (extraCodes.contains(code) && !extraMonster) issues.add(issue("extra_placement", code, type, 0));
         }
         boolean more = issues.size() > CollectionLimits.ISSUES;
-        return new Report(issues.subList(0, Math.min(issues.size(), CollectionLimits.ISSUES)), missing, more);
+        return new Report(issues.subList(0, Math.min(issues.size(), CollectionLimits.ISSUES)), missing, more,
+                false, null);
     }
 
     private static Issue issue(String key, int code, int actual, int limit) {

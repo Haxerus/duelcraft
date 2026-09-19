@@ -64,14 +64,22 @@ class DeckEligibilityTest {
         assertEquals(101, report.missing().size());
         assertTrue(report.moreProblems());
         assertFalse(report.eligible());
-        assertFalse(new DeckEligibility.Report(List.of(), Map.of(), true).eligible());
+        assertFalse(new DeckEligibility.Report(List.of(), Map.of(), true, false, null).eligible());
+    }
+
+    @Test void reportDistinguishesNeutralShortagesFromBlockingPolicyFailures() {
+        var missing = Map.of(1, 1);
+        assertTrue(new DeckEligibility.Report(List.of(), missing, false, false, null).eligible());
+        assertFalse(new DeckEligibility.Report(List.of(), missing, false, true, null).eligible());
+        assertFalse(new DeckEligibility.Report(List.of(), Map.of(), false, false, "Era locked").eligible());
+        assertFalse(new DeckEligibility.Report(List.of(), Map.of(), true, false, null).eligible());
     }
 
     @Test void reportDefensivelyCopiesResults() {
         var issues = new ArrayList<DeckEligibility.Issue>();
         var missing = new HashMap<Integer, Integer>();
         missing.put(1, 1);
-        var report = new DeckEligibility.Report(issues, missing, false);
+        var report = new DeckEligibility.Report(issues, missing, false, false, null);
         issues.add(new DeckEligibility.Issue("problem", 1, 1, 0));
         missing.clear();
         assertTrue(report.problems().isEmpty());

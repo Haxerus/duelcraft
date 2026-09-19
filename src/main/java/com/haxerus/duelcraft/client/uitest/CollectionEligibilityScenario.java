@@ -87,7 +87,7 @@ public final class CollectionEligibilityScenario implements UIScenario {
              for (int index = 0; index < 62; index++) issues.add(new DeckEligibility.Issue(
                      "duelcraft.collection.issue.unknown", 90000 + index, 0, 0));
              reply(ctx, new CollectionReply.Rejected(CollectionError.INELIGIBLE, 5,
-                     new DeckEligibility.Report(issues, Map.of(10066, 2), true)));
+                     new DeckEligibility.Report(issues, Map.of(10066, 2), true, true, null)));
          })
          .ticks(3)
          .checkCount("#eligibility-scroll .wrap", 66)
@@ -115,7 +115,7 @@ public final class CollectionEligibilityScenario implements UIScenario {
 
     private static DeckEligibility.Report placement() {
         return new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
-                "duelcraft.collection.issue.main_placement", 10066, 65, 0)), Map.of(), false);
+                "duelcraft.collection.issue.main_placement", 10066, 65, 0)), Map.of(), false, true, null);
     }
 
     private static void reply(TestContext ctx, CollectionReply reply) {

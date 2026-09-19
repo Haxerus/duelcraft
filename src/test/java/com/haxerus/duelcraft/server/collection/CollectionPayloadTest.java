@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class CollectionPayloadTest {
     static final UUID ID = UUID.randomUUID();
     static final SavedDeck DECK = new SavedDeck(ID, "Draft", new DeckList(List.of(1), List.of(2), List.of(3)));
-    static final DeckEligibility.Report REPORT = new DeckEligibility.Report(List.of(new DeckEligibility.Issue("missing", 1, 2, 3)), Map.of(1, 2), true);
+    static final DeckEligibility.Report REPORT = new DeckEligibility.Report(List.of(new DeckEligibility.Issue("missing", 1, 2, 3)), Map.of(1, 2), true, true, "Era locked");
     @Test void allCommandsRoundTrip() {
         for (var command : List.of(new CollectionCommand.Open(), new CollectionCommand.Page(ID, CollectionCommand.PageKind.COUNTS, 0),
                 new CollectionCommand.Page(ID, CollectionCommand.PageKind.DECKS, 1), new CollectionCommand.ReadDeck(ID),
@@ -78,6 +78,8 @@ class CollectionPayloadTest {
         badReply(buf -> { rejectionHeader(buf); buf.writeVarInt(0); buf.writeVarInt(513); });
         badReply(buf -> { rejectionHeader(buf); buf.writeVarInt(0); buf.writeVarInt(2); for (int i = 0; i < 2; i++) { buf.writeVarInt(1); buf.writeVarInt(1); } buf.writeBoolean(false); });
         badReply(buf -> { rejectionHeader(buf); buf.writeVarInt(0); buf.writeVarInt(1); buf.writeVarInt(1); buf.writeVarInt(0); buf.writeBoolean(false); });
+        badReply(buf -> { rejectionHeader(buf); emptyReportPrefix(buf); buf.writeBoolean(true); buf.writeUtf(" "); });
+        badReply(buf -> { rejectionHeader(buf); emptyReportPrefix(buf); buf.writeBoolean(true); buf.writeUtf("x".repeat(257)); });
         var buf = Unpooled.buffer();
         try {
             CollectionRequestPayload.STREAM_CODEC.encode(buf, new CollectionRequestPayload(ID, new CollectionCommand.Save(0, DECK)));
@@ -95,7 +97,7 @@ class CollectionPayloadTest {
         var missing = new HashMap<Integer, Integer>(); var counts = new HashMap<Integer, Long>();
         for (int i = 0; i < 512; i++) missing.put(Integer.MAX_VALUE - i, Integer.MAX_VALUE);
         for (int i = 0; i < 256; i++) counts.put(Integer.MAX_VALUE - i, Long.MAX_VALUE);
-        var report = new DeckEligibility.Report(problems, missing, true);
+        var report = new DeckEligibility.Report(problems, missing, true, true, "\u6F22".repeat(256));
         var summaries = new ArrayList<CollectionReply.Summary>();
         for (int i = 0; i < 32; i++) summaries.add(new CollectionReply.Summary(UUID.randomUUID(), name, 512, 0, 0));
         for (var reply : List.of(new CollectionReply.Changed(Long.MAX_VALUE, ID, deck, 0, report), new CollectionReply.Rejected(CollectionError.INELIGIBLE, Long.MAX_VALUE, report),
@@ -114,7 +116,7 @@ class CollectionPayloadTest {
         try {
             assertThrows(RuntimeException.class, () -> CollectionReplyPayload.STREAM_CODEC.encode(buf, new CollectionReplyPayload(ID, new CollectionReply.Counts(ID, 0, 0, counts))));
             assertEquals(0, buf.readableBytes());
-            var report = new DeckEligibility.Report(List.of(new DeckEligibility.Issue("k".repeat(129), 0, 0, 0)), Map.of(), false);
+            var report = new DeckEligibility.Report(List.of(new DeckEligibility.Issue("k".repeat(129), 0, 0, 0)), Map.of(), false, false, null);
             assertThrows(RuntimeException.class, () -> CollectionReplyPayload.STREAM_CODEC.encode(buf, new CollectionReplyPayload(ID, new CollectionReply.Rejected(CollectionError.INVALID, 0, report))));
             assertEquals(0, buf.readableBytes());
         } finally { buf.release(); }
@@ -131,4 +133,7 @@ class CollectionPayloadTest {
     }
     private static void countHeader(FriendlyByteBuf buf) { buf.writeByte(1); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); }
     private static void deckHeader(FriendlyByteBuf buf) { buf.writeByte(2); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); }
-    private static void rejectionHeader(FriendlyByteBuf buf) { buf.writeByte(5); buf.writeByte(CollectionError.INVALID.ordinal()); buf.writeVarLong(0); }}
+    private static void rejectionHeader(FriendlyByteBuf buf) { buf.writeByte(5); buf.writeByte(CollectionError.INVALID.ordinal()); buf.writeVarLong(0); }
+    private static void emptyReportPrefix(FriendlyByteBuf buf) {
+        buf.writeVarInt(0); buf.writeVarInt(0); buf.writeBoolean(false); buf.writeBoolean(false);
+    }}

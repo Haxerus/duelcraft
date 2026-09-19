@@ -183,6 +183,11 @@ final class CollectionWire {
         size(buf, report.missing().size(), CollectionLimits.DRAFT_CARDS);
         for (var entry : report.missing().entrySet()) { positive(buf, entry.getKey()); positive(buf, entry.getValue()); }
         buf.writeBoolean(report.moreProblems());
+        buf.writeBoolean(report.ownershipRequired());
+        buf.writeBoolean(report.restrictionReason() != null);
+        if (report.restrictionReason() != null) {
+            buf.writeUtf(report.restrictionReason(), DeckUsePolicy.MAX_RESTRICTION_REASON_LENGTH);
+        }
     }
     private static DeckEligibility.Report report(FriendlyByteBuf buf) {
         int size = size(buf, CollectionLimits.ISSUES); var issues = new ArrayList<DeckEligibility.Issue>(size);
@@ -192,7 +197,11 @@ final class CollectionWire {
         }
         int missingSize = size(buf, CollectionLimits.DRAFT_CARDS); var missing = new HashMap<Integer, Integer>();
         for (int i = 0; i < missingSize; i++) if (missing.put(positive(buf), positive(buf)) != null) throw invalid("Duplicate missing key");
-        return new DeckEligibility.Report(issues, missing, buf.readBoolean());
+        boolean moreProblems = buf.readBoolean();
+        boolean ownershipRequired = buf.readBoolean();
+        String restrictionReason = buf.readBoolean()
+                ? buf.readUtf(DeckUsePolicy.MAX_RESTRICTION_REASON_LENGTH) : null;
+        return new DeckEligibility.Report(issues, missing, moreProblems, ownershipRequired, restrictionReason);
     }
     private static IllegalArgumentException invalid(String message) { return new IllegalArgumentException(message); }
 }

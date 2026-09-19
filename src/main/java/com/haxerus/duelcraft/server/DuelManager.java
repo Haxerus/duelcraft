@@ -1,10 +1,13 @@
 package com.haxerus.duelcraft.server;
 
+import com.haxerus.duelcraft.ServerConfig;
+import com.haxerus.duelcraft.api.DeckUseCheckEvent;
 import com.haxerus.duelcraft.core.data.CardData;
 import com.haxerus.duelcraft.core.data.CardCatalog;
 import com.haxerus.duelcraft.server.collection.CollectionPayloadHandler;
 import com.haxerus.duelcraft.server.collection.CollectionService;
 import com.haxerus.duelcraft.server.collection.CollectionSnapshotStore;
+import com.haxerus.duelcraft.server.collection.DeckUsePolicy;
 import com.haxerus.duelcraft.core.Deck;
 import com.haxerus.duelcraft.core.DeckValidator;
 import com.haxerus.duelcraft.core.DeckRegistry;
@@ -26,6 +29,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -80,12 +84,16 @@ public class DuelManager {
             instance.shutdown();
             instance = null;
         }
+        ServerConfig.reset();
     }
 
     public void init() {
         var data = CardData.load().join();
         try {
-            collectionHandler = new CollectionPayloadHandler(new CollectionService(CardCatalog.load(data.database())), collectionSnapshots);
+            var policy = new DeckUsePolicy(ServerConfig.requireCardOwnership(),
+                    DeckUseCheckEvent.restriction(NeoForge.EVENT_BUS));
+            collectionHandler = new CollectionPayloadHandler(
+                    new CollectionService(CardCatalog.load(data.database()), policy), collectionSnapshots);
         } catch (java.sql.SQLException exception) {
             throw new IllegalStateException("Cannot load collection card facts", exception);
         }

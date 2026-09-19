@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CollectionClientTest {
-    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false);
+    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false, false, null);
     private static final SavedDeck DECK = new SavedDeck(UUID.randomUUID(), "Draft", new DeckList(List.of(), List.of(), List.of()));
     private static class Harness {
         final List<CollectionRequestPayload> sent = new ArrayList<>();

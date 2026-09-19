@@ -6,6 +6,9 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CollectionHandlerTest {
+    private static CollectionService service(Map<Integer, com.haxerus.duelcraft.core.data.CardCatalog.Facts> facts) {
+        return new CollectionService(facts, new DeckUsePolicy(true, null));
+    }
     static class Sender implements CollectionPayloadHandler.Sender {
         final UUID owner = UUID.randomUUID();
         PlayerCollectionData data = PlayerCollectionData.empty();
@@ -21,7 +24,7 @@ class CollectionHandlerTest {
         var reply = sender.replies.getLast(); assertEquals(request, reply.requestId()); return reply.reply();
     }
     @Test void authenticatedSavePersistsOnceRejectsReplayAndInvalidatesPages() {
-        var handler = new CollectionPayloadHandler(new CollectionService(Map.of()), new CollectionSnapshotStore());
+        var handler = new CollectionPayloadHandler(service(Map.of()), new CollectionSnapshotStore());
         var alice = new Sender(); var bob = new Sender();
         var opened = (CollectionReply.Opened) send(handler, alice, new CollectionCommand.Open());
         var deck = new SavedDeck(UUID.randomUUID(), "Draft", new DeckList(List.of(), List.of(), List.of()));
@@ -36,7 +39,7 @@ class CollectionHandlerTest {
         assertEquals(deck, ((CollectionReply.Deck) send(handler, alice, new CollectionCommand.ReadDeck(deck.id()))).deck());
     }
     @Test void currentRevisionMustStillMatchCapturedPages() {
-        var handler = new CollectionPayloadHandler(new CollectionService(Map.of()), new CollectionSnapshotStore());
+        var handler = new CollectionPayloadHandler(service(Map.of()), new CollectionSnapshotStore());
         var sender = new Sender(); sender.data = new PlayerCollectionData(0, Map.of(1, 2L), Map.of(), null);
         var opened = (CollectionReply.Opened) send(handler, sender, new CollectionCommand.Open());
         sender.data = new PlayerCollectionData(1, Map.of(1, 3L), Map.of(), null);
@@ -44,10 +47,12 @@ class CollectionHandlerTest {
         assertEquals(CollectionError.STALE, rejected.error()); assertEquals(1, rejected.revision());
     }
     @Test void busyAndUnreadableDataRejectAtHandlerBoundaryWithoutWrites() {
-        var handler = new CollectionPayloadHandler(new CollectionService(Map.of()), new CollectionSnapshotStore()); var sender = new Sender(); sender.busy = true;
+        var handler = new CollectionPayloadHandler(service(Map.of()), new CollectionSnapshotStore()); var sender = new Sender(); sender.busy = true;
         var id = UUID.randomUUID(); var deck = new SavedDeck(id, "Draft", new DeckList(List.of(), List.of(), List.of()));
         for (var command : List.of(new CollectionCommand.Save(0, deck), new CollectionCommand.Delete(0, id), new CollectionCommand.Activate(0, id), new CollectionCommand.ClearActive(0))) {
-            assertEquals(CollectionError.BUSY, ((CollectionReply.Rejected) send(handler, sender, command)).error());
+            var rejected = (CollectionReply.Rejected) send(handler, sender, command);
+            assertEquals(CollectionError.BUSY, rejected.error());
+            assertTrue(rejected.eligibility().ownershipRequired());
         }
         sender.busy = false; sender.data = null;
         assertEquals(CollectionError.DATA_UNAVAILABLE, ((CollectionReply.Rejected) send(handler, sender, new CollectionCommand.Open())).error());
@@ -61,7 +66,7 @@ class CollectionHandlerTest {
             cards.add(code); counts.put(code, 1L);
             facts.put(code, new com.haxerus.duelcraft.core.data.CardCatalog.Facts(code, com.haxerus.duelcraft.core.OcgConstants.TYPE_MONSTER));
         }
-        var handler = new CollectionPayloadHandler(new CollectionService(facts), new CollectionSnapshotStore());
+        var handler = new CollectionPayloadHandler(service(facts), new CollectionSnapshotStore());
         var sender = new Sender(); sender.data = new PlayerCollectionData(0, counts, Map.of(), null);
         var deck = new SavedDeck(UUID.randomUUID(), "Playable", new DeckList(cards, List.of(), List.of()));
         send(handler, sender, new CollectionCommand.Save(0, deck));

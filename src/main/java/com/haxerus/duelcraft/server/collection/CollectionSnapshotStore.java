@@ -5,7 +5,7 @@ import java.util.*;
 
 /** One immutable private snapshot per owner. Accessed on the server main thread. */
 public final class CollectionSnapshotStore {
-    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false);
+    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false, false, null);
     private record Snapshot(UUID id, PlayerCollectionData data, List<Map.Entry<Integer, Long>> counts,
                             List<CollectionReply.Summary> decks, long accessed) {}
     private final Map<UUID, Snapshot> snapshots = new HashMap<>();

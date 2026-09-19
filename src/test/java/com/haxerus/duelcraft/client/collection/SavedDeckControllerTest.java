@@ -18,7 +18,7 @@ class SavedDeckControllerTest {
         c.activate();
         replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
                 new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
-                        "duelcraft.collection.issue.main_placement", 43227, 65, 0)), Map.of(), false)));
+                        "duelcraft.collection.issue.main_placement", 43227, 65, 0)), Map.of(), false, true, null)));
         assertEquals("operation_failed", c.status());
         assertFalse(c.dirty());
         assertTrue(c.eligibility().missing().isEmpty());
@@ -32,7 +32,7 @@ class SavedDeckControllerTest {
         c.activate();
         replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
                 new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
-                        "duelcraft.collection.issue.copies", 123, 4, 3)), Map.of(123, 2), true)));
+                        "duelcraft.collection.issue.copies", 123, 4, 3)), Map.of(123, 2), true, true, null)));
         assertTrue(c.eligibility().moreProblems());
         assertEquals(Map.of(123, 2), c.eligibility().missing());
         assertEquals(4, c.eligibility().problems().getFirst().actual());
@@ -48,11 +48,11 @@ class SavedDeckControllerTest {
             c.activate();
             replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
                     new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
-                            "duelcraft.collection.issue.unknown", 123, 0, 0)), Map.of(), true)));
+                            "duelcraft.collection.issue.unknown", 123, 0, 0)), Map.of(), true, true, null)));
             if (delete) c.delete();
             else c.clearActive();
             replies.getLast().complete(new CollectionReply.Changed(5, null, null, 0,
-                    new DeckEligibility.Report(List.of(), Map.of(), false)));
+                    new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
             assertEquals("updated", c.status());
             assertNull(c.activeId());
             assertTrue(c.eligibility().eligible());
@@ -67,7 +67,7 @@ class SavedDeckControllerTest {
         var submitted = ((CollectionCommand.Save) commands.getFirst()).deck();
         replies.getFirst().complete(new CollectionReply.Changed(5, null, submitted, 0,
                 new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
-                        "duelcraft.collection.issue.main_placement", 43227, 65, 0)), Map.of(), false)));
+                        "duelcraft.collection.issue.main_placement", 43227, 65, 0)), Map.of(), false, true, null)));
         assertFalse(c.pending());
         assertFalse(c.dirty());
         assertEquals(submitted.cards(), model.draft());
@@ -97,7 +97,7 @@ class SavedDeckControllerTest {
         assertTrue(controller.pending());
         assertFalse(controller.needsDecision());
         replies.getFirst().complete(new CollectionReply.Changed(5, null, null, 0,
-                new DeckEligibility.Report(List.of(), Map.of(), false)));
+                new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
         assertEquals(0, closed[0], "Clear Active never acknowledges the dirty card/name edits");
         assertTrue(controller.needsDecision());
         assertTrue(controller.dirty());
@@ -201,7 +201,7 @@ class SavedDeckControllerTest {
         c.rename("Renamed");
         c.save();
         var submitted = ((CollectionCommand.Save) commands.getFirst()).deck();
-        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false)));
+        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
         assertFalse(c.dirty());
         assertEquals(6, c.revision());
         refresh.completeExceptionally(new IllegalStateException("refresh failed"));
@@ -304,7 +304,7 @@ class SavedDeckControllerTest {
         c.navigate(() -> c.select(target));
         c.save();
         var submitted = ((CollectionCommand.Save) commands.getFirst()).deck();
-        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false)));
+        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
         assertEquals(1, commands.size(), "ReadDeck must wait until CollectionClient has a revision-6 complete view");
         refresh.complete(new ClientCollectionState.View(6, Map.of(), List.of(), null));
         assertEquals(new CollectionCommand.ReadDeck(target), commands.getLast());
@@ -322,7 +322,7 @@ class SavedDeckControllerTest {
         c.save();
         var submitted = ((CollectionCommand.Save) commands.getFirst()).deck();
         c.dispose();
-        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false)));
+        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
         assertEquals(5, c.revision());
         assertTrue(c.dirty());
     }
@@ -340,7 +340,7 @@ class SavedDeckControllerTest {
         c.applyView(new ClientCollectionState.View(7, Map.of(123, 9L), List.of(), active));
         int[] navigationRevision = {0};
         c.navigate(() -> navigationRevision[0] = (int) c.revision());
-        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false)));
+        replies.getFirst().complete(new CollectionReply.Changed(6, null, submitted, 0, new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
         assertEquals(7, navigationRevision[0]);
         assertEquals(active, c.activeId());
         assertEquals(Map.of(123, 9L), model.owned());

@@ -73,6 +73,8 @@ public class Duelcraft {
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(DuelNetworking::onRegisterPayloads);
+        modEventBus.addListener(ServerConfig::onLoading);
+        modEventBus.addListener(ServerConfig::onUnloading);
 
         // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
@@ -97,6 +99,7 @@ public class Duelcraft {
 
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

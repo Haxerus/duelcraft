@@ -7,7 +7,7 @@ import java.util.function.*;
 
 /** Client-thread owner of saved-list identity, acknowledgement and deferred navigation. */
 public final class SavedDeckController {
-    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false);
+    private static final DeckEligibility.Report EMPTY = new DeckEligibility.Report(List.of(), Map.of(), false, false, null);
     private final DeckEditorModel model;
     private final DeckSaveHandler saveHandler;
     private final Function<CollectionCommand, CompletionStage<CollectionReply>> request;
