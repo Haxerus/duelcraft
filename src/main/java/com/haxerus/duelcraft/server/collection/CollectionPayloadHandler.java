@@ -48,7 +48,8 @@ public final class CollectionPayloadHandler {
         if (busy) { reject(payload, sender, CollectionError.BUSY, before.revision(), service.emptyReport()); return; }
         CollectionReply reply;
         switch (payload.command()) {
-            case CollectionCommand.Open ignored -> reply = snapshots.open(sender.id(), before, now);
+            case CollectionCommand.Open ignored -> reply = snapshots.open(sender.id(), before, now,
+                    service.ownershipRequired(), null);
             case CollectionCommand.Page page -> {
                 reply = snapshots.page(sender.id(), page, now);
                 long capturedRevision = switch (reply) {

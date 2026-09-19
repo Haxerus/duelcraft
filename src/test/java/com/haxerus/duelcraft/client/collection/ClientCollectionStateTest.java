@@ -6,6 +6,25 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClientCollectionStateTest {
+    @Test void completeViewCarriesPolicyAndClearanceAndClearDropsBoth() {
+        var state = new ClientCollectionState();
+        var clearance = new DeckEligibility.Report(List.of(), Map.of(123, 1), false, true, null);
+        state.begin(new CollectionReply.Opened(UUID.randomUUID(), 7, 0, 0, null, true, clearance));
+        assertTrue(state.view().ownershipRequired());
+        assertEquals(clearance, state.view().clearedActivation());
+
+        state.clear();
+        assertNull(state.view());
+    }
+
+    @Test void olderSnapshotCannotReplaceAuthoritativePolicyContext() {
+        var state = new ClientCollectionState();
+        state.begin(new CollectionReply.Opened(UUID.randomUUID(), 7, 0, 0, null, true, null));
+        assertThrows(IllegalArgumentException.class, () -> state.begin(
+                new CollectionReply.Opened(UUID.randomUUID(), 6, 0, 0, null, false, null)));
+        assertTrue(state.view().ownershipRequired());
+    }
+
     @Test void emptySnapshotPublishesAnImmutableCompleteView() {
         var state = new ClientCollectionState();
         state.begin(new CollectionReply.Opened(UUID.randomUUID(), 7, 0, 0, null));

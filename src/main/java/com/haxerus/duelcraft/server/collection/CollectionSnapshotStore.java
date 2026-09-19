@@ -10,7 +10,8 @@ public final class CollectionSnapshotStore {
                             List<CollectionReply.Summary> decks, long accessed) {}
     private final Map<UUID, Snapshot> snapshots = new HashMap<>();
 
-    public CollectionReply.Opened open(UUID owner, PlayerCollectionData data, long now) {
+    public CollectionReply.Opened open(UUID owner, PlayerCollectionData data, long now, boolean ownershipRequired,
+                                       DeckEligibility.Report clearedActivation) {
         var counts = data.counts().entrySet().stream().sorted(Map.Entry.comparingByKey()).toList();
         var decks = data.decks().values().stream().sorted(Comparator.comparing(SavedDeck::name).thenComparing(SavedDeck::id))
                 .map(deck -> new CollectionReply.Summary(deck.id(), deck.name(), deck.cards().main().size(),
@@ -18,7 +19,8 @@ public final class CollectionSnapshotStore {
         var snapshot = new Snapshot(UUID.randomUUID(), data, counts, decks, now);
         snapshots.put(owner, snapshot);
         return new CollectionReply.Opened(snapshot.id(), data.revision(), pages(counts.size(), CollectionLimits.COUNT_PAGE),
-                pages(decks.size(), CollectionLimits.SUMMARY_PAGE), data.activeDeckId());
+                pages(decks.size(), CollectionLimits.SUMMARY_PAGE), data.activeDeckId(), ownershipRequired,
+                clearedActivation);
     }
 
     public CollectionReply page(UUID owner, CollectionCommand.Page request, long now) {

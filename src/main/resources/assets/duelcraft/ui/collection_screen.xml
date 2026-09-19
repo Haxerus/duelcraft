@@ -46,7 +46,8 @@
         #inspector-stats { text-color: #CCCCCC; }
         #inspector-description { font-size: 13; }
         #inspector-owned, #inspector-used, #inspector-missing { height: 18; }
-        #inspector-missing { text-color: #FFDD55; }
+        #inspector-missing.warning { text-color: #FFDD55; }
+        #inspector-missing.neutral { text-color: #AAAAAA; }
         #card-edit-controls { flex-shrink: 0; gap-all: 4; }
         #card-edit-controls .row button { flex: 1; min-width: 0; }
         #add-card, #remove-card { height: 34; }
@@ -71,6 +72,7 @@
         .mode-button.selected, .filter-choice.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
         .selector-option { height: 18; flex-shrink: 0; font-size: 12; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
         .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; background: rect(#CCFFAA00); }
+        .missing-copy.neutral { text-color: #FFFFFF; background: rect(#B0555555); }
         #collection-pane { width: 348; flex-shrink: 0; min-height: 0; gap-all: 6; }
         #collection-search { flex: 1; min-width: 0; }
         #toggle-filters { width: 104; }
@@ -102,7 +104,9 @@
         #editor-footer { height: 36; flex-shrink: 0; flex-direction: row; align-items: center; gap-all: 8; }
         #card-density { width: 158; }
         #card-density text { adaptive-width: false; width: 100%; }
-        #deck-warnings { flex: 1; min-width: 0; font-size: 11; text-wrap: wrap; adaptive-height: true; text-color: #FFDD55; }
+        #deck-warnings, #deck-shortages { flex: 1; min-width: 0; font-size: 11; text-wrap: wrap; adaptive-height: true; }
+        #deck-warnings, #deck-shortages.warning { text-color: #FFDD55; }
+        #deck-shortages.neutral { text-color: #AAAAAA; }
         #editor-status { height: 18; flex-shrink: 0; font-size: 12; }
         #status-row { height: 18; flex-shrink: 0; }
         #editor-status { flex: 1; min-width: 0; }
@@ -213,6 +217,7 @@
                 <button id="deposit-cards" text="Deposit · unavailable" />
                 <button id="activate-deck" text="Activate · unavailable" />
                 <label id="deck-warnings" />
+                <label id="deck-shortages" />
                 <button id="card-density" text="Cards: Standard" />
             </element>
             <element id="status-row" class="row">

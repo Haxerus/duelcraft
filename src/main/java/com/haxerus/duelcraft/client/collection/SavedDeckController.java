@@ -21,6 +21,7 @@ public final class SavedDeckController {
     private long revision;
     private long viewRevision;
     private UUID activeId;
+    private boolean ownershipRequired;
     private List<CollectionReply.Summary> summaries = List.of();
     private boolean ready;
     private boolean pending;
@@ -51,6 +52,7 @@ public final class SavedDeckController {
     public String name() { return name; }
     public long revision() { return revision; }
     public UUID activeId() { return activeId; }
+    public boolean ownershipRequired() { return ownershipRequired; }
     public List<CollectionReply.Summary> summaries() { return summaries; }
     public boolean pending() { return pending; }
     public boolean ready() { return ready; }
@@ -95,8 +97,13 @@ public final class SavedDeckController {
         revision = view.revision();
         viewRevision = view.revision();
         activeId = view.activeId();
+        ownershipRequired = view.ownershipRequired();
         summaries = view.summaries();
         model.replaceOwnership(view.counts());
+        if (view.clearedActivation() != null) {
+            eligibility = view.clearedActivation();
+            status = "active_cleared";
+        }
         ready = true;
         changed.run();
     }
@@ -273,9 +280,13 @@ public final class SavedDeckController {
     private RuntimeException rejection(CollectionReply reply) {
         if (reply instanceof CollectionReply.Rejected rejected) {
             eligibility = rejected.eligibility();
-            return new IllegalStateException(rejected.error().name() + (rejected.eligibility().missing().isEmpty()
-                    ? "" : ": missing copies (" + rejected.eligibility().missing().values().stream()
-                            .mapToInt(Integer::intValue).sum() + ")"));
+            String reason = rejected.eligibility().restrictionReason();
+            if (reason == null && rejected.eligibility().ownershipRequired()
+                    && !rejected.eligibility().missing().isEmpty()) {
+                reason = "missing copies (" + rejected.eligibility().missing().values().stream()
+                        .mapToInt(Integer::intValue).sum() + ")";
+            }
+            return new IllegalStateException(rejected.error().name() + (reason == null ? "" : ": " + reason));
         }
         return new IllegalStateException("Collection changed; refresh and retry");
     }

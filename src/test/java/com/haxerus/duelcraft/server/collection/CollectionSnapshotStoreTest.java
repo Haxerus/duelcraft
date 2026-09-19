@@ -6,10 +6,24 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CollectionSnapshotStoreTest {
+    @Test void openCarriesAuthoritativePolicyContextAndOptionalClearance() {
+        var store = new CollectionSnapshotStore();
+        var owner = UUID.randomUUID();
+        var clearance = new DeckEligibility.Report(List.of(), Map.of(123, 2), false, true, null);
+        var required = store.open(owner, PlayerCollectionData.empty(), 0, true, clearance);
+        assertTrue(required.ownershipRequired());
+        assertEquals(clearance, required.clearedActivation());
+
+        var optional = store.open(owner, PlayerCollectionData.empty(), 1, false, null);
+        assertFalse(optional.ownershipRequired());
+        assertNull(optional.clearedActivation());
+    }
+
     @Test void pagesArePrivateAndInvalidated() {
         var store = new CollectionSnapshotStore();
         var alice = UUID.randomUUID();
-        var opened = store.open(alice, new PlayerCollectionData(0, Map.of(1, 999L), Map.of(), null), 0);
+        var opened = store.open(alice, new PlayerCollectionData(0, Map.of(1, 999L), Map.of(), null), 0,
+                false, null);
         var request = new CollectionCommand.Page(opened.snapshotId(), CollectionCommand.PageKind.COUNTS, 0);
         assertInstanceOf(CollectionReply.Rejected.class, store.page(UUID.randomUUID(), request, 1));
         assertInstanceOf(CollectionReply.Counts.class, store.page(alice, request, 1));
@@ -25,7 +39,7 @@ class CollectionSnapshotStoreTest {
             decks.put(deck.id(), deck);
         }
         var store = new CollectionSnapshotStore(); var owner = UUID.randomUUID();
-        var opened = store.open(owner, new PlayerCollectionData(7, counts, decks, null), 0);
+        var opened = store.open(owner, new PlayerCollectionData(7, counts, decks, null), 0, false, null);
         assertEquals(3, opened.countPages()); assertEquals(3, opened.deckPages());
         for (int i = 0; i < 3; i++) {
             var page = (CollectionReply.Counts) store.page(owner, new CollectionCommand.Page(opened.snapshotId(), CollectionCommand.PageKind.COUNTS, i), i);
@@ -38,11 +52,12 @@ class CollectionSnapshotStoreTest {
     }
     @Test void emptyKindsInvalidIndexesReplacementAndIdleExpiry() {
         var store = new CollectionSnapshotStore(); var owner = UUID.randomUUID();
-        var empty = store.open(owner, PlayerCollectionData.empty(), 0);
+        var empty = store.open(owner, PlayerCollectionData.empty(), 0, false, null);
         assertEquals(0, empty.countPages()); assertEquals(0, empty.deckPages());
         for (var kind : CollectionCommand.PageKind.values()) assertInstanceOf(CollectionReply.Rejected.class,
                 store.page(owner, new CollectionCommand.Page(empty.snapshotId(), kind, 0), 1));
-        var opened = store.open(owner, new PlayerCollectionData(1, Map.of(1, 1L), Map.of(), null), 0);
+        var opened = store.open(owner, new PlayerCollectionData(1, Map.of(1, 1L), Map.of(), null), 0,
+                false, null);
         assertInstanceOf(CollectionReply.Rejected.class, store.page(owner, new CollectionCommand.Page(empty.snapshotId(), CollectionCommand.PageKind.COUNTS, 0), 1));
         assertInstanceOf(CollectionReply.Rejected.class, store.page(owner, new CollectionCommand.Page(opened.snapshotId(), CollectionCommand.PageKind.COUNTS, -1), 1));
         assertInstanceOf(CollectionReply.Rejected.class, store.page(owner, new CollectionCommand.Page(opened.snapshotId(), CollectionCommand.PageKind.COUNTS, 1), 1));
@@ -50,7 +65,7 @@ class CollectionSnapshotStoreTest {
         assertInstanceOf(CollectionReply.Counts.class, store.page(owner, page, 29999));
         assertInstanceOf(CollectionReply.Counts.class, store.page(owner, page, 59998));
         assertInstanceOf(CollectionReply.Rejected.class, store.page(owner, page, 89998));
-        store.open(owner, PlayerCollectionData.empty(), 0); store.clear();
+        store.open(owner, PlayerCollectionData.empty(), 0, false, null); store.clear();
         assertInstanceOf(CollectionReply.Rejected.class, store.page(owner, page, 1));
     }
 }

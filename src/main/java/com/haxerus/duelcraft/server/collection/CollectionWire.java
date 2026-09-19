@@ -48,6 +48,9 @@ final class CollectionWire {
                 case CollectionReply.Opened opened -> {
                     buf.writeByte(0); buf.writeUUID(opened.snapshotId()); revision(buf, opened.revision());
                     number(buf, opened.countPages()); number(buf, opened.deckPages()); optionalId(buf, opened.activeId());
+                    buf.writeBoolean(opened.ownershipRequired());
+                    buf.writeBoolean(opened.clearedActivation() != null);
+                    if (opened.clearedActivation() != null) report(buf, opened.clearedActivation());
                 }
                 case CollectionReply.Counts counts -> {
                     buf.writeByte(1); header(buf, counts.snapshotId(), counts.revision(), counts.index());
@@ -81,7 +84,14 @@ final class CollectionWire {
     static CollectionReplyPayload decodeReply(ByteBuf buffer) {
         var buf = input(buffer); var id = buf.readUUID();
         CollectionReply reply = switch (buf.readUnsignedByte()) {
-            case 0 -> new CollectionReply.Opened(buf.readUUID(), revision(buf), number(buf), number(buf), optionalId(buf));
+            case 0 -> {
+                var snapshotId = buf.readUUID(); long revision = revision(buf);
+                int countPages = number(buf), deckPages = number(buf); var activeId = optionalId(buf);
+                boolean ownershipRequired = buf.readBoolean();
+                var clearedActivation = buf.readBoolean() ? report(buf) : null;
+                yield new CollectionReply.Opened(snapshotId, revision, countPages, deckPages, activeId,
+                        ownershipRequired, clearedActivation);
+            }
             case 1 -> {
                 var snapshot = buf.readUUID(); long revision = revision(buf); int index = number(buf);
                 int size = size(buf, CollectionLimits.COUNT_PAGE); var entries = new LinkedHashMap<Integer, Long>();

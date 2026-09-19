@@ -32,6 +32,10 @@ public final class CollectionService {
         return policy.emptyReport();
     }
 
+    public boolean ownershipRequired() {
+        return policy.ownershipRequired();
+    }
+
     public Change save(PlayerCollectionData before, long expectedRevision, boolean busy, UUID owner, SavedDeck deck) {
         var rejection = gate(before, expectedRevision, busy);
         if (rejection != null) return rejection;

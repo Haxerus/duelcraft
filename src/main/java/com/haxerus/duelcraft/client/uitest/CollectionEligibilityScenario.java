@@ -16,11 +16,9 @@ public final class CollectionEligibilityScenario implements UIScenario {
     @Override public void configure(ScenarioOptions options) { options.tags("collection").requiresWorld(false); }
 
     @Override public void define(ScenarioBuilder s) {
-        s.openScreen("owned wrong-placement list", ctx -> {
+        s.openScreen("unowned legal list", ctx -> {
             var main = new ArrayList<>(java.util.stream.IntStream.rangeClosed(10001, 10040).boxed().toList());
-            main.add(10066);
             var owned = new HashMap<>(CollectionFixture.owned());
-            owned.put(CollectionFixture.FIRST, 1L);
             var model = ctx.put("model", new DeckEditorModel(new DeckList(main,
                     List.of(10067, 10068, 10069, 10070), List.of()), owned));
             var replies = ctx.put("replies", new ArrayList<CompletableFuture<CollectionReply>>());
@@ -44,55 +42,82 @@ public final class CollectionEligibilityScenario implements UIScenario {
                 Object controller = ctx.getField(screen, "controller");
                 SavedDeckController lists = ctx.getField(controller, "lists");
                 ctx.put("lists", lists);
-                lists.applyView(new ClientCollectionState.View(4, owned, List.of(), CollectionFixture.LIST_ID));
+                lists.applyView(new ClientCollectionState.View(4, owned, List.of(), null, false, null));
                 return screen;
             } catch (ReflectiveOperationException error) {
                 throw new IllegalStateException("Could not create controlled editor", error);
             }
         }).awaitModularUI().ticks(3)
+         .checkTextContains("#deck-shortages", "Ownership optional")
+         .checkClass("#main-card-0 .missing-copy", "neutral")
+         .click("#main-card-0")
+         .checkClass("#inspector-missing", "neutral")
          .click("#activate-deck")
-         .step("reject owned Fusion in Main without shortages", ctx -> reply(ctx, new CollectionReply.Rejected(
-                 CollectionError.INELIGIBLE, 4, placement()))).ticks(3)
+         .step("server approves optional-ownership activation", ctx -> reply(ctx, new CollectionReply.Changed(
+                 5, CollectionFixture.LIST_ID, null, 0,
+                 new DeckEligibility.Report(List.of(), Map.of(CollectionFixture.FIRST, 1), false, false, null))))
+         .ticks(3)
+         .checkHidden("#eligibility-dialog")
+         .checkTextContains("#list-active-status", "active")
+         .hoverAt(-100, -100).screenshot("optional-ownership-activation")
+         .step("switch controlled snapshot to required ownership", ctx ->
+                 ctx.<SavedDeckController>get("lists").applyView(new ClientCollectionState.View(
+                         5, ctx.<DeckEditorModel>get("model").owned(), List.of(), null, true, null)))
+         .ticks(3)
+         .checkTextContains("#deck-shortages", "Ownership required")
+         .check("required shortage uses warning treatment", ctx ->
+                 !ctx.el("#main-card-0 .missing-copy").element().hasClass("neutral"))
+         .click("#activate-deck")
+         .step("server rejects required-ownership shortage", ctx -> reply(ctx, new CollectionReply.Rejected(
+                 CollectionError.INELIGIBLE, 5,
+                 new DeckEligibility.Report(List.of(), Map.of(CollectionFixture.FIRST, 1), false, true, null))))
+         .ticks(3)
          .checkVisible("#eligibility-dialog")
          .checkBounds("#eligibility-panel", DuelScreenScenario::insideViewport)
-         .checkTextContains("#eligibility-issue-0", "10066")
-         .checkTextContains("#eligibility-issue-0", "Extra")
-         .check("reason is translated", ctx -> !ctx.el("#eligibility-issue-0").text().contains("duelcraft.collection.issue"))
-         .check("owned wrong placement stays clean", ctx -> !ctx.<SavedDeckController>get("lists").dirty())
-         .hoverAt(-100, -100).screenshot("owned-placement-rejection");
+         .checkTextContains("#eligibility-missing-10001", "10001")
+         .check("required shortage stays clean", ctx -> !ctx.<SavedDeckController>get("lists").dirty())
+         .hoverAt(-100, -100).screenshot("required-ownership-rejection");
         CollectionRuntimeFixture.press(s, "#eligibility-close");
         s.checkHidden("#eligibility-dialog")
-         .click("#add-card").click("#save-deck")
-         .step("acknowledge invalidating Save", ctx -> {
-             var submitted = ((CollectionCommand.Save) ctx.get("command")).deck();
-             ctx.put("submitted", submitted);
-             reply(ctx, new CollectionReply.Changed(5, null, submitted, 0, placement()));
-         }).ticks(3)
-         .checkTextContains("#editor-status", "List saved")
-         .checkTextContains("#editor-status", "active selection cleared")
-         .checkTextContains("#eligibility-summary", "List saved")
-         .checkTextContains("#eligibility-summary", "active selection cleared")
+         .step("switch controlled snapshot to optional ownership", ctx ->
+                 ctx.<SavedDeckController>get("lists").applyView(new ClientCollectionState.View(
+                         5, ctx.<DeckEditorModel>get("model").owned(), List.of(), null, false, null)))
+         .click("#activate-deck")
+         .step("server applies companion denial while ownership is optional", ctx -> reply(ctx,
+                 new CollectionReply.Rejected(CollectionError.INELIGIBLE, 5,
+                         new DeckEligibility.Report(List.of(), Map.of(CollectionFixture.FIRST, 1), false,
+                                 false, "Era locked"))))
+         .ticks(3)
          .checkVisible("#eligibility-dialog")
-         .check("acknowledged invalidating Save is clean and exact", ctx -> {
-             SavedDeck submitted = ctx.get("submitted");
-             return !ctx.<SavedDeckController>get("lists").dirty()
-                     && ctx.<DeckEditorModel>get("model").draft().equals(submitted.cards())
-                     && ctx.<SavedDeckController>get("lists").activeId() == null;
-         }).hoverAt(-100, -100).screenshot("saved-active-cleared");
+         .checkTextContains("#eligibility-restriction", "Era locked")
+         .check("optional shortage is not presented as a denial reason", ctx ->
+                 ctx.elOpt("#eligibility-missing-10001").isEmpty())
+         .checkTextContains("#editor-status", "Era locked")
+         .hoverAt(-100, -100).screenshot("optional-companion-denial");
+        CollectionRuntimeFixture.press(s, "#eligibility-close");
+        s.step("surface first-open clearance without evaluating displayed draft", ctx ->
+                 ctx.<SavedDeckController>get("lists").applyView(new ClientCollectionState.View(
+                         6, ctx.<DeckEditorModel>get("model").owned(), List.of(), null, false,
+                         new DeckEligibility.Report(List.of(), Map.of(), false, false, "Previously restricted"))))
+         .ticks(3)
+         .checkVisible("#eligibility-dialog")
+         .checkTextContains("#editor-status", "previous active list")
+         .checkTextContains("#eligibility-restriction", "Previously restricted")
+         .hoverAt(-100, -100).screenshot("first-open-active-cleared");
         CollectionRuntimeFixture.press(s, "#eligibility-close");
         s.click("#activate-deck")
          .step("full bounded report has additional omitted issues and shortage", ctx -> {
-             var issues = new ArrayList<>(placement().problems());
+             var issues = new ArrayList<DeckEligibility.Issue>();
              issues.add(new DeckEligibility.Issue("duelcraft.collection.issue.copies", 10066, 4, 3));
              for (int index = 0; index < 62; index++) issues.add(new DeckEligibility.Issue(
                      "duelcraft.collection.issue.unknown", 90000 + index, 0, 0));
-             reply(ctx, new CollectionReply.Rejected(CollectionError.INELIGIBLE, 5,
+             reply(ctx, new CollectionReply.Rejected(CollectionError.INELIGIBLE, 6,
                      new DeckEligibility.Report(issues, Map.of(10066, 2), true, true, null)));
          })
          .ticks(3)
-         .checkCount("#eligibility-scroll .wrap", 66)
-         .checkTextContains("#eligibility-issue-1", "4 copies")
-         .checkTextContains("#eligibility-issue-1", "maximum is 3")
+         .checkCount("#eligibility-scroll .wrap", 65)
+         .checkTextContains("#eligibility-issue-0", "4 copies")
+         .checkTextContains("#eligibility-issue-0", "maximum is 3")
          .check("bounded details overflow inside the scroll surface", ctx -> {
              var scroll = (com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView) ctx.el("#eligibility-scroll").element();
              return scroll.getContainerHeight() > scroll.viewPort.getContentHeight();
@@ -111,11 +136,6 @@ public final class CollectionEligibilityScenario implements UIScenario {
         s.checkVisible("#eligibility-dialog")
          .checkTextContains("#eligibility-more", "Additional problems")
          .teardown("close controlled editor", ctx -> ctx.mc().setScreen(null));
-    }
-
-    private static DeckEligibility.Report placement() {
-        return new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
-                "duelcraft.collection.issue.main_placement", 10066, 65, 0)), Map.of(), false, true, null);
     }
 
     private static void reply(TestContext ctx, CollectionReply reply) {

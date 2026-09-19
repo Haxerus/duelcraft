@@ -67,6 +67,21 @@ class CollectionClientTest {
         assertEquals(changed, current.join());
     }
 
+    @Test void disconnectClearsPolicyAndPreviousConnectionOpenCannotReplaceCurrentMode() {
+        var h = new Harness();
+        var old = h.client.refresh().toCompletableFuture();
+        h.client.disconnect();
+        assertNull(h.client.state().view());
+        h.client.connect();
+        var current = h.client.refresh().toCompletableFuture();
+        h.reply(0, new CollectionReply.Opened(UUID.randomUUID(), 1, 0, 0, null, true, null));
+        assertTrue(old.isCompletedExceptionally());
+        assertFalse(current.isDone());
+        assertNull(h.client.state().view());
+        h.reply(1, new CollectionReply.Opened(UUID.randomUUID(), 1, 0, 0, null, false, null));
+        assertFalse(current.join().ownershipRequired());
+    }
+
     @Test void rejectedSaveTimeoutAndDisconnectNeverReplayMutation() {
         var h = new Harness();
         var rejected = h.client.request(new CollectionCommand.Save(0, DECK)).toCompletableFuture();

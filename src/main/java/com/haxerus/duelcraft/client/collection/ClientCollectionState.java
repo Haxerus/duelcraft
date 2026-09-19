@@ -7,8 +7,13 @@ import java.util.*;
 /** Client-thread snapshot assembly. Only complete views are published. */
 public final class ClientCollectionState {
     public record View(long revision, Map<Integer, Long> counts,
-                       List<CollectionReply.Summary> summaries, @Nullable UUID activeId) {
+                       List<CollectionReply.Summary> summaries, @Nullable UUID activeId,
+                       boolean ownershipRequired, @Nullable DeckEligibility.Report clearedActivation) {
         public View { counts = Map.copyOf(counts); summaries = List.copyOf(summaries); }
+        public View(long revision, Map<Integer, Long> counts, List<CollectionReply.Summary> summaries,
+                    @Nullable UUID activeId) {
+            this(revision, counts, summaries, activeId, false, null);
+        }
     }
 
     private @Nullable View view;
@@ -90,7 +95,8 @@ public final class ClientCollectionState {
 
     private void publishIfComplete() {
         if (nextPage() != null) return;
-        view = new View(opened.revision(), counts, new ArrayList<>(summaries.values()), opened.activeId());
+        view = new View(opened.revision(), counts, new ArrayList<>(summaries.values()), opened.activeId(),
+                opened.ownershipRequired(), opened.clearedActivation());
         discardPending();
     }
 

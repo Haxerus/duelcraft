@@ -21,7 +21,8 @@ class CollectionPayloadTest {
         }
     }
     @Test void allRepliesRoundTripIncludingOptionalFields() {
-        for (var reply : List.of(new CollectionReply.Opened(ID, 0, 2, 1, ID), new CollectionReply.Opened(ID, 0, 0, 0, null),
+        for (var reply : List.of(new CollectionReply.Opened(ID, 0, 2, 1, ID, false, null),
+                new CollectionReply.Opened(ID, 0, 0, 0, null, true, REPORT),
                 new CollectionReply.Counts(ID, 1, 0, Map.of(1, Long.MAX_VALUE)), new CollectionReply.Decks(ID, 1, 0, List.of(new CollectionReply.Summary(ID, "Draft", 1, 2, 3))),
                 new CollectionReply.Deck(1, DECK), new CollectionReply.Changed(2, ID, DECK, 0, REPORT), new CollectionReply.Changed(2, null, null, 0, REPORT), new CollectionReply.Rejected(CollectionError.STALE, 2, REPORT))) {
             var payload = new CollectionReplyPayload(ID, reply); var buf = Unpooled.buffer();
@@ -80,6 +81,14 @@ class CollectionPayloadTest {
         badReply(buf -> { rejectionHeader(buf); buf.writeVarInt(0); buf.writeVarInt(1); buf.writeVarInt(1); buf.writeVarInt(0); buf.writeBoolean(false); });
         badReply(buf -> { rejectionHeader(buf); emptyReportPrefix(buf); buf.writeBoolean(true); buf.writeUtf(" "); });
         badReply(buf -> { rejectionHeader(buf); emptyReportPrefix(buf); buf.writeBoolean(true); buf.writeUtf("x".repeat(257)); });
+        badReply(buf -> {
+            openedHeader(buf, false, true);
+            emptyReportPrefix(buf); buf.writeBoolean(true); buf.writeUtf(" ");
+        });
+        badReply(buf -> {
+            openedHeader(buf, true, true);
+            emptyReportPrefix(buf); buf.writeBoolean(true); buf.writeUtf("x".repeat(257));
+        });
         var buf = Unpooled.buffer();
         try {
             CollectionRequestPayload.STREAM_CODEC.encode(buf, new CollectionRequestPayload(ID, new CollectionCommand.Save(0, DECK)));
@@ -100,7 +109,9 @@ class CollectionPayloadTest {
         var report = new DeckEligibility.Report(problems, missing, true, true, "\u6F22".repeat(256));
         var summaries = new ArrayList<CollectionReply.Summary>();
         for (int i = 0; i < 32; i++) summaries.add(new CollectionReply.Summary(UUID.randomUUID(), name, 512, 0, 0));
-        for (var reply : List.of(new CollectionReply.Changed(Long.MAX_VALUE, ID, deck, 0, report), new CollectionReply.Rejected(CollectionError.INELIGIBLE, Long.MAX_VALUE, report),
+        for (var reply : List.of(new CollectionReply.Opened(ID, Long.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE,
+                        ID, true, report),
+                new CollectionReply.Changed(Long.MAX_VALUE, ID, deck, 0, report), new CollectionReply.Rejected(CollectionError.INELIGIBLE, Long.MAX_VALUE, report),
                 new CollectionReply.Counts(ID, Long.MAX_VALUE, Integer.MAX_VALUE, counts), new CollectionReply.Decks(ID, Long.MAX_VALUE, Integer.MAX_VALUE, summaries), new CollectionReply.Deck(Long.MAX_VALUE, deck))) {
             var buf = Unpooled.buffer(); var payload = new CollectionReplyPayload(ID, reply);
             try { CollectionReplyPayload.STREAM_CODEC.encode(buf, payload); assertTrue(buf.readableBytes() <= 24576, "Whole envelope bytes: " + buf.readableBytes()); System.out.println(reply.getClass().getSimpleName() + " maximum envelope: " + buf.readableBytes()); assertEquals(payload, CollectionReplyPayload.STREAM_CODEC.decode(buf)); }
@@ -133,6 +144,10 @@ class CollectionPayloadTest {
     }
     private static void countHeader(FriendlyByteBuf buf) { buf.writeByte(1); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); }
     private static void deckHeader(FriendlyByteBuf buf) { buf.writeByte(2); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); }
+    private static void openedHeader(FriendlyByteBuf buf, boolean ownershipRequired, boolean clearedActivation) {
+        buf.writeByte(0); buf.writeUUID(ID); buf.writeVarLong(0); buf.writeVarInt(0); buf.writeVarInt(0);
+        buf.writeBoolean(false); buf.writeBoolean(ownershipRequired); buf.writeBoolean(clearedActivation);
+    }
     private static void rejectionHeader(FriendlyByteBuf buf) { buf.writeByte(5); buf.writeByte(CollectionError.INVALID.ordinal()); buf.writeVarLong(0); }
     private static void emptyReportPrefix(FriendlyByteBuf buf) {
         buf.writeVarInt(0); buf.writeVarInt(0); buf.writeBoolean(false); buf.writeBoolean(false);

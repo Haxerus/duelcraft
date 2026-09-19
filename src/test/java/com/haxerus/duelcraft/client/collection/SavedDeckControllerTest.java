@@ -7,6 +7,52 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SavedDeckControllerTest {
+    @Test void optionalOwnershipAllowsServerApprovedUnownedActivationWithoutDenial() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null, false, null));
+        c.activate();
+        replies.getFirst().complete(new CollectionReply.Changed(5, id, null, 0,
+                new DeckEligibility.Report(List.of(), Map.of(123, 2), false, false, null)));
+        assertEquals(id, c.activeId());
+        assertFalse(c.ownershipRequired());
+        assertTrue(c.eligibility().eligible());
+        assertEquals(Map.of(123, 2), c.eligibility().missing());
+    }
+
+    @Test void requiredOwnershipShortageAndCompanionReasonsRemainAuthoritative() {
+        var required = productionController();
+        required.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null, true, null));
+        required.activate();
+        replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
+                new DeckEligibility.Report(List.of(), Map.of(123, 2), false, true, null)));
+        assertEquals("INELIGIBLE: missing copies (2)", required.detail());
+
+        for (boolean ownershipRequired : List.of(false, true)) {
+            commands.clear(); replies.clear();
+            var restricted = productionController();
+            restricted.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null,
+                    ownershipRequired, null));
+            restricted.activate();
+            replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
+                    new DeckEligibility.Report(List.of(), Map.of(123, 2), false,
+                            ownershipRequired, "Era locked")));
+            assertEquals("operation_failed", restricted.status());
+            assertEquals("INELIGIBLE: Era locked", restricted.detail());
+            assertEquals(ownershipRequired, restricted.eligibility().ownershipRequired());
+        }
+    }
+
+    @Test void firstOpenClearanceIsShownOnceWithoutTreatingNormalViewsAsNewDenials() {
+        var c = productionController();
+        var clearance = new DeckEligibility.Report(List.of(), Map.of(), false, false, "Era locked");
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null, false, clearance));
+        assertEquals("active_cleared", c.status());
+        assertEquals(clearance, c.eligibility());
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null, false, null));
+        assertEquals("active_cleared", c.status());
+        assertEquals(clearance, c.eligibility());
+    }
+
     @Test void ownedWrongPlacementActivationRetainsActionableReportWithoutShortages() {
         var c = productionController();
         var main = new ArrayList<>(java.util.stream.IntStream.rangeClosed(10001, 10040).boxed().toList());

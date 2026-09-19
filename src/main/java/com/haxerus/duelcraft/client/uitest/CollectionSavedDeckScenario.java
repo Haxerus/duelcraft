@@ -24,13 +24,18 @@ public final class CollectionSavedDeckScenario implements UIScenario {
           .step("choose real Main and Extra catalog cards", ctx -> {
               var cards = CardSearch.search(DuelcraftClient.getCollectionCatalog().toCompletableFuture().join(),
                       "", CardSearch.Filters.ALL, Map.of(), new DeckList(List.of(), List.of(), List.of()));
-              ctx.put("mainCode", cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
-                      && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) == 0).findFirst().orElseThrow().code());
+              var mainCodes = cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
+                      && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) == 0)
+                      .map(card -> card.code()).distinct().limit(40).toList();
+              if (mainCodes.size() != 40) throw new IllegalStateException("real catalog lacks 40 Main Deck cards");
+              ctx.put("mainCodes", mainCodes);
+              ctx.put("mainCode", mainCodes.getFirst());
               ctx.put("extraCode", cards.stream().filter(card -> (card.type() & TYPE_TOKEN) == 0
                       && (card.type() & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) != 0).findFirst().orElseThrow().code());
           });
         CollectionRuntimeFixture.open(s);
         s.checkVisible("#inspector-empty").checkHidden("#card-edit-controls")
+         .checkTextContains("#deck-shortages", "Ownership optional")
          .step("search real Main passcode", ctx -> ctx.el("#collection-search").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class)
                     .setText(String.valueOf(ctx.<Integer>get("mainCode")), true))
          .waitUntil("real Main search result mounted", ctx -> ctx.elOpt("#collection-card-" + ctx.<Integer>get("mainCode")).isPresent())
@@ -68,7 +73,16 @@ public final class CollectionSavedDeckScenario implements UIScenario {
                              new DeckList(List.of(mainCode), List.of(extraCode), List.of(extraCode)));
          }).hoverAt(-100, -100).screenshot("collection-real-save-acknowledged")
          .key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
-         .check("acknowledged Save permits close", ctx -> !(ctx.screen() instanceof com.haxerus.duelcraft.client.collection.CollectionScreen));
+         .check("acknowledged Save permits close", ctx -> !(ctx.screen() instanceof com.haxerus.duelcraft.client.collection.CollectionScreen))
+         .server("make the saved activation fixture legal while retaining zero owned copies", sc -> {
+             var data = CollectionRuntimeFixture.data(sc);
+             var saved = data.decks().values().iterator().next();
+             int extraCode = sc.get("extraCode");
+             var legal = new SavedDeck(saved.id(), saved.name(),
+                     new DeckList(sc.<List<Integer>>get("mainCodes"), List.of(extraCode), List.of(extraCode)));
+             var replaced = new PlayerCollectionData(data.revision() + 1, data.counts(), Map.of(saved.id(), legal), null);
+             sc.player().setData(CollectionAttachments.COLLECTION, CollectionAttachment.valid(replaced));
+         }).serverGet("capture legal authoritative saved state", "expected", CollectionRuntimeFixture::data);
         CollectionRuntimeFixture.open(s);
         s.waitUntil("reopened private snapshot equals server state", CollectionRuntimeFixture::snapshotMatches)
          .check("reopen preserves complete private snapshot", CollectionRuntimeFixture::snapshotMatches);
@@ -78,17 +92,24 @@ public final class CollectionSavedDeckScenario implements UIScenario {
         s.waitForText("#editor-title", "Runtime unowned draft")
          .check("ReadDeck loads every saved section exactly", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().values().iterator().next().cards()));
         CollectionRuntimeFixture.press(s, "#lists-close");
-        s.checkCount("#main-grid .card-tile", 1).checkCount("#extra-grid .card-tile", 1)
+        s.checkCount("#main-grid .card-tile", 40).checkCount("#extra-grid .card-tile", 1)
          .click("#toggle-side").checkCount("#side-grid .card-tile", 1)
          .click("#main-card-0").checkTextContains("#inspector-missing", "1")
          .step("activate with one real mouse gesture", ctx -> {
              CollectionLayoutScenario.press(ctx, "#activate-deck");
              CollectionLayoutScenario.release(ctx);
          })
-         .waitUntil("activation shortage visible", ctx -> ctx.el("#editor-status").text().contains("missing copies"))
-         .checkTextContains("#deck-warnings", "3 missing")
-         .checkServer("rejected activation leaves saved state unchanged", sc -> CollectionRuntimeFixture.data(sc).equals(sc.<PlayerCollectionData>get("expected")))
-         .hoverAt(-100, -100).screenshot("collection-real-activation-shortage")
+         .waitUntil("optional-ownership activation acknowledged", ctx -> ctx.el("#editor-status").text().contains("updated"))
+         .checkHidden("#eligibility-dialog")
+         .checkTextContains("#deck-shortages", "Ownership optional")
+         .checkServer("optional-ownership activation selects the saved list", sc -> {
+             var expected = sc.<PlayerCollectionData>get("expected");
+             var actual = CollectionRuntimeFixture.data(sc);
+             return actual.revision() == expected.revision() + 1 && actual.counts().equals(expected.counts())
+                     && actual.decks().equals(expected.decks())
+                     && expected.decks().keySet().iterator().next().equals(actual.activeDeckId());
+         })
+         .hoverAt(-100, -100).screenshot("collection-real-optional-activation")
          .closeScreen()
          .server("seed unreadable disposable attachment", sc -> {
              var raw = new net.minecraft.nbt.CompoundTag();

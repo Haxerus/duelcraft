@@ -242,17 +242,27 @@ final class CollectionController {
             return;
         }
         ((TextElement) element("eligibility-summary")).setText(Component.translatable("duelcraft.collection." +
-                ("saved_active_cleared".equals(lists.status()) ? "saved_active_cleared" : "eligibility_rejected")));
+                ("saved_active_cleared".equals(lists.status()) ? "saved_active_cleared"
+                        : "active_cleared".equals(lists.status()) ? "active_cleared" : "eligibility_rejected")));
+        if (report.restrictionReason() != null) {
+            var row = new Label().setText(Component.translatable("duelcraft.collection.restriction_reason",
+                    report.restrictionReason()));
+            row.setId("eligibility-restriction").addClass("wrap");
+            details.addScrollViewChild(row);
+        }
         for (int index = 0; index < report.problems().size(); index++) {
             var issue = report.problems().get(index);
             var row = new Label().setText(Component.translatable(issue.key(), issue.code(), issue.actual(), issue.limit()));
             row.setId("eligibility-issue-" + index).addClass("wrap");
             details.addScrollViewChild(row);
         }
-        for (int code : report.missing().keySet().stream().sorted().toList()) {
-            var row = new Label().setText(Component.translatable("duelcraft.collection.missing_copies", code, report.missing().get(code)));
-            row.setId("eligibility-missing-" + code).addClass("wrap");
-            details.addScrollViewChild(row);
+        if (report.ownershipRequired()) {
+            for (int code : report.missing().keySet().stream().sorted().toList()) {
+                var row = new Label().setText(Component.translatable("duelcraft.collection.missing_copies",
+                        code, report.missing().get(code)));
+                row.setId("eligibility-missing-" + code).addClass("wrap");
+                details.addScrollViewChild(row);
+            }
         }
         if (report.moreProblems()) {
             var row = new Label().setText(Component.translatable("duelcraft.collection.more_problems"));
@@ -369,7 +379,14 @@ final class CollectionController {
         }
         text("inspector-owned", "In collection: " + model.owned().getOrDefault(selectedCode, 0L));
         text("inspector-used", "In this list: " + model.draft().requiredCopies().getOrDefault(selectedCode, 0));
-        text("inspector-missing", model.missing(selectedCode) > 0 ? "Missing " + model.missing(selectedCode) + " copies" : "All copies owned");
+        var missing = element("inspector-missing");
+        if (model.missing(selectedCode) > 0 && lists.ownershipRequired()) {
+            missing.addClass("warning").removeClass("neutral");
+        } else {
+            missing.addClass("neutral").removeClass("warning");
+        }
+        text("inspector-missing", model.missing(selectedCode) > 0
+                ? "Missing " + model.missing(selectedCode) + " copies" : "All copies owned");
     }
 
     private List<Integer> sectionCodes(DeckEditorModel.Section section) {
@@ -432,7 +449,9 @@ final class CollectionController {
                 tile.setId(id + "-card-" + index);
                 tile.addClass("deck-card");
                 if (seen.merge(code, 1, Integer::sum) > model.owned().getOrDefault(code, 0L)) {
-                    tile.addChild(new Label().setText("Missing").addClass("missing-copy"));
+                    var missing = new Label().setText("Missing").addClass("missing-copy");
+                    if (!lists.ownershipRequired()) missing.addClass("neutral");
+                    tile.addChild(missing);
                 }
                 grid.addScrollViewChild(tile);
             }
@@ -450,14 +469,23 @@ final class CollectionController {
         if (draft.extra().size() > 15) warnings.add("Extra exceeds 15");
         if (draft.side().size() > 15) warnings.add("Side exceeds 15");
         if (draft.requiredCopies().values().stream().anyMatch(count -> count > 3)) warnings.add("More than 3 copies");
-        if (missing > 0) warnings.add(missing + " missing");
         text("deck-summary", lists.dirty() ? "Unsaved changes" : "Saved list");
         for (String id : List.of("activate-deck", "list-activate")) {
             element(id).setActive(!lists.pending() && lists.ready() && lists.stored() && !lists.dirty());
             element(id).getStyle().tooltips(Component.translatable("duelcraft.collection." +
-                    (lists.dirty() ? "save_first" : "supported_checks")));
+                    (lists.dirty() ? "save_first"
+                            : lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
         }
-        text("deck-warnings", warnings.isEmpty() ? "Drafts may be saved without owning every card." : String.join(" · ", warnings));
+        text("deck-warnings", String.join(" · ", warnings));
+        var shortages = element("deck-shortages");
+        String key = lists.ownershipRequired()
+                ? (missing > 0 ? "ownership_required_missing" : "ownership_required")
+                : (missing > 0 ? "ownership_optional_missing" : "ownership_optional");
+        ((TextElement) shortages).setText(Component.translatable("duelcraft.collection." + key, missing));
+        if (lists.ownershipRequired() && missing > 0) shortages.addClass("warning").removeClass("neutral");
+        else shortages.addClass("neutral").removeClass("warning");
+        shortages.getStyle().tooltips(Component.translatable("duelcraft.collection." +
+                (lists.ownershipRequired() ? "ownership_required_help" : "ownership_optional_help")));
     }
 
     /** Runs once after LDLib has laid out rebuilt rows, including edits with unchanged row counts. */
