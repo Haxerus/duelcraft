@@ -2,7 +2,7 @@
 
 Date: 2026-09-18. Revised: 2026-09-19 after the user's final decision.
 
-Status: Approved product direction; implementation and verification are pending. This revision supersedes the earlier proposal in this document that made ownership enforcement exclusively a companion responsibility.
+Status: M2 collection policy and editor implementation passed the [follow-up verification](../reports/2026-09-19-deck-use-policy-follow-up.md); final independent review remains before M3. M3–M6, including actual duel-route enforcement in M4, remain unfinished. This revision supersedes the earlier proposal in this document that made ownership enforcement exclusively a companion responsibility.
 
 ## Decision
 
@@ -63,7 +63,7 @@ Send the effective ownership setting and evaluated denial information from the s
 
 Original M1/M2 work and UI fixes remain reusable. Storage records do not need a migration for this policy change. Eligibility/report semantics, server context, network replies, UI feedback, and tests do need adjustment; old M2 evidence does not verify the amended policy.
 
-1. Complete the [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) before physical transfers.
+1. Complete final review of the implemented [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) before physical transfers.
 2. Continue the amended M3–M6 plans through shared policy enforcement on every duel route.
 3. Validate settings off/on without the companion and a test restriction under both settings. Companion development is not a prerequisite.
 
@@ -72,7 +72,7 @@ Authoritative planning documents:
 - [Player interaction design](../specs/2026-09-15-player-interaction-design.md)
 - [Implementation contracts](../specs/2026-09-17-player-interaction-contracts.md)
 - [Integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md)
-- [M2 baseline](../plans/2026-09-17-player-collections-milestone-2.md) and [pending policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md)
+- [M2 baseline](../plans/2026-09-17-player-collections-milestone-2.md) and [implemented policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md)
 - [M3 transfers](../plans/2026-09-17-card-transfers-milestone-3.md)
 - [M4 preparation](../plans/2026-09-17-duel-preparation-milestone-4.md)
 - [M5 entry points](../plans/2026-09-17-player-entry-points-milestone-5.md)
@@ -91,4 +91,4 @@ Authoritative planning documents:
 9. Restart with a changed setting or companion installation revalidates persisted selection; neither old activation nor removed restrictions create cards or auto-reactivate lists.
 10. Existing persistence, privacy, conservation, locks, editor behavior, and engine regression coverage remain intact.
 
-The exact hook registration/API types are engineering decisions in the follow-up. Acquisition balance, pack contents, recipes, quests, and progression design remain companion work. This amendment does not expand Duelcraft's built-in banlist or format support.
+The follow-up implements `DeckUsePolicy` and the synchronous `DeckUseCheckEvent` adapter on `NeoForge.EVENT_BUS`; `deny(String)` retains the first denial. The contracts record the exact APIs and SERVER config paths. Acquisition balance, pack contents, recipes, quests, and progression design remain companion work. This amendment does not expand Duelcraft's built-in banlist or format support.

@@ -10,11 +10,11 @@
 
 **Spec:** [Product design](../specs/2026-09-15-player-interaction-design.md) and [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md). Dependency: completed [milestone 1](2026-09-15-deck-editor-milestone-1.md), implemented through `2030dae` in `codex/deck-editor-m1` and reconciled onto current main. Its actual model/controller/scenario interfaces are the starting point; see the [M1 report](../reports/2026-09-17-deck-editor-m1.md).
 
-**Implementation verification:** Tasks 1–5, the whole-branch review and the final scoped fix review are complete, with 850 final unit/JNI tests and lifecycle evidence recorded in the [M2 report](../reports/2026-09-17-player-collections-m2.md). This verifies the original M2 baseline only; the policy follow-up below remains pending before M3. No merge/push is included.
+**Implementation verification:** Tasks 1–5, the whole-branch review and the final scoped fix review are complete, with 850 final unit/JNI tests and lifecycle evidence recorded in the [M2 report](../reports/2026-09-17-player-collections-m2.md). This verifies the original M2 baseline only; the policy follow-up has separate [verification evidence](../reports/2026-09-19-deck-use-policy-follow-up.md), with final independent review before M3. No merge/push is included.
 
 ## Policy revision after original M2 completion
 
-The [2026-09-19 decision](../handoffs/2026-09-18-optional-ownership-amendment.md) replaces unconditional ownership with core `requireCardOwnership=false` plus an optional companion restriction hook. Complete the [policy follow-up](2026-09-19-deck-use-policy-follow-up.md) before M3. It revises eligibility/report semantics, server context, wire data, UI feedback, and tests; it does not rebuild persistence or the editor.
+The [2026-09-19 decision](../handoffs/2026-09-18-optional-ownership-amendment.md) replaces unconditional ownership with core `requireCardOwnership=false` plus an optional companion restriction hook. The implemented [policy follow-up](2026-09-19-deck-use-policy-follow-up.md) awaits final independent review before M3. It revises eligibility/report semantics, server context, wire data, UI feedback, and tests; it does not rebuild persistence or the editor.
 
 Tasks 1–5 below describe the original M2 baseline and its original test examples. Checked boxes, where present, and the original M2 verification report record that behavior only. In particular, the unowned-activation rejection and shortage-driven invalidation examples must become explicit ownership-enabled cases, paired with default-setting success cases in the follow-up. They are not evidence for the amended policy and must not be executed as current unconditional requirements.
 

@@ -17,7 +17,7 @@ Read the [shared implementation contracts](../specs/2026-09-17-player-interactio
 
 ## Policy amendment before further implementation
 
-Decision 2026-09-19: core `requireCardOwnership=false` server setting plus an optional companion restriction hook. See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [M2 policy follow-up](2026-09-19-deck-use-policy-follow-up.md). Original M2 and subsequent editor fixes exist in `codex/player-collections`; M3–M6 have not started. The new policy implementation and verification remain pending, regardless of earlier M2 completion checkboxes. Preserve the M1/M2 reports as evidence for their original behavior.
+Decision 2026-09-19: core `requireCardOwnership=false` server setting plus an optional companion restriction hook. See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [M2 policy follow-up](2026-09-19-deck-use-policy-follow-up.md). Original M2 and subsequent editor fixes exist in `codex/player-collections`; M3–M6 have not started. The follow-up now has 901 passing unit/JNI tests, four retained-world JVM phases (60 checks), and dedicated A/B privacy runs under both settings (61 checks each), plus separate editor captures; see the [follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md). Final independent review remains before M3. Preserve the M1/M2 reports as evidence for their original behavior.
 
 Core owns collections, transfers, legality, and optional ownership enforcement. The companion supplies acquisition/progression and may deny additional deck use. Verify settings off/on without a companion and a test companion restriction under both settings. No companion development is required to complete integration.
 
@@ -55,7 +55,7 @@ Add `server/DuelPreparationService` to share challenge, accept, cancel, and read
 
 Update `DuelCommand`, `ServerPayloadHandler`, `DuelClientCommand`, and existing deck-upload tests together. Replace normal raw upload activation with YDK list import plus server activation; retain Main/Extra/Side in the import parser while preserving `DeckLoader` callers that only need engine decks. The Side list stays out of single-duel engine input. The human's solo deck follows the same deck-use policy; the AI's deck does not require a player collection.
 
-Replace session-only `playerCurrentDeck` as the authoritative selection. Pending invites contain participants/options and expiry, not access to the other player's list. Reject old/stale mutation paths while busy. If protocol shapes break compatibility, bump the current network version `2` and update setup instructions for matching clients/servers.
+Replace session-only `playerCurrentDeck` as the authoritative selection. Pending invites contain participants/options and expiry, not access to the other player's list. Reject old/stale mutation paths while busy. If protocol shapes break compatibility, bump the then-current network version (the M2 policy follow-up ends at `5`) and update setup instructions for matching clients/servers.
 
 **Exit:** request-sequence tests cover withdrawal between invite and accept, editing an active list, activation during first-turn selection, stale uploads during a duel, cancellation/disconnect, and immutable prepared decks. Existing seed/seat/shuffle behavior stays unchanged. Dedicated-server two-player duels use collections without manual deck commands.
 
