@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class DuelSession implements AutoCloseable {
+public class DuelSession implements ManagedDuelSession {
     private static final Logger LOGGER = LoggerFactory.getLogger(DuelSession.class);
     private static final AtomicLong NEXT_TAG = new AtomicLong(1);
     private final DuelEngine engine;
@@ -21,6 +21,7 @@ public class DuelSession implements AutoCloseable {
     /** Tag native log lines carry while this session is inside the engine. */
     private final String logTag = "duel#" + NEXT_TAG.getAndIncrement();
     private boolean ended;
+    private boolean closed;
 
     public DuelSession(DuelEngine engine, DuelOptions options, DuelEventListener listener) {
         this.engine = engine;
@@ -219,6 +220,8 @@ public class DuelSession implements AutoCloseable {
 
     @Override
     public void close() {
+        if (closed) return;
+        closed = true;
         OcgCore.nDestroyDuel(engine.getHandle(), duelHandle);
     }
 }

@@ -109,6 +109,7 @@ public class Duelcraft {
         serverEventBus.addListener(DuelManager::onServerStopped);
         serverEventBus.addListener(DuelManager::onServerTick);
         serverEventBus.addListener(DuelManager::onPlayerLoggedOut);
+        serverEventBus.addListener(DuelManager::onPlayerLoggedIn);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

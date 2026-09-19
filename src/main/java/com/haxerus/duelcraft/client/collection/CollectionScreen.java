@@ -30,6 +30,7 @@ import java.util.function.IntFunction;
 public final class CollectionScreen extends ModularUIScreen {
     public static final int DESIGN_WIDTH = 1280;
     public static final int DESIGN_HEIGHT = 720;
+    private boolean suspended;
     private final UIElement root;
     private final CollectionController controller;
 
@@ -140,9 +141,12 @@ public final class CollectionScreen extends ModularUIScreen {
     }
 
     @Override public void removed() {
-        controller.dispose();
+        if (!suspended) controller.dispose();
         super.removed();
     }
+
+    public void suspend() { suspended = true; }
+    public void resume() { suspended = false; controller.refreshCollections(); }
 
     /** Logout invalidates private callbacks before Minecraft replaces the screen. */
     public void disconnect() { controller.dispose(); }

@@ -2,528 +2,354 @@ package com.haxerus.duelcraft.server;
 
 import com.haxerus.duelcraft.ServerConfig;
 import com.haxerus.duelcraft.api.DeckUseCheckEvent;
+import com.haxerus.duelcraft.collection.*;
+import com.haxerus.duelcraft.core.*;
 import com.haxerus.duelcraft.core.data.CardData;
 import com.haxerus.duelcraft.core.data.CardCatalog;
-import com.haxerus.duelcraft.server.collection.CollectionPayloadHandler;
-import com.haxerus.duelcraft.server.collection.CollectionService;
-import com.haxerus.duelcraft.server.collection.CollectionSnapshotStore;
-import com.haxerus.duelcraft.server.collection.DeckUsePolicy;
-import com.haxerus.duelcraft.core.Deck;
-import com.haxerus.duelcraft.core.DeckValidator;
-import com.haxerus.duelcraft.core.DeckRegistry;
-import com.haxerus.duelcraft.core.DuelEngine;
-import com.haxerus.duelcraft.core.DuelOptions;
-import com.haxerus.duelcraft.core.DuelRule;
-import com.haxerus.duelcraft.core.OcgCore;
-import com.haxerus.duelcraft.core.PlayerOptions;
-import com.haxerus.duelcraft.duel.DuelSession;
-import com.haxerus.duelcraft.duel.FirstTurnLobby;
+import com.haxerus.duelcraft.duel.*;
+import com.haxerus.duelcraft.server.collection.*;
 import com.mojang.logging.LogUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.slf4j.Logger;
-
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class DuelManager {
     private static final Logger LOGGER = LogUtils.getLogger();
-
-    private static final ServerPlayer[] NO_SEATS = new ServerPlayer[0];
-
     private static DuelManager instance;
-
     private DuelEngine engine;
-    private final CollectionSnapshotStore collectionSnapshots = new CollectionSnapshotStore();
-    private CollectionPayloadHandler collectionHandler;
-    private Map<UUID, DuelSession> activeDuels;
-    private Map<UUID, UUID> playerToDuel;
-    private Map<UUID, SoloDuelHandler> soloHandlers;
-    /** Duellists of each active duel by engine index; index 1 is null in solo mode (the AI). */
-    private Map<UUID, ServerPlayer[]> duelSeats;
     private DeckRegistry deckRegistry;
-    private final Map<UUID, DuelDeckPayload> playerCurrentDeck = new HashMap<>();
+    private final CollectionSnapshotStore snapshots = new CollectionSnapshotStore();
+    private final Map<UUID, ManagedDuelSession> activeDuels = new HashMap<>();
+    private final Map<UUID, UUID> playerToDuel = new HashMap<>();
+    private final Map<UUID, UUID[]> duelSeats = new HashMap<>();
+    private final Map<UUID, SoloDuelHandler> soloHandlers = new HashMap<>();
+    private final Set<UUID> startingPlayers = new HashSet<>();
+    private final CollectionService collections;
+    private final CollectionPayloadHandler collectionHandler;
+    private final DuelPreparationService preparation;
+    private final Players players;
+    private final SessionFactory sessions;
+    private java.util.function.UnaryOperator<SessionFactory> nextSessionDecorator;
 
-    /** Outstanding challenges, target -> pending; entries expire after {@link DuelCommand#INVITE_TIMEOUT_MS}. */
-    public Map<UUID, DuelCommand.PendingChallenge> duelInvites;
+    interface Players {
+        boolean online(UUID id);
+        String name(UUID id);
+        Optional<PlayerCollectionData> data(UUID id);
+        void persist(UUID id, PlayerCollectionData data);
+        void send(UUID id, CustomPacketPayload payload);
+        void message(UUID id, Component message);
+    }
+    @FunctionalInterface interface SessionFactory {
+        ManagedDuelSession create(DuelOptions options, DuelEventListener listener);
+    }
 
-    /** First-turn rolls in progress; both duellists map to the same roll. */
-    private final Map<UUID, FirstTurnRoll> firstTurnRolls = new HashMap<>();
+    DuelManager(CollectionService collections, Players players, SessionFactory sessions) {
+        this.collections = collections;
+        this.players = players;
+        this.sessions = sessions;
+        collectionHandler = new CollectionPayloadHandler(collections, snapshots);
+        preparation = new DuelPreparationService(new DuelPreparationService.Host() {
+            public boolean online(UUID id) { return players.online(id); }
+            public String name(UUID id) { return players.name(id); }
+            public boolean isDueling(UUID id) { return playerToDuel.containsKey(id) || startingPlayers.contains(id); }
+            public DuelPreparationService.Selection selection(UUID id, DuelRule rule) { return DuelManager.this.selection(id, rule); }
+            public boolean start(DuelPreparationService.PreparedDuel duel, int firstSeat) { return startPrepared(duel, firstSeat); }
+            public void changed(UUID id, PreparationResult result) { publish(id, result); }
+        }, () -> ThreadLocalRandom.current().nextLong());
+    }
+
+    /** DEV-only one-shot fault injection; consumed before allocation even if startup throws. */
+    void decorateNextSession(java.util.function.UnaryOperator<SessionFactory> decorator) {
+        if (net.neoforged.fml.loading.FMLEnvironment.production) throw new IllegalStateException("Development fixture only");
+        nextSessionDecorator = Objects.requireNonNull(decorator);
+    }
 
     public static DuelManager get() { return instance; }
-
     public static void onServerStarting(ServerStartingEvent event) {
-        DuelManager manager = new DuelManager();
-        manager.init();
-        instance = manager;
-    }
-
-    /** A duellist who logs out forfeits; their outstanding invites go with them. */
-    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (instance == null || !(event.getEntity() instanceof ServerPlayer player)) return;
-        instance.handleLogout(player);
-    }
-
-    /** Expires first-turn rolls nobody finished; the invite timeout applies to each step. */
-    public static void onServerTick(ServerTickEvent.Post event) {
-        if (instance != null) instance.expireFirstTurnRolls();
-    }
-
-    public static void onServerStopped(ServerStoppedEvent event) {
-        if (instance != null) {
-            instance.shutdown();
-            instance = null;
-        }
-        ServerConfig.reset();
-    }
-
-    public void init() {
         var data = CardData.load().join();
         try {
-            var policy = new DeckUsePolicy(ServerConfig.requireCardOwnership(),
-                    DeckUseCheckEvent.restriction(NeoForge.EVENT_BUS));
-            collectionHandler = new CollectionPayloadHandler(
-                    new CollectionService(CardCatalog.load(data.database()), policy), collectionSnapshots);
+            var service = new CollectionService(CardCatalog.load(data.database()),
+                    new DeckUsePolicy(ServerConfig.requireCardOwnership(), DeckUseCheckEvent.restriction(NeoForge.EVENT_BUS)));
+            var engine = new DuelEngine(List.of(data.database().toString()), data.scriptPaths());
+            var manager = new DuelManager(service, onlinePlayers(event.getServer()),
+                    (options, listener) -> new DuelSession(engine, options, listener));
+            manager.engine = engine;
+            manager.deckRegistry = DeckRegistry.open(FMLPaths.GAMEDIR.get().resolve("duelcraft/decks"));
+            instance = manager;
         } catch (java.sql.SQLException exception) {
             throw new IllegalStateException("Cannot load collection card facts", exception);
         }
-        engine = new DuelEngine(List.of(data.database().toString()), data.scriptPaths());
-
-        activeDuels = new HashMap<>();
-        playerToDuel = new HashMap<>();
-        soloHandlers = new HashMap<>();
-        duelSeats = new HashMap<>();
-        duelInvites = new HashMap<>();
-
-        Path decksDir = FMLPaths.GAMEDIR.get().resolve("duelcraft").resolve("decks");
-        deckRegistry = DeckRegistry.open(decksDir);
-
-        int[] version = OcgCore.nGetVersion();
-        LOGGER.info("DuelManager initialized — OCG core v{}.{}, decks dir: {}",
-                version[0], version[1], decksDir);
     }
-
+    private static Players onlinePlayers(MinecraftServer server) {
+        return new Players() {
+            private ServerPlayer player(UUID id) { return server.getPlayerList().getPlayer(id); }
+            public boolean online(UUID id) { var p = player(id); return p != null && !p.hasDisconnected(); }
+            public String name(UUID id) { var p = player(id); return p == null ? "Opponent" : p.getName().getString(); }
+            public Optional<PlayerCollectionData> data(UUID id) { var p = player(id); return p == null ? Optional.empty() : p.getData(CollectionAttachments.COLLECTION).data(); }
+            public void persist(UUID id, PlayerCollectionData data) { var p = player(id); if (p != null) p.setData(CollectionAttachments.COLLECTION, CollectionAttachment.valid(data)); }
+            public void send(UUID id, CustomPacketPayload payload) { if (online(id)) PacketDistributor.sendToPlayer(player(id), payload); }
+            public void message(UUID id, Component message) { if (online(id)) player(id).sendSystemMessage(message); }
+        };
+    }
+    public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (instance != null && event.getEntity() instanceof ServerPlayer player) instance.revalidate(player.getUUID(), DuelRule.MR5);
+    }
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (instance != null && event.getEntity() instanceof ServerPlayer player) instance.logout(player.getUUID());
+    }
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (instance != null) instance.preparation.expire(System.currentTimeMillis());
+    }
+    public static void onServerStopped(ServerStoppedEvent event) {
+        if (instance != null) { instance.shutdown(); instance = null; }
+        ServerConfig.reset();
+    }
     public void shutdown() {
-        collectionSnapshots.clear();
-        for (DuelSession session : activeDuels.values()) {
-            session.close();
-        }
-
-        activeDuels.clear();
-        playerCurrentDeck.clear();
-        playerToDuel.clear();
-        duelSeats.clear();
-        if (engine != null) {
-            engine.close();
-            engine = null;
-        }
+        for (var id : new ArrayList<>(activeDuels.keySet())) endDuel(id);
+        preparation.clear();
+        startingPlayers.clear();
+        nextSessionDecorator = null;
+        snapshots.clear();
+        if (engine != null) { engine.close(); engine = null; }
     }
-
-    /**
-     * Start a solo test duel where player 1 is AI-controlled.
-     * The player's deck is shuffled with {@code seed} and the AI's with {@code seed + 1}, so two
-     * identical lists still produce different draws. Deck names are used only for logging.
-     */
-    public void startSoloDuel(ServerPlayer player, long seed, DuelRule rule, PlayerOptions playerOptions,
-                              Deck playerDeck, Deck aiDeck,
-                              String playerDeckName, String aiDeckName) {
-        if (playerToDuel.containsKey(player.getUUID())) {
-            LOGGER.warn("Cannot start solo duel - player is already in a duel!");
-            return;
-        }
-
-        DuelOptions options = DuelOptions.of(seed, rule, playerOptions);
-        UUID duelId = UUID.randomUUID();
-        var handler = new SoloDuelHandler(player, duelId);
-        var session = new DuelSession(engine, options, handler);
-
-        activeDuels.put(duelId, session);
-        playerToDuel.put(player.getUUID(), duelId);
-        soloHandlers.put(duelId, handler);
-        duelSeats.put(duelId, new ServerPlayer[]{player, null});
-
-        LOGGER.info("Solo duel {}: seed={}, rule={}, options={}, player={}, aiDeck={}",
-                duelId, seed, rule.id(), playerOptions, playerDeckName, aiDeckName);
-
-        Deck shuffledPlayer = playerDeck.shuffled(seed);
-        Deck shuffledAi = aiDeck.shuffled(seed + 1);
-
-        int lp0 = options.team1().lp();
-        int lp1 = options.team2().lp();
-        PacketDistributor.sendToPlayer(player, new DuelStartPayload(0, "AI Opponent",
-                lp0, lp1, shuffledPlayer.main().size(), shuffledPlayer.extra().size(), options.flags()));
-
-        session.setupDuel(shuffledPlayer, shuffledAi);
-        session.process();
-
-        processSoloAutoResponse(duelId, handler);
-    }
-
-    /**
-     * Handle a queued auto-response from the solo AI.
-     * Called by SoloDuelHandler when the AI player receives a prompt.
-     */
-    public void handleSoloAutoResponse(UUID duelId, byte[] response) {
-        DuelSession session = activeDuels.get(duelId);
-        if (session == null || session.isEnded()) return;
-        session.setResponse(response);
-
-        // Check if the AI needs to respond again (chained prompts)
-        // Find the handler — it's the listener on the session
-        // We need to check for pending auto-responses after each setResponse
-        for (var entry : activeDuels.entrySet()) {
-            if (entry.getKey().equals(duelId) && entry.getValue() == session) {
-                // Look up the handler through the duelId
-                processSoloAutoResponseByDuelId(duelId);
-                break;
-            }
-        }
-    }
-
-    private void processSoloAutoResponse(UUID duelId, SoloDuelHandler handler) {
-        Runnable autoResponse = handler.consumePendingAutoResponse();
-        if (autoResponse != null) {
-            autoResponse.run();
-        }
-    }
-
-    private void processSoloAutoResponseByDuelId(UUID duelId) {
-        // We need a way to get the handler. Let's track solo handlers.
-        var handler = soloHandlers.get(duelId);
-        if (handler != null) {
-            processSoloAutoResponse(duelId, handler);
-        }
-    }
-
-    /**
-     * Each deck carries its own shuffle seed so the duel seed reproduces the same two hands whichever
-     * seat the first-turn roll gave each duellist: the challenger's deck always shuffles with
-     * {@code seed} and the accepter's with {@code seed + 1} (see {@link #beginFirstTurnRoll}).
-     */
-    public void startDuel(ServerPlayer p1, ServerPlayer p2, long seed, DuelRule rule, PlayerOptions playerOptions,
-                          Deck team1Deck, long team1Seed, Deck team2Deck, long team2Seed,
-                          String team1Name, String team2Name) {
-        if (playerToDuel.containsKey(p1.getUUID()) || playerToDuel.containsKey(p2.getUUID())) {
-            LOGGER.warn("Cannot start duel - a player is already in a duel!");
-            for (ServerPlayer duellist : new ServerPlayer[]{p1, p2}) {
-                duellist.sendSystemMessage(Component.literal("A player is already in a duel; the duel was cancelled."));
-            }
-            return;
-        }
-
-        DuelOptions options = DuelOptions.of(seed, rule, playerOptions);
-        UUID duelId = UUID.randomUUID();
-        var handler = new ServerDuelHandler(p1, p2, duelId);
-        var session = new DuelSession(engine, options, handler);
-
-        activeDuels.put(duelId, session);
-        playerToDuel.put(p1.getUUID(), duelId);
-        playerToDuel.put(p2.getUUID(), duelId);
-        duelSeats.put(duelId, new ServerPlayer[]{p1, p2});
-
-        LOGGER.info("Duel {}: seed={}, rule={}, options={}, first={}, decks=[{} (shuffle {}), {} (shuffle {})]",
-                duelId, seed, rule.id(), playerOptions, p1.getName().getString(),
-                team1Name, team1Seed, team2Name, team2Seed);
-
-        Deck shuffled1 = team1Deck.shuffled(team1Seed);
-        Deck shuffled2 = team2Deck.shuffled(team2Seed);
-
-        int lp0 = options.team1().lp();
-        int lp1 = options.team2().lp();
-        int deck1Size = shuffled1.main().size();
-        int extra1Size = shuffled1.extra().size();
-        int deck2Size = shuffled2.main().size();
-        int extra2Size = shuffled2.extra().size();
-        PacketDistributor.sendToPlayer(p1, new DuelStartPayload(0, p2.getName().getString(),
-                lp0, lp1, deck1Size, extra1Size, options.flags()));
-        PacketDistributor.sendToPlayer(p2, new DuelStartPayload(1, p1.getName().getString(),
-                lp0, lp1, deck2Size, extra2Size, options.flags()));
-
-        session.setupDuel(shuffled1, shuffled2);
-        session.process();
-    }
-
-    public void handleResponse(ServerPlayer player, byte[] response) {
-        var duelId = playerToDuel.get(player.getUUID());
-        if (duelId == null) return;
-        DuelSession session = activeDuels.get(duelId);
-        if (session == null || session.isEnded()) return;
-
-        int seat = seatOf(duelId, player.getUUID());
-        if (!session.listener().acceptsResponseFrom(seat)) {
-            LOGGER.warn("Duel {}: dropping response from {} (seat {}), prompt belongs to player {}",
-                    duelId, player.getName().getString(), seat, session.listener().pendingPlayer());
-            return;
-        }
-
-        session.setResponse(response);
-        processSoloAutoResponseByDuelId(duelId);
-    }
-
-    /** Engine index of {@code playerUUID} in {@code duelId}, or -1 when they are not a duellist. */
-    private int seatOf(UUID duelId, UUID playerUUID) {
-        ServerPlayer[] seats = duelSeats.get(duelId);
-        if (seats == null) return -1;
-        for (int seat = 0; seat < seats.length; seat++) {
-            if (seats[seat] != null && seats[seat].getUUID().equals(playerUUID)) return seat;
-        }
-        return -1;
-    }
-
-    /** The player gives up: the opponent wins by surrender. */
-    public void forfeit(ServerPlayer player) {
-        UUID duelId = playerToDuel.get(player.getUUID());
-        if (duelId == null) return;
-        int seat = seatOf(duelId, player.getUUID());
-        LOGGER.info("Duel {}: {} forfeits", duelId, player.getName().getString());
-        finishDuel(duelId, 1 - seat, DuelEndPayload.REASON_SURRENDER);
-    }
-
-    private void handleLogout(ServerPlayer player) {
-        UUID playerUUID = player.getUUID();
-        collectionSnapshots.invalidate(playerUUID);
-        clearPlayerCurrentDeck(playerUUID);
-        duelInvites.remove(playerUUID);
-        duelInvites.values().removeIf(pending -> pending.challengerUUID().equals(playerUUID));
-
-        cancelFirstTurnRoll(playerUUID, player.getName().getString() + " disconnected.");
-
-        UUID duelId = playerToDuel.get(playerUUID);
-        if (duelId == null) return;
-        int seat = seatOf(duelId, playerUUID);
-        LOGGER.info("Duel {}: {} disconnected", duelId, player.getName().getString());
-        finishDuel(duelId, 1 - seat, DuelEndPayload.REASON_DISCONNECT);
-    }
-
-    /**
-     * End a duel with a result: tell every still-connected duellist, then close the session.
-     * The single path for forfeit, disconnect and an engine end without MSG_WIN.
-     */
-    public void finishDuel(UUID duelId, int winner, int reason) {
-        if (!activeDuels.containsKey(duelId)) return;
-        var payload = new DuelEndPayload(winner, reason);
-        for (ServerPlayer seat : duelSeats.getOrDefault(duelId, NO_SEATS)) {
-            if (seat != null && !seat.hasDisconnected()) {
-                PacketDistributor.sendToPlayer(seat, payload);
-            }
-        }
-        endDuel(duelId);
-    }
-
-    public void endDuel(UUID duelId) {
-        DuelSession session = activeDuels.remove(duelId);
-        soloHandlers.remove(duelId);
-        duelSeats.remove(duelId);
-        if (session != null) {
-            session.close();
-            playerToDuel.values().removeIf(id -> id.equals(duelId));
-        }
-    }
-
-    public UUID getPlayerActiveDuel(ServerPlayer player) {
-        return playerToDuel.get(player.getUUID());
-    }
-
-    // --- First-turn roll (edopro's pre-duel rock-paper-scissors, generic_duel.cpp:474-565) ---
-
-    /** One pending roll: the two duellists with everything the duel needs once they have answered. */
-    private static final class FirstTurnRoll {
-        final ServerPlayer[] players;
-        final Deck[] decks;
-        /** Shuffle seed per deck, keyed to the challenge role, not to the seat the roll hands out. */
-        final long[] deckSeeds;
-        final String[] deckNames;
-        final long seed;
-        final DuelRule rule;
-        final PlayerOptions playerOptions;
-        final FirstTurnLobby.Hand[] hands = new FirstTurnLobby.Hand[2];
-        /** Seat that won the roll and picks who goes first; -1 while the hands are still coming in. */
-        int chooser = -1;
-        long promptedAtMillis = System.currentTimeMillis();
-
-        FirstTurnRoll(ServerPlayer p0, ServerPlayer p1, long seed, DuelRule rule, PlayerOptions playerOptions,
-                      Deck deck0, Deck deck1, String deckName0, String deckName1) {
-            this.players = new ServerPlayer[]{p0, p1};
-            this.decks = new Deck[]{deck0, deck1};
-            this.deckSeeds = new long[]{seed, seed + 1};
-            this.deckNames = new String[]{deckName0, deckName1};
-            this.seed = seed;
-            this.rule = rule;
-            this.playerOptions = playerOptions;
-        }
-
-        int seatOf(UUID playerUUID) {
-            return players[0].getUUID().equals(playerUUID) ? 0 : 1;
-        }
-    }
-
-    /** Whether the player is in a duel or still answering a first-turn roll. */
-    public boolean isBusy(ServerPlayer player) {
-        return playerToDuel.containsKey(player.getUUID()) || firstTurnRolls.containsKey(player.getUUID());
-    }
-
+    public DuelPreparationService preparation() { return preparation; }
     public CollectionPayloadHandler collectionHandler() { return collectionHandler; }
-
-    /** Rolls for the first turn; the duel starts once the winner has chosen who goes first. */
-    public void beginFirstTurnRoll(ServerPlayer challenger, ServerPlayer accepter, long seed, DuelRule rule,
-                                   PlayerOptions playerOptions, Deck challengerDeck, Deck accepterDeck,
-                                   String challengerDeckName, String accepterDeckName) {
-        var roll = new FirstTurnRoll(challenger, accepter, seed, rule, playerOptions,
-                challengerDeck, accepterDeck, challengerDeckName, accepterDeckName);
-        firstTurnRolls.put(challenger.getUUID(), roll);
-        firstTurnRolls.put(accepter.getUUID(), roll);
-        promptHands(roll);
-    }
-
-    /** A duellist throws their hand; equal hands are replayed, as edopro replays ties. */
-    public void submitHand(ServerPlayer player, FirstTurnLobby.Hand hand) {
-        var roll = firstTurnRolls.get(player.getUUID());
-        if (roll == null || roll.chooser >= 0) {
-            player.sendSystemMessage(Component.literal("No first-turn roll to answer."));
-            return;
-        }
-        int seat = roll.seatOf(player.getUUID());
-        if (roll.hands[seat] != null) {
-            player.sendSystemMessage(Component.literal("You already chose " + name(roll.hands[seat]) + "."));
-            return;
-        }
-        roll.hands[seat] = hand;
-        player.sendSystemMessage(Component.literal("You chose " + name(hand) + "."));
-        if (roll.hands[0] == null || roll.hands[1] == null) return;
-
-        for (int seatIndex = 0; seatIndex < 2; seatIndex++) {
-            roll.players[seatIndex].sendSystemMessage(Component.literal(
-                    "You: " + name(roll.hands[seatIndex]) + " vs " + name(roll.hands[1 - seatIndex])));
-        }
-
-        int winner = FirstTurnLobby.resolve(roll.hands[0], roll.hands[1]);
-        if (winner == FirstTurnLobby.TIE) {
-            promptHands(roll);
-            return;
-        }
-        roll.chooser = winner;
-        roll.promptedAtMillis = System.currentTimeMillis();
-        roll.players[winner].sendSystemMessage(Component.literal("You won the roll. Go first? ")
-                .append(button("Yes", "/duel first yes")).append(" ")
-                .append(button("No", "/duel first no")));
-        roll.players[1 - winner].sendSystemMessage(Component.literal(
-                roll.players[winner].getName().getString() + " won the roll and is choosing who goes first."));
-    }
-
-    /** The roll winner answers; whoever goes first becomes engine player 0 (generic_duel.cpp:547-565). */
-    public void submitFirstTurnChoice(ServerPlayer player, boolean goFirst) {
-        var roll = firstTurnRolls.get(player.getUUID());
-        if (roll == null || roll.chooser < 0 || roll.seatOf(player.getUUID()) != roll.chooser) {
-            player.sendSystemMessage(Component.literal("Nothing to choose right now."));
-            return;
-        }
-        int first = goFirst ? roll.chooser : 1 - roll.chooser;
-        int second = 1 - first;
-        removeRoll(roll);
-        for (ServerPlayer duellist : roll.players) {
-            duellist.sendSystemMessage(Component.literal(
-                    roll.players[first].getName().getString() + " goes first."));
-        }
-        startDuel(roll.players[first], roll.players[second], roll.seed, roll.rule, roll.playerOptions,
-                roll.decks[first], roll.deckSeeds[first], roll.decks[second], roll.deckSeeds[second],
-                roll.deckNames[first], roll.deckNames[second]);
-    }
-
-    private void promptHands(FirstTurnRoll roll) {
-        roll.hands[0] = null;
-        roll.hands[1] = null;
-        roll.promptedAtMillis = System.currentTimeMillis();
-        for (ServerPlayer duellist : roll.players) {
-            duellist.sendSystemMessage(Component.literal("Rock-paper-scissors for the first turn: ")
-                    .append(button("Rock", "/duel hand rock")).append(" ")
-                    .append(button("Paper", "/duel hand paper")).append(" ")
-                    .append(button("Scissors", "/duel hand scissors")));
-        }
-    }
-
-    /** Drops rolls nobody answered in time, as {@link DuelCommand#INVITE_TIMEOUT_MS} drops invites. */
-    private void expireFirstTurnRolls() {
-        if (firstTurnRolls.isEmpty()) return;
-        long now = System.currentTimeMillis();
-        for (FirstTurnRoll roll : new LinkedHashSet<>(firstTurnRolls.values())) {
-            if (now - roll.promptedAtMillis > DuelCommand.INVITE_TIMEOUT_MS) {
-                removeRoll(roll);
-                for (ServerPlayer duellist : roll.players) {
-                    if (!duellist.hasDisconnected()) {
-                        duellist.sendSystemMessage(Component.literal(
-                                "The first-turn roll timed out; the duel was cancelled."));
-                    }
-                }
-            }
-        }
-    }
-
-    /** Cancels the roll this player is in, telling whoever is left why; false when there was none. */
-    public boolean cancelFirstTurnRoll(UUID playerUUID, String reason) {
-        var roll = firstTurnRolls.get(playerUUID);
-        if (roll == null) return false;
-        removeRoll(roll);
-        for (ServerPlayer duellist : roll.players) {
-            if (!duellist.hasDisconnected()) {
-                duellist.sendSystemMessage(Component.literal(reason + " The duel was cancelled."));
-            }
-        }
-        return true;
-    }
-
-    /** Only drops mappings that still point at {@code roll}, so a stale roll cannot unseat a live one. */
-    private void removeRoll(FirstTurnRoll roll) {
-        for (ServerPlayer duellist : roll.players) firstTurnRolls.remove(duellist.getUUID(), roll);
-    }
-
-    private static String name(FirstTurnLobby.Hand hand) {
-        return hand.name().charAt(0) + hand.name().substring(1).toLowerCase(Locale.ROOT);
-    }
-
-    /** A chat button that runs {@code command} when clicked. */
-    private static Component button(String label, String command) {
-        return Component.literal("[" + label + "]").withStyle(style -> style
-                .withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
-    }
-
     public DeckRegistry getDeckRegistry() { return deckRegistry; }
+    public boolean isBusy(ServerPlayer player) { return isBusy(player.getUUID()); }
+    boolean isBusy(UUID id) { return playerToDuel.containsKey(id) || preparation.isPreparing(id) || startingPlayers.contains(id); }
+    public UUID getPlayerActiveDuel(ServerPlayer player) { return playerToDuel.get(player.getUUID()); }
 
-    public void setPlayerCurrentDeck(UUID player, DuelDeckPayload selection) {
-        // The current structural/copy checks are shared by every rule; rechecked when a duel starts.
-        var problems = DeckValidator.problems(selection.deck(), DuelRule.MR5);
-        if (!problems.isEmpty()) throw new IllegalArgumentException(String.join("; ", problems));
-        playerCurrentDeck.put(player, selection);
-    }
-
-    public Optional<String> getPlayerCurrentDeck(UUID player) {
-        return Optional.ofNullable(playerCurrentDeck.get(player)).map(DuelDeckPayload::name);
-    }
-
-    public void clearPlayerCurrentDeck(UUID player) {
-        playerCurrentDeck.remove(player);
-    }
-
-    /** Resolves the uploaded snapshot; the server never opens a player's named deck file. */
-    public Deck resolveDeck(ServerPlayer player) throws IOException {
-        return resolveDeck(player.getUUID());
-    }
-
-    Deck resolveDeck(UUID player) throws IOException {
-        var selection = playerCurrentDeck.get(player);
-        if (selection == null) {
-            throw new IOException("No deck set; run /duel deck set <name>");
+    /** Rechecks persisted activation without ever deleting the saved list or granting copies. */
+    void revalidate(UUID owner, DuelRule rule) {
+        var before = players.data(owner).orElse(null);
+        if (before == null) return;
+        var change = collections.revalidateActive(before, owner, rule);
+        if (!change.success()) {
+            tell(owner, "Deck permission check failed; try again or contact the server administrator.");
+        } else if (!before.equals(change.data())) {
+            players.persist(owner, change.data()); snapshots.invalidate(owner);
+            tell(owner, "Active deck cleared: " + explain(change.eligibility()));
         }
-        return selection.deck();
+    }
+    private DuelPreparationService.Selection selection(UUID owner, DuelRule rule) {
+        var data = players.data(owner).orElse(null);
+        var deck = data == null || data.activeDeckId() == null ? null : data.decks().get(data.activeDeckId());
+        if (deck == null) {
+            tell(owner, "No active deck; use /duel deck set <name> or activate a saved list.");
+            notifyUnreadyPeer(owner);
+            return new DuelPreparationService.Selection(null, collections.emptyReport());
+        }
+        var change = collections.revalidateActive(data, owner, rule);
+        if (!change.success()) {
+            tell(owner, "Deck permission check failed; try again or contact the server administrator.");
+            notifyUnreadyPeer(owner);
+            return new DuelPreparationService.Selection(null, collections.emptyReport());
+        }
+        if (!data.equals(change.data())) {
+            players.persist(owner, change.data()); snapshots.invalidate(owner);
+            tell(owner, "Active deck cleared: " + explain(change.eligibility()));
+            notifyUnreadyPeer(owner);
+        }
+        return new DuelPreparationService.Selection(change.data().activeDeckId() == null ? null : deck, change.eligibility());
+    }
+
+    private void notifyUnreadyPeer(UUID owner) {
+        var view = preparation.view(owner, System.currentTimeMillis());
+        if (view.opponentId() != null) tell(view.opponentId(), "Opponent's deck is not ready");
+    }
+    public Optional<String> getPlayerCurrentDeck(UUID id) {
+        revalidate(id, DuelRule.MR5);
+        return players.data(id).map(data -> data.activeDeckId() == null ? null : data.decks().get(data.activeDeckId())).map(SavedDeck::name);
+    }
+    public Deck resolveDeck(ServerPlayer player) throws IOException { return resolveDeck(player.getUUID()); }
+    Deck resolveDeck(UUID owner) throws IOException {
+        var selected = selection(owner, DuelRule.MR5);
+        if (selected.deck() == null || !selected.eligibility().eligible()) throw new IOException("No eligible active deck");
+        return selected.deck().cards().toDuelDeck();
+    }
+    public boolean clearPlayerCurrentDeck(ServerPlayer player) { return clearPlayerCurrentDeck(player.getUUID()); }
+    boolean clearPlayerCurrentDeck(UUID owner) {
+        var before = players.data(owner).orElse(null);
+        if (before == null) return false;
+        var change = collections.clearActive(before, before.revision(), isBusy(owner));
+        if (!change.success()) { tell(owner, "Cannot clear deck: " + change.error()); return false; }
+        players.persist(owner, change.data()); snapshots.invalidate(owner);
+        tell(owner, "Current deck cleared."); return true;
+    }
+    private boolean current(DuelPreparationService.PreparedPlayer prepared, DuelRule rule) {
+        var owner = prepared.id();
+        if (!players.online(owner) || playerToDuel.containsKey(owner)) return false;
+        var data = players.data(owner).orElse(null);
+        if (data == null || !prepared.deck().id().equals(data.activeDeckId())
+                || !prepared.deck().equals(data.decks().get(data.activeDeckId()))) {
+            tell(owner, "Your active deck changed; prepare the duel again."); return false;
+        }
+        var selected = selection(owner, rule);
+        return selected.deck() != null && selected.eligibility().eligible();
+    }
+    private boolean startPrepared(DuelPreparationService.PreparedDuel prepared, int firstSeat) {
+        // Evaluate both owners so only each owner receives their private reasons.
+        boolean a = current(prepared.challenger(), prepared.settings().rule());
+        boolean b = current(prepared.accepter(), prepared.settings().rule());
+        if (!a || !b) {
+            if (!a) tell(prepared.accepter().id(), "Opponent's deck is not ready");
+            if (!b) tell(prepared.challenger().id(), "Opponent's deck is not ready");
+            return false;
+        }
+        var first = firstSeat == 0 ? prepared.challenger() : prepared.accepter();
+        var second = firstSeat == 0 ? prepared.accepter() : prepared.challenger();
+        LOGGER.info("Prepared duel {}: seed={}, rule={}, first={}, decks=[{} (shuffle {}), {} (shuffle {})]",
+                prepared.id(), prepared.settings().seed(), prepared.settings().rule().id(), first.id(),
+                first.deck().name(), first.shuffleSeed(), second.deck().name(), second.shuffleSeed());
+        return start(prepared.settings(), new UUID[]{first.id(), second.id()},
+                first.deck().cards().toDuelDeck().shuffled(first.shuffleSeed()),
+                second.deck().cards().toDuelDeck().shuffled(second.shuffleSeed()));
+    }
+    public boolean startSoloDuel(ServerPlayer player, DuelSettings settings, Deck aiDeck) {
+        return startSoloDuel(player.getUUID(), settings, aiDeck);
+    }
+    boolean startSoloDuel(UUID owner, DuelSettings settings, Deck aiDeck) {
+        if (isBusy(owner)) { tell(owner, "Cannot start while preparing or dueling."); return false; }
+        var flow = preparation.view(owner, System.currentTimeMillis());
+        if (flow.flowId() != null) preparation.cancel(owner, flow.flowId(), System.currentTimeMillis());
+        startingPlayers.add(owner);
+        boolean success = false;
+        try {
+            var selected = selection(owner, settings.rule());
+            if (selected.deck() == null || !selected.eligibility().eligible()) return false;
+            var snapshot = new DuelPreparationService.PreparedPlayer(owner, selected.deck(), settings.seed());
+            if (!current(snapshot, settings.rule())) return false;
+            var human = snapshot.deck().cards().toDuelDeck();
+            var ai = aiDeck == null ? human : aiDeck;
+            if (!DeckValidator.problems(ai, settings.rule()).isEmpty()) { tell(owner, "The AI deck is not legal."); return false; }
+            LOGGER.info("Solo duel: seed={}, rule={}, player={}, deck={}, AI shuffle={}",
+                    settings.seed(), settings.rule().id(), owner, snapshot.deck().name(), settings.seed() + 1);
+            success = start(settings, new UUID[]{owner, null}, human.shuffled(settings.seed()), ai.shuffled(settings.seed() + 1));
+            return success;
+        } finally {
+            startingPlayers.remove(owner);
+            preparation.startFinished(owner, success);
+        }
+    }
+    /** Only verified immutable selections reach this native boundary. */
+    private boolean start(DuelSettings settings, UUID[] seats, Deck first, Deck second) {
+        UUID id = UUID.randomUUID();
+        ManagedDuelSession session = null;
+        try {
+            java.util.function.Consumer<Boolean> complete = winSent -> {
+                if (winSent) endDuel(id); else finishDuel(id, DuelEndPayload.WINNER_DRAW, 0);
+            };
+            DuelEventListener listener;
+            if (seats[1] == null) listener = new SoloDuelHandler(payload -> players.send(seats[0], payload), complete,
+                    response -> handleSoloAutoResponse(id, response));
+            else listener = new ServerDuelHandler((seat, payload) -> players.send(seats[seat], payload), complete);
+            var options = DuelOptions.of(settings.seed(), settings.rule(), settings.options());
+            var decorator = nextSessionDecorator;
+            nextSessionDecorator = null;
+            session = (decorator == null ? sessions : decorator.apply(sessions)).create(options, listener);
+            activeDuels.put(id, session);
+            duelSeats.put(id, seats);
+            for (var owner : seats) if (owner != null) playerToDuel.put(owner, id);
+            if (listener instanceof SoloDuelHandler solo) soloHandlers.put(id, solo);
+            for (int seat = 0; seat < seats.length; seat++) if (seats[seat] != null) {
+                var deck = seat == 0 ? first : second;
+                players.send(seats[seat], new DuelStartPayload(seat, seats[1 - seat] == null ? "AI Opponent" : players.name(seats[1 - seat]),
+                        options.team1().lp(), options.team2().lp(), deck.main().size(), deck.extra().size(), options.flags()));
+            }
+            // setupDuel emits refreshes, so every human must receive Start first.
+            session.setupDuel(first, second);
+            session.process();
+            processSoloAutoResponse(id);
+            return true; // Synchronous completion is success even if ownership was already removed.
+        } catch (RuntimeException exception) {
+            LOGGER.error("Duel {} failed to start", id, exception);
+            if (session != null && activeDuels.get(id) == session) endDuel(id, false);
+            return false;
+        }
+    }
+    public void handleResponse(ServerPlayer player, byte[] response) {
+        var id = playerToDuel.get(player.getUUID());
+        var session = activeDuels.get(id);
+        if (session == null || session.isEnded() || !session.listener().acceptsResponseFrom(seatOf(id, player.getUUID()))) return;
+        session.setResponse(response); processSoloAutoResponse(id);
+    }
+    public void handleSoloAutoResponse(UUID id, byte[] response) {
+        var session = activeDuels.get(id);
+        if (session == null || session.isEnded()) return;
+        session.setResponse(response); processSoloAutoResponse(id);
+    }
+    private void processSoloAutoResponse(UUID id) {
+        var handler = soloHandlers.get(id);
+        if (handler != null) { var response = handler.consumePendingAutoResponse(); if (response != null) response.run(); }
+    }
+    private int seatOf(UUID id, UUID owner) {
+        var seats = duelSeats.get(id);
+        if (seats == null) return -1;
+        return owner.equals(seats[0]) ? 0 : owner.equals(seats[1]) ? 1 : -1;
+    }
+    public void forfeit(ServerPlayer player) { forfeit(player.getUUID()); }
+    void forfeit(UUID owner) {
+        var id = playerToDuel.get(owner);
+        if (id != null) finishDuel(id, 1 - seatOf(id, owner), DuelEndPayload.REASON_SURRENDER);
+        else { var view = preparation.view(owner, System.currentTimeMillis()); if (view.flowId() != null) preparation.cancel(owner, view.flowId(), System.currentTimeMillis()); }
+    }
+    private void logout(UUID owner) {
+        snapshots.invalidate(owner); preparation.logout(owner);
+        var id = playerToDuel.get(owner);
+        if (id != null) finishDuel(id, 1 - seatOf(id, owner), DuelEndPayload.REASON_DISCONNECT);
+    }
+    public void finishDuel(UUID id, int winner, int reason) {
+        if (!activeDuels.containsKey(id)) return;
+        for (var owner : duelSeats.get(id)) if (owner != null) players.send(owner, new DuelEndPayload(winner, reason));
+        endDuel(id);
+    }
+    public void endDuel(UUID id) { endDuel(id, true); }
+    private void endDuel(UUID id, boolean notify) {
+        var session = activeDuels.remove(id);
+        var seats = duelSeats.remove(id);
+        soloHandlers.remove(id);
+        if (seats != null) for (var owner : seats) if (owner != null) playerToDuel.remove(owner, id);
+        try { if (session != null) session.close(); }
+        catch (RuntimeException exception) { LOGGER.error("Closing duel {} failed", id, exception); }
+        if (notify && seats != null) for (var owner : seats) if (owner != null) preparation.duelEnded(owner);
+    }
+    private void publish(UUID owner, PreparationResult result) {
+        if (!players.online(owner)) return;
+        var view = preparation.view(owner, System.currentTimeMillis());
+        players.send(owner, new PreparationStatePayload(null, result, view));
+        if (result == PreparationResult.START_FAILED) tell(owner, "Duel could not start. Check your active deck and try again.");
+        else if (result == PreparationResult.STALE) tell(owner, "Duel preparation expired.");
+        else if (result == PreparationResult.OFFLINE) tell(owner, "Duel preparation cancelled because a player disconnected.");
+        else if (view.mode() == PreparationView.Mode.INVITED && !view.outgoing())
+            players.message(owner, Component.literal(view.opponentName() + " challenged you. ").append(button("Accept", "/duel accept")).append(" ").append(button("Decline", "/duel invite decline")));
+        else if (view.mode() == PreparationView.Mode.RPS && !view.ownHandSubmitted())
+            players.message(owner, Component.literal("Rock-paper-scissors: ").append(button("Rock", "/duel hand rock")).append(" ").append(button("Paper", "/duel hand paper")).append(" ").append(button("Scissors", "/duel hand scissors")));
+        else if (view.mode() == PreparationView.Mode.FIRST_CHOICE && view.canChooseFirst())
+            players.message(owner, Component.literal("You won the roll. Go first? ").append(button("Yes", "/duel first yes")).append(" ").append(button("No", "/duel first no")));
+    }
+    private void tell(UUID owner, String message) { players.message(owner, Component.literal(message)); }
+    private static String explain(DeckEligibility.Report report) {
+        if (report.restrictionReason() != null) return report.restrictionReason();
+        if (!report.problems().isEmpty()) return report.problems().stream().map(issue -> issue.key() + " (card " + issue.code() + ")").collect(java.util.stream.Collectors.joining("; "));
+        if (report.ownershipRequired() && !report.missing().isEmpty()) return "Missing deposited copies: " + report.missing();
+        return "Deck eligibility could not be confirmed.";
+    }
+    private static Component button(String label, String command) {
+        return Component.literal("[" + label + "]").withStyle(style -> style.withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
     }
 }

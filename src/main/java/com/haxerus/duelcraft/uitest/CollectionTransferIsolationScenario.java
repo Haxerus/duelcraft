@@ -62,20 +62,31 @@ public final class CollectionTransferIsolationScenario implements MPScenario {
              });
         }
         s.server("begin actual first-turn roll", sc -> {
-            var cards = CollectionPrivacyScenario.cards();
-            var deck = new Deck(cards.main(), cards.extra());
-            DuelManager.get().beginFirstTurnRoll(sc.player("A"), sc.player("B"), 3, DuelRule.MR5, PlayerOptions.standard(), deck, deck, "A", "B");
+            for (String role : List.of("A", "B")) {
+                var player = sc.player(role);
+                var before = data(sc, role);
+                var restored = exchange(player, new CollectionCommand.Deposit(before.revision(), CollectionPrivacyScenario.cards().main().getFirst(), 1));
+                sc.check("restore withdrawn copy through collection policy", restored instanceof CollectionReply.Changed);
+                var current = data(sc, role);
+                var activated = exchange(player, new CollectionCommand.Activate(current.revision(), current.decks().keySet().iterator().next()));
+                sc.check("activate eligible fixture through shared policy", activated instanceof CollectionReply.Changed);
+            }
+            var preparation = DuelManager.get().preparation();
+            long now = System.currentTimeMillis();
+            var a = sc.player("A").getUUID(); var b = sc.player("B").getUUID();
+            sc.check("invite accepted", preparation.invite(a, b, DuelRule.MR5, 3L, PlayerOptions.standard(), now).code() == com.haxerus.duelcraft.duel.PreparationResult.OK);
+            sc.check("real preparation locks", preparation.accept(b, preparation.view(b, now).flowId(), now).code() == com.haxerus.duelcraft.duel.PreparationResult.OK);
             sc.put("busyBefore", data(sc, "A"));
             sc.check("both participants locked by real roll", DuelManager.get().isBusy(sc.player("A")) && DuelManager.get().isBusy(sc.player("B")));
         }).client("A", "busy transfer rejected", b -> CollectionTransferClient.exchange(b,
-                new CollectionCommand.Withdraw(13, CODE, 1), CollectionError.BUSY, 5))
+                new CollectionCommand.Withdraw(15, CODE, 1), CollectionError.BUSY, 5))
          .server("busy request preserves exact state", sc -> {
              sc.check("collection unchanged", data(sc, "A").equals(sc.<PlayerCollectionData>get("busyBefore")));
              sc.check("physical five unchanged", sc.player("A").getInventory().getItem(0).getCount() == 5);
-             DuelManager.get().cancelFirstTurnRoll(sc.player("A").getUUID(), "M3 fixture complete");
+             cancel(sc);
          }).teardownAllClients("restore observers", b -> b.step("restore observer", CollectionPrivacyClient::restore).closeScreen())
          .teardownServer("restore inventories and attachments", sc -> {
-             DuelManager.get().cancelFirstTurnRoll(sc.player("A").getUUID(), "M3 fixture teardown");
+             cancel(sc);
              for (String role : List.of("A", "B")) {
                  CollectionAttachment original = sc.get("original" + role);
                  if (original == null) continue;
@@ -85,6 +96,27 @@ public final class CollectionTransferIsolationScenario implements MPScenario {
                  CardTransferService.owner(sc.player(role)).inventoryChanged();
              }
          });
+    }
+    private static void cancel(ServerContext sc) {
+        var preparation = DuelManager.get().preparation(); var id = sc.player("A").getUUID();
+        var view = preparation.view(id, System.currentTimeMillis());
+        if (view.flowId() != null) preparation.cancel(id, view.flowId(), System.currentTimeMillis());
+    }
+    private static CollectionReply exchange(net.minecraft.server.level.ServerPlayer player, CollectionCommand command) {
+        var owner = CardTransferService.owner(player);
+        var reply = new CollectionReply[1];
+        DuelManager.get().collectionHandler().handle(new com.haxerus.duelcraft.server.collection.CollectionRequestPayload(UUID.randomUUID(), command),
+                new com.haxerus.duelcraft.server.collection.CollectionPayloadHandler.Sender() {
+                    public UUID id() { return player.getUUID(); }
+                    public Optional<PlayerCollectionData> data() { return owner.data(); }
+                    public boolean busy() { return DuelManager.get().isBusy(player); }
+                    public void persist(PlayerCollectionData data) { owner.persist(data); }
+                    public void reply(com.haxerus.duelcraft.server.collection.CollectionReplyPayload payload) { reply[0] = payload.reply(); }
+                    public ItemStack slot(int index) { return owner.slot(index); }
+                    public void slot(int index, ItemStack stack) { owner.slot(index, stack); }
+                    public void inventoryChanged() { owner.inventoryChanged(); }
+                }, System.currentTimeMillis());
+        return reply[0];
     }
     private static PlayerCollectionData data(ServerContext sc, String role) {
         return sc.player(role).getData(CollectionAttachments.COLLECTION).data().orElseThrow();

@@ -3,10 +3,9 @@ package com.haxerus.duelcraft.server;
 import com.haxerus.duelcraft.core.Deck;
 import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.core.DeckRegistry;
-import com.haxerus.duelcraft.core.DeckValidator;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.core.PlayerOptions;
-import com.haxerus.duelcraft.duel.FirstTurnLobby;
+import com.haxerus.duelcraft.duel.*;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
@@ -29,9 +28,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class DuelCommand {
-
-    /** How long a duel challenge stays acceptable. */
-    public static final long INVITE_TIMEOUT_MS = 60_000L;
 
     private static final SuggestionProvider<CommandSourceStack> DECK_NAMES =
             (ctx, builder) -> {
@@ -100,6 +96,9 @@ public class DuelCommand {
                                         DuelCommand::challenge)))
                         .then(Commands.literal("accept")
                                 .executes(DuelCommand::accept))
+                        .then(Commands.literal("invite")
+                                .then(Commands.literal("decline").executes(ctx -> cancel(ctx, true)))
+                                .then(Commands.literal("cancel").executes(ctx -> cancel(ctx, false))))
                         .then(Commands.literal("hand")
                                 .then(Commands.argument("hand", StringArgumentType.word())
                                         .suggests(HANDS)
@@ -123,229 +122,78 @@ public class DuelCommand {
         );
     }
 
-    // --- challenge / accept / forfeit ---
-
+    private static int action(ServerPlayer player, PreparationCommand command) {
+        var reply = PreparationPayloadHandler.apply(DuelManager.get().preparation(), player.getUUID(),
+                new PreparationRequestPayload(UUID.randomUUID(), command), System.currentTimeMillis());
+        if (reply.result() != PreparationResult.OK) {
+            player.sendSystemMessage(Component.literal(reply.result() == PreparationResult.INELIGIBLE
+                    ? "A deck is not ready. Each owner receives their own deck details."
+                    : "Preparation: " + reply.result().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ')));
+            return 0;
+        }
+        String message = switch (command) {
+            case PreparationCommand.Invite ignored -> "Duel invitation sent.";
+            case PreparationCommand.Decline ignored -> "Duel invitation declined.";
+            case PreparationCommand.Cancel ignored -> "Duel preparation cancelled.";
+            case PreparationCommand.Hand ignored -> "Hand submitted.";
+            default -> null;
+        };
+        if (message != null) player.sendSystemMessage(Component.literal(message));
+        return 1;
+    }
+    private static PreparationView view(ServerPlayer player) {
+        return DuelManager.get().preparation().view(player.getUUID(), System.currentTimeMillis());
+    }
     private static int challenge(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer sender = ctx.getSource().getPlayerOrException();
-        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
-        DuelRule rule = ruleOf(ctx);
-        long seed = seedOf(ctx);
-        PlayerOptions options = playerOptionsOf(ctx);
-
-        if (sender.getUUID().equals(target.getUUID())) {
-            sender.sendSystemMessage(Component.literal("You can't challenge yourself."));
-            return 0;
-        }
-        if (DuelManager.get().isBusy(sender) || DuelManager.get().isBusy(target)) {
-            sender.sendSystemMessage(Component.literal("A player is already in a duel!"));
-            return 0;
-        }
-
-        if (!deckIsLegal(sender, sender, rule)) return 0;
-        if (!deckIsLegal(target, sender, rule)) return 0;
-
-        DuelManager.get().duelInvites.put(target.getUUID(),
-                new PendingChallenge(sender.getUUID(), seed, rule, options, System.currentTimeMillis()));
-        sender.sendSystemMessage(Component.literal("Sent duel challenge (seed=" + seed + ", rule=" + rule.id()
-                + ", lp=" + options.lp() + ", hand=" + options.startHand() + ", draw=" + options.drawPerTurn() + ")."));
-        target.sendSystemMessage(Component.literal("You have been challenged to a duel."));
-        return 1;
+        return action(ctx.getSource().getPlayerOrException(), new PreparationCommand.Invite(
+                EntityArgument.getPlayer(ctx, "player").getUUID(), ruleOf(ctx), seedOf(ctx), playerOptionsOf(ctx)));
     }
-
     private static int accept(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        var pending = DuelManager.get().duelInvites.get(player.getUUID());
-        if (pending == null) {
-            player.sendSystemMessage(Component.literal("No duel invites."));
-            return 0;
-        }
-        if (pending.isExpired(System.currentTimeMillis())) {
-            DuelManager.get().duelInvites.remove(player.getUUID());
-            player.sendSystemMessage(Component.literal("That duel challenge has expired."));
-            return 0;
-        }
-
-        var server = ctx.getSource().getServer();
-        var challenger = server.getPlayerList().getPlayer(pending.challengerUUID());
-        if (challenger == null) {
-            player.sendSystemMessage(Component.literal("Challenger is no longer online."));
-            DuelManager.get().duelInvites.remove(player.getUUID());
-            return 0;
-        }
-        // Either of them may have started something else since the invite was sent.
-        if (DuelManager.get().isBusy(player) || DuelManager.get().isBusy(challenger)) {
-            player.sendSystemMessage(Component.literal("A player is already in a duel!"));
-            return 0;
-        }
-
-        Deck challengerDeck;
-        try {
-            challengerDeck = DuelManager.get().resolveDeck(challenger);
-        } catch (IOException | DeckLoader.DeckParseException e) {
-            String who = challenger.getName().getString();
-            player.sendSystemMessage(Component.literal(who + "'s deck could not be loaded: " + e.getMessage()));
-            challenger.sendSystemMessage(Component.literal("Your deck could not be loaded, so "
-                    + player.getName().getString() + " could not accept: " + e.getMessage()));
-            return 0;
-        }
-        Deck accepterDeck;
-        try {
-            accepterDeck = DuelManager.get().resolveDeck(player);
-        } catch (IOException | DeckLoader.DeckParseException e) {
-            player.sendSystemMessage(Component.literal("Your deck could not be loaded: " + e.getMessage()));
-            return 0;
-        }
-        // Selections may have changed since the challenge; recheck the uploaded snapshots at ready time.
-        var challengerProblems = DeckValidator.problems(challengerDeck, pending.rule());
-        if (!challengerProblems.isEmpty()) {
-            String joined = String.join("; ", challengerProblems);
-            player.sendSystemMessage(Component.literal(
-                    challenger.getName().getString() + "'s deck is not legal: " + joined));
-            challenger.sendSystemMessage(Component.literal("Your deck is not legal, so "
-                    + player.getName().getString() + " could not accept: " + joined));
-            return 0;
-        }
-        if (!reportDeckProblems(accepterDeck, pending.rule(), player, player)) return 0;
-
-        String challengerName = DuelManager.get().getPlayerCurrentDeck(challenger.getUUID()).orElse(null);
-        String accepterName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
-
-        DuelManager.get().duelInvites.remove(player.getUUID());
-        DuelManager.get().beginFirstTurnRoll(challenger, player, pending.seed(), pending.rule(),
-                pending.options(), challengerDeck, accepterDeck, challengerName, accepterName);
-        return 1;
+        var player = ctx.getSource().getPlayerOrException(); var view = view(player);
+        if (view.flowId() == null) { player.sendSystemMessage(Component.literal("No duel invitation.")); return 0; }
+        return action(player, new PreparationCommand.Accept(view.flowId()));
     }
-
-    // --- first-turn roll ---
-
+    private static int cancel(CommandContext<CommandSourceStack> ctx, boolean decline) throws CommandSyntaxException {
+        var player = ctx.getSource().getPlayerOrException(); var view = view(player);
+        if (view.flowId() == null) { player.sendSystemMessage(Component.literal("No duel preparation.")); return 0; }
+        return action(player, decline ? new PreparationCommand.Decline(view.flowId())
+                : new PreparationCommand.Cancel(view.flowId()));
+    }
     private static int hand(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        String name = StringArgumentType.getString(ctx, "hand");
-        FirstTurnLobby.Hand hand = FirstTurnLobby.parse(name);
+        var player = ctx.getSource().getPlayerOrException(); var view = view(player);
+        String name = StringArgumentType.getString(ctx, "hand"); var hand = FirstTurnLobby.parse(name);
         if (hand == null) throw UNKNOWN_HAND.create(name);
-        DuelManager.get().submitHand(player, hand);
-        return 1;
+        if (view.roundId() == null) { player.sendSystemMessage(Component.literal("No first-turn roll to answer.")); return 0; }
+        return action(player, new PreparationCommand.Hand(view.flowId(), view.roundId(), hand));
     }
-
     private static int first(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var player = ctx.getSource().getPlayerOrException(); var view = view(player);
         String choice = StringArgumentType.getString(ctx, "choice");
-        if (!choice.equalsIgnoreCase("yes") && !choice.equalsIgnoreCase("no")) {
-            player.sendSystemMessage(Component.literal("Answer yes or no."));
-            return 0;
-        }
-        DuelManager.get().submitFirstTurnChoice(player, choice.equalsIgnoreCase("yes"));
-        return 1;
+        if (!choice.equalsIgnoreCase("yes") && !choice.equalsIgnoreCase("no")) { player.sendSystemMessage(Component.literal("Answer yes or no.")); return 0; }
+        if (view.flowId() == null) { player.sendSystemMessage(Component.literal("No first-turn choice.")); return 0; }
+        return action(player, new PreparationCommand.First(view.flowId(), choice.equalsIgnoreCase("yes")));
     }
-
     private static int forfeit(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        UUID duelID = DuelManager.get().getPlayerActiveDuel(player);
-        if (duelID == null) {
-            // A first-turn roll is not a duel yet, but it holds both players busy: let forfeit out of it.
-            if (DuelManager.get().cancelFirstTurnRoll(player.getUUID(),
-                    player.getName().getString() + " cancelled the roll.")) {
-                return 1;
-            }
-            player.sendSystemMessage(Component.literal("No active duel."));
-            return 0;
-        }
-        DuelManager.get().forfeit(player);
-        return 1;
+        var player = ctx.getSource().getPlayerOrException();
+        if (DuelManager.get().getPlayerActiveDuel(player) == null) return cancel(ctx, false);
+        DuelManager.get().forfeit(player); return 1;
     }
-
-    /** Whether {@code who}'s current deck loads and is legal; failures are reported to {@code sender}. */
-    private static boolean deckIsLegal(ServerPlayer who, ServerPlayer sender, DuelRule rule) {
-        Deck deck;
+    private static int test(CommandContext<CommandSourceStack> ctx, String aiDeckName) throws CommandSyntaxException {
+        var player = ctx.getSource().getPlayerOrException();
         try {
-            deck = DuelManager.get().resolveDeck(who);
-        } catch (IOException | DeckLoader.DeckParseException e) {
-            sender.sendSystemMessage(Component.literal(who == sender
-                    ? "Your deck could not be loaded: " + e.getMessage()
-                    : who.getName().getString() + "'s deck could not be loaded: " + e.getMessage()));
-            return false;
+            Deck ai = aiDeckName == null ? null : DuelManager.get().getDeckRegistry().load(aiDeckName);
+            return DuelManager.get().startSoloDuel(player,
+                    new DuelSettings(ruleOf(ctx), seedOf(ctx), playerOptionsOf(ctx)), ai) ? 1 : 0;
+        } catch (IOException | DeckLoader.DeckParseException exception) {
+            player.sendSystemMessage(Component.literal("Failed to load AI deck: " + exception.getMessage())); return 0;
         }
-        return reportDeckProblems(deck, rule, who, sender);
     }
-
-    /** Whether {@code deck} is legal; the joined problem list goes to {@code sender} when it is not. */
-    private static boolean reportDeckProblems(Deck deck, DuelRule rule, ServerPlayer owner, ServerPlayer sender) {
-        var problems = DeckValidator.problems(deck, rule);
-        if (problems.isEmpty()) return true;
-        sender.sendSystemMessage(Component.literal((owner == sender
-                ? "Your deck is not legal: "
-                : owner.getName().getString() + "'s deck is not legal: ") + String.join("; ", problems)));
-        return false;
-    }
-
-    // --- test ---
-
-    private static int test(CommandContext<CommandSourceStack> ctx, String aiDeckName)
-            throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        DuelRule rule = ruleOf(ctx);
-        long seed = seedOf(ctx);
-        PlayerOptions options = playerOptionsOf(ctx);
-
-        if (DuelManager.get().isBusy(player)) {
-            player.sendSystemMessage(Component.literal("You are already in a duel!"));
-            return 0;
-        }
-
-        Deck playerDeck;
-        Deck aiDeck;
-        try {
-            playerDeck = DuelManager.get().resolveDeck(player);
-            aiDeck = (aiDeckName == null) ? playerDeck : DuelManager.get().getDeckRegistry().load(aiDeckName);
-        } catch (IOException | DeckLoader.DeckParseException e) {
-            player.sendSystemMessage(Component.literal("Failed to load a deck: " + e.getMessage()));
-            return 0;
-        }
-        if (!reportDeckProblems(playerDeck, rule, player, player)) return 0;
-        if (aiDeck != playerDeck) {
-            var problems = DeckValidator.problems(aiDeck, rule);
-            if (!problems.isEmpty()) {
-                player.sendSystemMessage(Component.literal("The AI deck '" + aiDeckName
-                        + "' is not legal: " + String.join("; ", problems)));
-                return 0;
-            }
-        }
-        String playerDeckName = DuelManager.get().getPlayerCurrentDeck(player.getUUID()).orElse(null);
-
-        player.sendSystemMessage(Component.literal("Starting solo test duel vs AI (seed=" + seed
-                + ", rule=" + rule.id() + ", lp=" + options.lp() + ", hand=" + options.startHand()
-                + ", draw=" + options.drawPerTurn() + ")..."));
-        DuelManager.get().startSoloDuel(player, seed, rule, options, playerDeck, aiDeck, playerDeckName,
-                aiDeckName != null ? aiDeckName : playerDeckName);
-        return 1;
-    }
-
-    // --- deck subcommands ---
-
     private static int deckGet(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        var name = DuelManager.get().getPlayerCurrentDeck(player.getUUID());
-        player.sendSystemMessage(Component.literal(
-                name.map(n -> "Current deck: " + n).orElse("No deck set; run /duel deck set <name>.")));
+        var player = ctx.getSource().getPlayerOrException(); var name = DuelManager.get().getPlayerCurrentDeck(player.getUUID());
+        player.sendSystemMessage(Component.literal(name.map(n -> "Current deck: " + n).orElse("No active deck; run /duel deck set <name>.")));
         return 1;
     }
-
     private static int deckClear(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        if (DuelManager.get().isBusy(player)) {
-            player.sendSystemMessage(Component.literal("Cannot clear deck while preparing or dueling."));
-            return 0;
-        }
-        DuelManager.get().clearPlayerCurrentDeck(player.getUUID());
-        player.sendSystemMessage(Component.literal("Current deck cleared."));
-        return 1;
-    }
-
-    /** Pending challenge: who challenged, the agreed seed, rule set and per-player options, and when it was sent. */
-    public record PendingChallenge(UUID challengerUUID, long seed, DuelRule rule, PlayerOptions options,
-                                   long sentAtMillis) {
-        public boolean isExpired(long nowMillis) {
-            return nowMillis - sentAtMillis > INVITE_TIMEOUT_MS;
-        }
+        return DuelManager.get().clearPlayerCurrentDeck(ctx.getSource().getPlayerOrException()) ? 1 : 0;
     }
 }

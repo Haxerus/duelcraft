@@ -201,6 +201,17 @@ public final class DuelPreparationService {
         host.changed(actor, OK);
     }
 
+    /** Solo calls after releasing its temporary startup guard. */
+    public void startFinished(UUID actor, boolean success) {
+        advance(actor);
+        host.changed(actor, success ? OK : START_FAILED);
+    }
+
+    public void clear() {
+        for (var flow : new HashSet<>(flows.values())) finish(flow, OFFLINE);
+        revisions.clear();
+    }
+
     public boolean isPreparing(UUID actor) {
         var flow = flows.get(actor);
         return flow != null && flow.mode != Mode.INVITED;

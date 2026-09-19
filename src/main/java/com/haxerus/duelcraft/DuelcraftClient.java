@@ -1,6 +1,8 @@
 package com.haxerus.duelcraft;
 
 import com.haxerus.duelcraft.client.DuelClientCommand;
+import com.haxerus.duelcraft.client.interaction.ClientPreparationState;
+import com.haxerus.duelcraft.client.interaction.PreparationRouting;
 import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.client.ClientPayloadHandler;
 import com.haxerus.duelcraft.client.collection.CollectionCatalog;
@@ -34,6 +36,7 @@ public class DuelcraftClient {
     private static volatile @Nullable CardDatabase cardDatabase;
     private static volatile @Nullable CardImageManager cardImageManager;
     private static volatile @Nullable SystemStringTable systemStringTable;
+    private static final ClientPreparationState preparation = new ClientPreparationState(net.neoforged.neoforge.network.PacketDistributor::sendToServer);
     private static final CollectionClient collectionClient = new CollectionClient(task -> Minecraft.getInstance().execute(task));
     private static final CompletableFuture<List<CardInfo>> collectionCatalog = new CompletableFuture<>();
 
@@ -50,11 +53,14 @@ public class DuelcraftClient {
     private static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         if (Minecraft.getInstance().screen instanceof CollectionScreen screen) screen.disconnect();
         collectionClient.disconnect();
+        preparation.disconnect();
+        PreparationRouting.disconnect();
         LDLibDuelScreen.close();
     }
 
     private static void onLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
         collectionClient.connect();
+        preparation.connect();
     }
 
     private static void onClientSetup(FMLClientSetupEvent event) {
@@ -115,6 +121,8 @@ public class DuelcraftClient {
     public static @Nullable SystemStringTable getSystemStringTable() {
         return systemStringTable;
     }
+
+    public static ClientPreparationState preparation() { return preparation; }
 
     public static CollectionClient getCollectionClient() { return collectionClient; }
 

@@ -62,6 +62,7 @@ public final class DuelClientCommand {
 
     private static int collection(CommandContext<CommandSourceStack> ctx) {
         var minecraft = Minecraft.getInstance();
+        if (com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()) return 1;
         var player = minecraft.player;
         DuelcraftClient.getCollectionClient().refresh().whenCompleteAsync((view, error) -> {
             if (minecraft.player != player || player == null) return;

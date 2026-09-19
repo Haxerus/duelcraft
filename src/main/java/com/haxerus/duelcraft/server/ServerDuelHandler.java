@@ -4,18 +4,17 @@ import com.haxerus.duelcraft.duel.DuelEventListener;
 import com.haxerus.duelcraft.duel.MessageSanitizer;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.mojang.logging.LogUtils;
-import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import org.slf4j.Logger;
 
-import java.util.UUID;
 
 public class ServerDuelHandler implements DuelEventListener {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private final ServerPlayer player0;
-    private final ServerPlayer player1;
-    private final UUID duelId;
+    private final BiConsumer<Integer, CustomPacketPayload> send;
+    private final Consumer<Boolean> complete;
 
     // Player index of the last prompt forwarded via sendToPlayer; Retry only reaches this player.
     private int pendingPlayer = -1;
@@ -23,10 +22,9 @@ public class ServerDuelHandler implements DuelEventListener {
     // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
     private boolean winSent;
 
-    public ServerDuelHandler(ServerPlayer player0, ServerPlayer player1, UUID duelId) {
-        this.player0 = player0;
-        this.player1 = player1;
-        this.duelId = duelId;
+    public ServerDuelHandler(BiConsumer<Integer, CustomPacketPayload> send, Consumer<Boolean> complete) {
+        this.send = send;
+        this.complete = complete;
     }
 
     /** Player index of the last prompt forwarded; the response ownership check compares against it. */
@@ -44,8 +42,8 @@ public class ServerDuelHandler implements DuelEventListener {
             }
             case DuelMessage.Win win -> {
                 var payload = new DuelEndPayload(win.winner(), win.reason());
-                PacketDistributor.sendToPlayer(player0, payload);
-                PacketDistributor.sendToPlayer(player1, payload);
+                send.accept(0, payload);
+                send.accept(1, payload);
                 winSent = true;
                 return DUEL_ENDED;
             }
@@ -85,8 +83,7 @@ public class ServerDuelHandler implements DuelEventListener {
     }
 
     private void send(int playerIndex, DuelMessage msg) {
-        var player = playerIndex == 0 ? player0 : player1;
-        PacketDistributor.sendToPlayer(player,
+        send.accept(playerIndex,
                 new DuelMessagePayload(MessageSanitizer.forRecipient(msg, playerIndex)));
     }
 
@@ -100,11 +97,6 @@ public class ServerDuelHandler implements DuelEventListener {
 
     @Override
     public void onDuelEnd() {
-        if (winSent) {
-            DuelManager.get().endDuel(duelId);
-        } else {
-            // The engine stopped without MSG_WIN; nobody won, but both clients still need a result.
-            DuelManager.get().finishDuel(duelId, DuelEndPayload.WINNER_DRAW, 0);
-        }
+        complete.accept(winSent);
     }
 }

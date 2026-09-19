@@ -1,6 +1,9 @@
 package com.haxerus.duelcraft.client.uitest;
 
 import com.haxerus.duelcraft.server.DuelManager;
+import com.haxerus.duelcraft.collection.*;
+import com.haxerus.duelcraft.uitest.CollectionPrivacyScenario;
+import java.util.*;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.ScenarioBuilder;
@@ -18,9 +21,9 @@ import java.nio.file.Path;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/** Exercises registered client commands and the real upload packet against the integrated server. */
+/** Exercises registered client commands and the real collection Save/Activate packets against the integrated server. */
 @OnlyIn(Dist.CLIENT)
-@LDLRegisterClient(name = "duel_deck_upload", group = "duelcraft", registry = UIScenario.REGISTRY,
+@LDLRegisterClient(name = "duel_deck_import", group = "duelcraft", registry = UIScenario.REGISTRY,
         environment = RegistrationEnvironment.DEV_ONLY)
 public final class DuelDeckUploadScenario implements UIScenario {
     @Override
@@ -28,7 +31,11 @@ public final class DuelDeckUploadScenario implements UIScenario {
 
     @Override
     public void define(ScenarioBuilder s) {
-        s.step("write unique local deck", ctx -> {
+        s.server("capture attachment and prepare known empty-collection fixture", sc -> {
+            sc.put("originalCollection", sc.player().getData(CollectionAttachments.COLLECTION));
+            sc.player().setData(CollectionAttachments.COLLECTION, CollectionAttachment.valid(PlayerCollectionData.empty()));
+            sc.check("default policy permits unowned legal list", !com.haxerus.duelcraft.ServerConfig.requireCardOwnership());
+        }).step("write unique local deck", ctx -> {
             try {
                 var dir = ctx.mc().gameDirectory.toPath().resolve("duelcraft/decks");
                 Files.createDirectories(dir);
@@ -36,8 +43,8 @@ public final class DuelDeckUploadScenario implements UIScenario {
                 ctx.put("uploadFile", file);
                 String name = file.getFileName().toString();
                 ctx.put("uploadName", name.substring(0, name.length() - 4));
-                Files.writeString(file, "#main\n" + IntStream.range(1000, 1040).mapToObj(String::valueOf)
-                        .collect(Collectors.joining("\n")) + "\n#extra\n9000\n!side\n");
+                Files.writeString(file, "#main\n" + CollectionPrivacyScenario.cards().main().stream().map(String::valueOf)
+                        .collect(Collectors.joining("\n")) + "\n#extra\n" + CollectionPrivacyScenario.cards().extra().getFirst() + "\n!side\n" + CollectionPrivacyScenario.cards().side().stream().map(String::valueOf).collect(Collectors.joining("\n")) + "\n");
             } catch (IOException e) { throw new UncheckedIOException(e); }
         }).step("local command suggestions include spaced names", ctx -> {
             var dispatcher = ClientCommandHandler.getDispatcher();
@@ -58,14 +65,20 @@ public final class DuelDeckUploadScenario implements UIScenario {
           }).server("server retains uploaded cards without a file", ctx -> {
               try {
                   var deck = DuelManager.get().resolveDeck(ctx.player());
-                  ctx.check("main deck contents received", deck.main().equals(IntStream.range(1000, 1040).boxed().toList()));
-                  ctx.check("extra deck contents received", deck.extra().equals(java.util.List.of(9000)));
+                  ctx.check("main deck contents received", deck.main().equals(CollectionPrivacyScenario.cards().main()));
+                  ctx.check("extra deck contents received", deck.extra().equals(CollectionPrivacyScenario.cards().extra()));
+                  var data = ctx.player().getData(CollectionAttachments.COLLECTION).data().orElseThrow();
+                  ctx.check("side cards saved", data.decks().get(data.activeDeckId()).cards().side().equals(CollectionPrivacyScenario.cards().side()));
+                  ctx.check("import grants no deposited cards", data.counts().isEmpty());
               } catch (IOException e) { throw new UncheckedIOException(e); }
           }).step("clear falls through to the server", ctx -> {
               ctx.check("get is a server command", !ClientCommandHandler.runCommand("duel deck get"));
               ctx.mc().player.connection.sendCommand("duel deck clear");
           }).waitUntilServer("selection cleared", ctx -> DuelManager.get().getPlayerCurrentDeck(ctx.player().getUUID()).isEmpty())
-          .teardown("remove fixture file", ctx -> {
+          .teardownServer("restore attachment", sc -> {
+              CollectionAttachment original = sc.get("originalCollection");
+              if (original != null) sc.player().setData(CollectionAttachments.COLLECTION, original);
+          }).teardown("remove fixture file", ctx -> {
               Path file = ctx.get("uploadFile");
               try { if (file != null) Files.deleteIfExists(file); }
               catch (IOException e) { throw new UncheckedIOException(e); }

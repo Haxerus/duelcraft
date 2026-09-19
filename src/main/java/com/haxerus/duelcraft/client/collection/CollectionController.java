@@ -351,6 +351,8 @@ final class CollectionController {
         return Component.literal(detail);
     }
 
+    void refreshCollections() { lists.refresh(); }
+
     void initializeCollections() { lists.newDraft(); lists.refresh(); }
     void initializeCollections(ClientCollectionState.View view) { lists.newDraft(); lists.applyView(view); }
 

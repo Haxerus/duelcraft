@@ -796,7 +796,7 @@ public class LDLibDuelScreen {
             if (resultClose != null) {
                 resultClose.setOnClick(e -> {
                     LDLibDuelScreen.close();
-                    Minecraft.getInstance().setScreen(null);
+                    if (!com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()) Minecraft.getInstance().setScreen(null);
                 });
             }
             // The pause dialog is itself the confirmation, so its Concede sends straight away.

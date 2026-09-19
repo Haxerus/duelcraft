@@ -22,10 +22,17 @@ public class ClientPayloadHandler {
         collectionReceiver.accept(payload);
     }
 
+    public static void handlePreparation(com.haxerus.duelcraft.server.PreparationStatePayload payload, IPayloadContext context) {
+        if (com.haxerus.duelcraft.DuelcraftClient.preparation().receive(payload)) {
+            com.haxerus.duelcraft.client.interaction.PreparationRouting.apply(payload);
+        }
+    }
+
     public static void handleStart(DuelStartPayload payload, IPayloadContext context) {
         LOGGER.info("Duel starting — player {}, opponent: {}, LP={}|{}, deck={}, extra={}",
                 payload.localPlayer(), payload.opponentName(),
                 payload.lp0(), payload.lp1(), payload.deckSize(), payload.extraSize());
+        com.haxerus.duelcraft.client.interaction.PreparationRouting.suspendEditor();
         LDLibDuelScreen.open(payload);
     }
 
