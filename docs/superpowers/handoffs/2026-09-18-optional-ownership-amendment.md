@@ -2,7 +2,7 @@
 
 Date: 2026-09-18. Revised: 2026-09-19 after the user's final decision.
 
-Status: M2 collection policy and editor implementation passed the [follow-up verification](../reports/2026-09-19-deck-use-policy-follow-up.md); final independent review remains before M3. M3–M6, including actual duel-route enforcement in M4, remain unfinished. This revision supersedes the earlier proposal in this document that made ownership enforcement exclusively a companion responsibility.
+Status: M2 collection policy and editor implementation passed the [follow-up verification](../reports/2026-09-19-deck-use-policy-follow-up.md); final independent review is complete. M3–M6, including actual duel-route enforcement in M4, remain unfinished. This revision supersedes the earlier proposal in this document that made ownership enforcement exclusively a companion responsibility.
 
 ## Decision
 

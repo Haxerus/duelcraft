@@ -10,7 +10,7 @@
 
 **Spec:** [Amendment](../handoffs/2026-09-18-optional-ownership-amendment.md), [design](../specs/2026-09-15-player-interaction-design.md), [contracts](../specs/2026-09-17-player-interaction-contracts.md).
 
-**Status:** Implementation and execution checks complete on `codex/player-collections`; independent Task 3 and final follow-up review remain pending before M3. Tasks 1 and 2 were independently reviewed clean (commits `7706965`, `2783248`, `37a963d`). [Actual follow-up evidence](../reports/2026-09-19-deck-use-policy-follow-up.md) records 901 fresh full-suite tests, 60 retained-world checks, 61 dedicated checks per ownership mode, and final UI runs at both requested scales. Original M1/M2 history and evidence remain separate; M3–M6 remain unimplemented.
+**Status:** Implementation and execution checks complete on `codex/player-collections`; all independent task reviews and the final follow-up review are complete; M3 may proceed. Tasks 1 and 2 were independently reviewed clean (commits `7706965`, `2783248`, `37a963d`). [Actual follow-up evidence](../reports/2026-09-19-deck-use-policy-follow-up.md) records 902 fresh full-suite tests, 60 retained-world checks, 61 dedicated checks per ownership mode, and final UI runs at both requested scales. Original M1/M2 history and evidence remain separate; M3–M6 remain unimplemented.
 
 ## Global constraints
 

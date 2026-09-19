@@ -32,7 +32,7 @@ The companion owns acquisition, packs, rewards, progression, and optional additi
 
 Evaluate restrictions against the authenticated player and immutable candidate deck/collection state, including proposed post-mutation counts. Recheck at activation, active-list revalidation, acceptance, and immediately before startup. Checks must not mutate, consume, or reserve cards. Configuration changes take effect after a server restart; companion hot-swapping is outside scope. Persisted active IDs are revalidated under the current setting/hooks when next used, including after restart.
 
-The [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) implements this policy for collection operations and editor feedback; see the [verification report](../reports/2026-09-19-deck-use-policy-follow-up.md) and [amendment](../handoffs/2026-09-18-optional-ownership-amendment.md). Final independent review remains the gate before M3. M3–M6 remain unfinished; M4 owns actual solo/multiplayer duel-start enforcement and legacy-route removal.
+The [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) implements this policy for collection operations and editor feedback; see the [verification report](../reports/2026-09-19-deck-use-policy-follow-up.md) and [amendment](../handoffs/2026-09-18-optional-ownership-amendment.md). Final independent review is complete; M3 may proceed. M3–M6 remain unfinished; M4 owns actual solo/multiplayer duel-start enforcement and legacy-route removal.
 
 ## Technical baseline inspected
 

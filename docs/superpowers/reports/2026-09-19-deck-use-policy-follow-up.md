@@ -1,6 +1,6 @@
 # Deck-use policy follow-up verification — 2026-09-19
 
-Status: implementation, execution checks and implementer self-review complete. Independent Task 3 and final follow-up review remain pending before M3. This report is separate from the historical M1/M2 reports.
+Status: implementation, execution checks and implementer self-review complete. All independent task reviews and the final follow-up review are complete; M3 may proceed. This report is separate from the historical M1/M2 reports.
 
 ## Scope and code
 
@@ -98,4 +98,13 @@ The production diff was reviewed for authenticated ownership, busy/error orderin
 
 The original M2 manifest and level hashes were rechecked unchanged at handoff: SHA256 `4BC6BAB42ACA13365FF2750045F2FB47998E06A7B7F187B341BB67673FFA2489` and `D28F2EA9A04FD2242A90D9DAE9C9008CF4F753FFCDB55BF4EA2897834FB30AE1`, respectively. The isolated policy world remains retained after the removed phase, with ownership required, no listener, revision10 and no active list.
 
-No unresolved implementation defect is known from these checks. Independent Task 3 and final follow-up review remain pending. No merge/push was performed, and the worktree remains available for review. Evidence establishes the stated collection/editor and negotiation behavior; it does not establish an old-binary disconnect screen or policy enforcement at legacy duel startup routes.
+No unresolved implementation defect is known from these checks. All independent task reviews and the final follow-up review are complete. No merge/push was performed, and the worktree remains available for review. Evidence establishes the stated collection/editor and negotiation behavior; it does not establish an old-binary disconnect screen or policy enforcement at legacy duel startup routes.
+
+
+## Final review and completion
+
+All three task reviews passed. The broad review of `a13630e..5ad3fd1` found one minor normalization defect: a nonblank companion reason whose first 256 characters were whitespace became an invalid blank reason after truncation. Commit `20793f4` bounds the value before checking blankness and adds a direct-policy regression; `36a1216` strengthens the event regression to prove a later denial cannot replace the first fallback. The scoped re-review of both commits marked the finding addressed with no new Critical or Important issue. No findings remain parked or deferred.
+
+After the production fix, `./gradlew.bat test` passed **902 tests across 53 suites**, with zero failures, errors or skips in 29 seconds. The focused `DeckUsePolicyTest` then passed all 8 tests after the assertion-only follow-up. Evidence is under `build/evidence/deck-use-policy/final-fix/` (`full.log`, `full-xml/`, and `final-focused.log/.xml`). The earlier 901-test Task 3 run and runtime results above remain their original execution records. The normalization fix preserves the shipped event adapter's fallback behavior, so the unchanged UI, lifecycle and dedicated scenarios were not repeated.
+
+The implementation and review ledger, briefs, reports and diff packages are retained under `build/evidence/deck-use-policy/development-review/`. The task-created temporary Gradle user cache and its own daemon were cleaned up. The branch and worktree are preserved; no merge or push was performed. M2 follow-up is complete and M3 may proceed, with the M4 and old-binary compatibility limits above unchanged.
