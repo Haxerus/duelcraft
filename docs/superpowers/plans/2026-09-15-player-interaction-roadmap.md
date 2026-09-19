@@ -9,7 +9,7 @@ This roadmap covers the complete integration. Milestone 1 is complete through `2
 | 1. Sample-data editor — complete | [Editor](2026-09-15-deck-editor-milestone-1.md) |
 | 2. Persistence and saved lists — complete and reviewed | [Personal collections](2026-09-17-player-collections-milestone-2.md) |
 | 3. Physical cards and transfers — complete | [Inventory transfers](2026-09-17-card-transfers-milestone-3.md) |
-| 4. Duel preparation and import — implemented, final review pending | [Authoritative preparation](2026-09-17-duel-preparation-milestone-4.md) |
+| 4. Duel preparation and import — complete and reviewed | [Authoritative preparation](2026-09-17-duel-preparation-milestone-4.md) |
 | 5. Home, binder, mat and lobby | [Player entry points](2026-09-17-player-entry-points-milestone-5.md) |
 | 6. Release validation | [Tests and documentation](2026-09-17-interaction-release-milestone-6.md) |
 
@@ -17,7 +17,7 @@ Read the [shared implementation contracts](../specs/2026-09-17-player-interactio
 
 ## Policy amendment before further implementation
 
-Decision 2026-09-19: core `requireCardOwnership=false` server setting plus an optional companion restriction hook. See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [M2 policy follow-up](2026-09-19-deck-use-policy-follow-up.md). Original M2 and subsequent editor fixes exist in `codex/player-collections`; M3 is complete and user-accepted; M4 implementation and required checks are complete, with final review pending; M5–M6 have not started. The follow-up now has 902 passing unit/JNI tests, four retained-world JVM phases (60 checks), and dedicated A/B privacy runs under both settings (61 checks each), plus separate editor captures; see the [follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md). The follow-up passed independent review before M3 implementation. Preserve the M1/M2 reports as evidence for their original behavior.
+Decision 2026-09-19: core `requireCardOwnership=false` server setting plus an optional companion restriction hook. See the [ownership policy amendment](../handoffs/2026-09-18-optional-ownership-amendment.md) and [M2 policy follow-up](2026-09-19-deck-use-policy-follow-up.md). Original M2 and subsequent editor fixes exist in `codex/player-collections`; M3 is complete and user-accepted; M4 implementation, required checks and independent reviews are complete; manual acceptance is pending; M5–M6 have not started. The follow-up now has 902 passing unit/JNI tests, four retained-world JVM phases (60 checks), and dedicated A/B privacy runs under both settings (61 checks each), plus separate editor captures; see the [follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md). The follow-up passed independent review before M3 implementation. Preserve the M1/M2 reports as evidence for their original behavior.
 
 Core owns collections, transfers, legality, and optional ownership enforcement. The companion supplies acquisition/progression and may deny additional deck use. Verify settings off/on without a companion and a test companion restriction under both settings. No companion development is required to complete integration.
 
@@ -53,7 +53,7 @@ A restricted development grant command provides test cards until acquisition con
 
 ## 4. Authoritative duel preparation and list import
 
-**Implemented and verified 2026-09-19; final review pending:** [M4 report and manual checks](../reports/2026-09-19-duel-preparation-m4.md). Protocol 7; 1,007 final unit/JNI tests and 286 final Task 5 runtime checks. The report also records real import/editor tests and evidence limits. M5/M6 remain separate checkpoints.
+**Complete and independently reviewed 2026-09-19; manual acceptance pending:** [M4 report and manual checks](../reports/2026-09-19-duel-preparation-m4.md). Protocol 7; 1,007 final unit/JNI tests and 286 final Task 5 runtime checks. The report also records real import/editor tests and evidence limits. M5/M6 remain separate checkpoints.
 
 Add `server/DuelPreparationService` to share challenge, accept, cancel, and readiness validation across commands and UI. Adapt `DuelManager` to resolve persistent active-list IDs and capture immutable engine decks on acceptance. Keep `isBusy` true through first-turn selection/start; release it on timeout/cancel/disconnect/failure. Revalidate at preparation/start, including unknown/type checks, configured ownership enforcement, and companion restrictions defined in the M2 policy follow-up.
 

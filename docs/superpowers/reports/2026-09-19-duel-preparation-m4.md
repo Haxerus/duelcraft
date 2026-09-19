@@ -1,6 +1,6 @@
 # M4 collection-backed duel preparation verification
 
-Status: implementation and required checks complete; final independent review pending on `codex/player-collections` in the existing `.superpowers/worktrees/deck-editor` worktree. Started from clean `0fbe8c8`; user accepted all M3 manual playtests with no issues and authorized M4 with subagent-driven development. M5/M6 remain later checkpoints. No merge or push.
+Status: complete, verified and independently reviewed on `codex/player-collections` in the existing `.superpowers/worktrees/deck-editor` worktree. Started from clean `0fbe8c8`; user accepted all M3 manual playtests with no issues and authorized M4 with subagent-driven development. M5/M6 remain later checkpoints. No merge or push.
 
 ## Completed task 1: YDK imports
 
@@ -40,7 +40,7 @@ The controller also ran the real 1920x1080 GUI-scale-3 editor regression: three 
 
 Commit: `cc71703 test: close collection duel preparation races`.
 
-The integrated `collection_duel_policy` scenario passes **17/17 checks, 61 steps, two captures**. It uses the registered activation and solo commands with a legal list and empty deposited counts under default ownership. Actual Save/deposit packets return BUSY while preserving the exact attachment/inventory; the same operations succeed after release. Forfeit/result close restores the original dirty editor name, UUID, cards and controller. A one-shot wrapper delegates real native setup, then throws; the actual close path runs once, START_FAILED removes the duel screen without a result overlay, restores the draft and preserves selection, and a subsequent native retry succeeds. The controller parsed the actual report and inspected the recovery capture. Evidence: `build/evidence/collection-m4/task5/solo/`. This exercises JNI destruction, not independent native allocation/leak measurement.
+The integrated `collection_duel_policy` scenario passes **17/17 checks, 61 steps, two captures**. It uses the registered activation and solo commands with a legal list and empty deposited counts under default ownership. Actual Save/deposit packets return BUSY while preserving the exact attachment and fixture slot-0 count; the same operations succeed after release. Forfeit/result close restores the original dirty editor name, UUID, cards and controller. A one-shot wrapper delegates real native setup, then throws; the actual close path runs once, START_FAILED removes the duel screen without a result overlay, restores the draft and preserves selection, and a subsequent native retry succeeds. The controller parsed the actual report and inspected the recovery capture. Evidence: `build/evidence/collection-m4/task5/solo/`. This exercises JNI destruction, not independent native allocation/leak measurement.
 
 Final dedicated policy runs passed **74/74 checks in each ownership mode** (`task5/mp-final-default/`, `task5/mp-final-required/`). They cover solo/multiplayer policy with no hook, approval, denial and failure; changed progression after invitation/acceptance; exact Side ownership; RPS/FIRST_CHOICE/STARTING/live mutation locks; native failure/retry; and actual disconnect cleanup. The policy matrix invokes the production manager/preparation service on the real dedicated server with an installed event listener and real native sessions. Mutation/disconnect checks use actual game connections except synchronous STARTING probes, which call the authenticated handler while native startup holds the server thread. Successful command journeys are verified separately; each denying combination is not a separate client-command send.
 
@@ -52,9 +52,15 @@ Final migrated M3 transfer isolation plus dedicated command runs passed **42/42 
 
 Task 5's final runtime runs total **286 checks across 12 scenario executions**: solo 17, dedicated policy 74 + 74, migrated checks 42 + 42, and lifecycle 37. Earlier intermediate/failing attempts are excluded.
 
-## Remaining verification
+## Review completion and evidence limits
 
-All task reviews are approved with no remaining Critical/Important findings; the whole-milestone review remains. Task 5 review noted one optional coverage improvement: its synchronous STARTING probe compares collection data but not physical inventory, while other locked-state probes compare all 41 slots. Earlier M2/M3 evidence and retained worlds remain separate. M3 retained-world hashes captured before this milestone are in `build/evidence/collection-m4/m3-world-baseline-hashes.json`.
+All task reviews and the final whole-M4 review passed with no remaining Critical/Important findings. Final review covered `0fbe8c8..12cf9e3` and independently verified the final unit/runtime totals. Subsequent edits record this verdict and clarify evidence; they do not change source behavior. Review records and the execution ledger are archived locally under `build/evidence/collection-m4/reviews/`.
+
+Two nonblocking observations remain: the synchronous STARTING probe checks collection data but not physical inventory, and intentional fault diagnostics make logs noisy. BUSY rejection occurs before command dispatch or inventory access. Other multiplayer busy phases compare all 41 slots; the solo probe checks the attachment and fixture slot-0 count. The decision is to retain these as test-quality follow-ups: the costs are a narrower STARTING regression assertion and less readable logs, not a known production mutation defect.
+
+The local dedicated harness uses offline-mode identities. It verifies connection-derived isolation, not online-account authentication or a new multi-machine LAN/tunnel test. Older-version rejection is simulated against registered channels; native cleanup is exercised without independent leak measurement. These are explicit evidence limits, not claimed passes. Manual M4 user acceptance remains pending. M5/M6 have not started.
+
+Earlier M2/M3 evidence and retained worlds remain separate. M3 retained-world hashes captured before this milestone are in `build/evidence/collection-m4/m3-world-baseline-hashes.json`.
 
 ## Implementation decisions
 
@@ -75,7 +81,7 @@ Use matching client/server builds (protocol 7) and keep existing M2/M3 test worl
 4. Disconnect during an invitation, RPS and a live duel; confirm the remaining player is released and can begin another flow. After a live surrender/end, reopen the collection and confirm the saved list remains active.
 5. Restart a separate test world with ownership enabled. An unowned active list should become inactive while the list stays saved. Depositing exact passcodes across Main/Extra/Side should permit explicit activation; matching cards still held in inventory should not count. Deposits alone must not activate the deck.
 6. With a companion restriction installed, confirm denial applies with ownership both disabled and enabled. Change companion eligibility between invitation and acceptance, and between acceptance and first-turn choice: startup must recheck and release both players on failure. A failing hook should show a generic actionable error while retaining recoverable collection data.
-7. Run the DEV startup-failure fixture documented in the final runtime evidence. After Start followed by failure, confirm no victory overlay or stuck duel screen remains, collection controls recover, and a subsequent ordinary duel starts.
+7. Run the DEV startup-failure fixture with `./gradlew.bat runClient -PldTest=collection_duel_policy -PcollectionTransferUi -PldTestWindow=1280x720 -PldTestGuiScale=2 -PldTestWatchdogSec=240`. After Start followed by failure, confirm no victory overlay or stuck duel screen remains, collection controls recover, and a subsequent ordinary duel starts.
 
 ## Review observations
 

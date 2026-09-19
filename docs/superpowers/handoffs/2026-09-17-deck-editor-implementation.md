@@ -1,6 +1,6 @@
 # Collection and deck editor implementation handoff
 
-Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 implementation and required checks are complete; final independent review is pending. M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
+Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 is complete, verified and independently reviewed; its manual acceptance is pending. M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
 
 ## Workspace and starting point
 
@@ -24,7 +24,7 @@ The ownership amendment supersedes older unconditional ownership language. The i
 
 ## M3 completion addendum
 
-M3 commits begin with `1cc975c` (item), `9157898` (atomic service), and `f77f0e9` (packets/editor); the final task adds grant/runtime fixtures and review fixes. Final verification passed 930 unit/JNI tests, 86 scale2 UI checks, 188 scale3 UI checks, 28 dedicated checks per ownership mode, and 23 retained-world/restart checks. Evidence: `build/evidence/collection-m3/`. The original worktree and earlier evidence/worlds are preserved. No merge or push. The user accepted all M3 manual checks and authorized M4; its implementation and required checks are complete, with final review pending. See the [M4 verification report](../reports/2026-09-19-duel-preparation-m4.md).
+M3 commits begin with `1cc975c` (item), `9157898` (atomic service), and `f77f0e9` (packets/editor); the final task adds grant/runtime fixtures and review fixes. Final verification passed 930 unit/JNI tests, 86 scale2 UI checks, 188 scale3 UI checks, 28 dedicated checks per ownership mode, and 23 retained-world/restart checks. Evidence: `build/evidence/collection-m3/`. The original worktree and earlier evidence/worlds are preserved. No merge or push. The user accepted all M3 manual checks and authorized M4; its implementation, required checks and independent reviews are complete. See the [M4 verification report](../reports/2026-09-19-duel-preparation-m4.md).
 
 ## M4 completion evidence
 
@@ -63,7 +63,7 @@ M4 supplies command-driven preparation, persistent collection-backed selection a
 | Milestone | Status and implementation plan |
 | --- | --- |
 | M3: Physical cards and transfers | **Complete, verified.** [Report](../reports/2026-09-19-card-transfers-m3.md). [Plan](../plans/2026-09-17-card-transfers-milestone-3.md): canonical passcode card item; inventory transaction planner/service; transfer packets and editor controls; restricted card-grant command and real inventory scenarios. |
-| M4: Duel preparation and import | Implemented and verified; final review pending. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
+| M4: Duel preparation and import | Complete, verified and independently reviewed. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
 | M5: Player entry points | Not implemented. [Plan](../plans/2026-09-17-player-entry-points-milestone-5.md): Home/hotkey, binder, mat, private lobby and state-aware navigation. |
 | M6: Release validation | Not implemented. [Plan](../plans/2026-09-17-interaction-release-milestone-6.md): full UI/runtime matrix, dedicated two-player acceptance, compatibility and documentation audit. |
 
