@@ -104,8 +104,10 @@ class DeckUsePolicyTest {
                 DeckUseCheckEvent.restriction(invalidBus).denial(context(LEGAL, Map.of())));
 
         var boundedBlankBus = BusBuilder.builder().build();
-        boundedBlankBus.addListener(DeckUseCheckEvent.class,
-                event -> event.deny(" ".repeat(DeckUsePolicy.MAX_RESTRICTION_REASON_LENGTH) + "denied"));
+        boundedBlankBus.addListener(DeckUseCheckEvent.class, event -> {
+            event.deny(" ".repeat(DeckUsePolicy.MAX_RESTRICTION_REASON_LENGTH) + "denied");
+            event.deny("Later denial");
+        });
         assertEquals(DeckUseCheckEvent.INVALID_REASON_FALLBACK,
                 DeckUseCheckEvent.restriction(boundedBlankBus).denial(context(LEGAL, Map.of())));
     }
