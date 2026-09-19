@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.client.collection.ClientCollectionState;
 import com.haxerus.duelcraft.client.collection.CollectionScreen;
 import com.haxerus.duelcraft.client.collection.SavedDeckController;
 import com.haxerus.duelcraft.collection.CollectionReply;
+import com.haxerus.duelcraft.collection.SavedDeck;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Scroller;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
@@ -15,9 +16,15 @@ import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Real popup hit testing and visual checks for the playtest-specific collection regressions. */
 final class CollectionWidgetPlaytest {
@@ -28,6 +35,10 @@ final class CollectionWidgetPlaytest {
             var window = ctx.mc().getWindow();
             ctx.put("originalWidth", window.getWidth());
             ctx.put("originalHeight", window.getHeight());
+            var importFile = ctx.mc().gameDirectory.toPath().resolve("duelcraft/decks/collection-import-ui.ydk");
+            ctx.put("importFile", importFile);
+            try { Files.deleteIfExists(importFile); }
+            catch (IOException error) { throw new UncheckedIOException(error); }
             GLFW.glfwSetWindowSize(window.getWindow(), width, height);
         }).waitUntil("requested viewport applied", ctx -> ctx.mc().getWindow().getWidth() == width
                 && ctx.mc().getWindow().getHeight() == height)
@@ -40,12 +51,16 @@ final class CollectionWidgetPlaytest {
               var cards = new java.util.ArrayList<>(CollectionFixture.cards());
               cards.add(new com.haxerus.duelcraft.client.carddata.CardInfo(90000, "Anime sample", "",
                       1, 0, 0, 1, 1, 1, 4));
+              var listRef = new AtomicReference<SavedDeckController>();
               var screen = CollectionScreen.create(model, cards,
                       code -> { fullCalls.add(code); return code == 10003 ? null : full; },
                       code -> { artCalls.add(code); return code == 10003 ? null : art; },
-                      CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
+                      CollectionFixture.LIST_ID, (name, deck) -> CompletableFuture.completedFuture(
+                              new SavedDeck(listRef.get().id(), name, deck)), CollectionFixture.query());
               Object controller = ctx.getField(screen, "controller");
               SavedDeckController lists = ctx.getField(controller, "lists");
+              listRef.set(lists);
+              ctx.put("lists", lists);
               lists.applyView(new ClientCollectionState.View(1, model.owned(), List.of(
                       new CollectionReply.Summary(CollectionFixture.LIST_ID, "New list", 40, 5, 0)), null));
               return screen;
@@ -105,6 +120,48 @@ final class CollectionWidgetPlaytest {
           .step("choose Measure through its real popup row", ctx -> choose(ctx, "filter-measure", CardSearch.Measure.RANK))
           .click("#toggle-filters").ticks(2)
           .step("open Saved lists with real mouse input", ctx -> click(ctx, "saved-lists")).ticks(2)
+          .checkText("#list-import-label", "Import a local .ydk list")
+          .check("empty local picker has no selection and disables Import", ctx -> {
+              var picker = ctx.el("#list-import-picker").as(Selector.class);
+              return picker.getValue() == null && !ctx.el("#list-import").element().isActive();
+          })
+          .hoverAt(-100, -100).screenshot("collection-import-empty-scale" + guiScale)
+          .click("#list-import-picker").ticks(2)
+          .check("empty local picker opens safely", ctx -> {
+              var picker = ctx.el("#list-import-picker").as(Selector.class);
+              return picker.isOpen() && picker.getValue() == null && !ctx.el("#list-import").element().isActive();
+          })
+          .click("#list-import-picker").ticks(2)
+          .step("close Saved lists before adding a local deck", ctx -> click(ctx, "lists-close")).ticks(2)
+          .step("write populated local deck", ctx -> {
+              Path importFile = ctx.get("importFile");
+              try {
+                  Files.createDirectories(importFile.getParent());
+                  Files.writeString(importFile, "#main\n10001\n10002\n#extra\n10066\n!side\n10003\n");
+              } catch (IOException error) { throw new UncheckedIOException(error); }
+          })
+          .step("reopen Saved lists with a local deck", ctx -> click(ctx, "saved-lists")).ticks(2)
+          .click("#list-import-picker").ticks(2)
+          .step("choose populated Import row", ctx -> choose(ctx, "list-import-picker", "collection-import-ui"))
+          .check("populated local picker enables Import", ctx ->
+                  "collection-import-ui".equals(ctx.el("#list-import-picker").as(Selector.class).getValue())
+                          && ctx.el("#list-import").element().isActive())
+          .hoverAt(-100, -100).screenshot("collection-import-populated-scale" + guiScale)
+          .click("#list-import").ticks(2)
+          .check("Import loads and saves every YDK section", ctx -> {
+              var model = ctx.<com.haxerus.duelcraft.client.collection.DeckEditorModel>get("model");
+              var lists = ctx.<SavedDeckController>get("lists");
+              return model.draft().main().equals(List.of(10001, 10002))
+                      && model.draft().extra().equals(List.of(10066))
+                      && model.draft().side().equals(List.of(10003))
+                      && !model.dirty() && lists.stored() && "collection-import-ui".equals(lists.name());
+          })
+          .step("restore original playtest list", ctx -> {
+              var lists = ctx.<SavedDeckController>get("lists");
+              lists.importDraft(new SavedDeck(CollectionFixture.LIST_ID, "New list",
+                      CollectionFixture.model(false).draft()));
+              lists.save();
+          }).ticks(2)
           .click("#list-picker")
           .step("choose Saved list through its real popup row", ctx -> choose(ctx, "list-picker", CollectionFixture.LIST_ID))
           .hoverAt(-100, -100).screenshot("collection-playtest-scale" + guiScale)
@@ -120,6 +177,9 @@ final class CollectionWidgetPlaytest {
           .hoverAt(-100, -100).screenshot("sorted-deck-scale" + guiScale)
           .teardown("restore viewport", ctx -> {
               ctx.mc().setScreen(null);
+              Path importFile = ctx.get("importFile");
+              try { if (importFile != null) Files.deleteIfExists(importFile); }
+              catch (IOException error) { throw new UncheckedIOException(error); }
               GLFW.glfwSetWindowSize(ctx.mc().getWindow().getWindow(), ctx.get("originalWidth"), ctx.get("originalHeight"));
           });
     }
@@ -160,7 +220,7 @@ final class CollectionWidgetPlaytest {
             var scroll = ctx.el("#" + id).as(ScrollerView.class);
             if (!compact(scroll.verticalScroller, false) || !compact(scroll.horizontalScroller, true)) return false;
         }
-        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-picker")) {
+        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-picker", "list-import-picker")) {
             var selector = ctx.el("#" + id).as(Selector.class);
             if (!compact(selector.scrollerView.verticalScroller, false)
                     || !compact(selector.scrollerView.horizontalScroller, true)) return false;

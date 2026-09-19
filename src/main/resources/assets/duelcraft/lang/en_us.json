@@ -34,6 +34,7 @@
   "duelcraft.collection.lists": "Saved lists",
   "duelcraft.collection.import_local": "Import a local .ydk list",
   "duelcraft.collection.import": "Import",
+  "duelcraft.collection.no_local_decks": "No local .ydk files",
   "duelcraft.collection.list_name": "List name · 1–128 printable characters",
   "duelcraft.collection.new": "New",
   "duelcraft.collection.rename": "Save / Rename",

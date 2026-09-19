@@ -98,6 +98,7 @@ final class CollectionController {
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
         ((TextElement) element("inspector-empty-prompt")).setText(Component.translatable("duelcraft.collection.select_card"));
         for (var entry : Map.of("lists-title", "lists", "list-name-label", "list_name",
+                "list-import-label", "import_local",
                 "list-save-first", "save_first",
                 "delete-title", "delete_confirm", "delete-copy", "delete_copy",
                 "close-title", "save_changes", "close-copy", "save_changes_copy").entrySet()) {
@@ -240,10 +241,12 @@ final class CollectionController {
     }
 
     private void refreshImportPicker(Selector<String> picker) {
+        var options = UIElementProvider.<String>text(name -> name == null
+                ? Component.translatable("duelcraft.collection.no_local_decks") : Component.literal(name));
+        picker.setCandidateUIProvider(name -> options.apply(name).addClass("selector-option"));
         try {
             var names = imports.names();
-            var options = UIElementProvider.<String>text(Component::literal);
-            picker.setCandidates(names).setCandidateUIProvider(name -> options.apply(name).addClass("selector-option"));
+            picker.setCandidates(names);
             picker.setValue(names.isEmpty() ? null : names.getFirst(), false);
             importsAvailable = !names.isEmpty();
             element("list-import").setActive(importsAvailable && !lists.pending());
