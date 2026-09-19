@@ -1,4 +1,6 @@
 {
+  "item.duelcraft.card": "Duelcraft Card",
+  "item.duelcraft.card.passcode": "Passcode: %s",
   "duelcraft.collection.sort_deck": "Sort deck",
   "duelcraft.collection.sort_deck_help": "Normal Monsters → Effect Monsters → Spells → Traps. Sorts each section separately, preserving order within each type.",
   "itemGroup.duelcraft": "Example Mod Tab",

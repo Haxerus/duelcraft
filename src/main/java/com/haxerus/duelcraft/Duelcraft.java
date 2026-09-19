@@ -2,6 +2,8 @@ package com.haxerus.duelcraft;
 
 import com.haxerus.duelcraft.core.data.CardData;
 import com.haxerus.duelcraft.collection.CollectionAttachments;
+import com.haxerus.duelcraft.item.CardComponents;
+import com.haxerus.duelcraft.item.CardItem;
 import com.haxerus.duelcraft.server.DuelCommand;
 import com.haxerus.duelcraft.server.DuelManager;
 import com.haxerus.duelcraft.server.DuelNetworking;
@@ -46,6 +48,7 @@ public class Duelcraft {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
     // Create a Deferred Register to hold Items which will all be registered under the "duelcraft" namespace
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
+    public static final DeferredItem<CardItem> CARD = ITEMS.registerItem("card", CardItem::new);
     // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "duelcraft" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
@@ -82,6 +85,7 @@ public class Duelcraft {
         // Register the Deferred Register to the mod event bus so tabs get registered
         CREATIVE_MODE_TABS.register(modEventBus);
         CollectionAttachments.TYPES.register(modEventBus);
+        CardComponents.TYPES.register(modEventBus);
 
         // Register ourselves for server and other game events we are interested in.
         // Note that this is necessary if and only if we want *this* class (Duelcraft) to respond directly to events.

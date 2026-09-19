@@ -26,7 +26,7 @@ Java paths start at `src/main/java/com/haxerus/duelcraft/`, tests at `src/test/j
 
 **Interfaces:** `CardComponents.CARD_CODE` is `DeferredHolder<DataComponentType<?>,DataComponentType<Integer>>`; `CardItem.stack(int code,int count)` returns a canonical stack from registered `duelcraft:card`, and `CardItem.code(ItemStack)` returns `OptionalInt`. `CardItem.isCanonical(ItemStack)` compares item/components with a canonical stack; count does not affect component equivalence. Store max stack64.
 
-- [ ] Write registry-aware component serialization tests: distinct codes cannot merge; same codes can; absent/nonpositive component is not depositable; quantities1 and64 have equivalent components. Use the existing NeoForge unit-test environment and bootstrap registries only if its tested mod has not done so.
+- [x] Write registry-aware component serialization tests: distinct codes cannot merge; same codes can; absent/nonpositive component is not depositable; quantities1 and64 have equivalent components. Use the existing NeoForge unit-test environment and bootstrap registries only if its tested mod has not done so.
 
 ```java
 var a = CardItem.stack(89631139, 1);
@@ -37,16 +37,16 @@ assertFalse(ItemStack.isSameItemSameComponents(a, other));
 assertEquals(89631139, CardItem.code(a).orElseThrow());
 ```
 
-- [ ] Run `./gradlew.bat test --tests '*CardItemTest'` and establish failure for missing item/component behavior.
-- [ ] Register the integer component with persistent `Codec.INT` validated positive and network `ByteBufCodecs.VAR_INT` with equivalent validation. Centralize positivity checks in stack construction and request decoding; never trust a packet to describe an actual inventory item. Register the component deferred register on the mod bus.
-- [ ] Use the existing card-back asset for an initial recognizable item, not a new asset generator:
+- [x] Run `./gradlew.bat test --tests '*CardItemTest'` and establish failure for missing item/component behavior.
+- [x] Register the integer component with persistent `Codec.INT` validated positive and network `ByteBufCodecs.VAR_INT` with equivalent validation. Centralize positivity checks in stack construction and request decoding; never trust a packet to describe an actual inventory item. Register the component deferred register on the mod bus.
+- [x] Use the existing card-back asset for an initial recognizable item, not a new asset generator:
 
 ```json
 {"parent":"minecraft:item/generated","textures":{"layer0":"duelcraft:card_back"}}
 ```
 
 Client tooltip shows passcode and cached card name when available; server/common item code must not statically load `DuelcraftClient`. Put optional display lookup in a client tooltip event handler in `client/collection/CardItemTooltip.java`, registered by `DuelcraftClient.java`. Missing metadata retains passcode text. Do not show a positive-ID-less card as a normal collectible in the creative tab.
-- [ ] Verify component round trips and a dedicated-server launch without client-class loading, then commit `feat: add physical card items`.
+- [x] Verify component round trips and a dedicated-server launch without client-class loading, then commit `feat: add physical card items`.
 
 ## Task 2: Inventory transaction planner
 
