@@ -41,7 +41,7 @@ public final class CollectionPersistenceScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
         CollectionRuntimeFixture.discardNewDraft(s);
-        s.waitForText("#sample-label", "Runtime owned all sections");
+        s.waitForText("#editor-title", "Runtime owned all sections");
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.click("#activate-deck")
          .waitUntilServer("known owned activation accepted", sc -> CollectionRuntimeFixture.OWNED_ID.equals(CollectionRuntimeFixture.data(sc).activeDeckId()))
@@ -70,7 +70,7 @@ public final class CollectionPersistenceScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
         CollectionRuntimeFixture.discardNewDraft(s);
-        s.waitForText("#sample-label", "Runtime owned all sections")
+        s.waitForText("#editor-title", "Runtime owned all sections")
          .checkTextContains("#list-active-status", "is active")
          .check("ReadDeck after respawn loads complete owned Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().get(CollectionRuntimeFixture.OWNED_ID).cards()));
         CollectionRuntimeFixture.press(s, "#lists-close");
@@ -81,7 +81,7 @@ public final class CollectionPersistenceScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OTHER_ID);
         s
-         .waitForText("#sample-label", "Runtime second saved UUID")
+         .waitForText("#editor-title", "Runtime second saved UUID")
          .check("second UUID ReadDeck preserves complete Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().get(CollectionRuntimeFixture.OTHER_ID).cards()));
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkTextContains("#main-count", "1").checkTextContains("#extra-count", "1").checkTextContains("#side-count", "1")

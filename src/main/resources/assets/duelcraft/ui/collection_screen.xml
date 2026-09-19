@@ -22,11 +22,10 @@
         .muted { text-color: #AAAAAA; }
         .heading { font-size: 16; height: 20; flex-shrink: 0; }
         #editor-header { height: 56; flex-shrink: 0; flex-direction: row; gap-all: 12; align-items: center; }
-        #header-title { flex: 1; gap-all: 3; }
-        #header-title label { height: 14; }
-        #editor-title { height: 22; }
+        #header-title { flex: 1; min-width: 0; gap-all: 3; }
+        #deck-summary { height: 14; }
+        #editor-title { height: 22; width: 100%; text-wrap: hover_roll; overflow: hidden; }
         #saved-lists, #save-deck { width: 146; height: 36; }
-        #sample-label { width: 230; text-wrap: wrap; adaptive-height: true; text-color: #AAAAAA; }
         #lists-dialog, #delete-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
         #delete-dialog { z-index: 110; }
         #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
@@ -123,11 +122,9 @@
         <element id="collection-canvas">
             <element id="editor-header">
                 <element id="header-title">
-                    <label class="muted">DUELCRAFT / DECK BUILDER</label>
-                    <label id="editor-title" class="heading">duelcraft.collection.title</label>
+                    <label id="editor-title" class="heading" />
                     <label id="deck-summary" />
                 </element>
-                <label id="sample-label">duelcraft.collection.sample</label>
                 <button id="saved-lists" text="duelcraft.collection.lists" />
                 <button id="save-deck" text="duelcraft.collection.save" />
             </element>
@@ -144,7 +141,6 @@
                         <label id="inspector-owned" />
                         <label id="inspector-used" />
                         <label id="inspector-missing" />
-                        <label>Add to / remove from</label>
                         <element class="row">
                             <button id="section-deck" class="mode-button" text="Deck" />
                             <button id="section-side" class="mode-button" text="Side" />

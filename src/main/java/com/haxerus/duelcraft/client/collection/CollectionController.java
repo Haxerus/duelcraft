@@ -83,9 +83,7 @@ final class CollectionController {
         this.search = search;
         lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
         this.close = close;
-        for (var entry : Map.of("editor-title", "title", "sample-label", "sample", "editor-status", "unavailable").entrySet()) {
-            ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
-        }
+        ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
         for (var entry : Map.of("lists-title", "lists", "list-name-label", "list_name",
                 "list-supported-checks", "supported_checks", "list-save-first", "save_first",
                 "delete-title", "delete_confirm", "delete-copy", "delete_copy",
@@ -221,7 +219,7 @@ final class CollectionController {
         element("list-clear-active").setActive(!lists.pending() && lists.activeId() != null);
         element("list-refresh").setActive(!lists.pending());
         element("close-dialog").setDisplay(lists.needsDecision());
-        ((TextElement) element("sample-label")).setText(Component.literal(lists.name()));
+        ((TextElement) element("editor-title")).setText(Component.literal(lists.name()));
         ((TextElement) element("list-active-status")).setText(Component.translatable("duelcraft.collection." +
                 (lists.id().equals(lists.activeId()) ? "active" : "not_active")));
         if (!lists.status().isEmpty()) ((TextElement) element("editor-status")).setText(
@@ -449,8 +447,7 @@ final class CollectionController {
         if (draft.side().size() > 15) warnings.add("Side exceeds 15");
         if (draft.requiredCopies().values().stream().anyMatch(count -> count > 3)) warnings.add("More than 3 copies");
         if (missing > 0) warnings.add(missing + " missing");
-        text("deck-summary", "Main " + draft.main().size() + " · Extra " + draft.extra().size()
-                + " · Side " + draft.side().size() + (lists.dirty() ? " · Unsaved changes" : " · Saved list"));
+        text("deck-summary", lists.dirty() ? "Unsaved changes" : "Saved list");
         for (String id : List.of("activate-deck", "list-activate")) {
             element(id).setActive(!lists.pending() && lists.ready() && lists.stored() && !lists.dirty());
             element(id).getStyle().tooltips(Component.translatable("duelcraft.collection." +

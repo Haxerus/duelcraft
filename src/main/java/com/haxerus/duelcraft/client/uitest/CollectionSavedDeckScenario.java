@@ -72,7 +72,7 @@ public final class CollectionSavedDeckScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<PlayerCollectionData>get("expected").decks().keySet().iterator().next());
         CollectionRuntimeFixture.discardNewDraft(s);
-        s.waitForText("#sample-label", "Runtime unowned draft")
+        s.waitForText("#editor-title", "Runtime unowned draft")
          .check("ReadDeck loads every saved section exactly", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().values().iterator().next().cards()));
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkCount("#main-grid .card-tile", 1).checkCount("#extra-grid .card-tile", 1)

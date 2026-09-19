@@ -29,6 +29,10 @@ Evidence lives under ignored `build/playtest-fixes/`, including green scale/over
 
 No M3 work, persistence changes, physical transfers or duel-enforcement changes are included. The branch remains local and unmerged.
 
+## Header cleanup
+
+The deck-list name now supplies the prominent left-aligned heading and follows list switching and renaming. Removed the branding eyebrow, duplicate gray name label, repeated header section counts and redundant Add to / remove from caption. Section counts, save state and useful search/status text remain; long names use hover scrolling. Existing scenario references now target the heading. The layout and saved-list scenarios passed **54/54 checks** together; screenshots of the main view and renamed heading were inspected. Evidence is under `build/header-polish/ui-green/`.
+
 ## Follow-up polish
 
 Further manual feedback increased scrollbar arrows and tracks to explicit 12-pixel dimensions: the previous correction had restored LDLib's undersized 5-pixel defaults. Missing artwork now uses the bundled card back instead of name/passcode text. Hover tooltips retain identification, and the square inspector centers a portrait card back until cropped artwork arrives.
