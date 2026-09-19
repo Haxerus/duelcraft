@@ -73,8 +73,7 @@ public class Duelcraft {
         // Register the commonSetup method for modloading
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(DuelNetworking::onRegisterPayloads);
-        modEventBus.addListener(ServerConfig::onLoading);
-        modEventBus.addListener(ServerConfig::onUnloading);
+        registerServerLifecycle(modEventBus, NeoForge.EVENT_BUS);
 
         // Register the Deferred Register to the mod event bus so blocks get registered
         BLOCKS.register(modEventBus);
@@ -88,10 +87,6 @@ public class Duelcraft {
         // Note that this is necessary if and only if we want *this* class (Duelcraft) to respond directly to events.
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
-        NeoForge.EVENT_BUS.addListener(DuelManager::onServerStarting);
-        NeoForge.EVENT_BUS.addListener(DuelManager::onServerStopped);
-        NeoForge.EVENT_BUS.addListener(DuelManager::onServerTick);
-        NeoForge.EVENT_BUS.addListener(DuelManager::onPlayerLoggedOut);
         NeoForge.EVENT_BUS.addListener(DuelCommand::register);
 
         // Register the item to a creative tab
@@ -100,6 +95,15 @@ public class Duelcraft {
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
         modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
+    }
+
+    static void registerServerLifecycle(IEventBus modEventBus, IEventBus serverEventBus) {
+        modEventBus.addListener(ServerConfig::onLoading);
+        modEventBus.addListener(ServerConfig::onUnloading);
+        serverEventBus.addListener(DuelManager::onServerStarting);
+        serverEventBus.addListener(DuelManager::onServerStopped);
+        serverEventBus.addListener(DuelManager::onServerTick);
+        serverEventBus.addListener(DuelManager::onPlayerLoggedOut);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
