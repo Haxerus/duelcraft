@@ -1,22 +1,25 @@
-> **Current policy, 2026-09-19:** Core `requireCardOwnership=false` plus an optional companion restriction hook supersedes unconditional ownership statements in this historical handoff. Original M1/M2 and the [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) have separate completed implementation/verification evidence; see the [new report](../reports/2026-09-19-deck-use-policy-follow-up.md). Final independent review is complete; M3 may proceed. M3–M6 remain unfinished; M4 owns legacy-route removal and actual duel-start enforcement. See the [amendment](2026-09-18-optional-ownership-amendment.md).
+# M3 kickoff prompt
 
-> **Historical M1 handoff — completed.** Use the implementation through `2030dae` in `codex/deck-editor-m1`, including the approved dark duel-UI styling. See [M1 results](../reports/2026-09-17-deck-editor-m1.md). Continue with [milestone 2](../plans/2026-09-17-player-collections-milestone-2.md); do not recreate the sample editor.
-
-# Kickoff prompt
-
-Paste the following into a new implementation session in the Duelcraft project:
+Updated 2026-09-19. Paste this into a fresh Duelcraft implementation session. This replaces the original M1 kickoff.
 
 ```text
-Implement milestone 1 of Duelcraft's collection/deck-editor integration: the approved 1280x720 LDLib2 editor with sample data.
+Implement M3 of Duelcraft's collection/deck-editor integration: physical card items and authoritative inventory/collection transfers. Finish M3 first; keep M4–M6 as later milestone checkpoints.
 
-Start by reading this handoff and the documents it links:
-C:/Users/haxer/Documents/Programming/Modding/Duelcraft/docs/superpowers/handoffs/2026-09-17-deck-editor-implementation.md
+Work directly in this existing worktree:
+C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor
+Branch: codex/player-collections. The latest implementation commit is b407f7b, followed by the handoff documentation commit. Check the current branch, HEAD and working tree before editing; preserve any later user changes. Do not start from main or the old deck-editor-m1 worktree.
 
-The executable plan is docs/superpowers/plans/2026-09-15-deck-editor-milestone-1.md. Read AGENTS.md, the design spec, and the roadmap, and inspect the accepted HTML prototype before coding. The visual direction and product rules are settled; proceed with implementation rather than reopening general design questions. Resolve routine API details from the pinned source, and flag only material contradictions or genuinely blocking decisions.
+Read AGENTS.md, then the current handoff and its linked contracts, ownership amendment, roadmap and M3 plan:
+C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor/docs/superpowers/handoffs/2026-09-17-deck-editor-implementation.md
 
-Use an isolated implementation workspace and a codex/ branch. The handoff documents and prototype are currently uncommitted in the main checkout; preserve them in the new workspace before proceeding. Leave the existing user modification to docs/engine-gap-analysis.md untouched.
+Executable plan:
+C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor/docs/superpowers/plans/2026-09-17-card-transfers-milestone-3.md
 
-Complete all five milestone tasks, with meaningful model/search tests and the actual LDLib2 screen scenarios. Run the required Minecraft client checks and capture screenshots. Keep the existing duel UI unchanged. Use injected sample metadata, ownership, textures, and an in-memory save callback; clearly label the sample state. Do not implement persistence, real inventory transfers, activation, production hotkey/items, or lobbies yet.
+M1, M2, the ownership-policy follow-up and editor polish are complete and user-approved. Preserve the existing dark duel-UI styling and the 1280x720 editor, including rich filters, Deck/Side routing, sorting, quiet empty inspector and centered feedback. Continue the approved design rather than repeating discovery.
 
-Review the plan against current code, then carry the milestone through implementation and verification. Keep the plan's checkboxes current and report evidence for the completed work, any blocked checks, and how I can open the editor for playtesting. Do not proceed to milestone 2 in this session. Do not merge or push without my request.
+Preserve the agreed policy: core SERVER requireCardOwnership defaults false; enabled ownership counts only deposited exact-passcode copies across Main/Extra/Side. Supported legality and optional companion denials still apply in either mode. Drafts can be saved without required cards. Transfers always require actual quantities, capacity, authoritative revisions and busy checks. Revalidate the active deck against proposed post-transfer state. A shortage alone clears activation only with ownership enabled; a companion denial can clear it under either setting. Keep the saved list. A failed policy evaluation leaves inventory and collection unchanged. Deposits never auto-activate or create copies. Acquisition/progression belongs to a companion mod.
+
+Implement the four M3 tasks using the existing CollectionService and DeckUsePolicy. Follow the plan's tests for conservation, atomic transfer behavior, replay/stale requests, unsupported stacks, offhand rules, ownership modes and companion denial/failure. Run the real UI, restart and dedicated-player checks required by the plan; preserve earlier evidence and report any blocked checks accurately. Bump the current protocol if payload shapes become incompatible.
+
+Use GRADLE_USER_HOME=C:/Users/haxer/.gradle. Keep task checkboxes current, commit scoped changes, and record verification results and manual playtest instructions. The handoff records the current 904-test and 226-UI-check baseline. Complete and verify M3 before starting M4. Do not merge or push without my request.
 ```

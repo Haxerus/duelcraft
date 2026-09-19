@@ -1,88 +1,97 @@
-> **Current policy, 2026-09-19:** Core `requireCardOwnership=false` plus an optional companion restriction hook supersedes unconditional ownership statements in this historical handoff. Original M1/M2 and the [M2 policy follow-up](../plans/2026-09-19-deck-use-policy-follow-up.md) have separate completed implementation/verification evidence; see the [new report](../reports/2026-09-19-deck-use-policy-follow-up.md). Final independent review is complete; M3 may proceed. M3–M6 remain unfinished; M4 owns legacy-route removal and actual duel-start enforcement. See the [amendment](2026-09-18-optional-ownership-amendment.md).
+# Collection and deck editor implementation handoff
 
-> **Historical M1 handoff — completed.** Use the implementation through `2030dae` in `codex/deck-editor-m1`, including the approved dark duel-UI styling. See [M1 results](../reports/2026-09-17-deck-editor-m1.md). Continue with [milestone 2](../plans/2026-09-17-player-collections-milestone-2.md); do not recreate the sample editor.
+Updated 2026-09-19. This replaces the original M1 startup handoff. **Implement M3 next.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans.
 
-# Deck editor implementation handoff
+## Workspace and starting point
 
-## Start here
-
-Implement **milestone 1: the in-game deck editor using sample data**. Finish its five tasks and validation before moving to persistent collections or other roadmap milestones. The user has completed visual design iteration and requested a clean session for implementation. Continue from the existing plan rather than restarting product discovery.
+- Implementation worktree: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor`
+- Branch: `codex/player-collections`
+- Latest implementation commit: `b407f7b` (`Polish deck editor feedback and add type sorting`). The handoff/kickoff documentation commit follows it.
+- Main checkout: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft`. It is not the implementation starting point. Work directly in the existing worktree; do not restart from main or the old `deck-editor-m1` worktree.
+- This handoff and its [kickoff prompt](2026-09-17-deck-editor-kickoff.md) live in the implementation worktree. Use the absolute worktree paths when opening them from a fresh session.
+- Check `git status`, branch, and HEAD before editing. The polish is committed; preserve any later user changes. No merge or push has been requested.
 
 Read in this order:
 
-1. Repository `AGENTS.md` and any instructions applicable to the implementation workspace.
-2. [Design specification](../specs/2026-09-15-player-interaction-design.md).
-3. [Integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md), for boundaries and future dependencies.
-4. [Milestone 1 implementation plan](../plans/2026-09-15-deck-editor-milestone-1.md), the executable task list.
-5. [Accepted interactive prototype](../references/2026-09-17-deck-editor-1280x720.html), especially Standard/Large density, expanded Side, filters, and independent scrolling. The copied file includes its card images.
+1. Repository `AGENTS.md` and any applicable worktree instructions.
+2. This handoff and the [ownership amendment](2026-09-18-optional-ownership-amendment.md).
+3. [Design specification](../specs/2026-09-15-player-interaction-design.md) and [implementation contracts](../specs/2026-09-17-player-interaction-contracts.md).
+4. [Integration roadmap](../plans/2026-09-15-player-interaction-roadmap.md).
+5. [M3 implementation plan](../plans/2026-09-17-card-transfers-milestone-3.md), the next executable task list.
+6. [M2 policy follow-up report](../reports/2026-09-19-deck-use-policy-follow-up.md), for verified policy behavior and runtime test setup.
 
-The [kickoff prompt](2026-09-17-deck-editor-kickoff.md) is intended for a fresh session; this document supplies the context it references.
+The ownership amendment supersedes older unconditional ownership language. The implemented dark Minecraft UI and subsequent user feedback supersede the early HTML prototype's visual styling. Consult current source for API details; plan snippets are contracts, not code to paste unchanged.
 
-## Workspace state at handoff
+## Completed work
 
-Checked on 2026-09-17:
+**M1:** The 1280x720 LDLib2 collection/deck editor, local deck model, rich card filtering/search, virtual collection rows, and real-screen test fixtures. Its approved styling matches the existing dark duel UI. [M1 report](../reports/2026-09-17-deck-editor-m1.md).
 
-- Main checkout: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft`.
-- Branch: `main`; HEAD: `a957157` (`Update .gitignore & add misc. files`). Recheck before editing.
-- No collection/editor implementation has started. The planned `DeckList`, editor model, controller, screen, and collection scenarios do not exist yet.
-- `docs/engine-gap-analysis.md` has a pre-existing user modification. Preserve it; do not revert, stage, or bundle it into implementation commits.
-- The September 15 spec and two plans are untracked. This handoff, kickoff, and repository prototype copy are also uncommitted delivery artifacts.
-- A new git worktree will not inherit untracked files. Before leaving this checkout, preserve/copy this documentation package into the implementation worktree with the same relative paths, or deliberately commit only these documents. Do not assume a clean checkout contains them.
-- No Java/native build or Minecraft harness was run while writing these planning/handoff documents. Any past browser validation is not evidence that the Minecraft port works.
+**M2:** Per-player persistent collections, saved deck lists, explicit activation, private/revisioned networking, production card metadata/search, and persistence/privacy validation. [M2 report](../reports/2026-09-17-player-collections-m2.md).
 
-Use an isolated implementation workspace following the applicable worktree workflow and a `codex/` branch. A fresh worktree needs the native submodule/build artifacts described in AGENTS.md. Worktree creation is not a reason to lose the plan or incorporate unrelated user edits.
+**M2 policy follow-up:** Core optional ownership enforcement, shared `DeckUsePolicy`, the deny-only companion event, authoritative policy reports, neutral optional shortages, and persisted-active revalidation on Open. The development collection command passes its first fresh snapshot into the screen, retaining any active-clearance explanation. Independent reviews and runtime checks are complete. [Plan](../plans/2026-09-19-deck-use-policy-follow-up.md) and [report](../reports/2026-09-19-deck-use-policy-follow-up.md).
 
-The package consists of the linked spec, roadmap, milestone plan, prototype, this handoff, and kickoff prompt. The original prototype remains available at `C:/Users/haxer/.codex/visualizations/2026/09/16/01a0a7ac-e1fe-70d0-9df2-65139ed2a651/duelcraft-deck-720.html` if recovering the reference is necessary.
+**Editor playtest fixes:** Deck/Side editing routes Extra Deck monsters automatically; dropdowns work; scrolling avoids repeated artwork rebuilds; selection is subtle; Saved lists and Save list have equal dimensions; scrollbar arrows have usable dimensions; the inspector uses cropped artwork and a quiet unselected state; tokens are excluded; alternate-format cards have a toggle; missing images use the card back; the deck name is the heading. [Earlier fixes report](../reports/2026-09-18-collection-editor-playtest-fixes.md).
 
-## Product context that must survive the new session
+**Latest polish (`b407f7b`):** Centered ownership feedback and Missing badges; localized saved-list help for the effective ownership mode; added Sort deck in the Main Deck header. Sorting groups Normal Monsters, then other monsters (including Effect Monsters), then Spells, then Traps. It preserves order within each group and keeps Main/Extra/Side separate; unknown metadata sorts last. Sorting changes only the draft, requires a save to persist, and is blocked during pending operations. The user approved the result.
 
-The user and friends spent 300+ hours on a custom server using YDM II. Physical-card storage pressure and poor binder searching were major pain points. Keep a Minecraft feel while adopting Master Duel's effective deck-editor layout. The user approved the three-column mockup and explicitly approved a full **1280x720 design canvas**; 960x540 is only a smaller viewport test, not the editor's design size.
+## Product rules to preserve
 
-Agreed behavior for the eventual integrated product:
+- Use **collection**, not archive. Each player owns their world/server collection, like an Ender Chest. Physical storage pressure and poor binder searching were the original pain points.
+- Preserve the dark duel-UI styling, three-column editor, 1280x720 design canvas, Standard/Large density, independent scrolling, and existing filters. The duel screen retains its own layout/scaling.
+- Decks are lists. Saving/editing a well-formed draft does not require ownership or playability. Lists can share the same deposited copies without consuming or reserving them.
+- Core SERVER setting `requireCardOwnership` defaults to `false`. With ownership off, an otherwise eligible list can activate without deposited copies. With ownership on, count deposited copies only, by exact passcode, across Main + Extra + Side, including single duels. Inventory cards do not count until deposited.
+- Supported legality remains mandatory for activation/use in either mode. The synchronous `DeckUseCheckEvent` on `NeoForge.EVENT_BUS` allows companion mods to deny additional use in either mode; they cannot override core legality, enabled ownership, authentication, or busy checks.
+- Evaluate proposed post-mutation state. An ordinary policy denial after a valid mutation clears active selection and preserves the mutation and saved list. A failed policy evaluation rejects the mutation without changing inventory or collection. Keep actual denial reasons distinct from neutral optional shortages.
+- A withdrawal-created shortage alone clears an otherwise valid active deck only when ownership is required. A companion denial can clear it in either mode. Withdrawals always require real stored copies and inventory capacity. Deposits do not auto-activate a deck.
+- Keep transfers and deck changes locked during preparation/live duels, with server enforcement. M3 must respect existing busy gates; M4 owns the full preparation integration and legacy duel-route cutover.
+- Configuration changes require restart/world reopening. The server captures the effective setting for its lifecycle. Revalidate persisted activation after config/companion changes; removing a restriction does not auto-reactivate a deck.
+- Acquisition, packs, rewards, progression, and extra restrictions belong to the companion. The user will handle acquisition later; it is not a blocking design question for M3.
+- Later entry points remain: binder opens collection/deckbuilding; duel mat opens invitation/preparation; remappable hotkey opens Home, so players need not carry items.
 
-- Say **collection**, never archive. It belongs to each player on that world/server, like an Ender Chest.
-- Support collectible/tradable physical cards and deposits/withdrawals into personal storage without a slot/gameplay capacity limit.
-- Save deck lists even when cards are missing. Multiple lists can reference the same owned copies; lists do not consume copies.
-- Validate playability and ownership when activating a deck and preparing a duel. Ineligible lists cannot be active or used for duels.
-- If withdrawal makes the active deck ineligible, clear its active selection, keep the list, and explain why.
-- No deposits, withdrawals, or deck changes during duels. The eventual server must enforce this, not just hide the UI.
-- Binder opens collection/deckbuilding; duel mat opens invitations/lobby preparation; a remappable hotkey opens a home screen linking to both. Players need not carry either item.
-- Final readability, comfortable minimum screen size, and density depend on in-game playtesting. The user has not supplied numerical usability/performance targets.
+## M3 scope and remaining milestones
 
-The spec separately labels proposed technical defaults: deposited copies only for ownership, exact-passcode storage, Side included in ownership, preparation locking from accepted invite through RPS, and persistence/network implementation choices. Do not describe those as separately user-confirmed details. They do not block the sample-data milestone; revisit material changes when planning the relevant server milestone.
+| Milestone | Status and implementation plan |
+| --- | --- |
+| M3: Physical cards and transfers | **Next, not implemented.** [Plan](../plans/2026-09-17-card-transfers-milestone-3.md): canonical passcode card item; inventory transaction planner/service; transfer packets and editor controls; restricted card-grant command and real inventory scenarios. |
+| M4: Duel preparation and import | Not implemented. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
+| M5: Player entry points | Not implemented. [Plan](../plans/2026-09-17-player-entry-points-milestone-5.md): Home/hotkey, binder, mat, private lobby and state-aware navigation. |
+| M6: Release validation | Not implemented. [Plan](../plans/2026-09-17-interaction-release-milestone-6.md): full UI/runtime matrix, dedicated two-player acceptance, compatibility and documentation audit. |
 
-## Milestone 1 boundary
+Implement and verify M3 before beginning M4. Its four tasks include conservation/capacity/revision tests, real inventory UI flows, retained-world restart checks, and dedicated-player isolation. Use the existing `CollectionService` and shared policy rather than adding another ownership ledger or restriction system. Follow the contracts for accessible slots, canonical components, amount bounds, and all-or-nothing transfers.
 
-Build the local `DeckList`/editor model, pure rich search/filtering, XML/LSS screen, virtual collection rows, sample fixtures, and real-screen harness scenarios described in the plan. Keep draft state outside widgets. Make save an injected in-memory callback and identify sample data in the screen.
+M3 changes the request/reply protocol; inspect the current registration (version `5` at this handoff) and bump it for incompatible payload changes. Connect the currently unavailable transfer controls without rebuilding the editor. Reuse the existing card-back texture for the initial physical item.
 
-Preserve the existing duel UI, its 960x540 sizing, and duel-specific input/lifecycle behavior. Give the editor its own 1280x720 host. Keep `core.Deck` as Main/Extra simulation input; the new list retains Side without adding match mode.
+At M3 completion, update its checkboxes, record exact verification evidence, and provide manual checks. Keep M4–M6 as separate milestone checkpoints. M2 completion does not certify legacy duel-start routes: actual collection-backed duel enforcement and bypass removal belong to M4. No public collection-enforced release before that cutover.
 
-Do not implement real persistence, transfer packets, active-deck selection, new physical items, production home/hotkey, lobbies, acquisition/economy, or banlists in this milestone. Controls representing those functions must be disabled or clearly identified as unavailable. Do not put sample cards or ownership into a player's real inventory/storage.
+## Verification at this handoff
 
-The plan's Java interface blocks describe contracts, not compilable source to paste verbatim. Check signatures against pinned APIs and implement the methods. Make small evidence-backed corrections to the plan when necessary; do not expand scope or restart the approved visual design.
+Final polish verification on 2026-09-19:
 
-## Source findings and pitfalls
+- `./gradlew.bat test --console=plain`: **904 tests in 53 suites, zero failures/errors/skips**. The full execution passed in 2m19s. A pre-commit invocation subsequently succeeded with all tasks up to date; it was not a second execution of the tests.
+- `./gradlew.bat runClient -PldTest=collection_playtest_scale2,collection_eligibility -PldTestWindow=1280x720 -PldTestGuiScale=2 --console=plain`: **2/2 scenarios, 69/69 checks**.
+- `./gradlew.bat runClient -PldTest=collection_playtest_scale3,collection_eligibility,collection_overflow -PldTestWindow=1920x1080 -PldTestGuiScale=3 --console=plain`: **3/3 scenarios, 157/157 checks**.
+- Inspected actual Minecraft screenshots for sorting, centered badges/footer, optional/required localized help, and warning/overflow layouts. The user then reported that everything looked good.
+- `git diff --check` passed before the polish commit.
 
-- Minecraft 1.21.1; NeoForge 21.1.224; Java 21; LDLib2 2.2.39.a. Verify `build.gradle` if versions have changed.
-- Use `client/DuelScreen.java` and `client/LDLibDuelScreen.java` as scaling/XML examples, not as targets for refactoring. Their lower scale clamp cannot be copied blindly into a larger editor canvas.
-- `client/carddata/CardDatabase.java` currently supplies point lookups and specialized announce-card search. Keep that search intact; collection filtering has different rules.
-- `CardInfo` already has the metadata needed for the sample filters. Avoid changing its widespread constructor just for this milestone.
-- The pinned LDLib source JAR contains `VirtualScrollerView<T>`. Group four cards into each virtual row and retain selection/model state outside mounted widgets. Request images only for mounted rows and the inspector.
-- `CardImageManager` has a single texture-loaded callback. Do not overwrite the duel UI's callback. An injected texture provider is sufficient for the first milestone and can return null in tests.
-- The browser prototype once overlapped Large cards because grid rows shrank. Explicit fixed row heights and scrolling fixed it. Carry that behavior into LSS and verify bounds, rather than relying on browser CSS semantics.
-- Current `DeckLoader` drops Side; current uploaded deck selections are session-only. Neither is the eventual collection model.
-- `DuelManager.isBusy` includes first-turn rolls. `ServerPayloadHandler.handleDeck` currently lacks the new ownership/busy policy; addressing it belongs to later integration, not the sample screen.
-- `docs/multiplayer-decks.md` reflects newer uploaded-deck behavior than the filename-based flow in AGENTS.md. Prefer current source when prose disagrees.
-- LDLib source is at `../LDLib2` relative to the main checkout. From a different worktree, locate it using the main checkout path rather than assuming it is still a sibling. XML schema: `LDLib2/ldlib2-ui.xsd`.
+Local evidence root: `build/evidence/editor-polish-2026-09-19/`. It contains `tests.log`, `full-test-xml/`, `scale2/` and `scale3/` reports/screenshots, and their command logs. `first-scale2/` retains an initial test-harness failure: the newly added modal test tried to release a click on a button covered by the dialog it opened. The corrected press/release sequence passed; no production correction was needed for that failure. These local artifacts are not committed binaries.
 
-Java paths in this section are under `src/main/java/com/haxerus/duelcraft/`.
+Earlier M2 policy evidence is separate: `build/evidence/deck-use-policy/task-3/` and the linked report record 60 retained-world lifecycle checks and 61 dedicated multiplayer checks in each ownership mode, along with UI/persistence checks. Do not describe those historical runs as new M3 transfer evidence. Preserve retained worlds and reports.
 
-## Verification and completion
+## Working and testing notes
 
-Follow the plan's model/search tests and actual LDLib2 scenarios. Verify behavior, not just screenshots: add/remove, save failure retaining draft, dirty-close choices, ownership indicators, filter combinations, transformed clicks, scroll independence, and bounded mounted rows with 16,000 synthetic cards.
+Run from the implementation worktree with PowerShell:
 
-Exercise 1280x720, 960x540, and 1920x1080 windows and GUI scales 2/3/4; record effective sizes/scales because Minecraft may clamp the request. Include non-16:9 and resize-with-dirty-draft checks. Keep prior harness reports/screenshots before another run overwrites them.
+```powershell
+$env:GRADLE_USER_HOME = 'C:/Users/haxer/.gradle'
+./gradlew.bat test --console=plain
+```
 
-Commands in the plan assume the new scenarios exist. On Windows, use `./gradlew.bat` if necessary. Full tests need native DLLs and configured EDOPro data. The documented paths are `C:/ProjectIgnis/expansions/cards.cdb` and `C:/ProjectIgnis/script;C:/ProjectIgnis/script/official`. Do not assume the proposed `-PskipNative` option is implemented. Diagnose environment failures separately from failing behavior tests.
+Use the shared Gradle cache; do not create a worktree-local `.gradle-user`. Native DLLs/build setup are already present here. Tests use the configured EDOPro data (`C:/ProjectIgnis/expansions/cards.cdb`, `C:/ProjectIgnis/script`, `C:/ProjectIgnis/script/official`). A separate fresh worktree needs the submodule/native setup in AGENTS.md; reusing this one avoids that setup.
 
-Deliver code, test results, actual Minecraft screenshots, and instructions for opening the sample editor. Update task checkboxes and append observed results to the roadmap. Explain any failed/unrun checks accurately. Keep human playtesting distinct from automated bounds checks. Stop at the milestone 1 boundary with a usable editor for playtesting; the next milestone needs its storage/network implementation plan.
+The current development entry point is `/duel collection`. Deposit/withdraw controls remain unavailable until M3. The production hotkey, binder, and mat belong to M5.
+
+LDLib2 source is `C:/Users/haxer/Documents/Programming/Modding/LDLib2`, not a sibling of this nested worktree. UI guidance: `docs/ldlib2-ui-guide.md` and `docs/ui-wiring-guide.md`. For engine-related changes, begin with `docs/engine-wiki/README.md`.
+
+The SERVER config normally loads from `<gameDir>/config/duelcraft-server.toml`; an existing `<world>/serverconfig/duelcraft-server.toml` override takes precedence. Consult the policy report for verified lifecycle test setup rather than guessing the active config file.
+
+LDLib UI runs overwrite `build/ldlib2-uitest`. Copy reports/screenshots into a distinct evidence directory before the next run. Use disposable fixtures for new transfer tests and preserve existing retained-world evidence. Report unrun or blocked checks explicitly. Keep changes scoped, commit milestone work, and do not merge or push without a request.
