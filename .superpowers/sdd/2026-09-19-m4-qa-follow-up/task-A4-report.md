@@ -115,3 +115,31 @@ Source commit: `eac5b15df97264e1044f87356568a33f66f380ce`
 | `.\gradlew.bat runClient -PldTest=duel_zone_inspector_actions` | Exit 0; run `41868_4cb939d5`, PASS, 69/69 checks, 88 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix1/green-zone/` |
 
 No broader suite was run: this fix changes only card-detail ownership at the zone-inspector callback boundary, and the three directly affected scenarios are green. The grouped UI suite remains reserved for I1. The runs retain the previously documented model/texture, sound, shader, Gradle-deprecation, and unchecked fixture warnings.
+
+## Review fix 2: identity-only pile and material details
+
+Review source: `.superpowers/sdd/2026-09-19-m4-qa-follow-up/task-A4-fix1-review.md`
+
+Source commit: `8cca0740bdb032fd09b82599c3ef67fcf3297451`
+
+Fix 1 used the hovered `ClientCard` both as the source-aware ownership token and as `LDLibDuelScreen`'s optional live detail context. That made pile and material identity hovers consume old query stats and card hints. In particular, `ClientDuelState` retains those fields when an on-field card becomes an Xyz material, although they should not decorate an identity-only material hover.
+
+The zone-inspector callback still carries the exact card object for immediate conditional clearing, but now calls the screen with a null live detail context and that card as a separate owner. Field and hand hovers continue to pass the card as both detail context and owner, preserving live decorations, A1 immediate revocation, and the 500 ms pointer-crossing grace.
+
+The focused scenario now stages a card on field, applies `QUERY_ATTACK`/`QUERY_DEFENSE` and `CHINT_TURN`, attaches that exact object as material, and verifies the state remains retained while its material hover shows identity without `#card-hints` or `#card-link-markers`. Existing stationary redaction, close/host-departure clearing, unknown-material privacy, material order, and zero-response assertions remain in the same scenario.
+
+### RED
+
+| Command | Exit/result | Evidence |
+|---|---|---|
+| `.\gradlew.bat runClient -PldTest=duel_xyz_materials` | Exit 1; run `23860_3c070ade`, FAIL, 166/167 checks, 169 steps. The sole failure was `checkHidden #card-hints`; retained query/hint state and all earlier checks passed. `35_error.png` visibly shows the stale `ATK 3000 / DEF 2500` and `Turns passed: 12` decorations. | `build/evidence/qa-m4-follow-up/a4/review-fix2/red-xyz/` |
+
+### GREEN
+
+| Command | Exit/result | Evidence |
+|---|---|---|
+| `.\gradlew.bat runClient -PldTest=duel_xyz_materials` | Exit 0; run `32628_bb3487c`, PASS, 167/167 checks, 169 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix2/green-xyz/` |
+| `.\gradlew.bat runClient -PldTest=duel_public_hand_hover` | Exit 0; run `5828_39f5eba4`, PASS, 9/9 checks, 31 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix2/green-public-hand/` |
+| `.\gradlew.bat runClient -PldTest=duel_zone_inspector_actions` | Exit 0; run `42032_39f5eba4`, PASS, 69/69 checks, 88 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix2/green-zone/` |
+
+No broader suite was run because the production change is confined to detail-context selection at the existing zone-inspector callback. The grouped UI suite remains reserved for I1. Startup retained the previously documented model/texture, sound, shader, and Gradle-deprecation warnings.
