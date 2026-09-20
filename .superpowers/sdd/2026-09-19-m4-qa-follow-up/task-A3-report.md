@@ -97,3 +97,37 @@ I inspected the neither, log-only, zone-only-scrolled, both-with-active-prompt, 
 ## Limitations and concerns
 
 No unresolved A3 concern. Per the task split, the full duelcraft UI group and existing hand/rule-layout group are reserved for I1; this task ran only the A3 scenario at both required scales and the two directly affected legacy scenarios. Historical pre-self-review green evidence remains in `green-scale2/` and `green-scale3/`; the authoritative final evidence uses the `-final` directories above.
+
+## Review fix 1: zone content rebuild offsets
+
+Review found that the zone inspector restored its pixel offset after viewport resizing but not after `ZoneInspectorController.refresh()` cleared and repopulated its content. LDLib2 retained the normalized fraction while the container height changed, which moved the actual visible anchor.
+
+Source commit `6404544` (`fix: preserve zone scroll across content rebuilds`) now captures the actual offset before clearing the open zone list. After the rebuilt content lays out, a zone-specific callback restores that offset through the existing clamp calculation. `zoneContentRevision` prevents an older delayed callback from overriding a newer rebuild; every callback still unregisters itself. The test explicitly queues two controller refreshes before layout, then allows the normal dirty-state refresh, so the final revision owns restoration.
+
+### Review-fix RED
+
+Command, with the same Java and Gradle environment recorded above:
+
+```powershell
+.\gradlew.bat runClient -PldTest=duel_panel_layout -PldTestWindow=1280x720 -PldTestGuiScale=2 --console=plain 2>&1 | Tee-Object -FilePath build/evidence/qa-m4-follow-up/a3/review-fix1/red-scale2/console.log; exit $LASTEXITCODE
+```
+
+Exit: `1`. Run `11496_77e24d3c`: `0/1` scenarios, `1575/1577` checks, `216` steps. A saved offset of `7.0000005` drifted to `8.005748` after the first live content growth and to `9.011495` after the queued mutations. The shrink-to-fit clamp and every earlier A3 assertion passed. Full report, screenshots, and console stream:
+
+`build/evidence/qa-m4-follow-up/a3/review-fix1/red-scale2/`
+
+### Review-fix GREEN
+
+Final command:
+
+```powershell
+.\gradlew.bat runClient -PldTest=duel_panel_layout -PldTestWindow=1280x720 -PldTestGuiScale=2 --console=plain 2>&1 | Tee-Object -FilePath build/evidence/qa-m4-follow-up/a3/review-fix1/green-scale2-final/console.log; exit $LASTEXITCODE
+```
+
+Exit: `0`. Run `30504_bb3487c`: `1/1` scenario, `1577/1577` checks, `216` steps. The first content growth preserved `7.0000005` exactly; rapid queued refreshes restored `7.000001`, within subpixel rounding; the short rebuilt pile clamped to zero. Full report, screenshots, and console stream:
+
+`build/evidence/qa-m4-follow-up/a3/review-fix1/green-scale2-final/`
+
+The final `right-panels-zone-content-refresh` capture was inspected and retains the existing field, controls, player hints, and right-column geometry. Scale 3 was not rerun for this review fix because no XML, sizing, or layout rule changed; the original final scale-3 run remains green at `1523/1523`.
+
+The archived console streams expose the warning output omitted by `report.txt`. The final green stream contains the standard advanced-terminal warning, vanilla command ambiguities, union resource URL notices, placeholder example model/resource warnings, missing vanilla sounds, and known shader sampler/uniform warnings. None mentions layout dirtiness, the zone restore path, a scenario error, or a behavioral failure. The RED stream additionally prints Gradle's existing deprecation notice because that invocation failed. These are environment/resource noise; the final process ends with `BUILD SUCCESSFUL`.

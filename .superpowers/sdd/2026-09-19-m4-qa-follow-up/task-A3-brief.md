@@ -63,3 +63,8 @@ Observed leads at the planning SHA:
 
   Remove all log/card-info mutual exclusion in `wireAuxiliaryPanels`, log click handlers and `showCardInfo`. Keep board/prompt geometry unchanged. Reflow player-hint offsets against the new column. Preserve scroll state on resize/rebuild; append-only log updates should stay at the bottom only if the user was already at the bottom. Do not clear the zone's inspected selection when toggling the log.
 - [x] Rerun the scenario, inspect screenshots at both scales and check existing `DuelHandLayoutScenario`/rule-layout group coverage at I1. Expected: details, log and zone contents simultaneously usable, with no field/prompt overlap. Commit `fix: stack duel log and zone inspector on the right`.
+
+### Review fix 1
+
+- [x] Preserve the zone inspector's real pixel offset across live content rebuilds, clamp when rebuilt content fits, and ignore superseded delayed restore callbacks.
+- [x] Add focused RED/GREEN coverage for a scrollable pile growth, rapid queued rebuilds, and shrink-to-fit clamping. Archive the complete reports, screenshots, and console streams under `build/evidence/qa-m4-follow-up/a3/review-fix1/`.
