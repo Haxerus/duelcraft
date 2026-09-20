@@ -131,8 +131,8 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
 
 **Interfaces:** Keep `SavedDeckController.save()`, `newDraft()`, `duplicate()`, `rename(String)`, `importDraft(SavedDeck)`, `select(UUID)` and existing activation/deletion methods. No new server command. Preserve useful selectors such as `#saved-lists`, `#list-name`, `#list-picker`, `#lists-dialog`, `#lists-close`; update affected fixture selectors in the same commit if a control is deliberately removed.
 
-- [ ] Extend controller/UI tests around a single flow: choose an existing deck, edit and Save; its UUID remains constant and one acknowledged save updates the baseline. New/Make a copy create distinct unsaved identities and do not send a save until requested. Import loads all three sections as a draft; Save is explicit. Rename edits the current name and Save persists it. Deleting another saved entry does not accidentally delete the current dirty draft. Save never sends Activate, and activation failure keeps both list and explanatory feedback.
-- [ ] Add real-screen expectations to `collection_editor_qa` before rewriting layout. Use the existing fixture command capture and assert operation counts:
+- [x] Extend controller/UI tests around a single flow: choose an existing deck, edit and Save; its UUID remains constant and one acknowledged save updates the baseline. New/Make a copy create distinct unsaved identities and do not send a save until requested. Import loads all three sections as a draft; Save is explicit. Rename edits the current name and Save persists it. Deleting another saved entry does not accidentally delete the current dirty draft. Save never sends Activate, and activation failure keeps both list and explanatory feedback.
+- [x] Add real-screen expectations to `collection_editor_qa` before rewriting layout. Use the existing fixture command capture and assert operation counts:
 
   ```text
   New or Make a copy or Import -> 0 Save requests, 0 Activate requests
@@ -142,10 +142,10 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
   failed Save                -> dirty draft retained, no implicit navigation
   ```
 
-- [ ] Run the focused saved-controller suite and the new UI scenario to capture failing operation counts/layout expectations.
-- [ ] Reorganize the header around the current name, Save, My decks, Active status and separate Use for duels. Consolidate list management into one My decks surface; secondary New, Make a copy, Import, Export and Delete remain accessible there. Remove redundant Rename-as-save behavior; renaming edits the name and the primary Save commits it. Keep clear-active capability where it currently exists. Route deck switching/New/Import through `navigate`; Make a copy deliberately copies the current draft without discarding it. Remove automatic `save()` calls from GUI duplicate/import callbacks, but keep the compatibility command's `saveThenActivate` behavior intact.
-- [ ] Keep the dark styles, centered feedback and 1280x720 bounds. Preserve the existing filter controls and card/detail sizing as far as the changed header allows. Test long names, zero/many saved lists, active-but-different selection, keyboard focus, stale selection reads, deletion confirmation and pending actions. Do not add folders, favorites, another navigation shell or new persistence layers.
-- [ ] Run the exact focused commands below. Update assertions for intentional explicit-Save semantics without removing persistence checks. Inspect screenshots at scales 2/3. Commit `refactor: simplify deck save and list management`.
+- [x] Run the focused saved-controller suite and the new UI scenario to capture failing operation counts/layout expectations.
+- [x] Reorganize the header around the current name, Save, My decks, Active status and separate Use for duels. Consolidate list management into one My decks surface; secondary New, Make a copy, Import, Export and Delete remain accessible there. Remove redundant Rename-as-save behavior; renaming edits the name and the primary Save commits it. Keep clear-active capability where it currently exists. Route deck switching/New/Import through `navigate`; Make a copy deliberately copies the current draft without discarding it. Remove automatic `save()` calls from GUI duplicate/import callbacks, but keep the compatibility command's `saveThenActivate` behavior intact.
+- [x] Keep the dark styles, centered feedback and 1280x720 bounds. Preserve the existing filter controls and card/detail sizing as far as the changed header allows. Test long names, zero/many saved lists, active-but-different selection, keyboard focus, stale selection reads, deletion confirmation and pending actions. Do not add folders, favorites, another navigation shell or new persistence layers.
+- [x] Run the exact focused commands below. Update assertions for intentional explicit-Save semantics without removing persistence checks. Inspect screenshots at scales 2/3. Commit `refactor: simplify deck save and list management`.
 
   ```powershell
   ./gradlew.bat test --tests '*SavedDeckControllerTest' --tests '*DeckImportServiceTest'

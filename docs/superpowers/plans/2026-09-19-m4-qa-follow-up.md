@@ -53,7 +53,7 @@ Java paths in this table are relative to `src/main/java/com/haxerus/duelcraft/`;
 - [x] A3: independent left details and right stacked zone/log panels.
 - [x] A4: face-down banish badges and read-only Materials action.
 - [x] C1: aggregate copy cap and pointer gestures.
-- [ ] C2: initial active selection, empty draft dismissal and layered Escape/Close.
+- [x] C2: initial active selection, empty draft dismissal and layered Escape/Close.
 - [ ] C3: simplified My decks and explicit Save lifecycle.
 - [ ] C4: safe client-local YDK export.
 - [ ] I1: full regression, packaged QA.2 and documentation below.
