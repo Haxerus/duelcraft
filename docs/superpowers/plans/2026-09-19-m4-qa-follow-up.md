@@ -50,7 +50,7 @@ Java paths in this table are relative to `src/main/java/com/haxerus/duelcraft/`;
 - [x] A1: source-backed hidden/public identity handling, with red/green regressions and engine trace.
 - [x] B1: invitation/notification cardinality, including tie rounds and dedicated evidence.
 - [x] A2: reveal/selection integration, original candidate indices and read-only reveal presentation.
-- [ ] A3: independent left details and right stacked zone/log panels.
+- [x] A3: independent left details and right stacked zone/log panels.
 - [ ] A4: face-down banish badges and read-only Materials action.
 - [ ] C1: aggregate copy cap and pointer gestures.
 - [ ] C2: initial active selection, empty draft dismissal and layered Escape/Close.

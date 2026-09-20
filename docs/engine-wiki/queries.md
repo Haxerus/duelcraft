@@ -64,7 +64,7 @@ u32 QUERY_END
 | `QUERY_COVER 0x2000000` | `u32` | cover/card-back identifier |
 | `QUERY_END 0x80000000` | none | terminator, emitted regardless of requested flags |
 
-The constant values are declared together in [`ocgapi_constants.h`](../../native/ygopro-core/ocgapi_constants.h#L168). Widths and compound layouts come from [`card::get_infos`](../../native/ygopro-core/card.cpp#L119). Signed attack values use the same four bytes as `u32`; decode them as `i32`. `QUERY_POSITION` calls `get_info_location()`, which substitutes an overlay material's `current.sequence` for position ([implementation](../../native/ygopro-core/card.cpp#L222)).
+The constant values are declared together in [`ocgapi_constants.h`](../../native/ygopro-core/ocgapi_constants.h#L168). Widths and compound layouts come from [`card::get_infos`](../../native/ygopro-core/card.cpp#L119). Signed attack values use the same four bytes as `u32`; decode them as `i32`. `QUERY_POSITION` calls `get_info_location()`, which substitutes an overlay material's `current.sequence` for position ([implementation](../../native/ygopro-core/card.cpp#L222)). The same `location_info` is written for both endpoints of `MSG_MOVE` ([producer example](../../native/ygopro-core/operations.cpp#L5051)), so an overlay destination's `position` is its zero-based material index. A client applying that move inserts at this index and then renumbers the material list; appending would lose engine order when a material is inserted or moved before an existing one.
 
 ## Visibility belongs to the host
 
