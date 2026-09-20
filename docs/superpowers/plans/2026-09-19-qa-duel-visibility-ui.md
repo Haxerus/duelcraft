@@ -1,6 +1,6 @@
 # QA Duel Visibility and UI Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Display authorized card identities in the correct prompt, support simultaneous inspectors/log, and make banished positions and Xyz materials inspectable.
 
@@ -142,9 +142,9 @@ Observed leads at the planning SHA:
 
 **Interfaces:** Keep existing `#duel-log`, `#zone-inspector` and `#card-info-banner` selectors. Create `#duel-right-column` in duel XML. Add `private void refreshRightPanels()` in `LDLibDuelScreen`'s existing UI refresher; invoke it on either panel's visibility change and layout refresh. No wire or server changes.
 
-- [ ] Extend `DuelPanelLayoutScenario` for all four visibility states, at scales 2 and 3: neither; zone only; log only; both. Assert the right panels stay inside the column, share no area, and use its full height when alone. Show left card details while both are visible and click a log entry. Record independent scroll positions, toggle a sibling and assert preservation. Include active prompt, player hints and long contents.
-- [ ] Run `./gradlew.bat runClient -PldTest=duel_panel_layout`; archive failing bounds/visibility checks.
-- [ ] Move log XML into the right column with zone above/log below. Use the existing column width and margins; split the available height equally only when both display. The state table for `refreshRightPanels()` is:
+- [x] Extend `DuelPanelLayoutScenario` for all four visibility states, at scales 2 and 3: neither; zone only; log only; both. Assert the right panels stay inside the column, share no area, and use its full height when alone. Show left card details while both are visible and click a log entry. Record independent scroll positions, toggle a sibling and assert preservation. Include active prompt, player hints and long contents.
+- [x] Run `./gradlew.bat runClient -PldTest=duel_panel_layout`; archive failing bounds/visibility checks.
+- [x] Move log XML into the right column with zone above/log below. Use the existing column width and margins; split the available height equally only when both display. The state table for `refreshRightPanels()` is:
 
   ```text
   zone=false, log=false -> column hidden
@@ -154,16 +154,16 @@ Observed leads at the planning SHA:
   ```
 
   Remove all log/card-info mutual exclusion in `wireAuxiliaryPanels`, log click handlers and `showCardInfo`. Keep board/prompt geometry unchanged. Reflow player-hint offsets against the new column. Preserve scroll state on resize/rebuild; append-only log updates should stay at the bottom only if the user was already at the bottom. Do not clear the zone's inspected selection when toggling the log.
-- [ ] Rerun the scenario, inspect screenshots at both scales and check existing `DuelHandLayoutScenario`/rule-layout group coverage at I1. Expected: details, log and zone contents simultaneously usable, with no field/prompt overlap. Commit `fix: stack duel log and zone inspector on the right`.
+- [x] Rerun the scenario, inspect screenshots at both scales and check existing `DuelHandLayoutScenario`/rule-layout group coverage at I1. Expected: details, log and zone contents simultaneously usable, with no field/prompt overlap. Commit `fix: stack duel log and zone inspector on the right`.
 
 ## Task A4: Expose face-down banish status and Xyz materials
 
 **Interfaces:** Add `public void openMaterials(ClientCard host)` to `ZoneInspectorController`. Add `void inspectMaterials(ClientCard host)` to `ClickDispatcher.Callbacks`, wired by `LDLibDuelScreen` to that method. This is a UI-only action, not an `IdleAction`/`BattleAction`, and it must never enter `ResponseBuilder`.
 
-- [ ] Extend `DuelZoneInspectorActionsScenario` and `DuelXyzMaterialsScenario`: own known face-down banished card; opponent unknown face-down card; public face-up card; both turn players; zero/one/multiple/unknown materials; own/opponent host; no actionable engine menu; a host with summon/activate actions; detach/reorder/control-change/host departure; mandatory field selection. Assert `Face-down` marker separately from art. Assert material order, hover privacy and zero response sends when opening/closing the material inspector.
-- [ ] Run `./gradlew.bat runClient -PldTest=duel_xyz_materials` and `./gradlew.bat runClient -PldTest=duel_zone_inspector_actions`; capture failures for absent action/badges.
-- [ ] Add a text/badge overlay using `ClientCard.isFaceDown()` for banished tiles independently of resolved identity. Use a localized caption and preserve unknown backs/anonymous hover. Do not reveal a code because the viewer is the turn player.
-- [ ] Add the Materials (N) action to the context menu when `!host.materials.isEmpty()`. Keep engine choices' original action indices. A mandatory selection click routes to selection first; read-only inspection is available in normal browsing/waiting and existing explicit inspect mode without clearing that prompt. The action body is deliberately separate:
+- [x] Extend `DuelZoneInspectorActionsScenario` and `DuelXyzMaterialsScenario`: own known face-down banished card; opponent unknown face-down card; public face-up card; both turn players; zero/one/multiple/unknown materials; own/opponent host; no actionable engine menu; a host with summon/activate actions; detach/reorder/control-change/host departure; mandatory field selection. Assert `Face-down` marker separately from art. Assert material order, hover privacy and zero response sends when opening/closing the material inspector.
+- [x] Run `./gradlew.bat runClient -PldTest=duel_xyz_materials` and `./gradlew.bat runClient -PldTest=duel_zone_inspector_actions`; capture failures for absent action/badges.
+- [x] Add a text/badge overlay using `ClientCard.isFaceDown()` for banished tiles independently of resolved identity. Use a localized caption and preserve unknown backs/anonymous hover. Do not reveal a code because the viewer is the turn player.
+- [x] Add the Materials (N) action to the context menu when `!host.materials.isEmpty()`. Keep engine choices' original action indices. A mandatory selection click routes to selection first; read-only inspection is available in normal browsing/waiting and existing explicit inspect mode without clearing that prompt. The action body is deliberately separate:
 
   ```java
   callbacks.inspectMaterials(host);
@@ -171,7 +171,7 @@ Observed leads at the planning SHA:
   ```
 
   Wire `openMaterials` to the actual host object and its `materials` list in engine order, refresh when materials change and clear if that host no longer occupies a field slot. Respect the A3 split layout. Update the existing `.ctx-action` count assertion in `DuelXyzMaterialsScenario` for the additional action rather than deleting its original host-click coverage.
-- [ ] Rerun both scenarios and `./gradlew.bat test --tests '*ClientDuelStateTest' --tests '*ResponseValidatorTest'`. Inspect menu bounds and badge readability at scales 2/3. Commit `feat: inspect Xyz materials and mark face-down banished cards`.
+- [x] Rerun both scenarios and `./gradlew.bat test --tests '*ClientDuelStateTest' --tests '*ResponseValidatorTest'`. Inspect menu bounds and badge readability at scales 2/3. Commit `feat: inspect Xyz materials and mark face-down banished cards`.
 
 ## Track completion
 

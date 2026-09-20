@@ -62,3 +62,9 @@ Observed leads at the planning SHA:
 
   Wire `openMaterials` to the actual host object and its `materials` list in engine order, refresh when materials change and clear if that host no longer occupies a field slot. Respect the A3 split layout. Update the existing `.ctx-action` count assertion in `DuelXyzMaterialsScenario` for the additional action rather than deleting its original host-click coverage.
 - [x] Rerun both scenarios and `./gradlew.bat test --tests '*ClientDuelStateTest' --tests '*ResponseValidatorTest'`. Inspect menu bounds and badge readability at scales 2/3. Commit `feat: inspect Xyz materials and mark face-down banished cards`.
+
+## Review fix 1: stale material hover identity
+
+- [x] Reproduce stationary-pointer stale details when a live recipient-redacted `QUERY_OVERLAY_CARD` changes a hovered material code to zero, and when close/host departure removes the hovered tile without a leave event.
+- [x] Clear details immediately only when the inspector still owns them; preserve unrelated event details and the existing delayed pointer crossing behavior.
+- [x] Verify `duel_xyz_materials`, `duel_zone_inspector_actions`, and A1's `duel_public_hand_hover`; archive full RED/GREEN reports, screenshots, and console logs under `build/evidence/qa-m4-follow-up/a4/review-fix1/`.

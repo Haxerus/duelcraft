@@ -89,3 +89,29 @@ These were test timing, coordinate, or selector issues. The final runs use expli
 - Minecraft startup continues to log pre-existing missing example block/item model, `card_back` atlas, sound, shader-uniform, and Gradle deprecation warnings. They do not fail `verifyUiTest` and are outside A4.
 - Client startup loaded the existing card-data cache and refreshed `strings.conf`; scenario artwork and identity assertions use deterministic fixture textures and do not depend on card database/image contents.
 - Evidence lives under ignored `build/evidence/qa-m4-follow-up/a4/` and is not part of the Git commits.
+
+## Review fix 1: stale material hover identity
+
+Review source: `.superpowers/sdd/2026-09-19-m4-qa-follow-up/task-A4-review.md`
+
+Source commit: `eac5b15df97264e1044f87356568a33f66f380ce`
+
+`ScrollerView.clearAllScrollViewChildren()` removes material tiles without emitting `MOUSE_LEAVE`. A known material hover had already canceled the delayed hide, so a live host query that replaced that material's code with zero could rebuild an anonymous tile while leaving the old identity visible. Closing the inspector or removing its host had the same stale-detail path.
+
+`ZoneInspectorController` now keeps the exact `ClientCard` that supplied its current details through the normal 500 ms pointer-crossing grace. Before rebuilding or closing, it asks the screen to clear that source immediately. `LDLibDuelScreen` clears only when the supplied object still owns the displayed details. A later prompt/event detail has a different or null owner and remains visible. A1's stationary opponent-hand revocation now uses the same owner-aware immediate clear and retains its existing behavior.
+
+### RED
+
+| Command | Exit/result | Evidence |
+|---|---|---|
+| `.\gradlew.bat runClient -PldTest=duel_xyz_materials` | Exit 1; run `32340_3c070ade`, FAIL, 160/163 checks, 166 steps. The only failures were the intended stale banner after owned close, stationary overlay-code redaction, and host departure. The unrelated `HINT_CARD` refresh/close control passed. | `build/evidence/qa-m4-follow-up/a4/review-fix1/red-xyz/` |
+
+### GREEN
+
+| Command | Exit/result | Evidence |
+|---|---|---|
+| `.\gradlew.bat runClient -PldTest=duel_xyz_materials` | Exit 0; run `37608_39f5eba4`, PASS, 163/163 checks, 166 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix1/green-xyz/` |
+| `.\gradlew.bat runClient -PldTest=duel_public_hand_hover` | Exit 0; run `31232_39f5eba4`, PASS, 9/9 checks, 31 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix1/green-public-hand/` |
+| `.\gradlew.bat runClient -PldTest=duel_zone_inspector_actions` | Exit 0; run `41868_4cb939d5`, PASS, 69/69 checks, 88 steps. | `build/evidence/qa-m4-follow-up/a4/review-fix1/green-zone/` |
+
+No broader suite was run: this fix changes only card-detail ownership at the zone-inspector callback boundary, and the three directly affected scenarios are green. The grouped UI suite remains reserved for I1. The runs retain the previously documented model/texture, sound, shader, Gradle-deprecation, and unchecked fixture warnings.
