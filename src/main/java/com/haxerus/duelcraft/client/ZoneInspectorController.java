@@ -25,8 +25,9 @@ public class ZoneInspectorController {
     public interface Callbacks {
         void setCardImageBackground(UIElement elem, int code);
         void onCardClicked(int player, int location, int sequence, UIEvent event);
-        void showCardInfo(int code);
+        void showCardInfo(int code, ClientCard source);
         void hideCardInfo();
+        void clearCardInfo(ClientCard source);
         void onVisibilityChanged();
         void restoreScrollAfterContentLayout(float offset);
     }
@@ -41,6 +42,7 @@ public class ZoneInspectorController {
     private int inspectedLocation = -1;
     private String inspectedTitle;
     private ClientCard inspectedHost;
+    private ClientCard cardInfoOwner;
 
     public ZoneInspectorController(UI ui, ClientDuelState state, Callbacks callbacks) {
         this.ui = ui;
@@ -83,6 +85,7 @@ public class ZoneInspectorController {
                     : Component.literal(inspectedTitle));
         }
         if (listElem == null) return;
+        clearOwnedCardInfo();
 
         int player = inspectedPlayer;
         int location = inspectedLocation;
@@ -108,10 +111,16 @@ public class ZoneInspectorController {
                 });
             }
             if (code != 0) {
-                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> {
+                    cardInfoOwner = inspectedCard;
+                    callbacks.showCardInfo(code, inspectedCard);
+                });
                 card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             } else {
-                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.hideCardInfo());
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> {
+                    clearOwnedCardInfo();
+                    callbacks.hideCardInfo();
+                });
             }
             if (!materials && location == LOCATION_REMOVED && inspectedCard.isFaceDown()) {
                 card.addChild(new Label()
@@ -146,12 +155,19 @@ public class ZoneInspectorController {
     }
 
     private void close() {
+        clearOwnedCardInfo();
         if (inspector != null) inspector.addClass("hidden");
         inspectedPlayer = -1;
         inspectedLocation = -1;
         inspectedTitle = null;
         inspectedHost = null;
         callbacks.onVisibilityChanged();
+    }
+
+    private void clearOwnedCardInfo() {
+        if (cardInfoOwner == null) return;
+        callbacks.clearCardInfo(cardInfoOwner);
+        cardInfoOwner = null;
     }
 
     private void bindPileClick(String elementId, String title, int player, int location) {

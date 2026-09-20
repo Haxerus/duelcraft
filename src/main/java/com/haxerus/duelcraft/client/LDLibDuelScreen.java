@@ -281,6 +281,7 @@ public class LDLibDuelScreen {
         // Overlays
         private final UIElement cardInfoBanner;
         private long cardInfoHideAt;
+        private ClientCard cardInfoOwner;
         private ClientCard inspectedHandCard;
         private int inspectedHandCode;
         private final UIElement resultOverlay;
@@ -403,11 +404,14 @@ public class LDLibDuelScreen {
                 @Override public void onCardClicked(int player, int location, int sequence, UIEvent event) {
                     UIRefresher.this.onCardClicked(player, location, sequence, event);
                 }
-                @Override public void showCardInfo(int code) {
-                    UIRefresher.this.showCardInfo(code);
+                @Override public void showCardInfo(int code, ClientCard source) {
+                    UIRefresher.this.showCardInfo(code, source);
                 }
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
+                }
+                @Override public void clearCardInfo(ClientCard source) {
+                    UIRefresher.this.clearCardInfo(source);
                 }
                 @Override public void onVisibilityChanged() {
                     UIRefresher.this.refreshRightPanels();
@@ -1027,15 +1031,12 @@ public class LDLibDuelScreen {
                     && (state.handDisplayCode(inspectedHandCard) != inspectedHandCode
                     || state.cardAt(inspectedHandCard.controller, LOCATION_HAND, inspectedHandCard.sequence) != inspectedHandCard)) {
                 // Revocation wins over the pointer-crossing delay, even while the inspector is hovered.
-                cardInfoBanner.addClass("hidden");
-                inspectedHandCard = null;
-                cardInfoHideAt = 0;
+                clearCardInfo(inspectedHandCard);
             }
 
             if (cardInfoHideAt != 0 && now >= cardInfoHideAt
                     && cardInfoBanner != null && !cardInfoBanner.isSelfOrChildHover()) {
-                cardInfoBanner.addClass("hidden");
-                cardInfoHideAt = 0;
+                clearCardInfo();
             }
 
             if (state.pendingModal != null && hintModal != null && hintModal.hasClass("hidden")) {
@@ -1237,6 +1238,7 @@ public class LDLibDuelScreen {
         /** {@code onField} supplies the card's live hints/stats, or null for an event-only identity. */
         private void showCardInfo(int code, ClientCard onField) {
             if (code == 0 || cardInfoBanner == null) return;
+            cardInfoOwner = onField;
             inspectedHandCard = onField != null && onField.location == LOCATION_HAND ? onField : null;
             inspectedHandCode = code;
             cardInfoHideAt = 0;
@@ -1375,6 +1377,17 @@ public class LDLibDuelScreen {
         private void hideCardInfo() {
             // Allow the pointer to cross the gap to the scrollable description panel.
             cardInfoHideAt = System.currentTimeMillis() + 500;
+        }
+
+        private void clearCardInfo(ClientCard source) {
+            if (cardInfoOwner == source) clearCardInfo();
+        }
+
+        private void clearCardInfo() {
+            if (cardInfoBanner != null) cardInfoBanner.addClass("hidden");
+            cardInfoOwner = null;
+            inspectedHandCard = null;
+            cardInfoHideAt = 0;
         }
 
         private Label findCardCountLabel(String parentId) {

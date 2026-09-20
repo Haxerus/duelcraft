@@ -4,6 +4,7 @@ import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.message.QueriedCard;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
@@ -94,6 +95,11 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
          })
          .step("hover known material", ctx -> hoverMaterial(ctx, 0)).ticks(2)
          .checkVisible("#card-info-banner")
+         .step("close while known material owns details", ctx -> clickElement(ctx, "#zone-inspector-close"))
+         .frames(2).checkHidden("#card-info-banner")
+         .step("reopen own materials", ctx -> clickHost(ctx, "#plr-mon-2"))
+         .frames(2).step("choose own materials again", ctx -> clickContextAction(ctx, 0))
+         .ticks(2)
          .step("hover unknown material", ctx -> hoverMaterial(ctx, 2)).ticks(12)
          .checkHidden("#card-info-banner")
          .check("opening materials sends no response", ctx ->
@@ -111,10 +117,22 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
              materialArtwork(ctx, 1, 33750025);
              materialArtwork(ctx, 2, 0);
          })
-         .step("hover opponent unknown material", ctx -> hoverMaterial(ctx, 2)).ticks(2)
-         .checkHidden("#card-info-banner")
+         .step("hover opponent known material", ctx -> hoverMaterial(ctx, 0)).ticks(2)
+         .checkVisible("#card-info-banner")
+         .step("recipient query redacts hovered material without moving the pointer", ctx ->
+                 overlayQuery(1, 0, 0, 33750025, 0))
+         .ticks(3).checkHidden("#card-info-banner")
+         .step("redacted hovered material becomes an anonymous back", ctx -> materialArtwork(ctx, 0, 0))
          .screenshot("opponent-material-inspector")
-         .step("close opponent materials", ctx -> clickElement(ctx, "#zone-inspector-close")).ticks(2)
+         .step("show unrelated event details", ctx -> LDLibDuelScreen.applyMessage(
+                 new DuelMessage.Hint(HINT_CARD, 0, 99000004)))
+         .ticks(1).checkVisible("#card-info-banner").checkText("#card-name-label", "Card #99000004")
+         .step("refresh with no material-owned details", ctx -> overlayQuery(1, 0, 0, 0, 0))
+         .ticks(1).checkVisible("#card-info-banner").checkText("#card-name-label", "Card #99000004")
+         .step("close does not clear unrelated details", ctx -> clickElement(ctx, "#zone-inspector-close"))
+         .frames(2).checkVisible("#card-info-banner").checkText("#card-name-label", "Card #99000004")
+         .step("move away after unrelated-details control", ctx -> ctx.input().moveTo(1, 1)).ticks(12)
+         .checkHidden("#card-info-banner")
          .step("click exposed material edge with a host action", ctx -> DuelScreenFixture.promptRepositionOf(0, 1))
          .ticks(2)
          .step("material click", ctx -> {
@@ -198,10 +216,13 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
          .check("control change retains the actual inspected host", ctx ->
                  DuelVisibilityFixture.state().cardAt(1, LOCATION_MZONE, 6) == ctx.get("inspected-host"))
          .screenshot("materials-after-detach-reorder-control-change")
+         .step("hover known material before host departure", ctx -> hoverMaterial(ctx, 1)).ticks(2)
+         .checkVisible("#card-info-banner")
          .step("host leaves the field", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.Move(28406301,
                  new LocInfo(1, LOCATION_MZONE, 6, POS_FACEUP_DEFENSE),
                  new LocInfo(1, LOCATION_GRAVE, 1, POS_FACEUP_ATTACK), 0)))
          .ticks(3).checkHidden("#zone-inspector")
+         .checkHidden("#card-info-banner")
          .check("host departure and all inspection gestures send no response", ctx ->
                  ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
          .teardown("close", ctx -> {
@@ -232,6 +253,13 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
         return new DuelMessage.SelectCard(0, false, 1, 2, List.of(
                 new DuelMessage.CardInfo(28406301, 0, LOCATION_MZONE, 2, POS_FACEUP_DEFENSE),
                 new DuelMessage.CardInfo(55415564, 0, LOCATION_MZONE, 3, POS_FACEUP_ATTACK)));
+    }
+
+    private static void overlayQuery(int player, int sequence, int... codes) {
+        var query = new QueriedCard();
+        query.flags = QUERY_OVERLAY_CARD;
+        query.overlayCards = java.util.Arrays.stream(codes).boxed().toList();
+        LDLibDuelScreen.applyMessage(new DuelMessage.UpdateCard(player, LOCATION_MZONE, sequence, query));
     }
 
     static void assertStack(TestContext ctx, String slot) {
