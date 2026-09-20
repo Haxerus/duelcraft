@@ -27,6 +27,7 @@ public class ZoneInspectorController {
         void onCardClicked(int player, int location, int sequence, UIEvent event);
         void showCardInfo(int code);
         void hideCardInfo();
+        void onVisibilityChanged();
     }
 
     private final UI ui;
@@ -101,6 +102,7 @@ public class ZoneInspectorController {
         inspectedLocation = location;
         inspectedTitle = title;
         if (inspector != null) inspector.removeClass("hidden");
+        callbacks.onVisibilityChanged();
         refresh();
     }
 
@@ -109,6 +111,7 @@ public class ZoneInspectorController {
         inspectedPlayer = -1;
         inspectedLocation = -1;
         inspectedTitle = null;
+        callbacks.onVisibilityChanged();
     }
 
     private void bindPileClick(String elementId, String title, int player, int location) {

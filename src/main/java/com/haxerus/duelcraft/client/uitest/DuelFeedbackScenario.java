@@ -11,6 +11,7 @@ import com.lowdragmc.lowdraglib2.uitest.ScenarioBuilder;
 import com.lowdragmc.lowdraglib2.uitest.ScenarioOptions;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
@@ -79,10 +80,10 @@ public final class DuelFeedbackScenario implements UIScenario {
          .checkTextContains("#lp-delta-0", "-500")
          .check("player hint stays below the LP delta", ctx ->
                  ctx.el("#plr-hints").bounds().y() >= ctx.el("#lp-delta-0").bounds().bottom() - 1)
-         .check("log stays below the wrapped player hint", ctx ->
-                 ctx.el("#duel-log").bounds().y() >= ctx.el("#plr-hints").bounds().bottom() + 1)
-         .check("LP delta stays above log header", ctx ->
-                 ctx.el("#lp-delta-0").bounds().bottom() <= ctx.el("#duel-log-title").bounds().y() + 1)
+         .check("right log stays clear of the local player hint", ctx ->
+                 ctx.el("#plr-hints").bounds().right() <= ctx.el("#duel-log").bounds().x() - 1)
+         .check("right log stays clear of the local LP delta", ctx ->
+                 ctx.el("#lp-delta-0").bounds().right() <= ctx.el("#duel-log").bounds().x() - 1)
          .check("the log lists the chain links and the damage",
                  ctx -> ctx.count(".log-line") >= 3)
          .step("visual layout", DuelUiAssertions::audit)
@@ -95,7 +96,7 @@ public final class DuelFeedbackScenario implements UIScenario {
                  "Your opponent selected a card effect that adds one monster from the Deck to the hand, then Special Summons a monster.")))
          .ticks(2)
          .check("toast stays clear of the open log", ctx ->
-                 ctx.el("#toast").bounds().x() >= ctx.el("#duel-log").bounds().right() + 1)
+                 ctx.el("#toast").bounds().right() <= ctx.el("#duel-log").bounds().x() - 1)
          .step("feedback layout", DuelUiAssertions::audit)
          .screenshot("feedback-banner-toast")
          .step("resolve chain and enter a real damage step", ctx -> {
@@ -139,11 +140,11 @@ public final class DuelFeedbackScenario implements UIScenario {
          .step("enough real events to require scrolling", ctx -> {
              for (int i = 0; i < 60; i++) LDLibDuelScreen.applyMessage(new DuelMessage.Recover(0, i + 1));
          }).ticks(2)
-         .step("remember log offset", ctx -> ctx.put("logY", ctx.all(".log-line").getFirst().bounds().y()))
-         .scroll("#duel-log-list", -100).ticks(2)
-         .check("log scrolls", ctx -> ctx.all(".log-line").getFirst().bounds().y() < (float) ctx.get("logY"))
+         .step("remember bottom-follow log offset", ctx -> ctx.put("logY", ctx.all(".log-line").getFirst().bounds().y()))
+         .step("scroll log to its first entry", ctx -> ctx.el("#duel-log-list").as(ScrollerView.class)
+                 .verticalScroller.setNormalizedValue(0)).ticks(2)
+         .check("log scrolls", ctx -> ctx.all(".log-line").getFirst().bounds().y() > (float) ctx.get("logY"))
          .screenshot("log-long-scrolled")
-         .scroll("#duel-log-list", 100).ticks(2)
          .step("click a whole chain line", ctx -> {
              var bounds = ctx.all(".log-line").stream()
                      .filter(ref -> ref.as(TextElement.class).getText().getString().startsWith("Chain Link 1:"))
@@ -151,7 +152,7 @@ public final class DuelFeedbackScenario implements UIScenario {
              ctx.input().mouseDown(bounds.centerX(), bounds.centerY(), 0);
              ctx.input().mouseUp(bounds.centerX(), bounds.centerY(), 0);
          }).ticks(2)
-         .checkHidden("#duel-log")
+         .checkVisible("#duel-log")
          .checkVisible("#card-info-banner")
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();

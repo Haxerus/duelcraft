@@ -17,7 +17,7 @@ import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
-/** Standing effects share their owner's side column without covering LP changes or open panels. */
+/** Standing effects reserve their owner's side column without covering LP changes or open panels. */
 @LDLRegisterClient(name = "duel_player_hints", group = "duelcraft", registry = UIScenario.REGISTRY,
         environment = RegistrationEnvironment.DEV_ONLY)
 public final class DuelPlayerHintsScenario implements UIScenario {
@@ -63,20 +63,24 @@ public final class DuelPlayerHintsScenario implements UIScenario {
         DuelPromptLayoutScenario.capture(s, "long-standing-hints-and-details");
         DuelPanelLayoutScenario.press(s, "#log-toggle");
         s.checkVisible("#duel-log")
-         .check("log starts below local standing effects", ctx ->
-                 ctx.el("#duel-log").bounds().y() >= ctx.el("#plr-hints").bounds().bottom());
+         .check("right column starts below opponent standing effects", ctx ->
+                 ctx.el("#duel-log").bounds().y() >= ctx.el("#opp-hints").bounds().bottom());
         DuelPromptLayoutScenario.capture(s, "long-standing-hints-and-log");
         s.step("clear local effects independently", ctx -> { remove(0, 101); remove(0, 102); })
          .ticks(3).checkHidden("#plr-hints").checkVisible("#opp-hints")
-         .check("cleared local backing restores log height", ctx ->
-                 ctx.el("#duel-log").bounds().y() == ((ElementBounds) ctx.get("details-before-hints")).y())
+         .check("cleared local backing restores details height", ctx ->
+                 ctx.el("#card-info-banner").bounds().y() == ((ElementBounds) ctx.get("details-before-hints")).y())
          .check("opponent effects still reserve inspector space", ctx ->
                  ctx.el("#zone-inspector").bounds().y() >= ctx.el("#opp-hints").bounds().bottom());
         DuelPromptLayoutScenario.capture(s, "local-standing-hints-cleared");
         s.step("clear remaining effects", ctx -> { remove(1, 102); remove(1, 103); })
          .ticks(3).checkHidden("#plr-hints").checkHidden("#opp-hints")
-         .check("cleared opponent backing restores inspector height", ctx -> sameBounds(
-                 ctx.el("#zone-inspector").bounds(), ctx.get("inspector-before-hints")));
+         .check("cleared opponent backing restores right-column top", ctx ->
+                 ctx.el("#zone-inspector").bounds().y()
+                         == ((ElementBounds) ctx.get("inspector-before-hints")).y())
+         .check("stacked panels keep an equal split", ctx -> Math.abs(
+                 ctx.el("#zone-inspector").bounds().height()
+                         - ctx.el("#duel-log").bounds().height()) <= 1);
         DuelPromptLayoutScenario.capture(s, "all-standing-hints-cleared");
         s.teardown("close", ctx -> { LDLibDuelScreen.close(); ctx.mc().setScreen(null); });
     }
