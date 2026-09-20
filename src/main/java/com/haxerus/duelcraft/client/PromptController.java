@@ -413,14 +413,16 @@ public class PromptController {
         close.setId("reveal-close");
         close.addClass("prompt-btn");
         close.setText(Component.literal("Close"));
-        close.setOnClick(e -> {
-            state.pendingReveals.removeFirst();
-            displayedReveal = null;
-            callbacks.hideCardInfo();
-            promptOverlay.addClass("hidden");
-            refreshReveals();
-        });
+        close.setOnClick(e -> acknowledgeReveal());
         promptButtons.addChild(close);
+    }
+
+    private void acknowledgeReveal() {
+        state.pendingReveals.removeFirst();
+        displayedReveal = null;
+        callbacks.hideCardInfo();
+        promptOverlay.addClass("hidden");
+        refreshReveals();
     }
 
     private static List<DuelMessage.CardInfo> revealCandidates(DuelMessage prompt) {
@@ -1571,6 +1573,11 @@ public class PromptController {
     public boolean handleRightClick(UIEvent e) {
         if (inspectingField) {
             e.stopPropagation();
+            return true;
+        }
+        if (displayedReveal != null) {
+            e.stopPropagation();
+            acknowledgeReveal();
             return true;
         }
         // edopro binds right-click to the shared Cancel/Finish button (`event_handler.cpp:1498-1511`).

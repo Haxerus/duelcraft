@@ -25,6 +25,47 @@ public final class DuelVisibilityQAScenario implements UIScenario {
              LDLibDuelScreen.applyMessage(new DuelMessage.ShuffleHand(1, java.util.Collections.nCopies(5, 0)));
              ctx.<DuelVisibilityFixture>get("art").captureResponses();
          }).ticks(3);
+        for (boolean battle : new boolean[]{false, true}) {
+            var effects = List.of(new DuelMessage.ActivatableCard(89631139, 0, LOCATION_MZONE, 0, 1, 1, 0),
+                    new DuelMessage.ActivatableCard(89631139, 0, LOCATION_MZONE, 0, 1, 2, 0));
+            DuelMessage command = battle ? new DuelMessage.SelectBattleCmd(0, effects, List.of(), true, true)
+                    : new DuelMessage.SelectIdleCmd(0, List.of(), List.of(), List.of(), List.of(), List.of(),
+                            effects, true, true, false);
+            s.step("right-click lifecycle: " + (battle ? "battle" : "idle"), ctx -> LDLibDuelScreen.applyMessage(command))
+             .ticks(2).click("#plr-mon-0 .card").ticks(2);
+            press(s, ".ctx-action");
+            s.checkVisible("#prompt-overlay").checkCount("#prompt-dialog .prompt-btn", 2);
+            rightClickDialog(s);
+            s.checkHidden("#prompt-overlay")
+             .check("effect chooser cancellation keeps command pending", ctx -> DuelVisibilityFixture.state().pendingPrompt == command)
+             .check("effect chooser cancellation sends no response", ctx -> ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+             .step("two read-only reveals during command", ctx -> {
+                 reveal(LOCATION_DECK);
+                 reveal(LOCATION_EXTRA);
+             }).ticks(2).checkVisible("#prompt-overlay").checkVisible("#reveal-close")
+             .check("Deck reveal precedes Extra reveal", ctx -> DuelVisibilityFixture.state().pendingReveals.size() == 2
+                     && DuelVisibilityFixture.state().pendingReveals.peekFirst().cards().getFirst().location() == LOCATION_DECK);
+            rightClickDialog(s);
+            s.checkVisible("#prompt-overlay").checkVisible("#reveal-close")
+             .check("right-click acknowledges only the first reveal", ctx -> DuelVisibilityFixture.state().pendingReveals.size() == 1
+                     && DuelVisibilityFixture.state().pendingReveals.peekFirst().cards().getFirst().location() == LOCATION_EXTRA)
+             .screenshot("right-click-reveal-" + (battle ? "battle" : "idle"))
+             .step("Close the accessible next reveal", ctx -> {
+                 // Keep both command cases running on RED, after recording the inaccessible control.
+                 if (!ctx.el("#prompt-overlay").element().hasClass("hidden")) {
+                     var b = ctx.el("#reveal-close").bounds();
+                     ctx.input().mouseDown(b.centerX(), b.centerY(), 0);
+                     ctx.input().mouseUp(b.centerX(), b.centerY(), 0);
+                 }
+             }).ticks(2).checkHidden("#prompt-overlay")
+             .check("Close empties the reveal queue", ctx -> DuelVisibilityFixture.state().pendingReveals.isEmpty())
+             .check("read-only acknowledgements preserve the command", ctx -> DuelVisibilityFixture.state().pendingPrompt == command)
+             .check("read-only acknowledgements send zero response bytes", ctx -> ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+             .step("reset command case after assertions", ctx -> {
+                 DuelVisibilityFixture.state().pendingReveals.clear();
+                 LDLibDuelScreen.applyMessage(new DuelMessage.Waiting());
+             }).ticks(2);
+        }
         for (int location : new int[]{LOCATION_HAND, LOCATION_DECK, LOCATION_EXTRA}) {
             for (boolean sameTick : new boolean[]{true, false}) {
                 if (sameTick) s.step("one batch: reversed reveal and original-order choice " + location, ctx -> {
@@ -89,6 +130,13 @@ public final class DuelVisibilityQAScenario implements UIScenario {
              LDLibDuelScreen.close(); ctx.mc().setScreen(null);
              DuelVisibilityFixture fixture = ctx.get("art"); if (fixture != null) fixture.close();
          });
+    }
+    private static void rightClickDialog(ScenarioBuilder s) {
+        s.step("right-click through root listener", ctx -> {
+            var b = ctx.el("#prompt-title").bounds();
+            ctx.input().mouseDown(b.centerX(), b.centerY(), 1);
+            ctx.input().mouseUp(b.centerX(), b.centerY(), 1);
+        }).ticks(2);
     }
     private static void reveal(int location) {
         LDLibDuelScreen.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
