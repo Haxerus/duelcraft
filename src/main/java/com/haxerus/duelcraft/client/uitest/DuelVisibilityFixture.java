@@ -35,21 +35,37 @@ public final class DuelVisibilityFixture implements AutoCloseable {
     public void captureResponses() {
         Object refresher = field(LDLibDuelScreen.class, null, "refresher");
         var prompt = (PromptController) field(refresher.getClass(), refresher, "prompt");
-        var original = field(PromptController.class, prompt, "callbacks");
+        var originalPrompt = field(PromptController.class, prompt, "callbacks");
         var capture = Proxy.newProxyInstance(PromptController.class.getClassLoader(),
                 new Class<?>[]{PromptController.Callbacks.class}, (proxy, method, args) -> {
                     if (method.getName().equals("sendResponse")) {
-                        byte[] response = ((Supplier<byte[]>) args[0]).get();
-                        if (state().markResponseSent()) {
-                            responses.add(response.clone());
-                            state().onResponseSent();
-                            prompt.onResponseSent();
-                        }
+                        captureResponse((Supplier<byte[]>) args[0], prompt);
                         return null;
                     }
-                    return method.invoke(original, args);
+                    return method.invoke(originalPrompt, args);
                 });
         set(PromptController.class, prompt, "callbacks", capture);
+
+        var clicks = (ClickDispatcher) field(refresher.getClass(), refresher, "clicks");
+        var originalClicks = field(ClickDispatcher.class, clicks, "callbacks");
+        var clickCapture = Proxy.newProxyInstance(ClickDispatcher.class.getClassLoader(),
+                new Class<?>[]{ClickDispatcher.Callbacks.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("sendResponse")) {
+                        captureResponse((Supplier<byte[]>) args[0], prompt);
+                        return null;
+                    }
+                    return method.invoke(originalClicks, args);
+                });
+        set(ClickDispatcher.class, clicks, "callbacks", clickCapture);
+    }
+
+    private void captureResponse(Supplier<byte[]> response, PromptController prompt) {
+        byte[] bytes = response.get();
+        if (state().markResponseSent()) {
+            responses.add(bytes.clone());
+            state().onResponseSent();
+            prompt.onResponseSent();
+        }
     }
 
     public static void artwork(TestContext ctx, int index, int code) {

@@ -797,6 +797,20 @@
         padding-all: 2;
         }
 
+        .face-down-marker {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        min-height: 7;
+        font-size: 6;
+        horizontal-align: center;
+        vertical-align: center;
+        text-color: #FFFFFF;
+        background: rect(#CC000000);
+        z-index: 2;
+        }
+
         .insp-slot {
         flex-basis: 1;
         background: built-in(ui-gdp:RECT);
@@ -1258,6 +1272,12 @@
         height: 14;
         align-items: center;
         justify-content: center;
+        }
+
+        .ctx-materials {
+        font-size: 7;
+        text-color: #FFFFFF;
+        background: sdf(#44AACC, 3, 2);
         }
 
         /* ── Rule-driven visibility (FieldRenderer assigns these classes) ── */

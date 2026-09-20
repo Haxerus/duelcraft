@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.ElementBounds;
@@ -14,6 +15,9 @@ import com.lowdragmc.lowdraglib2.uitest.TestContext;
 import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.List;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -36,6 +40,8 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
         s.openScreen("Xyz material stacks", ctx -> LDLibDuelScreen.create(DuelScreenFixture.startPayload(DuelRule.MR5)))
          .awaitModularUI()
          .step("hosts in attack, defense and both shared extra zones", ctx -> {
+             ctx.put("art", new DuelVisibilityFixture());
+             ctx.<DuelVisibilityFixture>get("art").captureResponses();
              DuelScreenFixture.populate(DuelRule.MR5);
              LDLibDuelScreen.applyMessage(new DuelMessage.PosChange(28406301, 0, LOCATION_MZONE, 2,
                      POS_FACEUP_ATTACK, POS_FACEUP_DEFENSE));
@@ -73,6 +79,42 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
                  assertStack(ctx, slot);
              }
          }).screenshot("xyz-material-stacks")
+         .step("zero-material host has no read-only action", ctx -> clickHost(ctx, "#plr-mon-0"))
+         .frames(2).checkHidden("#context-menu")
+         .step("open normal browsing menu for own host", ctx -> clickHost(ctx, "#plr-mon-2"))
+         .frames(2).checkVisible("#context-menu").checkCount(".ctx-action", 1)
+         .step("open own materials", ctx -> clickContextAction(ctx, 0))
+         .ticks(3).checkVisible("#zone-inspector")
+         .checkText("#zone-inspector-title", "Materials (3)")
+         .checkCount("#zone-inspector-list .material-card", 3)
+         .step("own materials keep engine order and recipient identities", ctx -> {
+             materialArtwork(ctx, 0, 89631139);
+             materialArtwork(ctx, 1, 33750025);
+             materialArtwork(ctx, 2, 0);
+         })
+         .step("hover known material", ctx -> hoverMaterial(ctx, 0)).ticks(2)
+         .checkVisible("#card-info-banner")
+         .step("hover unknown material", ctx -> hoverMaterial(ctx, 2)).ticks(12)
+         .checkHidden("#card-info-banner")
+         .check("opening materials sends no response", ctx ->
+                 ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+         .screenshot("own-material-inspector")
+         .step("close own materials", ctx -> clickElement(ctx, "#zone-inspector-close")).ticks(2)
+         .check("closing materials sends no response", ctx ->
+                 ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+         .step("open opponent host materials", ctx -> clickHost(ctx, "#opp-mon-0"))
+         .frames(2).checkCount(".ctx-action", 1)
+         .step("choose opponent materials", ctx -> clickContextAction(ctx, 0))
+         .ticks(3).checkText("#zone-inspector-title", "Materials (3)")
+         .step("opponent material privacy is unchanged", ctx -> {
+             materialArtwork(ctx, 0, 89631139);
+             materialArtwork(ctx, 1, 33750025);
+             materialArtwork(ctx, 2, 0);
+         })
+         .step("hover opponent unknown material", ctx -> hoverMaterial(ctx, 2)).ticks(2)
+         .checkHidden("#card-info-banner")
+         .screenshot("opponent-material-inspector")
+         .step("close opponent materials", ctx -> clickElement(ctx, "#zone-inspector-close")).ticks(2)
          .step("click exposed material edge with a host action", ctx -> DuelScreenFixture.promptRepositionOf(0, 1))
          .ticks(2)
          .step("material click", ctx -> {
@@ -81,29 +123,91 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
              float x = (material.x() + host.x()) / 2;
              ctx.input().mouseDown(x, host.centerY(), 0);
              ctx.input().mouseUp(x, host.centerY(), 0);
-         }).frames(2).checkVisible("#context-menu").checkCount(".ctx-action", 1)
+         }).frames(2).checkVisible("#context-menu").checkCount(".ctx-action", 2)
+         .step("material action stays separate from the original engine action", ctx ->
+                 clickContextAction(ctx, 1))
+         .ticks(2).checkText("#zone-inspector-title", "Materials (1)")
+         .check("read-only action sends no engine choice", ctx ->
+                 ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+         .step("close exposed-edge materials", ctx -> clickElement(ctx, "#zone-inspector-close")).ticks(2)
+         .step("summon and activate keep their engine menu entries", ctx ->
+                 LDLibDuelScreen.applyMessage(summonAndActivate(0, 2)))
+         .ticks(2).step("open combined host menu", ctx -> clickHost(ctx, "#plr-mon-2"))
+         .frames(2).checkCount(".ctx-action", 3)
+         .step("combined menu stays inside the duel canvas", ctx ->
+                 DuelUiAssertions.contains(ctx, ctx.el("#duel-canvas").bounds(),
+                         ctx.el("#context-menu").bounds(), "materials context menu"))
+         .screenshot("materials-context-menu")
          // A host with actions reopens its menu on either mouse button; click an empty zone to dismiss.
          .click("#plr-st-2").frames(2).checkHidden("#context-menu")
-         .step("detach only material and transfer another to zero-material host", ctx -> {
-             LDLibDuelScreen.applyMessage(new DuelMessage.Waiting());
-             LDLibDuelScreen.applyMessage(new DuelMessage.Move(89631139,
-                     new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 1, 0),
-                     new LocInfo(0, LOCATION_GRAVE, 1, POS_FACEUP_ATTACK), 0));
-             LDLibDuelScreen.applyMessage(new DuelMessage.Move(0,
-                     new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 2, 2),
-                     new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0), 0));
-         }).ticks(5)
-         .checkCount("#plr-mon-1 .xyz-material", 0)
-         .checkCount("#plr-mon-2 .xyz-material", 2)
-         .checkCount("#plr-mon-0 .xyz-material.card-back", 1)
-         .step("refreshed stacks still fit", ctx -> {
-             assertStack(ctx, "#plr-mon-0");
-             assertStack(ctx, "#plr-mon-1");
-             assertStack(ctx, "#plr-mon-2");
-         }).screenshot("xyz-materials-detached-and-moved")
+         .step("mandatory field selection retains click priority", ctx ->
+                 LDLibDuelScreen.applyMessage(mandatoryFieldSelection()))
+         .ticks(2).step("select material host", ctx -> clickHost(ctx, "#plr-mon-2"))
+         .ticks(2).checkHidden("#context-menu")
+         .check("mandatory click selects instead of inspecting", ctx ->
+                 ctx.el("#plr-mon-2").element().hasClass("selected"))
+         .check("mandatory selection has not auto-sent", ctx ->
+                 ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+         .step("enter explicit field inspection", ctx ->
+                 LDLibDuelScreen.applyMessage(new DuelMessage.SelectYesNo(0, 1L)))
+         .ticks(2).click("#prompt-toggle-btn").ticks(2)
+         .checkHidden("#prompt-overlay").checkText("#prompt-toggle-btn", "Show Prompt")
+         .step("open materials while explicit inspection owns field clicks", ctx ->
+                 clickHost(ctx, "#plr-mon-2"))
+         .frames(2).checkCount(".ctx-action", 1)
+         .step("choose inspection-mode materials", ctx -> clickContextAction(ctx, 0))
+         .ticks(2).checkVisible("#zone-inspector")
+         .checkHidden("#prompt-overlay").checkText("#prompt-toggle-btn", "Show Prompt")
+         .check("explicit inspection keeps the prompt and sends no response", ctx ->
+                 DuelVisibilityFixture.state().pendingPrompt instanceof DuelMessage.SelectYesNo
+                         && ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
+         .screenshot("materials-during-explicit-inspection")
+         .step("close inspection-mode materials", ctx -> clickElement(ctx, "#zone-inspector-close")).ticks(2)
+         .click("#prompt-toggle-btn").ticks(2).checkVisible("#prompt-overlay")
+         .step("reopen changing host by object identity", ctx -> {
+             LDLibDuelScreen.applyMessage(new DuelMessage.SelectIdleCmd(0,
+                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                     true, true, false));
+             ctx.put("inspected-host", DuelVisibilityFixture.state().cardAt(0, LOCATION_MZONE, 2));
+         }).ticks(2).checkHidden("#prompt-overlay")
+         .step("open changing host menu", ctx -> clickHost(ctx, "#plr-mon-2"))
+         .frames(2).checkVisible("#context-menu").checkCount(".ctx-action", 1)
+         .step("choose changing host materials", ctx -> clickContextAction(ctx, 0))
+         .ticks(2).checkCount("#zone-inspector-list .material-card", 3)
+         .step("detach first material", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.Move(89631139,
+                 new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 2, 0),
+                 new LocInfo(0, LOCATION_GRAVE, 1, POS_FACEUP_ATTACK), 0)))
+         .ticks(3).checkText("#zone-inspector-title", "Materials (2)")
+         .step("detach refreshes current order", ctx -> {
+             materialArtwork(ctx, 0, 33750025);
+             materialArtwork(ctx, 1, 0);
+         })
+         .step("move unknown material to the front", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.Move(0,
+                 new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 2, 1),
+                 new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 2, 0), 0)))
+         .ticks(3).step("reorder refreshes in engine order", ctx -> {
+             materialArtwork(ctx, 0, 0);
+             materialArtwork(ctx, 1, 33750025);
+         })
+         .step("host changes control while inspector remains associated", ctx ->
+                 LDLibDuelScreen.applyMessage(new DuelMessage.Move(28406301,
+                         new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_DEFENSE),
+                         new LocInfo(1, LOCATION_MZONE, 6, POS_FACEUP_DEFENSE), 0)))
+         .ticks(3).checkVisible("#zone-inspector")
+         .checkCount("#zone-inspector-list .material-card", 2)
+         .check("control change retains the actual inspected host", ctx ->
+                 DuelVisibilityFixture.state().cardAt(1, LOCATION_MZONE, 6) == ctx.get("inspected-host"))
+         .screenshot("materials-after-detach-reorder-control-change")
+         .step("host leaves the field", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.Move(28406301,
+                 new LocInfo(1, LOCATION_MZONE, 6, POS_FACEUP_DEFENSE),
+                 new LocInfo(1, LOCATION_GRAVE, 1, POS_FACEUP_ATTACK), 0)))
+         .ticks(3).checkHidden("#zone-inspector")
+         .check("host departure and all inspection gestures send no response", ctx ->
+                 ctx.<DuelVisibilityFixture>get("art").responses.isEmpty())
          .teardown("close", ctx -> {
              LDLibDuelScreen.close();
              ctx.mc().setScreen(null);
+             ctx.<DuelVisibilityFixture>get("art").close();
          });
     }
 
@@ -113,6 +217,21 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
             LDLibDuelScreen.applyMessage(new DuelMessage.Move(code, new LocInfo(player, 0, 0, 0),
                     new LocInfo(player, LOCATION_MZONE | LOCATION_OVERLAY, sequence, index), 0));
         }
+    }
+
+    private static DuelMessage.SelectIdleCmd summonAndActivate(int player, int sequence) {
+        int code = 28406301;
+        return new DuelMessage.SelectIdleCmd(player,
+                List.of(new DuelMessage.IdleCmdCard(code, player, LOCATION_MZONE, sequence)),
+                List.of(), List.of(), List.of(), List.of(),
+                List.of(new DuelMessage.ActivatableCard(code, player, LOCATION_MZONE, sequence, 0, 1L, 0)),
+                true, true, false);
+    }
+
+    private static DuelMessage.SelectCard mandatoryFieldSelection() {
+        return new DuelMessage.SelectCard(0, false, 1, 2, List.of(
+                new DuelMessage.CardInfo(28406301, 0, LOCATION_MZONE, 2, POS_FACEUP_DEFENSE),
+                new DuelMessage.CardInfo(55415564, 0, LOCATION_MZONE, 3, POS_FACEUP_ATTACK)));
     }
 
     static void assertStack(TestContext ctx, String slot) {
@@ -142,6 +261,40 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
         return ctx.el(slot).element().getChildren().stream()
                 .filter(c -> (c.hasClass("card") || c.hasClass("card-back")) && !c.hasClass("xyz-material"))
                 .findFirst().orElseThrow();
+    }
+
+    private static void clickHost(TestContext ctx, String slot) {
+        var bounds = ElementBounds.of(host(ctx, slot));
+        ctx.input().mouseDown(bounds.centerX(), bounds.centerY(), 0);
+        ctx.input().mouseUp(bounds.centerX(), bounds.centerY(), 0);
+    }
+
+    private static void clickContextAction(TestContext ctx, int index) {
+        var bounds = ctx.all(".ctx-action").get(index).bounds();
+        ctx.input().mouseDown(bounds.centerX(), bounds.centerY(), 0);
+        ctx.input().mouseUp(bounds.centerX(), bounds.centerY(), 0);
+    }
+
+    private static void clickElement(TestContext ctx, String selector) {
+        var bounds = ctx.el(selector).bounds();
+        ctx.input().mouseDown(bounds.centerX(), bounds.centerY(), 0);
+        ctx.input().mouseUp(bounds.centerX(), bounds.centerY(), 0);
+    }
+
+    private static void hoverMaterial(TestContext ctx, int index) {
+        var bounds = ctx.all("#zone-inspector-list .material-card").get(index).bounds();
+        ctx.input().moveTo(bounds.centerX(), bounds.centerY());
+    }
+
+    private static void materialArtwork(TestContext ctx, int index, int code) {
+        var texture = ctx.all("#zone-inspector-list .material-card").get(index).element()
+                .getStyle().backgroundTexture().getRawTexture();
+        ResourceLocation expected = code == 0
+                ? ResourceLocation.parse("duelcraft:textures/card_back.png")
+                : DuelVisibilityFixture.texture(code);
+        ctx.check("material " + index + " artwork identity " + code,
+                texture instanceof SpriteTexture sprite && sprite.getImageLocation().equals(expected),
+                expected, texture);
     }
 
     private static void unchanged(TestContext ctx, ElementBounds before, ElementBounds after, String name) {

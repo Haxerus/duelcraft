@@ -349,7 +349,8 @@ class ClientDuelStateTest {
                 new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
         for (int code : new int[]{22222, 33333, 44444}) {
             move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
-                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0,
+                            state.mzone[0][0].materials.size()));
         }
 
         // Detach the middle material: from.position is the material's index on the host.
@@ -361,6 +362,26 @@ class ClientDuelStateTest {
         assertEquals(0, host.materials.get(0).sequence);
         assertEquals(1, host.materials.get(1).sequence);
         assertEquals(List.of(33333), codesOf(state.grave[0]));
+    }
+
+    @Test
+    void overlayMoveUsesTheEngineDestinationOrder() {
+        var state = newState();
+        draw(state, 0, 11111, 22222, 33333, 44444);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        for (int code : new int[]{22222, 33333, 44444}) {
+            move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0,
+                            state.mzone[0][0].materials.size()));
+        }
+
+        move(state, 44444, new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 2),
+                new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+
+        assertEquals(List.of(44444, 22222, 33333), codesOf(state.mzone[0][0].materials));
+        assertEquals(List.of(0, 1, 2), state.mzone[0][0].materials.stream()
+                .map(card -> card.sequence).toList());
     }
 
     @Test
@@ -708,7 +729,8 @@ class ClientDuelStateTest {
                 new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
         for (int code : new int[]{22222, 33333, 44444}) {
             move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
-                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0,
+                            state.mzone[0][0].materials.size()));
         }
 
         state.applyMessage(new DuelMessage.RemoveCards(List.of(

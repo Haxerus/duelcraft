@@ -462,8 +462,14 @@ public class LDLibDuelScreen {
                     return cards != null ? cards.searchDeclarable(query, opcodes, DECLARABLE_SEARCH_LIMIT) : List.of();
                 }
             });
-            clicks = new ClickDispatcher(ui, state, prompt, canvas,
-                    response -> LDLibDuelScreen.sendResponse(state, response));
+            clicks = new ClickDispatcher(ui, state, prompt, canvas, new ClickDispatcher.Callbacks() {
+                @Override public void sendResponse(Supplier<byte[]> response) {
+                    LDLibDuelScreen.sendResponse(state, response);
+                }
+                @Override public void inspectMaterials(ClientCard host) {
+                    zoneInspector.openMaterials(host);
+                }
+            });
 
             // ── Bind reactive data ──
             bindReactiveData();
@@ -648,14 +654,17 @@ public class LDLibDuelScreen {
 
             if (flags.contains(DirtyFlag.PILE_COUNTS)) {
                 field.refreshPiles();
-                zoneInspector.refresh();
             }
 
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
                 prompt.rebuild();
                 updatePhaseButtons();
-                zoneInspector.refresh();
             }
+
+            if (flags.contains(DirtyFlag.PILE_COUNTS) || flags.contains(DirtyFlag.PROMPT)
+                    || flags.contains(DirtyFlag.MZONE_0) || flags.contains(DirtyFlag.MZONE_1)
+                    || flags.contains(DirtyFlag.SZONE_0) || flags.contains(DirtyFlag.SZONE_1))
+                zoneInspector.refresh();
 
             // Turn/phase change also affects button visibility (hide on opponent's turn)
             if (flags.contains(DirtyFlag.TURN_PHASE))

@@ -1223,10 +1223,11 @@ public class ClientDuelState {
                     to.controller(), Integer.toHexString(to.location()), to.sequence());
             return;
         }
-        host.materials.add(card);
+        int index = Math.max(0, Math.min(to.position(), host.materials.size()));
+        host.materials.add(index, card);
         card.controller = to.controller();
         card.location = LOCATION_OVERLAY;
-        card.sequence = host.materials.size() - 1;
+        renumber(host.materials);
     }
 
     private void detachMaterial(ClientCard card, LocInfo from) {

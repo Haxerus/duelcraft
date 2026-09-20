@@ -93,5 +93,7 @@
   "duelcraft.collection.catalog_failed": "Card catalog unavailable. Saved passcodes can still be removed and saved.",
   "duelcraft.collection.catalog_empty": "The card catalog is empty.",
   "duelcraft.collection.no_matches": "No matching cards. Open Filters to clear.",
-  "duelcraft.collection.unknown_card": "Metadata unavailable. This passcode can be removed from the list and saved; adding it requires catalog metadata."
+  "duelcraft.collection.unknown_card": "Metadata unavailable. This passcode can be removed from the list and saved; adding it requires catalog metadata.",
+  "duelcraft.duel.face_down": "Face-down",
+  "duelcraft.duel.materials": "Materials (%s)"
 }
