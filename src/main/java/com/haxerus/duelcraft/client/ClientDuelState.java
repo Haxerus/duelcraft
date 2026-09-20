@@ -175,6 +175,12 @@ public class ClientDuelState {
         return card != null ? card.code : 0;
     }
 
+    /** Artwork and hover permission for the hand, independent of remembered prompt identities. */
+    public int handDisplayCode(ClientCard card) {
+        if (card.location != LOCATION_HAND) return 0;
+        return card.controller == localPlayer || (card.isPublic && !card.isHidden) ? card.code : 0;
+    }
+
     /** The list backing a non-field location, or null for the field and unknown locations. */
     public List<ClientCard> pile(int player, int location) {
         return switch (location) {
@@ -674,11 +680,9 @@ public class ClientDuelState {
                 LOGGER.debug("[State] ConfirmExtraTop: player={}, cards={}", confirm.player(), confirm.cards().size());
             }
             case DuelMessage.ConfirmCards confirm -> {
-                // Retain hand reveals for later prompts whose foreign candidate codes are stripped.
-                // EDOPro writes these onto GetCard(controller, location, sequence) before showing the reveal.
+                // General reveals use actual locations, not reveal order (EDOPro MSG_CONFIRM_CARDS).
                 for (var info : confirm.cards()) {
-                    if (info.location() != LOCATION_HAND) continue;
-                    ClientCard card = cardAt(info.controller(), info.location(), info.sequence());
+                    ClientCard card = cardAt(info.controller(), info.location(), info.sequence(), 0);
                     if (card != null && info.code() != 0) {
                         card.code = info.code();
                         markZoneDirty(card.controller, card.location);
@@ -1068,6 +1072,11 @@ public class ClientDuelState {
 
     /** Puts a card into a container without touching its position (used by Draw and Swap). */
     private void putAt(ClientCard card, int controller, int location, int sequence) {
+        if (card.location != location || card.controller != controller) {
+            // Public status describes the old location; the destination query grants it anew.
+            card.isPublic = false;
+            card.isHidden = false;
+        }
         card.controller = controller;
         card.location = location;
         card.sequence = sequence;
@@ -1382,15 +1391,23 @@ public class ClientDuelState {
         QueriedCard previous = card.stats;
         card.stats = query;
         boolean visualChanged = false;
+        if ((query.flags & QUERY_IS_PUBLIC) != 0) {
+            visualChanged |= card.isPublic != query.isPublic;
+            card.isPublic = query.isPublic;
+        }
+        if ((query.flags & QUERY_IS_HIDDEN) != 0) {
+            visualChanged |= card.isHidden != query.isHidden;
+            card.isHidden = query.isHidden;
+        }
         if ((query.flags & (QUERY_LSCALE | QUERY_RSCALE)) != 0 && (previous == null
                 || previous.lscale != query.lscale || previous.rscale != query.rscale)) {
             visualChanged = true;   // the pendulum scale badge
         }
-        if (query.code != 0 && query.code != card.code) {
+        if ((query.flags & QUERY_CODE) != 0 && query.code != 0 && query.code != card.code) {
             card.code = query.code;
             visualChanged = true;
         }
-        if (query.position != 0 && query.position != card.position) {
+        if ((query.flags & QUERY_POSITION) != 0 && query.position != 0 && query.position != card.position) {
             card.position = query.position;
             visualChanged = true;
         }

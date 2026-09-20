@@ -105,3 +105,11 @@ A constructed single-card query containing only code `0x12345678` is `08 00 01 0
 - Preserve unknown chunks if a proxy must round-trip newer query data; otherwise skip by size.
 - Reset all destination fields before parsing a new object. An absent flag means "not supplied", not zero.
 - Treat a zero slot marker as one position in MZONE/SZONE so later cards keep their sequence.
+
+## Duelcraft hand presentation state
+
+`ClientCard.isPublic` and `isHidden` retain only explicitly supplied visibility fields. Incremental results without QUERY_CODE or with code zero preserve recipient-known identity; code/position values without their flags are not authoritative. A visibility change dirties the hand even if identity and position are unchanged. Moving to a different location/controller resets the previous location's visibility until the destination query supplies it.
+
+`ClientDuelState.handDisplayCode` is a hand-only artwork/hover decision: the controller sees their recipient-known code; the opponent needs current public=true and hidden=false. Remembered reveal identity alone cannot turn the opponent hand face up. Both tile artwork and hover use this decision, while foreign gameplay actions remain unavailable. It is not a global policy for field cards, Extra Deck inspection or prompt candidates.
+
+The installed Ceremonial Bell script sets EFFECT_PUBLIC on both hands. The native regression removes Bell with Raigeki, observes public=false and a real ShuffleHand, and verifies both sanitized query fields and displayed codes. The engine's public-off hand shuffle (`processor.cpp:4900-4908`) legitimately erases the opponent's remembered codes. Separate incremental-state tests verify public=false hides a card even when no shuffle has erased its cached code. No host redaction or refresh-schedule change was needed. Details: [QA visibility trace](../superpowers/reports/2026-09-19-qa-visibility-trace.md).

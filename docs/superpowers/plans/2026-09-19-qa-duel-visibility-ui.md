@@ -49,8 +49,8 @@ Observed leads at the planning SHA:
 
 **Interfaces:** Consume existing `MessageSanitizer.forRecipient(DuelMessage, int)`, `ClientDuelState.applyMessage(DuelMessage)`, `cardAt(int,int,int,int)` and `candidateCode(DuelMessage.CardInfo)`. Produce corrected existing behavior plus `public int handDisplayCode(ClientCard card)` on `ClientDuelState`: return the recipient-permitted artwork/hover code for a hand card, or zero. This helper is presentation-specific; it must not become a global authorization rule for all locations.
 
-- [ ] Capture bounded producer-to-render traces for Painful Choice, an actual script that reveals/views an opponent Extra Deck, and Ceremonial Bell. Verify the exact selected Extra Deck fixture from local scripts/database and record its name, passcode, setup and script hash before writing the scenario. Compare native `libduel.cpp` ConfirmCards, `playerop.cpp` selection emission, `card.cpp` QUERY_IS_PUBLIC, EDOPro `generic_duel.cpp` recipient routing and `duelclient.cpp` reveal/selection handling. Record raw message type, recipient, location/sequence, sanitized code, query visibility flags and selected response index in the trace report. Raw test-only traces stay in local evidence, never ordinary multiplayer logs. Identify the first loss of authorized information in each reproduction.
-- [ ] Add a failing state test that reveals out-of-order opponent Extra Deck candidates and proves lookup uses the card location, not reveal order. This complete test body fits `ClientDuelStateTest` with its existing imports:
+- [x] Capture bounded producer-to-render traces for Painful Choice, an actual script that reveals/views an opponent Extra Deck, and Ceremonial Bell. Verify the exact selected Extra Deck fixture from local scripts/database and record its name, passcode, setup and script hash before writing the scenario. Compare native `libduel.cpp` ConfirmCards, `playerop.cpp` selection emission, `card.cpp` QUERY_IS_PUBLIC, EDOPro `generic_duel.cpp` recipient routing and `duelclient.cpp` reveal/selection handling. Record raw message type, recipient, location/sequence, sanitized code, query visibility flags and selected response index in the trace report. Raw test-only traces stay in local evidence, never ordinary multiplayer logs. Identify the first loss of authorized information in each reproduction.
+- [x] Add a failing state test that reveals out-of-order opponent Extra Deck candidates and proves lookup uses the card location, not reveal order. This complete test body fits `ClientDuelStateTest` with its existing imports:
 
   ```java
   @Test void extraRevealResolvesCandidatesByLocation() {
@@ -67,7 +67,7 @@ Observed leads at the planning SHA:
   }
   ```
 
-- [ ] Add paired recipient tests from the traced messages: allowed reveal/Extra inspection versus unrelated hidden cards; public hand effect on/off; `QUERY_IS_HIDDEN` precedence; zero/missing QUERY_CODE; duplicate passcodes at different positions; movement/resequencing; deck/hand/Extra shuffles; disconnect/reset. Assert actual sanitized fields as well as client lookup. A query that merely omits a code must not erase legitimately remembered identity. Ending a public effect must still change opponent artwork/hover back to hidden even if the cached code remains nonzero.
+- [x] Add paired recipient tests from the traced messages: allowed reveal/Extra inspection versus unrelated hidden cards; public hand effect on/off; `QUERY_IS_HIDDEN` precedence; zero/missing QUERY_CODE; duplicate passcodes at different positions; movement/resequencing; deck/hand/Extra shuffles; disconnect/reset. Assert actual sanitized fields as well as client lookup. A query that merely omits a code must not erase legitimately remembered identity. Ending a public effect must still change opponent artwork/hover back to hidden even if the cached code remains nonzero.
 
   Use this concrete public-state regression alongside the paired packet tests (import `QueriedCard`):
 
@@ -89,8 +89,8 @@ Observed leads at the planning SHA:
       assertEquals(89631139, card.code);
   }
   ```
-- [ ] Run `./gradlew.bat test --tests '*ClientDuelStateTest' --tests '*MessageSanitizerTest' --tests '*RefreshScheduleTest'`. Record the failing behavioral assertions before implementation; do not count compilation errors or missing native dependencies as a reproduced bug.
-- [ ] Extend general reveal application to all source-supported card locations, resolving the actual card object before storing nonzero identity. Preserve existing specialized deck-top sequence semantics. Keep prompt resolution in `candidateCode`; add only the minimum context needed by the traced rules for identity association/invalidation. Do not introduce a global passcode cache. The core operation remains location-based:
+- [x] Run `./gradlew.bat test --tests '*ClientDuelStateTest' --tests '*MessageSanitizerTest' --tests '*RefreshScheduleTest'`. Record the failing behavioral assertions before implementation; do not count compilation errors or missing native dependencies as a reproduced bug.
+- [x] Extend general reveal application to all source-supported card locations, resolving the actual card object before storing nonzero identity. Preserve existing specialized deck-top sequence semantics. Keep prompt resolution in `candidateCode`; add only the minimum context needed by the traced rules for identity association/invalidation. Do not introduce a global passcode cache. The core operation remains location-based:
 
   ```java
   ClientCard card = cardAt(info.controller(), info.location(), info.sequence(), 0);
@@ -98,8 +98,8 @@ Observed leads at the planning SHA:
   ```
 
   Here `info` is an existing `ConfirmCard`; overlay candidate addressing still uses its own position index through `candidateCode`, not this snippet. If the producer emits an untracked location, keep the presentation-only reveal scoped to that event rather than assigning it to a guessed slot. Any new wire metadata requires a documented producer-backed reason and protocol review.
-- [ ] Implement `handDisplayCode` using current recipient permission, ownership and authoritative public/hidden flags, separately from remembered identity. Have hand rendering and hover use the same returned code. Keep foreign gameplay actions unavailable. Mark HAND dirty when visibility flags change, including changes with unchanged code and position. Honor queried-field presence when applying incremental results. Adjust sanitizer/refresh schedule only when the trace demonstrates a disclosure/timing defect; document the precise source contract and keep negative privacy tests.
-- [ ] Run the focused suites again and add/run named native regressions in `OcgCoreTest` with real configured data. Expected: reproduced tests green, both recipients correct, no broader hidden fields exposed. Update the visibility trace and affected engine-wiki contract. Commit only A1 files as `fix: preserve authorized reveal and public hand state`.
+- [x] Implement `handDisplayCode` using current recipient permission, ownership and authoritative public/hidden flags, separately from remembered identity. Have hand rendering and hover use the same returned code. Keep foreign gameplay actions unavailable. Mark HAND dirty when visibility flags change, including changes with unchanged code and position. Honor queried-field presence when applying incremental results. Adjust sanitizer/refresh schedule only when the trace demonstrates a disclosure/timing defect; document the precise source contract and keep negative privacy tests.
+- [x] Run the focused suites again and add/run named native regressions in `OcgCoreTest` with real configured data. Expected: reproduced tests green, both recipients correct, no broader hidden fields exposed. Update the visibility trace and affected engine-wiki contract. Commit only A1 files as `fix: preserve authorized reveal and public hand state`.
 
 ## Task A2: Put reveals in the correct prompt and verify real effects
 

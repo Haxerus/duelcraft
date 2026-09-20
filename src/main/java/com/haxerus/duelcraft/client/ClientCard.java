@@ -21,12 +21,16 @@ import static com.haxerus.duelcraft.core.OcgConstants.POS_FACEDOWN;
  * Minecraft-free so {@link ClientDuelState} stays testable under plain JUnit.
  */
 public class ClientCard {
-    /** 0 when the card is hidden from this client (opponent's face-down cards, deck contents). */
+    /** Last recipient-known identity; nonzero does not imply current face-up permission. */
     public int code;
     public int position;
     public int controller;
     public int location;
     public int sequence;
+
+    /** Authoritative visibility, retained when an incremental query omits either field. */
+    public boolean isPublic;
+    public boolean isHidden;
 
     /** Latest query result, or null until an UPDATE_DATA covers this slot. */
     public QueriedCard stats;

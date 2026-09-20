@@ -673,7 +673,7 @@ public class LDLibDuelScreen {
             container.clearAllScrollViewChildren();
 
             for (int i = 0; i < cards.size(); i++) {
-                int code = cards.get(i).code;
+                int code = state.handDisplayCode(cards.get(i));
                 int seq = i;
                 var card = new UIElement();
                 card.addClass("card");
@@ -685,7 +685,7 @@ public class LDLibDuelScreen {
                     card.lss("margin", "0 " + right + " 0 " + left);
                 }
 
-                if (isLocal && code != 0) {
+                if (code != 0) {
                     setCardImageBackground(card, code);
                 } else {
                     card.lss("background", CARD_BACK_SPRITE);
@@ -693,6 +693,8 @@ public class LDLibDuelScreen {
 
                 if (isLocal) {
                     card.addEventListener(UIEvents.CLICK, e -> onCardClicked(player, LOCATION_HAND, seq, e));
+                }
+                if (code != 0) {
                     card.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(code));
                     card.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
                 }
