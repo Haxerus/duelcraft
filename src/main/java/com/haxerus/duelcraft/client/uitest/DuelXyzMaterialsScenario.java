@@ -59,7 +59,9 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
          })
          .step("one, several and unknown materials", ctx -> {
              attach(0, 1, 1);
-             attach(0, 2, 3);
+             attachDecoratedMaterial(0, 2);
+             attachAt(0, 2, 1, 33750025);
+             attachAt(0, 2, 2, 0);
              attach(1, 0, 3);
              attach(1, 1, 1);
              attach(0, 5, 3);
@@ -93,8 +95,18 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
              materialArtwork(ctx, 1, 33750025);
              materialArtwork(ctx, 2, 0);
          })
+         .step("attached material retains its old on-field query and hint state", ctx -> {
+             var material = DuelVisibilityFixture.state()
+                     .cardAt(0, LOCATION_MZONE | LOCATION_OVERLAY, 2, 0);
+             ctx.check("material retained query state", material != null && material.stats != null
+                     && material.stats.attack == 3000 && material.stats.defense == 2500);
+             ctx.check("material retained on-field hint", material != null
+                     && material.hintType == CHINT_TURN && material.hintValue == 12);
+         })
          .step("hover known material", ctx -> hoverMaterial(ctx, 0)).ticks(2)
          .checkVisible("#card-info-banner")
+         .checkHidden("#card-hints")
+         .checkHidden("#card-link-markers")
          .step("close while known material owns details", ctx -> clickElement(ctx, "#zone-inspector-close"))
          .frames(2).checkHidden("#card-info-banner")
          .step("reopen own materials", ctx -> clickHost(ctx, "#plr-mon-2"))
@@ -235,9 +247,27 @@ public final class DuelXyzMaterialsScenario implements UIScenario {
     private static void attach(int player, int sequence, int count) {
         for (int index = 0; index < count; index++) {
             int code = index == 2 ? 0 : index == 0 ? 89631139 : 33750025;
-            LDLibDuelScreen.applyMessage(new DuelMessage.Move(code, new LocInfo(player, 0, 0, 0),
-                    new LocInfo(player, LOCATION_MZONE | LOCATION_OVERLAY, sequence, index), 0));
+            attachAt(player, sequence, index, code);
         }
+    }
+
+    private static void attachDecoratedMaterial(int player, int hostSequence) {
+        int code = 89631139;
+        var staging = new LocInfo(player, LOCATION_SZONE, 2, POS_FACEUP_ATTACK);
+        LDLibDuelScreen.applyMessage(new DuelMessage.Move(code, new LocInfo(player, 0, 0, 0), staging, 0));
+        var stats = new QueriedCard();
+        stats.flags = QUERY_ATTACK | QUERY_DEFENSE;
+        stats.attack = 3000;
+        stats.defense = 2500;
+        LDLibDuelScreen.applyMessage(new DuelMessage.UpdateCard(player, LOCATION_SZONE, 2, stats));
+        LDLibDuelScreen.applyMessage(new DuelMessage.CardHint(staging, CHINT_TURN, 12));
+        LDLibDuelScreen.applyMessage(new DuelMessage.Move(code, staging,
+                new LocInfo(player, LOCATION_MZONE | LOCATION_OVERLAY, hostSequence, 0), 0));
+    }
+
+    private static void attachAt(int player, int hostSequence, int materialIndex, int code) {
+        LDLibDuelScreen.applyMessage(new DuelMessage.Move(code, new LocInfo(player, 0, 0, 0),
+                new LocInfo(player, LOCATION_MZONE | LOCATION_OVERLAY, hostSequence, materialIndex), 0));
     }
 
     private static DuelMessage.SelectIdleCmd summonAndActivate(int player, int sequence) {

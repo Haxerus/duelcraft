@@ -404,8 +404,8 @@ public class LDLibDuelScreen {
                 @Override public void onCardClicked(int player, int location, int sequence, UIEvent event) {
                     UIRefresher.this.onCardClicked(player, location, sequence, event);
                 }
-                @Override public void showCardInfo(int code, ClientCard source) {
-                    UIRefresher.this.showCardInfo(code, source);
+                @Override public void showCardInfo(int code, ClientCard owner) {
+                    UIRefresher.this.showCardInfo(code, null, owner);
                 }
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
@@ -1232,13 +1232,18 @@ public class LDLibDuelScreen {
         }
 
         private void showCardInfo(int code) {
-            showCardInfo(code, null);
+            showCardInfo(code, null, null);
         }
 
         /** {@code onField} supplies the card's live hints/stats, or null for an event-only identity. */
         private void showCardInfo(int code, ClientCard onField) {
+            showCardInfo(code, onField, onField);
+        }
+
+        /** {@code owner} permits source-aware clearing without exposing its stale live state. */
+        private void showCardInfo(int code, ClientCard onField, ClientCard owner) {
             if (code == 0 || cardInfoBanner == null) return;
-            cardInfoOwner = onField;
+            cardInfoOwner = owner;
             inspectedHandCard = onField != null && onField.location == LOCATION_HAND ? onField : null;
             inspectedHandCode = code;
             cardInfoHideAt = 0;

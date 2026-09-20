@@ -25,7 +25,7 @@ public class ZoneInspectorController {
     public interface Callbacks {
         void setCardImageBackground(UIElement elem, int code);
         void onCardClicked(int player, int location, int sequence, UIEvent event);
-        void showCardInfo(int code, ClientCard source);
+        void showCardInfo(int code, ClientCard owner);
         void hideCardInfo();
         void clearCardInfo(ClientCard source);
         void onVisibilityChanged();
