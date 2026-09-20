@@ -39,7 +39,7 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
 
 **Interfaces:** Change `DeckEditorModel.add(Section,int)` and `addToDeck(int type,int code)` to return `boolean` (true only when added). Add `public boolean canAdd(int code)` and `public boolean removeAt(Section section, int index)`. Existing calls that ignore the new return remain source-compatible but controller feedback must consume it. Keep bulk loading/import/constructor behavior separate from manual additions. Extend grid callback wiring with an `IntConsumer` add action; existing single-click selection keeps its meaning.
 
-- [ ] Add these concrete failing tests in `DeckEditorModelTest`:
+- [x] Add these concrete failing tests in `DeckEditorModelTest`:
 
   ```java
   @Test void capCountsAllSectionsWithoutChangingImportedDrafts() {
@@ -64,9 +64,9 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
   ```
 
   Add parameterized Main/Extra/Side and natural type routing, fourth-copy rejection, remove-then-add, invalid index, and frozen mutation cases. Preserve the server's existing draft-save tests for missing ownership and illegal lists; the new cap must not become a save-time rejection.
-- [ ] Run `./gradlew.bat test --tests '*DeckEditorModelTest'`. After adding new method signatures, confirm a behavioral red for the missing cap/removal rather than recording only a compiler error.
-- [ ] Implement the manual cap in the model before replacing any lists. `canAdd` uses `draft.requiredCopies().getOrDefault(code, 0) < 3`; `add` still calls `requireEditable` first and returns false without dirtying the draft at the cap. `addToDeck` returns the result from `add(naturalSection(type), code)`. `removeAt` removes the given index from that section and leaves other copies in order. Do not truncate a loaded/imported draft or alter server deck policy.
-- [ ] Add real-input cases to `collection_editor_qa`: one click only inspects; two left clicks produce one add; a second double-click produces one more; fourth copy via any route fails; right click removes precisely the clicked tile and does not fire a left-click action. Include Deck/Side, Extra type routing, filter refresh/virtualized rows and pending/frozen state. Bind double click to LDLib2's existing event instead of inventing a timing system:
+- [x] Run `./gradlew.bat test --tests '*DeckEditorModelTest'`. After adding new method signatures, confirm a behavioral red for the missing cap/removal rather than recording only a compiler error.
+- [x] Implement the manual cap in the model before replacing any lists. `canAdd` uses `draft.requiredCopies().getOrDefault(code, 0) < 3`; `add` still calls `requireEditable` first and returns false without dirtying the draft at the cap. `addToDeck` returns the result from `add(naturalSection(type), code)`. `removeAt` removes the given index from that section and leaves other copies in order. Do not truncate a loaded/imported draft or alter server deck policy.
+- [x] Add real-input cases to `collection_editor_qa`: one click only inspects; two left clicks produce one add; a second double-click produces one more; fourth copy via any route fails; right click removes precisely the clicked tile and does not fire a left-click action. Include Deck/Side, Extra type routing, filter refresh/virtualized rows and pending/frozen state. Bind double click to LDLib2's existing event instead of inventing a timing system:
 
   ```text
   collection single-left -> existing selection/inspector callback only
@@ -75,7 +75,7 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
   ```
 
   Consume right-click propagation and verify press/release behavior. Ignore callbacks from a stale rendered draft after the model changed; capture the rendered draft reference or an existing generation token. Keep pending/busy guards before mutation and issue centered cap feedback instead of a false success message. Refresh button enablement and gestures from the same `canAdd` result.
-- [ ] Run focused unit tests and `./gradlew.bat runClient -PldTest=collection_editor_qa`. Fix overflow fixtures that previously manufactured 4+ copies via manual `add` by constructing an imported `DeckList`, retaining their original overflow purpose. Commit `feat: add bounded pointer editing for deck lists`.
+- [x] Run focused unit tests and `./gradlew.bat runClient -PldTest=collection_editor_qa`. Fix overflow fixtures that previously manufactured 4+ copies via manual `add` by constructing an imported `DeckList`, retaining their original overflow purpose. Commit `feat: add bounded pointer editing for deck lists`.
 
 ## Task C2: Open the active list and make dismissal layered
 
