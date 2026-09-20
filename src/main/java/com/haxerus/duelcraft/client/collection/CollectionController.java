@@ -687,7 +687,7 @@ final class CollectionController {
     }
 
     @SuppressWarnings("unchecked")
-    boolean dismissTopLayer() {
+    public boolean dismissTopLayer() {
         var selectors = List.<Selector<?>>of(
                 (Selector<Object>) element("collection-ownership"),
                 (Selector<Object>) element("card-sort"),

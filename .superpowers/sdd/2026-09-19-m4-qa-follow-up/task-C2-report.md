@@ -75,3 +75,15 @@ BUILD SUCCESSFUL
 - The supplemental saved-decks policy mismatch is classified above and archived without overwriting passing evidence.
 - Per the task boundary, no full `group:duelcraft` run or reconnect/restart lifecycle was performed. I1 owns combined/restart acceptance.
 - No C3 export dialogs exist yet. C2 includes the import selector in layered dismissal and does not add speculative export behavior.
+
+## Review round 1
+
+The independent review found one interface mismatch: `CollectionController.dismissTopLayer()` was package-private although the approved brief requires `public boolean dismissTopLayer()`. The method is now public; its implementation and behavior are unchanged.
+
+```text
+./gradlew.bat compileJava --console=plain
+BUILD SUCCESSFUL in 8s
+2 actionable tasks: 1 executed, 1 up-to-date
+```
+
+The focused compile console is archived at `build/evidence/qa-m4-follow-up/c2/review-round1-compile/compileJava.log`. Runtime suites were not repeated for this accessibility-only correction. Full earlier green console logs remain available at `ui-green-attempt1/run.log` and `preparation-retention-attempt1/run.log`; the final rerun archives themselves contain reports and screenshots but no console logs. I1 should retain fresh combined-runtime console logs so final warning classification can be checked line by line.
