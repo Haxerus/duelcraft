@@ -115,6 +115,23 @@ class DuelPreparationServiceTest {
         assertEquals(id, service.view(host.alice, 1).flowId());
     }
 
+    @Test
+    void repeatedCrossedAndThirdPartyInvitationsCannotReplaceTheOnlyFlow() {
+        UUID id = invite();
+        assertEquals(BUSY, service.invite(host.alice, host.bob, DuelRule.MR5, null,
+                PlayerOptions.standard(), 1).code());
+        assertEquals(BUSY, service.invite(host.bob, host.alice, DuelRule.MR5, null,
+                PlayerOptions.standard(), 2).code());
+        assertEquals(BUSY, service.invite(host.alice, host.outsider, DuelRule.MR5, null,
+                PlayerOptions.standard(), 3).code());
+
+        assertEquals(id, service.view(host.alice, 3).flowId());
+        assertEquals(id, service.view(host.bob, 3).flowId());
+        assertEquals(Mode.IDLE, service.view(host.outsider, 3).mode());
+        assertEquals(1, host.notifications.get(host.alice).size());
+        assertEquals(1, host.notifications.get(host.bob).size());
+    }
+
     @ParameterizedTest
     @CsvSource({"0,5,1", "100000,5,1", "8000,-1,1", "8000,21,1", "8000,5,-1", "8000,5,11"})
     void rejectsOutOfRangeSettings(int lp, int hand, int draw) {

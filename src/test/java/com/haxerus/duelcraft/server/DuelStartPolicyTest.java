@@ -17,6 +17,7 @@ class DuelStartPolicyTest {
         final Map<UUID, PlayerCollectionData> data = new HashMap<>();
         final List<String> events = new ArrayList<>();
         final List<PreparationStatePayload> states = new ArrayList<>();
+        final Map<UUID, List<PreparationStatePayload>> statesByOwner = new HashMap<>();
         final Map<UUID, List<String>> messages = new HashMap<>();
         final DuelManager manager;
         int allocations, closes;
@@ -58,7 +59,7 @@ class DuelStartPolicyTest {
         }
         boolean managerBusy() { return manager.isBusy(a); }
         void assertNoOwnership() {
-            for (String name : List.of("activeDuels", "playerToDuel", "duelSeats", "soloHandlers", "startingPlayers")) {
+            for (String name : List.of("activeDuels", "playerToDuel", "duelSeats", "soloHandlers", "startingPlayers", "announcements")) {
                 try {
                     var field = DuelManager.class.getDeclaredField(name); field.setAccessible(true); var value = field.get(manager);
                     assertTrue(value instanceof Map<?, ?> map ? map.isEmpty() : ((Set<?>) value).isEmpty(), name);
@@ -72,7 +73,11 @@ class DuelStartPolicyTest {
         public void send(UUID id, CustomPacketPayload payload) {
             if (payload instanceof DuelStartPayload) events.add("start");
             if (payload instanceof DuelMessagePayload) events.add("refresh");
-            if (payload instanceof PreparationStatePayload state) { states.add(state); if (state.result() == PreparationResult.START_FAILED) events.add("failed"); }
+            if (payload instanceof PreparationStatePayload state) {
+                states.add(state);
+                statesByOwner.computeIfAbsent(id, ignored -> new ArrayList<>()).add(state);
+                if (state.result() == PreparationResult.START_FAILED) events.add("failed");
+            }
         }
         public void message(UUID id, Component message) { messages.computeIfAbsent(id, x -> new ArrayList<>()).add(message.getString()); }
         UUID ready() {

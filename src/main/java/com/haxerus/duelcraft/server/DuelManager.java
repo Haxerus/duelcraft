@@ -38,6 +38,7 @@ public class DuelManager {
     private final Map<UUID, UUID[]> duelSeats = new HashMap<>();
     private final Map<UUID, SoloDuelHandler> soloHandlers = new HashMap<>();
     private final Set<UUID> startingPlayers = new HashSet<>();
+    private final Map<UUID, AnnouncementKey> announcements = new HashMap<>();
     private final CollectionService collections;
     private final CollectionPayloadHandler collectionHandler;
     private final DuelPreparationService preparation;
@@ -56,6 +57,7 @@ public class DuelManager {
     @FunctionalInterface interface SessionFactory {
         ManagedDuelSession create(DuelOptions options, DuelEventListener listener);
     }
+    private record AnnouncementKey(UUID flowId, PreparationView.Mode mode, UUID roundId) {}
 
     DuelManager(CollectionService collections, Players players, SessionFactory sessions) {
         this.collections = collections;
@@ -122,6 +124,7 @@ public class DuelManager {
         for (var id : new ArrayList<>(activeDuels.keySet())) endDuel(id);
         preparation.clear();
         startingPlayers.clear();
+        announcements.clear();
         nextSessionDecorator = null;
         snapshots.clear();
         if (engine != null) { engine.close(); engine = null; }
@@ -308,7 +311,7 @@ public class DuelManager {
         else { var view = preparation.view(owner, System.currentTimeMillis()); if (view.flowId() != null) preparation.cancel(owner, view.flowId(), System.currentTimeMillis()); }
     }
     private void logout(UUID owner) {
-        snapshots.invalidate(owner); preparation.logout(owner);
+        snapshots.invalidate(owner); announcements.remove(owner); preparation.logout(owner);
         var id = playerToDuel.get(owner);
         if (id != null) finishDuel(id, 1 - seatOf(id, owner), DuelEndPayload.REASON_DISCONNECT);
     }
@@ -330,16 +333,32 @@ public class DuelManager {
     private void publish(UUID owner, PreparationResult result) {
         if (!players.online(owner)) return;
         var view = preparation.view(owner, System.currentTimeMillis());
+        boolean announce = shouldAnnounce(owner, view);
         players.send(owner, new PreparationStatePayload(null, result, view));
         if (result == PreparationResult.START_FAILED) tell(owner, "Duel could not start. Check your active deck and try again.");
         else if (result == PreparationResult.STALE) tell(owner, "Duel preparation expired.");
         else if (result == PreparationResult.OFFLINE) tell(owner, "Duel preparation cancelled because a player disconnected.");
-        else if (view.mode() == PreparationView.Mode.INVITED && !view.outgoing())
+        else if (announce && view.mode() == PreparationView.Mode.INVITED)
             players.message(owner, Component.literal(view.opponentName() + " challenged you. ").append(button("Accept", "/duel accept")).append(" ").append(button("Decline", "/duel invite decline")));
-        else if (view.mode() == PreparationView.Mode.RPS && !view.ownHandSubmitted())
+        else if (announce && view.mode() == PreparationView.Mode.RPS)
             players.message(owner, Component.literal("Rock-paper-scissors: ").append(button("Rock", "/duel hand rock")).append(" ").append(button("Paper", "/duel hand paper")).append(" ").append(button("Scissors", "/duel hand scissors")));
-        else if (view.mode() == PreparationView.Mode.FIRST_CHOICE && view.canChooseFirst())
+        else if (announce && view.mode() == PreparationView.Mode.FIRST_CHOICE)
             players.message(owner, Component.literal("You won the roll. Go first? ").append(button("Yes", "/duel first yes")).append(" ").append(button("No", "/duel first no")));
+    }
+    private boolean shouldAnnounce(UUID owner, PreparationView view) {
+        boolean actionable = switch (view.mode()) {
+            case INVITED -> !view.outgoing();
+            case RPS -> !view.ownHandSubmitted();
+            case FIRST_CHOICE -> view.canChooseFirst();
+            case IDLE, DUEL -> {
+                announcements.remove(owner);
+                yield false;
+            }
+            default -> false;
+        };
+        if (!actionable) return false;
+        var key = new AnnouncementKey(view.flowId(), view.mode(), view.roundId());
+        return !key.equals(announcements.put(owner, key));
     }
     private void tell(UUID owner, String message) { players.message(owner, Component.literal(message)); }
     private static String explain(DeckEligibility.Report report) {
