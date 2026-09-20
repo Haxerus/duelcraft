@@ -35,6 +35,8 @@ The server defaults to `requireCardOwnership=false`. Supported legality and comp
 
 ## Limits and reporting
 
+The packaged two-client duel remains unverified: client A crashed in native GLFW during automated window activation. The cause is unproven; a real friend playtest is still needed.
+
 This remains the command-based M4 checkpoint. Home, binder, mat and lobby navigation belong to M5. Supported deck checks cover sizes, known/playable card types, placement and three copies per exact passcode; they do not implement banlists, alias-group limits, full format rules or match sideboarding. Acquisition/progression remains companion work. Native deployment supports Windows x64 only; the Ubuntu CI native path remains unresolved.
 
 The filesystem test machine cannot create Windows symlinks without additional privileges, so that one export test is a documented skip. The exporter rejects links in source and refuses an unsafe fallback when atomic overwrite is unsupported; the latter filesystem condition was not exercised. Export work already submitted to the disk worker can finish after closing the editor, while stale feedback is discarded.

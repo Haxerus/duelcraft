@@ -1063,7 +1063,8 @@ public class PromptController {
     }
 
     private void buildTributePrompt(DuelMessage.SelectTribute sel) {
-        if (sel.cards().stream().anyMatch(c -> (c.location() & LOCATION_ONFIELD) == 0)) {
+        if (sel.cards().stream().anyMatch(c -> (c.location() & LOCATION_ONFIELD) == 0)
+                || needsCandidateIdentityDialog(sel)) {
             buildPileTributePrompt(sel);
             return;
         }
@@ -1631,22 +1632,33 @@ public class PromptController {
 
     // ── "Is this selection all on-field?" helpers ──────────────────────────
 
+    /** The ordinary field deliberately keeps face-down artwork private, even after a reveal. */
+    private boolean needsCandidateIdentityDialog(DuelMessage prompt) {
+        return revealCandidates(prompt).stream().anyMatch(candidate -> {
+            int code = state.candidateCode(candidate);
+            if (code == 0) return false;
+            var card = state.cardAt(candidate.controller(), candidate.location(), candidate.sequence(), candidate.position());
+            return card == null || card.isFaceDown() || card.code != code;
+        });
+    }
+
     private boolean isFieldOnlySelection(DuelMessage.SelectCard sel) {
         return !sel.cards().isEmpty()
+                && !needsCandidateIdentityDialog(sel)
                 && sel.cards().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0
                                 && (c.location() & LOCATION_OVERLAY) == 0);
     }
 
     private boolean isFieldOnlyUnselectCard(DuelMessage.SelectUnselectCard sel) {
-        return sel.selectableCards().stream()
+        return !needsCandidateIdentityDialog(sel) && sel.selectableCards().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
                 && sel.unselectableCards().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
     }
 
     private boolean isFieldOnlySum(DuelMessage.SelectSum sel) {
-        return sel.selectable().stream()
+        return !needsCandidateIdentityDialog(sel) && sel.selectable().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
                 && sel.mustSelect().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
