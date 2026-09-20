@@ -170,7 +170,7 @@ class PlaytestInteractionTest {
         var confirm = events.stream().filter(m -> m instanceof DuelMessage.ConfirmCards).findFirst().orElseThrow();
         assertTrue(MessageSanitizer.recipientsOf(confirm).includes(0));
         state.applyMessage(MessageSanitizer.forRecipient(confirm, 0));
-        state.confirmCards = null;
+        state.pendingReveals.clear();
         var sanitized = (DuelMessage.SelectCard) MessageSanitizer.forRecipient(prompt, 0);
         for (var candidate : sanitized.cards()) {
             assertEquals(0, candidate.code(), "Foreign prompt codes are still stripped");

@@ -138,7 +138,7 @@ class ClientDuelStateTest {
                 new DuelMessage.ConfirmCard(89631139, 1, 0, 0),
                 new DuelMessage.ConfirmCard(46986414, 1, LOCATION_EXTRA, 99))));
         assertTrue(state.extra[1].stream().allMatch(c -> c.code == 0));
-        assertEquals(2, state.confirmCards.size());
+        assertEquals(2, state.pendingReveals.getFirst().cards().size());
     }
 
     private static ClientDuelState newState() {
@@ -481,8 +481,8 @@ class ClientDuelStateTest {
                 new DuelMessage.ConfirmCard(89631139, 0, LOCATION_DECK, 39),
                 new DuelMessage.ConfirmCard(46986414, 0, LOCATION_DECK, 38))));
 
-        assertEquals("Your Deck (top)", state.confirmTitle);
-        assertEquals(2, state.confirmCards.size());
+        assertEquals("Your Deck (top)", state.pendingReveals.getFirst().title());
+        assertEquals(2, state.pendingReveals.getFirst().cards().size());
         assertEquals(89631139, state.deck[0].get(39).code);
         assertEquals(46986414, state.deck[0].get(38).code);
     }
@@ -495,8 +495,8 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.ConfirmExtraTop(1, List.of(
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_EXTRA, 14))));
 
-        assertEquals("Opponent's Extra Deck (top)", state.confirmTitle);
-        assertEquals(1, state.confirmCards.size());
+        assertEquals("Opponent's Extra Deck (top)", state.pendingReveals.getFirst().title());
+        assertEquals(1, state.pendingReveals.getFirst().cards().size());
         assertEquals(89631139, state.extra[1].get(14).code);
     }
 
@@ -507,7 +507,21 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0))));
 
-        assertEquals("Opponent's Revealed Cards", state.confirmTitle);
+        assertEquals("Opponent's Revealed Cards", state.pendingReveals.getFirst().title());
+    }
+
+    @Test
+    void receivedRevealBatchRetainsOrderedImmutableEvents() {
+        var state = newState();
+        var first = new java.util.ArrayList<>(List.of(new DuelMessage.ConfirmCard(89631139, 1, LOCATION_EXTRA, 0)));
+        var second = List.of(new DuelMessage.ConfirmCard(46986414, 1, LOCATION_DECK, 2));
+        state.applyMessage(new DuelMessage.ConfirmCards(0, first));
+        state.applyMessage(new DuelMessage.ConfirmCards(0, second));
+        first.clear();
+        assertEquals(2, state.pendingReveals.size());
+        assertEquals(89631139, state.pendingReveals.removeFirst().cards().getFirst().code());
+        assertEquals(second, state.pendingReveals.getFirst().cards());
+        assertThrows(UnsupportedOperationException.class, () -> state.pendingReveals.getFirst().cards().clear());
     }
 
     @Test
@@ -524,7 +538,7 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0),
                 new DuelMessage.ConfirmCard(46986414, 1, LOCATION_HAND, 1))));
-        state.confirmCards = null; // The reveal panel consumes its display list.
+        state.pendingReveals.clear(); // The reveal panel consumes its display list.
         state.applyMessage(sanitized);
         assertEquals(89631139, state.candidateCode(sanitized.cards().get(0)));
         assertEquals(46986414, state.candidateCode(sanitized.cards().get(1)));

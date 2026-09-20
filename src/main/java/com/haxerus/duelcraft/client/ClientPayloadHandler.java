@@ -13,6 +13,15 @@ import org.slf4j.Logger;
 public class ClientPayloadHandler {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static Consumer<CollectionReplyPayload> collectionReceiver = ignored -> {};
+    private static Consumer<com.haxerus.duelcraft.duel.message.DuelMessage> duelObserver = ignored -> {};
+
+    public static Consumer<com.haxerus.duelcraft.duel.message.DuelMessage> observeDuelMessages(
+            Consumer<com.haxerus.duelcraft.duel.message.DuelMessage> observer) {
+        if (net.neoforged.fml.loading.FMLEnvironment.production) throw new IllegalStateException("DEV-only duel observer");
+        var previous = duelObserver;
+        duelObserver = Objects.requireNonNull(observer);
+        return previous;
+    }
 
     public static void setCollectionReceiver(Consumer<CollectionReplyPayload> receiver) {
         collectionReceiver = Objects.requireNonNull(receiver);
@@ -37,6 +46,7 @@ public class ClientPayloadHandler {
     }
 
     public static void handleMessage(DuelMessagePayload payload, IPayloadContext context) {
+        duelObserver.accept(payload.message());
         LDLibDuelScreen.applyMessage(payload.message());
     }
 

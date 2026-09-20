@@ -306,8 +306,10 @@ public class ClientDuelState {
     }
 
     // Confirm/reveal card display
-    public String confirmTitle;
-    public List<DuelMessage.ConfirmCard> confirmCards;
+    public record Reveal(String title, List<DuelMessage.ConfirmCard> cards) {
+        public Reveal { cards = List.copyOf(cards); }
+    }
+    public final Deque<Reveal> pendingReveals = new ArrayDeque<>();
 
     // RPS result display
     public int rpsHand0;
@@ -1028,8 +1030,7 @@ public class ClientDuelState {
     }
 
     private void reveal(String title, List<DuelMessage.ConfirmCard> cards) {
-        confirmTitle = title;
-        confirmCards = cards;
+        if (!cards.isEmpty()) pendingReveals.addLast(new Reveal(title, cards));
         dirtyFlags.add(DirtyFlag.CONFIRM);
     }
 

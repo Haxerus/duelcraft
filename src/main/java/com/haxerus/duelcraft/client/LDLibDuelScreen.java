@@ -650,8 +650,8 @@ public class LDLibDuelScreen {
                 rebuildLog();
             if (flags.contains(DirtyFlag.WINNER))
                 showResultOverlay();
-            if (flags.contains(DirtyFlag.CONFIRM))
-                zoneInspector.showConfirmCards();
+            if (flags.contains(DirtyFlag.CONFIRM) || flags.contains(DirtyFlag.PROMPT))
+                prompt.refreshReveals();
             updatePromptControls();
         }
 

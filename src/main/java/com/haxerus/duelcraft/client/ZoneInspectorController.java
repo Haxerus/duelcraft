@@ -15,9 +15,8 @@ import java.util.List;
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /**
- * The floating panel that shows pile contents (graveyard, banished, extra deck)
- * or a list of confirmed/revealed cards. Holds its own lifecycle — open/close/refresh —
- * and reacts to PILE_COUNTS and CONFIRM dirty flags so that additions/removals
+ * The floating panel for pile contents (graveyard, banished, extra deck).
+ * Owns open/close/refresh and reacts to PILE_COUNTS dirty flags so additions/removals
  * update live without the user reopening the panel.
  */
 public class ZoneInspectorController {
@@ -95,40 +94,6 @@ public class ZoneInspectorController {
 
             listElem.addScrollViewChild(card);
         }
-    }
-
-    /** Display the reveal/confirm list (consumes state.confirmCards). */
-    public void showConfirmCards() {
-        if (state.confirmCards == null || state.confirmCards.isEmpty()) return;
-        if (inspector == null) return;
-
-        // The reveal is not a pile, so drop the inspection target: a later PILE_COUNTS refresh
-        // would otherwise rebuild the list from whichever pile was open before.
-        inspectedPlayer = -1;
-        inspectedLocation = -1;
-        inspectedTitle = null;
-
-        inspector.removeClass("hidden");
-        var titleLabel = byId("zone-inspector-title");
-        var listElem = byId("zone-inspector-list", ScrollerView.class);
-        if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(state.confirmTitle));
-
-        if (listElem != null) {
-            listElem.clearAllScrollViewChildren();
-            for (var confirmCard : state.confirmCards) {
-                int code = confirmCard.code();
-
-                var card = new UIElement();
-                card.addClass("card");
-                callbacks.setCardImageBackground(card, code);
-                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
-                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
-
-                listElem.addScrollViewChild(card);
-            }
-        }
-
-        state.confirmCards = null;
     }
 
     private void open(int player, int location, String title) {

@@ -18,7 +18,6 @@ import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
-import java.util.stream.IntStream;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 import static com.haxerus.duelcraft.client.uitest.DuelPromptLayoutScenario.capture;
@@ -48,8 +47,7 @@ public final class DuelPanelLayoutScenario implements UIScenario {
          .scroll("#card-text-scroll", -10).ticks(2)
          .check("card description scrolls", ctx -> ctx.el("#card-text").bounds().y() < (float) ctx.get("textY"));
         capture(s, "card-info-scrolled");
-        s.step("reveal sixty cards", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.ConfirmCards(0,
-                IntStream.range(0, 60).mapToObj(i -> new DuelMessage.ConfirmCard(0, 0, LOCATION_DECK, i)).toList())));
+        s.step("populate sixty-card inspection pile", ctx -> inspectionPile(60)).click("#plr-graveyard");
         capture(s, "large-reveal");
         s.checkCount("#zone-inspector-list .card", 60)
          .step("reveal grid uses its full width evenly", ctx -> {
@@ -74,8 +72,7 @@ public final class DuelPanelLayoutScenario implements UIScenario {
          .check("large inspector scrolls", ctx -> ctx.all("#zone-inspector-list .card").getFirst().bounds().y() < (float) ctx.get("pileY"));
         capture(s, "reveal-scrolled");
         for (int count : new int[]{1, 2, 3, 5, 6}) {
-            s.step("reveal " + count + " cards", ctx -> LDLibDuelScreen.applyMessage(new DuelMessage.ConfirmCards(0,
-                    IntStream.range(0, count).mapToObj(i -> new DuelMessage.ConfirmCard(0, 0, LOCATION_DECK, i)).toList())))
+            s.step("inspect " + count + " cards", ctx -> inspectionPile(count))
              .ticks(2).checkCount("#zone-inspector-list .card", count)
              .step("partial rows keep their columns", DuelPanelLayoutScenario::checkInspectorColumns);
             capture(s, "reveal-" + count + "-cards");
@@ -134,6 +131,12 @@ public final class DuelPanelLayoutScenario implements UIScenario {
             ctx.check("card " + i + " wraps to the expected row", i < columns.length
                     ? Math.abs(card.y() - firstY) <= 1 : card.y() >= firstY + column.height());
         }
+    }
+
+    private static void inspectionPile(int count) {
+        DuelVisibilityFixture.state().grave[0].clear();
+        for (int i = 0; i < count; i++) LDLibDuelScreen.applyMessage(new DuelMessage.Move(0,
+                new LocInfo(0, 0, 0, 0), new LocInfo(0, LOCATION_GRAVE, i, POS_FACEUP_ATTACK), 0));
     }
 
     static void press(ScenarioBuilder s, String selector) {
