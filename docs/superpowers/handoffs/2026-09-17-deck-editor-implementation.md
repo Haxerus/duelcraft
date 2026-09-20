@@ -6,9 +6,13 @@ QA follow-up: `codex/qa-m4` packages the reviewed checkpoint for Windows x64 fri
 
 ## M4 QA.2 integration (2026-09-20)
 
+**I1 remains open because packaged two-client duel acceptance is blocked by repeated native GLFW crashes in client A.** Implementation readiness and automated regression results are separate from that unmet acceptance check; independent I1 and whole-branch review follow this handoff.
+
 The approved A/B/C follow-up fixes are integrated on `codex/qa-m4`. QA.2 retains protocol 7 and the pinned dependencies. The [QA.2 friend guide](../../qa-m4-qa2.md) describes the command entry points, collection save/export behavior and manual checks; the [combined verification report](../reports/2026-09-19-m4-qa-follow-up-verification.md) distinguishes unit/native, synthetic UI, dedicated transport, fresh lifecycle and packaged acceptance. The QA.1 guide/artifact and historical worlds remain separate evidence. This does not implement M5 or complete M6.
 
-I1 verification is in progress: the unit/native suite passed 1,097 of 1,098 cases with one expected Windows symlink-privilege skip; the corrected full UI group passed 51 scenarios and 12,036 checks. Fresh lifecycle and dirty-editor disconnect checks passed. The report records initial fixture failures and their focused corrections; the ten required dedicated runs passed 2,712 checks with all 30 child exits 0. Package hashes and actual packaged acceptance will be added before delivery.
+I1 built QA.2 from clean source `7985fca2043a3808b1106849695e1d99a67318b9`. The unit/native suite passed 1,097 of 1,098 cases with one expected Windows symlink-privilege skip; the corrected full UI group passed 51 scenarios and 12,036 checks. Fresh lifecycle passed 87 checks, dedicated reconnect passed 11 in each mode, and the ten required dedicated runs passed 2,712 checks with all 30 child exits 0. Initial fixture failures and narrow corrections remain archived. The ZIP SHA256 is `A110CA7D9102E1B4C022C06B9B6B3CC96279F15C3DA6624BE125FEB2C8B80F14`; its BUILD-INFO retains the build source despite later documentation commits.
+
+Actual packaged server and two clients booted with native libraries verified against the JAR. Client B passed collection entry, real artwork, export/reimport with exact ordered 40/3/2 sections, and dirty-draft save/close. Packaged two-client duel acceptance remains **open**: client A suffered the same native GLFW access violation in three bounded launches, before mod UI input. The report records every PID, fatal report and exit; no crash fix or successful packaged duel is claimed. I1's parent gate remains pending independent review. This local offline loopback test did not change existing accounts, Prism instances or historical worlds.
 
 ## Workspace and starting point
 
