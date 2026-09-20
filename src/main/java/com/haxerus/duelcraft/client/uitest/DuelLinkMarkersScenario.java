@@ -126,9 +126,9 @@ public final class DuelLinkMarkersScenario implements UIScenario {
             Class.forName("org.sqlite.JDBC");
             try (var connection = DriverManager.getConnection("jdbc:sqlite:" + databasePath);
                  var sql = connection.createStatement()) {
-                sql.execute("CREATE TABLE datas (id INTEGER, type INTEGER, atk INTEGER, def INTEGER, level INTEGER, race INTEGER, attribute INTEGER)");
+                sql.execute("CREATE TABLE datas (id INTEGER, type INTEGER, atk INTEGER, def INTEGER, level INTEGER, race INTEGER, attribute INTEGER, ot INTEGER)");
                 sql.execute("CREATE TABLE texts (id INTEGER, name TEXT, desc TEXT)");
-                sql.execute("INSERT INTO datas VALUES (99000001, " + (TYPE_MONSTER | TYPE_LINK) + ", 2300, 495, 8, 16777216, 32), (99000002, 17, 1000, 1000, 4, 1, 16)");
+                sql.execute("INSERT INTO datas VALUES (99000001, " + (TYPE_MONSTER | TYPE_LINK) + ", 2300, 495, 8, 16777216, 32, 1), (99000002, 17, 1000, 1000, 4, 1, 16, 1)");
                 sql.execute("INSERT INTO texts VALUES (99000001, 'Marker fixture', 'All eight Link directions.'), (99000002, 'Normal fixture', '')");
             }
             fixtureDatabase = new CardDatabase(databasePath);

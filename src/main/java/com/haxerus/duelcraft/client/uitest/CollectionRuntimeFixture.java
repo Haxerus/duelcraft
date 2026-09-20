@@ -33,7 +33,8 @@ final class CollectionRuntimeFixture {
                      sc.check("original attachment absence restored on current player", !sc.player().hasData(CollectionAttachments.COLLECTION));
                  }
              }
-         });
+         }).teardown("discard revisions from the restored fixture", ctx ->
+                 DuelcraftClient.getCollectionClient().connect());
     }
 
     static void open(ScenarioBuilder s) {
@@ -66,6 +67,7 @@ final class CollectionRuntimeFixture {
                     ctx.getField(ctx.el("#list-picker").element(), "candidateButtons");
             var button = buttons.get(target.apply(ctx));
             ctx.require("saved UUID has a real dropdown row", button != null);
+            buttons.forEach((id, candidate) -> candidate.setId("runtime-list-" + id));
             button.setId("runtime-list-choice");
         });
         press(s, "#runtime-list-choice");

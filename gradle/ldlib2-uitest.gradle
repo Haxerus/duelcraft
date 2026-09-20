@@ -209,3 +209,47 @@ if (project.hasProperty('collectionM4Lifecycle')) {
     }
     tasks.matching { it.name == 'runClient' }.configureEach { finalizedBy 'verifyCollectionM4Lifecycle' }
 }
+
+// QA.2 uses a new disposable save; historical M2/M3/M4 launchers are untouched.
+if (project.hasProperty('collectionQa2Lifecycle')) {
+    def phase = project.property('collectionQa2Lifecycle').toString()
+    if (!(phase in ['optional-seed', 'optional-restart', 'required-missing', 'required-owned-seed', 'required-owned-restart']) || ldTestEnabled
+            || ['collectionLifecycle', 'collectionPolicyLifecycle', 'collectionTransferLifecycle', 'collectionM4Lifecycle'].any { project.hasProperty(it) }) {
+        throw new GradleException('collectionQa2Lifecycle requires one isolated QA.2 phase')
+    }
+    def retainedDir = project.file('run-qa-m4-follow-up-lifecycle')
+    neoForge.runs.matching { it.name == 'client' }.configureEach { run ->
+        run.gameDirectory = retainedDir
+        run.systemProperty 'duelcraft.uitest.collectionQa2Lifecycle', phase
+        run.programArguments.addAll '--username', 'QA2Lifecycle', '--width', '1280', '--height', '720'
+        if (phase != 'optional-seed') run.programArguments.addAll '--quickPlaySingleplayer', 'collection_qa2_login_20260919'
+    }
+    tasks.register('verifyCollectionQa2Lifecycle') {
+        doLast {
+            def failure = new File(retainedDir, 'qa2-lifecycle-failure.txt')
+            if (failure.exists()) throw new GradleException(failure.text)
+            (phase == 'optional-seed' ? ['optional-seed', 'optional-rejoin'] : [phase]).each { name ->
+                def evidence = new File(retainedDir, "lifecycle-evidence/$name")
+                def report = new groovy.json.JsonSlurper().parse(new File(evidence, 'report.json'))
+                def manifest = new groovy.json.JsonSlurper().parse(new File(evidence, 'qa2-lifecycle-phase.json'))
+                if (report.status != 'PASS' || !report.finishedAt || manifest.phase != name) throw new GradleException('Incomplete QA.2 lifecycle evidence')
+                logger.lifecycle("QA.2 lifecycle $name: ${report.totals.checks - report.totals.checksFailed}/${report.totals.checks} checks, PID ${manifest.pid}")
+            }
+        }
+    }
+    tasks.matching { it.name == 'runClient' }.configureEach { finalizedBy 'verifyCollectionQa2Lifecycle' }
+}
+def qa2LifecycleDir = project.file('run-qa-m4-follow-up-lifecycle')
+tasks.register('prepareCollectionQa2OwnershipRequired') {
+    doLast {
+        def root = qa2LifecycleDir
+        def manifest = new groovy.json.JsonSlurper().parse(new File(root, 'qa2-lifecycle-phase.json'))
+        def report = new groovy.json.JsonSlurper().parse(new File(root, 'lifecycle-evidence/optional-restart/report.json'))
+        if (manifest.phase != 'optional-restart' || manifest.world != 'collection_qa2_login_20260919' || report.status != 'PASS'
+                || ProcessHandle.of(manifest.pid as long).map { it.isAlive() }.orElse(false)) throw new GradleException('Requires passed optional restart and stopped JVM')
+        def config = new File(root, 'config/duelcraft-server.toml')
+        def original = config.text
+        if (original.count('requireCardOwnership = false') != 1) throw new GradleException('Unexpected QA.2 SERVER config')
+        config.text = original.replace('requireCardOwnership = false', 'requireCardOwnership = true')
+    }
+}
