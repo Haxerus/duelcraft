@@ -48,7 +48,7 @@ Java paths in this table are relative to `src/main/java/com/haxerus/duelcraft/`;
 ## Checkpoints
 
 - [x] A1: source-backed hidden/public identity handling, with red/green regressions and engine trace.
-- [ ] B1: invitation/notification cardinality, including tie rounds and dedicated evidence.
+- [x] B1: invitation/notification cardinality, including tie rounds and dedicated evidence.
 - [ ] A2: reveal/selection integration, original candidate indices and read-only reveal presentation.
 - [ ] A3: independent left details and right stacked zone/log panels.
 - [ ] A4: face-down banish badges and read-only Materials action.

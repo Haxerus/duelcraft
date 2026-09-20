@@ -105,7 +105,7 @@ Observed leads at the planning SHA:
 
 **Interfaces:** Consume A1's `candidateCode` and `handDisplayCode`. Produce `public void refreshReveals()` on `PromptController`, consuming the existing pending confirmation state when safe. Replace `ZoneInspectorController.showConfirmCards()` call sites; remove that method after all callers migrate. Existing selection response APIs and original indices remain unchanged. For multiple pending reveals, use a small ordered queue of immutable reveal records in client state only if the reproduced batching behavior requires it; do not overwrite an unconsumed event.
 
-- [ ] Extend `DuelRevealedHandScenario` and create DEV_ONLY `duel_visibility_qa` using actual pointer input. Cover hand/deck/Extra, reversed reveal order, duplicate identities, unknown candidates, same-tick reveal+selection and reveal-before-selection. Add read-only reveal with no subsequent selection, multiple reveal events, Retry, Waiting and dialog dismissal. Assert zone inspector stays closed and that a previously manually opened inspector keeps its contents. The existing scenario-builder pattern is:
+- [x] Extend `DuelRevealedHandScenario` and create DEV_ONLY `duel_visibility_qa` using actual pointer input. Cover hand/deck/Extra, reversed reveal order, duplicate identities, unknown candidates, same-tick reveal+selection and reveal-before-selection. Add read-only reveal with no subsequent selection, multiple reveal events, Retry, Waiting and dialog dismissal. Assert zone inspector stays closed and that a previously manually opened inspector keeps its contents. The existing scenario-builder pattern is:
 
   ```java
   s.step("authorized reveal", ctx -> LDLibDuelScreen.applyMessage(
@@ -118,9 +118,9 @@ Observed leads at the planning SHA:
   ```
 
   Supply initialized Extra Deck card objects through the existing `DuelScreenFixture` before these steps. Assert candidate artwork identity and hover, not just panel visibility. Click a non-first candidate and capture response bytes to prove the original selection index is used; inspect `ResponseBuilder`/`ResponseValidator` for the exact encoding instead of assuming a byte width.
-- [ ] Run `./gradlew.bat runClient -PldTest=duel_visibility_qa` before changing presentation and archive the expected failures. Keep fixture art independent of a downloaded image/database, using deterministic textures and explicit candidate identity assertions.
-- [ ] Route confirmation refresh through `PromptController.refreshReveals`. When a mandatory selection consumes the relevant reveal, render its choices directly and dismiss the associated read-only reveal without sending a response. Otherwise present a prompt-owned read-only reveal with an explicit Close/Continue acknowledgement local to the UI. Queue unrelated inspection reveals behind an unanswered mandatory choice; do not replace its selected indices, min/max, cancelability or response gate. Coalesce the current received-message batch before rebuilding surfaces. Do not delay the engine waiting for a fabricated confirmation response.
-- [ ] Audit card/unselect/tribute/sum/sort candidate display paths for direct code-only rendering. Where source contracts require recipient-state lookup, route through the same location-aware resolver without changing response order. Bind artwork and hover to one resolved code. Keep unknowns anonymous. Run existing selection and response tests after these edits:
+- [x] Run `./gradlew.bat runClient -PldTest=duel_visibility_qa` before changing presentation and archive the expected failures. Keep fixture art independent of a downloaded image/database, using deterministic textures and explicit candidate identity assertions.
+- [x] Route confirmation refresh through `PromptController.refreshReveals`. When a mandatory selection consumes the relevant reveal, render its choices directly and dismiss the associated read-only reveal without sending a response. Otherwise present a prompt-owned read-only reveal with an explicit Close/Continue acknowledgement local to the UI. Queue unrelated inspection reveals behind an unanswered mandatory choice; do not replace its selected indices, min/max, cancelability or response gate. Coalesce the current received-message batch before rebuilding surfaces. Do not delay the engine waiting for a fabricated confirmation response.
+- [x] Audit card/unselect/tribute/sum/sort candidate display paths for direct code-only rendering. Where source contracts require recipient-state lookup, route through the same location-aware resolver without changing response order. Bind artwork and hover to one resolved code. Keep unknowns anonymous. Run existing selection and response tests after these edits:
 
   ```powershell
   ./gradlew.bat test --tests '*ClientDuelStateTest' --tests '*ResponseBuilderTest' --tests '*ResponseValidatorTest' --tests '*DuelMessageCodecTest'
@@ -128,8 +128,8 @@ Observed leads at the planning SHA:
   ./gradlew.bat runClient -PldTest=duel_revealed_hand
   ```
 
-- [ ] Implement DEV_ONLY `duel_visibility_qa_mp` with separate A/B clients and the real manager/native session. Use the existing dedicated fixture pattern, restore collection/inventory fixtures on teardown, and keep client-only helpers in `client/uitest`. Reproduce all three traced effects from A1 using real scripts. Capture both recipients' received sanitized records and actual prompt artwork/response; assert the native continuation resolves the chosen candidate. Ceremonial Bell must show/remove public hand visibility on both clients, with an actual shuffle/move negative case. An injected `ConfirmCards` UI scenario alone does not close this step.
-- [ ] Run and archive:
+- [x] Implement DEV_ONLY `duel_visibility_qa_mp` with separate A/B clients and the real manager/native session. Use the existing dedicated fixture pattern, restore collection/inventory fixtures on teardown, and keep client-only helpers in `client/uitest`. Reproduce all three traced effects from A1 using real scripts. Capture both recipients' received sanitized records and actual prompt artwork/response; assert the native continuation resolves the chosen candidate. Ceremonial Bell must show/remove public hand visibility on both clients, with an actual shuffle/move negative case. An injected `ConfirmCards` UI scenario alone does not close this step.
+- [x] Run and archive:
 
   ```powershell
   ./gradlew.bat runMpTest -PldMpTest=duel_visibility_qa_mp -PldMpOwnership=default

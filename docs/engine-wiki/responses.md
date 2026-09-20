@@ -97,6 +97,8 @@ repeat count: u32 code, u8 controller, u8 location, u32 sequence, u8 tribute_val
 
 The response selects indices through the common card-list format. The core rejects more than `max_count` selected cards, but tests the minimum against the sum of their `tribute_value` fields. `max_count` is not a maximum tribute sum ([producer and validator](../../native/ygopro-core/playerop.cpp#L641)).
 
+The tribute producer serializes each candidate's actual controller/location/sequence; its message contract does not restrict that location to the field. Duelcraft keeps field-only tribute highlights and uses a dialog when a tribute list includes a pile, resolving zero-coded identities through recipient card state. Both paths retain the original indices and release weights, and share the same response validator and count/value gate. The synthetic mixed field/Deck regression chooses a double-valued non-first candidate: value 2 satisfies min 2 while count 1 remains below max 2, so Finish appears before the exact type-0/index-1 response is sent. Sum and sort dialog artwork/hover likewise resolve the same recipient-known identity without reordering their response index spaces.
+
 ### `MSG_SELECT_SUM` payload
 
 ```text
