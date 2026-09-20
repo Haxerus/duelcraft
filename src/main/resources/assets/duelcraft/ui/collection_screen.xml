@@ -8,8 +8,8 @@
         label, text { font-size: 12; text-color: #FFFFFF; text-shadow: true; }
         #saved-lists, #save-deck, #withdraw-card, #deposit-card, #section-deck, #section-side, #add-card, #remove-card,
         #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
-        #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
-        #list-delete, #list-import, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
+        #card-density, #eligibility-details, #eligibility-close, #list-new, #list-duplicate, #list-export,
+        #list-delete, #list-import, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
         #delete-cancel, #close-save, #close-discard, #close-cancel, #close-editor, #alternate-formats {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
@@ -22,16 +22,21 @@
         .muted { text-color: #AAAAAA; }
         .heading { font-size: 16; height: 20; flex-shrink: 0; }
         #editor-header { height: 56; flex-shrink: 0; flex-direction: row; gap-all: 12; align-items: center; }
-        #header-title { flex: 1; min-width: 0; gap-all: 3; }
+        #header-title { flex: 1; min-width: 280; gap-all: 3; }
+        #header-state { width: 150; flex-shrink: 0; gap-all: 3; }
         #deck-summary { height: 14; }
-        #editor-title { height: 22; width: 100%; text-wrap: hover_roll; overflow: hidden; }
-        #saved-lists, #save-deck { width: 146; height: 36; }
-        #close-editor { width: 96; height: 36; }
+        #editor-title { display: none; }
+        #list-name-label { height: 14; font-size: 11; text-color: #AAAAAA; }
+        #list-name { width: 100%; }
+        #list-active-status { height: 18; text-wrap: hover_roll; overflow: hidden; }
+        #saved-lists, #save-deck { width: 108; height: 36; }
+        #activate-deck { width: 124; height: 36; }
+        #close-editor { width: 82; height: 36; }
         #lists-dialog, #delete-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
         #delete-dialog { z-index: 110; }
         #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #lists-panel .row button { flex: 1; min-width: 0; }
-        #list-picker, #list-name, #list-import-picker { width: 100%; }
+        #list-picker, #list-import-picker { width: 100%; }
         #delete-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #delete-panel button { flex: 1; }
         #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
@@ -133,11 +138,17 @@
         <element id="collection-canvas">
             <element id="editor-header">
                 <element id="header-title">
-                    <label id="editor-title" class="heading" />
+                    <label id="editor-title" />
+                    <label id="list-name-label">duelcraft.collection.list_name</label>
+                    <text-field id="list-name" />
+                </element>
+                <element id="header-state">
+                    <label id="list-active-status" />
                     <label id="deck-summary" />
                 </element>
-                <button id="saved-lists" text="duelcraft.collection.lists" />
                 <button id="save-deck" text="duelcraft.collection.save" />
+                <button id="saved-lists" text="duelcraft.collection.lists" />
+                <button id="activate-deck" text="duelcraft.collection.use_for_duels" />
                 <button id="close-editor" text="duelcraft.collection.close" />
             </element>
             <element id="editor-body">
@@ -225,7 +236,6 @@
             </element>
             <element id="editor-footer">
                 <button id="deposit-cards" text="duelcraft.collection.deposit_all" />
-                <button id="activate-deck" text="Activate · unavailable" />
                 <element id="deck-feedback">
                     <label id="deck-warnings" />
                     <label id="deck-shortages" />
@@ -253,17 +263,13 @@
                         <selector id="list-import-picker" class="grow" />
                         <button id="list-import" text="duelcraft.collection.import" />
                     </element>
-                    <label id="list-name-label">duelcraft.collection.list_name</label>
-                    <text-field id="list-name" />
-                    <label id="list-active-status" />
                     <element class="row">
                         <button id="list-new" text="duelcraft.collection.new" />
-                        <button id="list-rename" text="duelcraft.collection.rename" />
                         <button id="list-duplicate" text="duelcraft.collection.duplicate" />
+                        <button id="list-export" text="duelcraft.collection.export" />
                         <button id="list-delete" text="duelcraft.collection.delete" />
                     </element>
                     <element class="row">
-                        <button id="list-activate" text="duelcraft.collection.activate" />
                         <button id="list-clear-active" text="duelcraft.collection.clear_active" />
                         <button id="list-refresh" text="duelcraft.collection.refresh" />
                         <button id="lists-close" text="duelcraft.collection.done" />

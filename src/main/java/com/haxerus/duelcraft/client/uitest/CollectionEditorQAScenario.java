@@ -1,8 +1,14 @@
 package com.haxerus.duelcraft.client.uitest;
 
 import com.haxerus.duelcraft.client.collection.CollectionCardGrid;
+import com.haxerus.duelcraft.client.collection.ClientCollectionState;
 import com.haxerus.duelcraft.client.collection.CollectionScreen;
 import com.haxerus.duelcraft.client.collection.DeckEditorModel;
+import com.haxerus.duelcraft.client.collection.SavedDeckController;
+import com.haxerus.duelcraft.collection.CollectionCommand;
+import com.haxerus.duelcraft.collection.CollectionError;
+import com.haxerus.duelcraft.collection.CollectionReply;
+import com.haxerus.duelcraft.collection.DeckEligibility;
 import com.haxerus.duelcraft.collection.DeckList;
 import com.haxerus.duelcraft.collection.SavedDeck;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
@@ -21,7 +27,15 @@ import org.lwjgl.glfw.GLFW;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
 /** Real pointer coverage for collection double-click and exact deck-tile removal. */
 @OnlyIn(Dist.CLIENT)
@@ -30,6 +44,9 @@ import java.util.concurrent.CompletableFuture;
 public final class CollectionEditorQAScenario implements UIScenario {
     private static final int MAIN = 10003;
     private static final int OTHER = 10002;
+    private static final UUID ACTIVE = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final UUID SELECTED = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+    private static final String LONG_NAME = "Explicit Save keeps this deliberately long current deck name stable while typing 0123456789";
 
     @Override public void configure(ScenarioOptions options) {
         options.tags("collection", "pointer").requiresWorld(false).guiScale(2);
@@ -181,6 +198,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
          .step("open delete confirmation", ctx -> CollectionLayoutScenario.press(ctx, "#list-delete"))
          .step("release delete confirmation", CollectionLayoutScenario::release).ticks(2)
          .checkVisible("#delete-dialog")
+         .checkTextContains("#delete-title", "New list")
          .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
          .check("Escape dismisses only delete confirmation", ctx -> !ctx.el("#delete-dialog").isVisible()
                  && ctx.el("#lists-dialog").isVisible())
@@ -207,8 +225,122 @@ public final class CollectionEditorQAScenario implements UIScenario {
          .hoverAt(-100, -100).screenshot("collection-editor-pointer-qa")
          .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
          .check("third nested Escape closes the clean editor", ctx -> !(ctx.screen() instanceof CollectionScreen))
-         .keyUp(GLFW.GLFW_KEY_ESCAPE)
-         .openScreen("empty unsaved draft closes without discard", ctx -> {
+          .keyUp(GLFW.GLFW_KEY_ESCAPE)
+          .step("write disposable explicit-Save import fixture", ctx -> {
+              String name = "collection-editor-c3-" + UUID.randomUUID();
+              Path file = ctx.mc().gameDirectory.toPath().resolve("duelcraft/decks/" + name + ".ydk");
+              try {
+                  Files.createDirectories(file.getParent());
+                  Files.writeString(file, "#main\n10003\n10002\n#extra\n10080\n!side\n10004\n");
+              } catch (IOException error) { throw new UncheckedIOException(error); }
+              ctx.put("c3ImportName", name);
+              ctx.put("c3ImportFile", file);
+          })
+          .openScreen("explicit Save and My decks", CollectionEditorQAScenario::commandScreen)
+          .awaitModularUI().ticks(3)
+          .checkText("#editor-title", "Active fixture")
+          .check("current name is a primary visible header field", ctx ->
+                  ctx.el("#list-name").isVisible() && !ctx.el("#lists-dialog").isVisible()
+                          && ctx.el("#list-name").bounds().y() < ctx.el("#editor-body").bounds().y())
+          .check("Active status and Use for duels are separate header controls", ctx ->
+                  ctx.el("#list-active-status").isVisible() && ctx.el("#activate-deck").isVisible()
+                          && ctx.el("#activate-deck").bounds().y() < ctx.el("#editor-body").bounds().y())
+          .step("open My decks for saved selection", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
+          .step("release My decks for saved selection", CollectionLayoutScenario::release).ticks(2)
+          .checkVisible("#list-export")
+          .check("My decks starts with zero persistence or activation requests", ctx ->
+                  count(ctx, CollectionCommand.Save.class) == 0 && count(ctx, CollectionCommand.Activate.class) == 0)
+          .step("open saved list picker for explicit selection", ctx -> CollectionLayoutScenario.press(ctx, "#list-picker"))
+          .step("release saved list picker", CollectionLayoutScenario::release).ticks(2)
+          .step("identify different saved list row", ctx -> {
+              Map<UUID, com.lowdragmc.lowdraglib2.gui.ui.elements.Button> buttons =
+                      ctx.getField(ctx.el("#list-picker").element(), "candidateButtons");
+              ctx.check("saved list picker exposes many saved lists", buttons.size() == 12);
+              buttons.get(SELECTED).setId("c3-selected-list");
+          })
+          .step("choose different saved list", ctx -> CollectionLayoutScenario.press(ctx, "#c3-selected-list"))
+          .step("release different saved list", CollectionLayoutScenario::release).ticks(2)
+          .checkText("#editor-title", "Selected fixture")
+          .checkTextContains("#list-active-status", "not active")
+          .step("close My decks after selection", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
+          .step("release My decks after selection", CollectionLayoutScenario::release).ticks(2)
+          .typeInto("#list-name", LONG_NAME).ticks(2)
+          .check("typing keeps current-name focus and exact value", ctx -> {
+              var field = ctx.el("#list-name").as(TextField.class);
+              return field.isFocused() && LONG_NAME.equals(field.getValue());
+          })
+          .step("select card for explicit Save edit", ctx -> CollectionLayoutScenario.press(ctx, "#collection-card-" + MAIN))
+          .step("release card for explicit Save edit", CollectionLayoutScenario::release).ticks(2)
+          .step("add card for explicit Save edit", ctx -> CollectionLayoutScenario.press(ctx, "#add-card"))
+          .step("release add for explicit Save edit", CollectionLayoutScenario::release).ticks(2)
+          .step("submit explicit Save", ctx -> CollectionLayoutScenario.press(ctx, "#save-deck"))
+          .step("release explicit Save", CollectionLayoutScenario::release).ticks(2)
+          .check("Save sends exactly one Save and zero Activate requests with current identity and content", ctx -> {
+              var saves = ctx.<ArrayList<CollectionCommand>>get("c3Commands").stream()
+                      .filter(CollectionCommand.Save.class::isInstance).map(CollectionCommand.Save.class::cast).toList();
+              return saves.size() == 1 && count(ctx, CollectionCommand.Activate.class) == 0
+                      && saves.getFirst().deck().id().equals(SELECTED)
+                      && saves.getFirst().deck().name().equals(LONG_NAME)
+                      && saves.getFirst().deck().cards().main().equals(List.of(OTHER, MAIN));
+          })
+          .step("reject explicit Save", ctx -> nextMutation(ctx).complete(new CollectionReply.Rejected(
+                  CollectionError.INVALID, 4, emptyEligibility()))).ticks(2)
+          .check("failed Save keeps the dirty draft and current editor", ctx ->
+                  model(ctx).dirty() && lists(ctx).id().equals(SELECTED)
+                          && ctx.el("#editor-status").text().contains("retained"))
+          .step("retry explicit Save", ctx -> CollectionLayoutScenario.press(ctx, "#save-deck"))
+          .step("release explicit Save retry", CollectionLayoutScenario::release).ticks(2)
+          .step("acknowledge explicit Save", ctx -> {
+              var save = ctx.<ArrayList<CollectionCommand>>get("c3Commands").stream()
+                      .filter(CollectionCommand.Save.class::isInstance).map(CollectionCommand.Save.class::cast)
+                      .reduce((first, second) -> second).orElseThrow();
+              nextMutation(ctx).complete(new CollectionReply.Changed(5, ACTIVE, save.deck(), 0, emptyEligibility()));
+          }).ticks(2)
+          .check("successful Save updates the baseline without changing the active ID", ctx ->
+                  !model(ctx).dirty() && lists(ctx).stored() && lists(ctx).id().equals(SELECTED)
+                          && lists(ctx).activeId().equals(ACTIVE) && count(ctx, CollectionCommand.Activate.class) == 0)
+          .step("request Use for duels", ctx -> CollectionLayoutScenario.press(ctx, "#activate-deck"))
+          .step("release Use for duels", CollectionLayoutScenario::release).ticks(2)
+          .check("Use for duels is the sole explicit activation request", ctx ->
+                  count(ctx, CollectionCommand.Activate.class) == 1)
+          .step("reject explicit activation with policy detail", ctx -> nextMutation(ctx).complete(
+                  new CollectionReply.Rejected(CollectionError.INELIGIBLE, 5,
+                          new DeckEligibility.Report(List.of(), Map.of(), false, true,
+                                  "fixture policy restriction")))).ticks(2)
+          .check("activation failure retains the list and explanatory feedback", ctx ->
+                  lists(ctx).id().equals(SELECTED) && !model(ctx).dirty()
+                          && ctx.el("#editor-status").text().contains("fixture policy restriction"))
+          .step("dismiss activation details", ctx -> CollectionLayoutScenario.press(ctx, "#eligibility-close"))
+          .step("release activation details", CollectionLayoutScenario::release).ticks(2)
+          .step("open My decks for draft actions", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
+          .step("release My decks for draft actions", CollectionLayoutScenario::release).ticks(2)
+          .step("create New draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-new"))
+          .step("release New draft", CollectionLayoutScenario::release).ticks(2)
+          .step("capture New identity", ctx -> ctx.put("c3NewId", lists(ctx).id()))
+          .step("make a copy without saving", ctx -> CollectionLayoutScenario.press(ctx, "#list-duplicate"))
+          .step("release Make a copy", CollectionLayoutScenario::release).ticks(2)
+          .check("New and Make a copy create distinct unsaved identities without requests", ctx ->
+                  !lists(ctx).stored() && !lists(ctx).id().equals(ctx.get("c3NewId"))
+                          && count(ctx, CollectionCommand.Save.class) == 2
+                          && count(ctx, CollectionCommand.Activate.class) == 1)
+          .step("open import picker for explicit draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-import-picker"))
+          .step("release import picker", CollectionLayoutScenario::release).ticks(2)
+          .step("identify disposable import row", ctx -> {
+              Map<String, com.lowdragmc.lowdraglib2.gui.ui.elements.Button> buttons =
+                      ctx.getField(ctx.el("#list-import-picker").element(), "candidateButtons");
+              buttons.get(ctx.<String>get("c3ImportName")).setId("c3-import-choice");
+          })
+          .step("choose disposable import row", ctx -> CollectionLayoutScenario.press(ctx, "#c3-import-choice"))
+          .step("release disposable import row", CollectionLayoutScenario::release).ticks(2)
+          .step("load import as draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-import"))
+          .step("release import draft", CollectionLayoutScenario::release).ticks(2)
+          .check("Import loads all sections and remains explicitly unsaved", ctx ->
+                  model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER), List.of(10080), List.of(10004)))
+                          && !lists(ctx).stored() && count(ctx, CollectionCommand.Save.class) == 2
+                          && count(ctx, CollectionCommand.Activate.class) == 1)
+          .hoverAt(-100, -100).screenshot("collection-explicit-save-management")
+          .step("close explicit-Save screen", ctx -> ctx.mc().setScreen(null))
+          .openScreen("empty unsaved draft closes without discard", ctx -> {
              var model = ctx.put("emptyModel", new DeckEditorModel(empty(), CollectionFixture.owned()));
              return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
                      CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
@@ -239,11 +371,13 @@ public final class CollectionEditorQAScenario implements UIScenario {
          .checkVisible("#close-dialog")
          .check("saved empty rename still requires a discard decision", ctx ->
                  ctx.screen() instanceof CollectionScreen)
-         .teardown("restore pointer viewport", ctx -> {
-             ctx.mc().setScreen(null);
-             GLFW.glfwSetWindowSize(ctx.mc().getWindow().getWindow(),
-                     ctx.get("originalWidth"), ctx.get("originalHeight"));
-         });
+          .teardown("restore pointer viewport", ctx -> {
+              ctx.mc().setScreen(null);
+              try { Files.deleteIfExists(ctx.get("c3ImportFile")); }
+              catch (IOException error) { throw new UncheckedIOException(error); }
+              GLFW.glfwSetWindowSize(ctx.mc().getWindow().getWindow(),
+                      ctx.get("originalWidth"), ctx.get("originalHeight"));
+          });
     }
 
     private static void leftPress(ScenarioBuilder s, String name, String selector) {
@@ -293,6 +427,69 @@ public final class CollectionEditorQAScenario implements UIScenario {
 
     private static CollectionCardGrid grid(TestContext ctx) {
         return ctx.el("#collection-results").as(CollectionCardGrid.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static CollectionScreen commandScreen(TestContext ctx) {
+        var model = ctx.put("model", new DeckEditorModel(empty(), CollectionFixture.owned()));
+        var commands = ctx.put("c3Commands", new ArrayList<CollectionCommand>());
+        var mutations = ctx.put("c3Mutations", new ArrayList<CompletableFuture<CollectionReply>>());
+        var activeDeck = new SavedDeck(ACTIVE, "Active fixture", empty());
+        var selectedDeck = new SavedDeck(SELECTED, "Selected fixture",
+                new DeckList(List.of(OTHER), List.of(), List.of()));
+        Function<CollectionCommand, CompletionStage<CollectionReply>> request = command -> {
+            commands.add(command);
+            if (command instanceof CollectionCommand.ReadDeck read) {
+                var deck = read.id().equals(ACTIVE) ? activeDeck : selectedDeck;
+                return CompletableFuture.completedFuture(new CollectionReply.Deck(4, deck));
+            }
+            var reply = new CompletableFuture<CollectionReply>();
+            mutations.add(reply);
+            return reply;
+        };
+        var summaries = new ArrayList<CollectionReply.Summary>();
+        summaries.add(new CollectionReply.Summary(ACTIVE, activeDeck.name(), 0, 0, 0));
+        summaries.add(new CollectionReply.Summary(SELECTED, selectedDeck.name(), 1, 0, 0));
+        for (int index = 0; index < 10; index++) {
+            summaries.add(new CollectionReply.Summary(new UUID(0, 0xc0 + index),
+                    "Saved fixture " + (index + 1), index, 0, 0));
+        }
+        var view = new ClientCollectionState.View(4, CollectionFixture.owned(), List.copyOf(summaries), ACTIVE);
+        Supplier<CompletionStage<ClientCollectionState.View>> refresh = () -> CompletableFuture.completedFuture(view);
+        try {
+            var method = CollectionScreen.class.getDeclaredMethod("create", DeckEditorModel.class, List.class,
+                    java.util.function.IntFunction.class, UUID.class,
+                    com.haxerus.duelcraft.client.collection.DeckSaveHandler.class,
+                    com.haxerus.duelcraft.client.collection.CollectionQuery.class, Function.class,
+                    Supplier.class, java.util.concurrent.Executor.class);
+            method.setAccessible(true);
+            var screen = (CollectionScreen) method.invoke(null, model, CollectionFixture.cards(),
+                    (java.util.function.IntFunction<net.minecraft.resources.ResourceLocation>) code -> null,
+                    UUID.randomUUID(), null, CollectionFixture.query(), request, refresh,
+                    (java.util.concurrent.Executor) Runnable::run);
+            Object controller = ctx.getField(screen, "controller");
+            ctx.<SavedDeckController>getField(controller, "lists").openInitial(view);
+            return screen;
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalStateException(error);
+        }
+    }
+
+    private static long count(TestContext ctx, Class<? extends CollectionCommand> type) {
+        return ctx.<ArrayList<CollectionCommand>>get("c3Commands").stream().filter(type::isInstance).count();
+    }
+
+    private static CompletableFuture<CollectionReply> nextMutation(TestContext ctx) {
+        return ctx.<ArrayList<CompletableFuture<CollectionReply>>>get("c3Mutations").removeFirst();
+    }
+
+    private static SavedDeckController lists(TestContext ctx) {
+        Object controller = ctx.getField(ctx.screen(), "controller");
+        return ctx.getField(controller, "lists");
+    }
+
+    private static DeckEligibility.Report emptyEligibility() {
+        return new DeckEligibility.Report(List.of(), Map.of(), false, false, null);
     }
 
     private static DeckEditorModel model(TestContext ctx) { return ctx.get("model"); }

@@ -78,6 +78,7 @@ final class CollectionController {
     private final Map<String, FilterChoice> choices = new LinkedHashMap<>();
     private final Map<ScrollerView, Float> pendingScrollOffsets = new HashMap<>();
     private List<CardInfo> results = List.of();
+    private UUID deleteTarget;
 
     CollectionController(UI ui, DeckEditorModel model, List<CardInfo> cards,
             IntFunction<ResourceLocation> textures, IntFunction<ResourceLocation> art, UUID id,
@@ -216,29 +217,42 @@ final class CollectionController {
             if (target != null && !target.equals(lists.id())) lists.navigate(() -> lists.select(target));
         });
         button("list-new").setOnClick(event -> lists.navigate(lists::newDraft));
-        button("list-rename").setOnClick(event -> lists.save());
-        button("list-duplicate").setOnClick(event -> { lists.duplicate(); lists.save(); });
+        button("list-duplicate").setOnClick(event -> lists.duplicate());
         button("list-import").setOnClick(event -> {
             String name = importPicker.getValue();
             if (name == null) return;
             lists.navigate(() -> {
                 try {
                     lists.importDraft(imports.load(name));
-                    lists.save();
                 } catch (IOException | UncheckedIOException | DeckLoader.DeckParseException | IllegalArgumentException error) {
                     lists.importFailed(error);
                 }
             });
         });
-        button("list-delete").setOnClick(event -> element("delete-dialog").setDisplay(true));
+        button("list-export").setOnClick(event -> ((TextElement) element("editor-status")).setText(
+                Component.translatable("duelcraft.collection.export_coming_soon")));
+        button("list-delete").setOnClick(event -> {
+            UUID selected = ((Selector<UUID>) element("list-picker")).getValue();
+            deleteTarget = selected == null ? lists.id() : selected;
+            String targetName = lists.summaries().stream()
+                    .filter(summary -> summary.id().equals(deleteTarget))
+                    .map(CollectionReply.Summary::name).findFirst().orElse(lists.name());
+            ((TextElement) element("delete-title")).setText(
+                    Component.translatable("duelcraft.collection.delete_confirm", targetName));
+            element("delete-dialog").setDisplay(true);
+        });
         button("delete-confirm").setOnClick(event -> {
             element("delete-dialog").setDisplay(false);
-            lists.delete();
+            UUID target = deleteTarget;
+            deleteTarget = null;
+            if (target != null) lists.delete(target);
         });
-        button("delete-cancel").setOnClick(event -> element("delete-dialog").setDisplay(false));
-        button("activate-deck").setText(Component.translatable("duelcraft.collection.activate"));
+        button("delete-cancel").setOnClick(event -> {
+            deleteTarget = null;
+            element("delete-dialog").setDisplay(false);
+        });
+        button("activate-deck").setText(Component.translatable("duelcraft.collection.use_for_duels"));
         button("activate-deck").setOnClick(event -> lists.activate());
-        button("list-activate").setOnClick(event -> lists.activate());
         button("list-clear-active").setOnClick(event -> lists.clearActive());
         button("list-refresh").setOnClick(event -> lists.refresh());
         element("lists-dialog").setDisplay(false);
@@ -282,7 +296,7 @@ final class CollectionController {
         element("list-picker").setActive(!lists.pending() && lists.ready());
         element("list-import-picker").setActive(!lists.pending());
         element("list-import").setActive(importsAvailable && !lists.pending());
-        for (String id : List.of("save-deck", "list-new", "list-rename", "list-duplicate", "close-save")) {
+        for (String id : List.of("save-deck", "list-new", "list-duplicate", "list-export", "close-save")) {
             element(id).setActive(!lists.pending() && lists.ready());
         }
         for (String id : List.of("close-discard", "close-cancel")) element(id).setActive(!lists.pending());
@@ -595,12 +609,10 @@ final class CollectionController {
         if (draft.side().size() > 15) warnings.add("Side exceeds 15");
         if (draft.requiredCopies().values().stream().anyMatch(count -> count > 3)) warnings.add("More than 3 copies");
         text("deck-summary", lists.dirty() ? "Unsaved changes" : "Saved list");
-        for (String id : List.of("activate-deck", "list-activate")) {
-            element(id).setActive(!lists.pending() && lists.ready() && lists.stored() && !lists.dirty());
-            element(id).getStyle().tooltips(Component.translatable("duelcraft.collection." +
-                    (lists.dirty() ? "save_first"
-                            : lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
-        }
+        element("activate-deck").setActive(!lists.pending() && lists.ready() && lists.stored() && !lists.dirty());
+        element("activate-deck").getStyle().tooltips(Component.translatable("duelcraft.collection." +
+                (lists.dirty() ? "save_first"
+                        : lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
         text("deck-warnings", String.join(" · ", warnings));
         element("deck-warnings").setDisplay(!warnings.isEmpty());
         ((TextElement) element("list-supported-checks")).setText(Component.translatable("duelcraft.collection." +
@@ -705,6 +717,7 @@ final class CollectionController {
             }
         }
         if (element("delete-dialog").isDisplayed()) {
+            deleteTarget = null;
             element("delete-dialog").setDisplay(false);
             return true;
         }

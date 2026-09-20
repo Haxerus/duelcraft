@@ -68,7 +68,7 @@ final class CollectionWidgetPlaytest {
           .check("requested GUI scale is active", ctx -> ctx.mc().getWindow().getGuiScale() == guiScale)
           .check("only Deck and Side edit modes are exposed", ctx -> ctx.exists("#section-deck")
                   && ctx.exists("#section-side") && !ctx.exists("#section-main") && !ctx.exists("#section-extra"))
-          .check("Saved lists and Save list align", ctx -> {
+          .check("My decks and Save align", ctx -> {
               var lists = ctx.el("#saved-lists").bounds();
               var save = ctx.el("#save-deck").bounds();
               return Math.abs(lists.width() - save.width()) < 1 && Math.abs(lists.height() - save.height()) < 1
@@ -121,15 +121,25 @@ final class CollectionWidgetPlaytest {
           .click("#toggle-filters").ticks(2)
           .step("open Saved lists with real mouse input", ctx -> click(ctx, "saved-lists")).ticks(2)
           .checkText("#list-import-label", "Import a local .ydk list")
-          .check("empty local picker has no selection and disables Import", ctx -> {
+          .step("record initial local import state", ctx -> {
               var picker = ctx.el("#list-import-picker").as(Selector.class);
-              return picker.getValue() == null && !ctx.el("#list-import").element().isActive();
+              Map<String, Button> candidates = ctx.getField(picker, "candidateButtons");
+              ctx.attach("initial local imports", "candidates=%s, value=%s, active=%s".formatted(
+                      candidates.keySet(), picker.getValue(), ctx.el("#list-import").element().isActive()));
           })
-          .hoverAt(-100, -100).screenshot("collection-import-empty-scale" + guiScale)
-          .click("#list-import-picker").ticks(2)
-          .check("empty local picker opens safely", ctx -> {
+          .check("local picker selection and Import state match available files", ctx -> {
               var picker = ctx.el("#list-import-picker").as(Selector.class);
-              return picker.isOpen() && picker.getValue() == null && !ctx.el("#list-import").element().isActive();
+              Map<String, Button> candidates = ctx.getField(picker, "candidateButtons");
+              return candidates.isEmpty() == (picker.getValue() == null)
+                      && ctx.el("#list-import").element().isActive() == !candidates.isEmpty();
+          })
+          .hoverAt(-100, -100).screenshot("collection-import-initial-scale" + guiScale)
+          .click("#list-import-picker").ticks(2)
+          .check("local picker opens safely with the available files", ctx -> {
+              var picker = ctx.el("#list-import-picker").as(Selector.class);
+              Map<String, Button> candidates = ctx.getField(picker, "candidateButtons");
+              return picker.isOpen() && candidates.isEmpty() == (picker.getValue() == null)
+                      && ctx.el("#list-import").element().isActive() == !candidates.isEmpty();
           })
           .click("#list-import-picker").ticks(2)
           .step("close Saved lists before adding a local deck", ctx -> click(ctx, "lists-close")).ticks(2)
@@ -148,14 +158,28 @@ final class CollectionWidgetPlaytest {
                           && ctx.el("#list-import").element().isActive())
           .hoverAt(-100, -100).screenshot("collection-import-populated-scale" + guiScale)
           .click("#list-import").ticks(2)
-          .check("Import loads and saves every YDK section", ctx -> {
+          .step("record imported draft state", ctx -> {
+              var model = ctx.<com.haxerus.duelcraft.client.collection.DeckEditorModel>get("model");
+              var lists = ctx.<SavedDeckController>get("lists");
+              ctx.attach("imported draft", "draft=%s, modelDirty=%s, stored=%s, name=%s".formatted(
+                      model.draft(), model.dirty(), lists.stored(), lists.name()));
+          })
+          .check("Import loads every YDK section as an unsaved draft", ctx -> {
               var model = ctx.<com.haxerus.duelcraft.client.collection.DeckEditorModel>get("model");
               var lists = ctx.<SavedDeckController>get("lists");
               return model.draft().main().equals(List.of(10001, 10002))
                       && model.draft().extra().equals(List.of(10066))
                       && model.draft().side().equals(List.of(10003))
-                      && !model.dirty() && lists.stored() && "collection-import-ui".equals(lists.name());
+                      && lists.dirty() && !lists.stored() && "collection-import-ui".equals(lists.name());
           })
+          .step("close My decks before explicit import Save", ctx -> click(ctx, "lists-close")).ticks(2)
+          .click("#save-deck").ticks(2)
+          .check("explicit Save acknowledges the imported draft", ctx -> {
+              var model = ctx.<com.haxerus.duelcraft.client.collection.DeckEditorModel>get("model");
+              var lists = ctx.<SavedDeckController>get("lists");
+              return !model.dirty() && lists.stored();
+          })
+          .step("reopen My decks after explicit import Save", ctx -> click(ctx, "saved-lists")).ticks(2)
           .step("restore original playtest list", ctx -> {
               var lists = ctx.<SavedDeckController>get("lists");
               lists.importDraft(new SavedDeck(CollectionFixture.LIST_ID, "New list",

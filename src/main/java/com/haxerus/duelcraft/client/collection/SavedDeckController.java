@@ -283,7 +283,8 @@ public final class SavedDeckController {
     }
 
     public void clearActive() { mutate(new CollectionCommand.ClearActive(revision), false); }
-    public void delete() { mutate(new CollectionCommand.Delete(revision, id), true); }
+    public void delete() { delete(id); }
+    void delete(UUID target) { mutate(new CollectionCommand.Delete(revision, target), target.equals(id)); }
 
     public void transfer(CollectionCommand command) {
         if (pending || disposed || !ready) return;
@@ -320,6 +321,7 @@ public final class SavedDeckController {
 
     private void mutate(CollectionCommand command, boolean delete) {
         if (pending || disposed || !ready) return;
+        readToken++;
         eligibility = EMPTY;
         detail = "";
         setPending(true);

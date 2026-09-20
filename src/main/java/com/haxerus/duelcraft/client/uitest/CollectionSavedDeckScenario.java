@@ -49,9 +49,7 @@ public final class CollectionSavedDeckScenario implements UIScenario {
          .step("release selected Extra card", CollectionLayoutScenario::release).ticks(2)
          .click("#add-card").click("#section-side").click("#add-card")
          .checkTextContains("#inspector-missing", "2");
-        CollectionRuntimeFixture.press(s, "#saved-lists");
         s.typeInto("#list-name", "Runtime unowned draft");
-        CollectionRuntimeFixture.press(s, "#lists-close");
         // Press and inspect in the same client step: no fabricated acknowledgement delay.
         s.step("Save enters pending before real packet acknowledgement", ctx -> {
             CollectionLayoutScenario.press(ctx, "#save-deck");

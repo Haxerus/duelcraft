@@ -488,6 +488,128 @@ class SavedDeckControllerTest {
         assertEquals("save_first", controller.status());
     }
 
+    @Test void explicitSaveKeepsSelectedIdentityUpdatesBaselineAndNeverActivates() {
+        var selected = UUID.randomUUID();
+        var active = UUID.randomUUID();
+        var cards = new DeckList(List.of(7), List.of(8), List.of(9));
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(
+                new CollectionReply.Summary(selected, "Selected", 1, 1, 1)), active));
+        c.select(selected);
+        replies.getFirst().complete(new CollectionReply.Deck(4, new SavedDeck(selected, "Selected", cards)));
+
+        c.rename("Renamed selected list");
+        model.add(DeckEditorModel.Section.SIDE, 10);
+        c.save();
+
+        assertEquals(2, commands.size());
+        var submitted = ((CollectionCommand.Save) commands.getLast()).deck();
+        assertEquals(selected, submitted.id());
+        assertEquals("Renamed selected list", submitted.name());
+        assertEquals(new DeckList(List.of(7), List.of(8), List.of(9, 10)), submitted.cards());
+        assertTrue(commands.stream().noneMatch(CollectionCommand.Activate.class::isInstance));
+        replies.getLast().complete(new CollectionReply.Changed(5, active, submitted, 0,
+                new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
+
+        assertEquals(selected, c.id());
+        assertEquals(active, c.activeId());
+        assertFalse(c.dirty());
+        model.add(DeckEditorModel.Section.MAIN, 11);
+        model.discard();
+        assertEquals(submitted.cards(), model.draft());
+    }
+
+    @Test void newDuplicateAndImportStayUnsavedUntilExplicitSave() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null));
+
+        c.newDraft();
+        var fresh = c.id();
+        assertFalse(c.stored());
+        assertTrue(commands.isEmpty());
+
+        c.duplicate();
+        var copy = c.id();
+        assertNotEquals(fresh, copy);
+        assertFalse(c.stored());
+        assertTrue(commands.isEmpty());
+
+        var importedCards = new DeckList(List.of(7, 8), List.of(9), List.of(10));
+        var imported = new SavedDeck(UUID.randomUUID(), "Imported", importedCards);
+        c.importDraft(imported);
+        assertEquals(imported.id(), c.id());
+        assertEquals(importedCards, model.draft());
+        assertFalse(c.stored());
+        assertTrue(commands.isEmpty());
+
+        c.save();
+        assertEquals(List.of(new CollectionCommand.Save(4, imported)), commands);
+    }
+
+    @Test void deletingAnotherSavedIdentityNeverDeletesTheCurrentDirtyDraft() {
+        var other = UUID.randomUUID();
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(
+                new CollectionReply.Summary(id, "Current", 0, 0, 0),
+                new CollectionReply.Summary(other, "Other", 1, 0, 0)), null));
+        c.rename("Dirty current");
+        model.add(DeckEditorModel.Section.MAIN, 7);
+        var dirtyCards = model.draft();
+
+        c.delete(other);
+        assertEquals(new CollectionCommand.Delete(4, other), commands.getFirst());
+        replies.getFirst().complete(new CollectionReply.Changed(5, null, null, 0,
+                new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
+
+        assertEquals(id, c.id());
+        assertEquals("Dirty current", c.name());
+        assertEquals(dirtyCards, model.draft());
+        assertTrue(c.dirty());
+    }
+
+    @Test void deletingASelectedEntryInvalidatesItsPendingReadAndKeepsTheCurrentDirtyDraft() {
+        var other = UUID.randomUUID();
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(
+                new CollectionReply.Summary(id, "Current", 0, 0, 0),
+                new CollectionReply.Summary(other, "Other", 1, 0, 0)), null));
+        c.rename("Dirty current");
+        model.add(DeckEditorModel.Section.MAIN, 7);
+        var dirtyCards = model.draft();
+
+        c.select(other);
+        c.delete(other);
+        replies.getFirst().complete(new CollectionReply.Deck(4,
+                new SavedDeck(other, "Other", new DeckList(List.of(8), List.of(), List.of()))));
+        replies.getLast().complete(new CollectionReply.Changed(5, null, null, 0,
+                new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
+
+        assertEquals(List.of(new CollectionCommand.ReadDeck(other), new CollectionCommand.Delete(4, other)), commands);
+        assertEquals(id, c.id());
+        assertEquals("Dirty current", c.name());
+        assertEquals(dirtyCards, model.draft());
+        assertTrue(c.dirty());
+    }
+
+    @Test void failedActivationKeepsTheSavedListAndActionableFeedback() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null));
+        var cards = model.draft();
+
+        c.activate();
+        replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.INELIGIBLE, 4,
+                new DeckEligibility.Report(List.of(new DeckEligibility.Issue(
+                        "duelcraft.collection.issue.main_size", 0, 0, 40)), Map.of(), false, true,
+                        "minimum Main Deck size")));
+
+        assertEquals(id, c.id());
+        assertEquals(cards, model.draft());
+        assertFalse(c.dirty());
+        assertEquals("operation_failed", c.status());
+        assertTrue(c.detail().contains("minimum Main Deck size"));
+        assertEquals("minimum Main Deck size", c.eligibility().restrictionReason());
+    }
+
     @Test void productionSaveUsesChangedRevisionAndRefreshFailureDoesNotUndoAcknowledgement() {
         var refresh = new CompletableFuture<ClientCollectionState.View>();
         var c = new SavedDeckController(model, id, "List", null,
