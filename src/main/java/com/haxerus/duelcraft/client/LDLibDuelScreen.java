@@ -276,6 +276,7 @@ public class LDLibDuelScreen {
         private int renderedLogEntries;
         private int rightPanelLayoutRevision;
         private int logContentRevision;
+        private int zoneContentRevision;
 
         // Overlays
         private final UIElement cardInfoBanner;
@@ -410,6 +411,9 @@ public class LDLibDuelScreen {
                 }
                 @Override public void onVisibilityChanged() {
                     UIRefresher.this.refreshRightPanels();
+                }
+                @Override public void restoreScrollAfterContentLayout(float offset) {
+                    UIRefresher.this.restoreZoneAfterContentLayout(offset);
                 }
             });
             var descResolver = new OptionTextResolver(
@@ -945,6 +949,14 @@ public class LDLibDuelScreen {
             list.viewContainer.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
                 event.currentElement.removeEventListener(UIEvents.LAYOUT_CHANGED, event.currentListener);
                 if (revision == logContentRevision) restoreScroll(list, offset, bottom);
+            });
+        }
+
+        private void restoreZoneAfterContentLayout(float offset) {
+            int revision = ++zoneContentRevision;
+            zoneList.viewContainer.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
+                event.currentElement.removeEventListener(UIEvents.LAYOUT_CHANGED, event.currentListener);
+                if (revision == zoneContentRevision) restoreScroll(zoneList, offset, false);
             });
         }
 

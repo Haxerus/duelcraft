@@ -28,6 +28,7 @@ public class ZoneInspectorController {
         void showCardInfo(int code);
         void hideCardInfo();
         void onVisibilityChanged();
+        void restoreScrollAfterContentLayout(float offset);
     }
 
     private final UI ui;
@@ -76,6 +77,7 @@ public class ZoneInspectorController {
         int player = inspectedPlayer;
         int location = inspectedLocation;
         List<ClientCard> cards = getPileCards(player, location);
+        float scrollOffset = Math.max(0, -listElem.viewContainer.getTaffyLayout().location().y);
 
         listElem.clearAllScrollViewChildren();
         for (int i = 0; i < cards.size(); i++) {
@@ -95,6 +97,7 @@ public class ZoneInspectorController {
 
             listElem.addScrollViewChild(card);
         }
+        callbacks.restoreScrollAfterContentLayout(scrollOffset);
     }
 
     private void open(int player, int location, String title) {

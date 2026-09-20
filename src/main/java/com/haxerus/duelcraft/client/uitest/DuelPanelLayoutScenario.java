@@ -2,6 +2,7 @@ package com.haxerus.duelcraft.client.uitest;
 
 import com.haxerus.duelcraft.client.LDLibDuelScreen;
 import com.haxerus.duelcraft.client.ClientDuelState;
+import com.haxerus.duelcraft.client.ZoneInspectorController;
 import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.message.LocInfo;
@@ -144,6 +145,33 @@ public final class DuelPanelLayoutScenario implements UIScenario {
              ctx.put("zoneOffset", offset);
          });
         capture(s, "right-panels-zone-only-scrolled");
+        s.step("grow the open pile while it remains scrollable", ctx -> inspectionPile(64)).ticks(3)
+         .checkCount("#zone-inspector-list .card", 64)
+         .step("zone content rebuild preserves its pixel offset", ctx ->
+                 sameOffset(ctx, "#zone-inspector-list", "zoneOffset",
+                         "growing an open pile preserves its pixel offset"))
+         .step("queue two pile mutations before the next layout", ctx -> {
+             inspectionPile(62);
+             refreshZoneInspector();
+             inspectionPile(66);
+             refreshZoneInspector();
+         }).ticks(3)
+         .checkCount("#zone-inspector-list .card", 66)
+         .step("latest queued pile rebuild preserves its pixel offset", ctx ->
+                 sameOffset(ctx, "#zone-inspector-list", "zoneOffset",
+                         "queued open-pile refresh preserves its pixel offset"))
+         .step("shrink the open pile below the viewport", ctx -> inspectionPile(2)).ticks(3)
+         .checkCount("#zone-inspector-list .card", 2)
+         .check("short pile clamps its pixel offset to zero",
+                 ctx -> Math.abs(scrollOffset(ctx, "#zone-inspector-list")) <= 1)
+         .step("restore the long pile for sibling toggles", ctx -> inspectionPile(60)).ticks(3)
+         .scroll("#zone-inspector-list", -20).ticks(2)
+         .step("remember restored zone pixel offset", ctx -> {
+             float offset = scrollOffset(ctx, "#zone-inspector-list");
+             ctx.check("restored zone has a real content offset", offset > 0, "> 0", offset);
+             ctx.put("zoneOffset", offset);
+         });
+        capture(s, "right-panels-zone-content-refresh");
 
         press(s, "#log-toggle");
         s.step("both panels split the column", ctx -> {
@@ -308,6 +336,19 @@ public final class DuelPanelLayoutScenario implements UIScenario {
         DuelVisibilityFixture.state().grave[0].clear();
         for (int i = 0; i < count; i++) LDLibDuelScreen.applyMessage(new DuelMessage.Move(0,
                 new LocInfo(0, 0, 0, 0), new LocInfo(0, LOCATION_GRAVE, i, POS_FACEUP_ATTACK), 0));
+    }
+
+    private static void refreshZoneInspector() {
+        try {
+            var refresherField = LDLibDuelScreen.class.getDeclaredField("refresher");
+            refresherField.setAccessible(true);
+            var refresher = refresherField.get(null);
+            var inspectorField = refresher.getClass().getDeclaredField("zoneInspector");
+            inspectorField.setAccessible(true);
+            ((ZoneInspectorController) inspectorField.get(refresher)).refresh();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot queue zone inspector refresh", e);
+        }
     }
 
     static void press(ScenarioBuilder s, String selector) {
