@@ -10,6 +10,8 @@ import com.haxerus.duelcraft.collection.CollectionError;
 import com.haxerus.duelcraft.collection.CollectionReply;
 import com.haxerus.duelcraft.collection.DeckEligibility;
 import com.haxerus.duelcraft.collection.DeckList;
+import com.haxerus.duelcraft.collection.DeckListLoader;
+import com.haxerus.duelcraft.client.collection.DeckExportService;
 import com.haxerus.duelcraft.collection.SavedDeck;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
@@ -338,8 +340,9 @@ public final class CollectionEditorQAScenario implements UIScenario {
                   model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER), List.of(10080), List.of(10004)))
                           && !lists(ctx).stored() && count(ctx, CollectionCommand.Save.class) == 2
                           && count(ctx, CollectionCommand.Activate.class) == 1)
-          .hoverAt(-100, -100).screenshot("collection-explicit-save-management")
-          .step("close explicit-Save screen", ctx -> ctx.mc().setScreen(null))
+          .hoverAt(-100, -100).screenshot("collection-explicit-save-management");
+        exportSteps(s);
+        s.step("close explicit-Save screen", ctx -> ctx.mc().setScreen(null))
           .openScreen("empty unsaved draft closes without discard", ctx -> {
              var model = ctx.put("emptyModel", new DeckEditorModel(empty(), CollectionFixture.owned()));
              return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
@@ -373,11 +376,144 @@ public final class CollectionEditorQAScenario implements UIScenario {
                  ctx.screen() instanceof CollectionScreen)
           .teardown("restore pointer viewport", ctx -> {
               ctx.mc().setScreen(null);
-              try { Files.deleteIfExists(ctx.get("c3ImportFile")); }
+              try {
+                  Files.deleteIfExists(ctx.get("c3ImportFile"));
+                  Path directory = ctx.get("c4Directory");
+                  if (directory != null) {
+                      try (var files = Files.list(directory)) {
+                          for (Path file : files.toList()) Files.delete(file);
+                      }
+                      Files.delete(directory);
+                  }
+              }
               catch (IOException error) { throw new UncheckedIOException(error); }
               GLFW.glfwSetWindowSize(ctx.mc().getWindow().getWindow(),
                       ctx.get("originalWidth"), ctx.get("originalHeight"));
           });
+    }
+
+    private static void exportSteps(ScenarioBuilder s) {
+        s.step("invalid current deck name", ctx -> {
+            ctx.put("c4OriginalName", lists(ctx).name());
+            lists(ctx).rename(" ");
+        });
+        leftPress(s, "reject invalid name export", "#list-export");
+        s.check("invalid deck name stays local without opening export", ctx -> !ctx.el("#export-dialog").isVisible()
+                && ctx.el("#editor-status").text().contains("valid deck name"))
+         .step("restore valid current name", ctx -> lists(ctx).rename(ctx.get("c4OriginalName")));
+        leftPress(s, "open export filename", "#list-export");
+        s.check("Export opens a filename dialog", ctx -> ctx.exists("#export-dialog")
+                && ctx.el("#export-dialog").isVisible())
+         .check("export buttons retain the existing dialog hit size", ctx -> ctx.el("#export-submit").bounds().height()
+                 >= ctx.el("#list-export").bounds().height())
+         .step("isolate exports and capture unsaved draft", ctx -> {
+             try {
+                 Path directory = Files.createTempDirectory("duelcraft-c4-export-");
+                 ctx.put("c4Directory", directory);
+                 ctx.setField(ctx.getField(ctx.screen(), "controller"), "exports", new DeckExportService(directory));
+             } catch (IOException error) { throw new UncheckedIOException(error); }
+             ctx.put("c4Snapshot", lists(ctx).snapshot());
+             ctx.put("c4Counts", model(ctx).owned());
+             ctx.put("c4Revision", lists(ctx).revision());
+             ctx.put("c4Commands", ctx.<ArrayList<CollectionCommand>>get("c3Commands").size());
+         })
+         .check("suggestion uses current unsaved name", ctx -> ctx.el("#export-filename").as(TextField.class)
+                 .getText().equals(lists(ctx).name() + ".ydk"))
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2).keyUp(GLFW.GLFW_KEY_ESCAPE)
+         .check("Escape cancels only filename dialog", ctx -> !ctx.el("#export-dialog").isVisible()
+                 && ctx.el("#lists-dialog").isVisible() && lists(ctx).dirty());
+        leftPress(s, "reopen local export", "#list-export");
+        s.step("submit traversal filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("../escape.ydk", true));
+        leftPress(s, "reject traversal export", "#export-submit");
+        s.waitUntil("filename error reaches client", ctx -> ctx.el("#export-error").text().contains("filename"))
+         .checkVisible("#export-dialog")
+         .step("choose new filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("Unsaved draft.ydk", true))
+         .hoverAt(-100, -100).screenshot("collection-export-filename");
+        leftPress(s, "write new local export", "#export-submit");
+        s.waitUntil("new export feedback names output", ctx -> ctx.el("#editor-status").text().contains("Exported Unsaved draft.ydk"))
+         .check("exported unsaved draft round trips every section", ctx -> {
+             try {
+                 return ctx.<SavedDeck>get("c4Snapshot").cards().equals(DeckListLoader.loadFromFile(
+                         ctx.<Path>get("c4Directory").resolve("Unsaved draft.ydk")));
+             } catch (IOException error) { throw new UncheckedIOException(error); }
+         });
+        leftPress(s, "open collision export", "#list-export");
+        s.step("choose existing filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("Unsaved draft.ydk", true));
+        leftPress(s, "request collision export", "#export-submit");
+        s.waitUntil("collision asks for confirmation", ctx -> ctx.el("#export-overwrite-dialog").isVisible())
+         .checkTextContains("#export-overwrite-copy", "Unsaved draft.ydk")
+         .check("overwrite buttons retain existing dialog hit size", ctx -> ctx.el("#export-overwrite-confirm").bounds().height()
+                 >= ctx.el("#list-export").bounds().height())
+         .hoverAt(-100, -100).screenshot("collection-export-overwrite")
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2).keyUp(GLFW.GLFW_KEY_ESCAPE)
+         .check("Escape dismisses only overwrite decision", ctx -> !ctx.el("#export-overwrite-dialog").isVisible()
+                 && ctx.el("#export-dialog").isVisible());
+        leftPress(s, "cancel filename locally", "#export-cancel");
+        s.check("collision cancellation preserves exported bytes", ctx -> {
+            try { return ctx.<SavedDeck>get("c4Snapshot").cards().equals(DeckListLoader.loadFromFile(
+                    ctx.<Path>get("c4Directory").resolve("Unsaved draft.ydk"))); }
+            catch (IOException error) { throw new UncheckedIOException(error); }
+        }).step("prepare different collision content", ctx -> {
+            try { Files.writeString(ctx.<Path>get("c4Directory").resolve("Unsaved draft.ydk"), "original collision bytes"); }
+            catch (IOException error) { throw new UncheckedIOException(error); }
+        });
+        leftPress(s, "open confirmed replacement", "#list-export");
+        s.step("choose replacement filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("Unsaved draft.ydk", true));
+        leftPress(s, "request overwrite decision", "#export-submit");
+        s.waitUntil("replacement decision is visible", ctx -> ctx.el("#export-overwrite-dialog").isVisible())
+         .step("changed filename invalidates confirmation", ctx -> ctx.el("#export-filename").as(TextField.class)
+                 .setText("Different.ydk", true))
+         .checkHidden("#export-overwrite-dialog")
+         .step("choose original collision again", ctx -> ctx.el("#export-filename").as(TextField.class)
+                 .setText("Unsaved draft.ydk", true));
+        leftPress(s, "request fresh filename decision", "#export-submit");
+        s.waitUntil("fresh filename decision is visible", ctx -> ctx.el("#export-overwrite-dialog").isVisible())
+         .step("change draft after collision", ctx -> lists(ctx).rename("Changed during confirmation"));
+        leftPress(s, "reject stale snapshot confirmation", "#export-overwrite-confirm");
+        s.check("changed snapshot restarts filename decision", ctx -> !ctx.el("#export-overwrite-dialog").isVisible()
+                 && ctx.el("#export-dialog").isVisible()
+                 && ctx.el("#export-filename").as(TextField.class).getText().equals("Changed during confirmation.ydk"))
+         .step("restore current draft name", ctx -> lists(ctx).rename(ctx.<SavedDeck>get("c4Snapshot").name()));
+        leftPress(s, "cancel changed draft decision", "#export-cancel");
+        leftPress(s, "restart original draft export", "#list-export");
+        s.step("choose final replacement filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("Unsaved draft.ydk", true));
+        leftPress(s, "request final overwrite decision", "#export-submit");
+        s.waitUntil("final replacement decision is visible", ctx -> ctx.el("#export-overwrite-dialog").isVisible())
+         .check("changed decisions never replaced old bytes", ctx -> {
+             try { return Files.readString(ctx.<Path>get("c4Directory").resolve("Unsaved draft.ydk")).equals("original collision bytes"); }
+             catch (IOException error) { throw new UncheckedIOException(error); }
+         });
+        leftPress(s, "confirm replacement", "#export-overwrite-confirm");
+        s.waitUntil("replacement feedback is visible", ctx -> !ctx.el("#export-dialog").isVisible())
+         .checkTextContains("#editor-status", "Exported Unsaved draft.ydk")
+         .check("confirmed replacement imports all captured sections", ctx -> {
+             try { return ctx.<SavedDeck>get("c4Snapshot").cards().equals(new com.haxerus.duelcraft.client.collection.DeckImportService(
+                     com.haxerus.duelcraft.core.DeckRegistry.open(ctx.get("c4Directory"))).load("Unsaved draft").cards()); }
+             catch (IOException error) { throw new UncheckedIOException(error); }
+         })
+         .check("local export never mutates server state or acknowledges the draft", ctx ->
+                 lists(ctx).snapshot().equals(ctx.get("c4Snapshot")) && lists(ctx).dirty() && !lists(ctx).stored()
+                         && lists(ctx).activeId().equals(ACTIVE) && model(ctx).owned().equals(ctx.get("c4Counts"))
+                         && lists(ctx).revision() == ctx.<Long>get("c4Revision")
+                         && ctx.<ArrayList<CollectionCommand>>get("c3Commands").size() == ctx.<Integer>get("c4Commands"))
+         .hoverAt(-100, -100).screenshot("collection-export-complete")
+         .step("hold export callback for disposal", ctx -> {
+             var callbacks = ctx.put("c4Callbacks", new java.util.concurrent.ConcurrentLinkedQueue<Runnable>());
+             ctx.setField(ctx.getField(ctx.screen(), "controller"), "client", (java.util.concurrent.Executor) callbacks::add);
+             ctx.put("c4Status", ctx.el("#editor-status").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement.class));
+             ctx.put("c4StatusBefore", ctx.el("#editor-status").text());
+         });
+        leftPress(s, "open late callback export", "#list-export");
+        s.step("choose late callback filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("Disposed.ydk", true));
+        leftPress(s, "write before disposal callback", "#export-submit");
+        s.waitUntil("completion awaits client dispatch", ctx -> !ctx.<java.util.concurrent.ConcurrentLinkedQueue<Runnable>>get("c4Callbacks").isEmpty())
+         .step("dispose before dispatching completion", ctx -> {
+             ctx.mc().setScreen(null);
+             ctx.<java.util.concurrent.ConcurrentLinkedQueue<Runnable>>get("c4Callbacks").remove().run();
+         })
+         .check("disposed completion cannot change feedback or reopen screen", ctx -> !(ctx.screen() instanceof CollectionScreen)
+                 && ctx.<com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement>get("c4Status").getText().getString()
+                         .equals(ctx.<String>get("c4StatusBefore")));
     }
 
     private static void leftPress(ScenarioBuilder s, String name, String selector) {
@@ -466,7 +602,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
             var screen = (CollectionScreen) method.invoke(null, model, CollectionFixture.cards(),
                     (java.util.function.IntFunction<net.minecraft.resources.ResourceLocation>) code -> null,
                     UUID.randomUUID(), null, CollectionFixture.query(), request, refresh,
-                    (java.util.concurrent.Executor) Runnable::run);
+                    (java.util.concurrent.Executor) ctx.mc()::execute);
             Object controller = ctx.getField(screen, "controller");
             ctx.<SavedDeckController>getField(controller, "lists").openInitial(view);
             return screen;

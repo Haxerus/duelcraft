@@ -416,6 +416,23 @@ class SavedDeckControllerTest {
             command -> { commands.add(command); var reply = new CompletableFuture<CollectionReply>(); replies.add(reply); return reply; },
             () -> CompletableFuture.completedFuture(new ClientCollectionState.View(0, Map.of(), List.of(), null)), Runnable::run, () -> {});
 
+    @Test void snapshotCapturesUnsavedIdentityAndCardsWithoutAcknowledgingOrRequestingAnything() {
+        controller.newDraft();
+        controller.rename("Export me");
+        model.add(DeckEditorModel.Section.MAIN, 7);
+        var snapshot = controller.snapshot();
+        assertEquals(new SavedDeck(controller.id(), "Export me", new DeckList(List.of(7), List.of(), List.of())), snapshot);
+        assertTrue(controller.dirty());
+        assertFalse(controller.stored());
+        assertFalse(controller.pending());
+        assertTrue(commands.isEmpty());
+        controller.rename("Later");
+        model.add(DeckEditorModel.Section.SIDE, 8);
+        assertEquals("Export me", snapshot.name());
+        assertEquals(List.of(), snapshot.cards().side());
+        assertThrows(UnsupportedOperationException.class, () -> snapshot.cards().main().add(9));
+    }
+
     @Test void nameOnlyEditsAreDirtyAndSaveAcknowledgementDefersNavigation() {
         controller.rename("Renamed");
         assertTrue(controller.dirty());

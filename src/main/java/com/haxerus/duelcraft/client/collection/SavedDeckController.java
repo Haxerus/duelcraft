@@ -52,6 +52,7 @@ public final class SavedDeckController {
 
     public UUID id() { return id; }
     public String name() { return name; }
+    public SavedDeck snapshot() { return new SavedDeck(id, name, model.draft()); }
     public long revision() { return revision; }
     public UUID activeId() { return activeId; }
     public boolean ownershipRequired() { return ownershipRequired; }

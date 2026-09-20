@@ -10,7 +10,8 @@
         #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #list-new, #list-duplicate, #list-export,
         #list-delete, #list-import, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
-        #delete-cancel, #close-save, #close-discard, #close-cancel, #close-editor, #alternate-formats {
+        #delete-cancel, #export-submit, #export-cancel, #export-overwrite-confirm, #export-overwrite-cancel,
+        #close-save, #close-discard, #close-cancel, #close-editor, #alternate-formats {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
         button text { font-size: 12; text-color: #ffffff; }
@@ -32,13 +33,14 @@
         #saved-lists, #save-deck { width: 108; height: 36; }
         #activate-deck { width: 124; height: 36; }
         #close-editor { width: 82; height: 36; }
-        #lists-dialog, #delete-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
-        #delete-dialog { z-index: 110; }
+        #lists-dialog, #delete-dialog, #export-dialog, #export-overwrite-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
+        #delete-dialog, #export-dialog { z-index: 110; }
+        #export-overwrite-dialog { z-index: 120; }
         #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #lists-panel .row button { flex: 1; min-width: 0; }
         #list-picker, #list-import-picker { width: 100%; }
-        #delete-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
-        #delete-panel button { flex: 1; }
+        #delete-panel, #export-panel, #export-overwrite-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #delete-panel button, #export-panel button, #export-overwrite-panel button { flex: 1; }
         #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
         #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: built-in(ui-gdp:RECT); }
         #inspector-empty { flex: 1; min-height: 0; align-items: center; justify-content: center; gap-all: 16; }
@@ -285,6 +287,28 @@
                     <element class="row">
                         <button id="delete-confirm" text="duelcraft.collection.delete" />
                         <button id="delete-cancel" text="duelcraft.collection.cancel" />
+                    </element>
+                </element>
+            </element>
+            <element id="export-dialog">
+                <element id="export-panel">
+                    <label id="export-title" class="heading" />
+                    <label id="export-copy" class="wrap" />
+                    <text-field id="export-filename" />
+                    <label id="export-error" class="wrap warning" />
+                    <element class="row">
+                        <button id="export-submit" text="duelcraft.collection.export" />
+                        <button id="export-cancel" text="duelcraft.collection.cancel" />
+                    </element>
+                </element>
+            </element>
+            <element id="export-overwrite-dialog">
+                <element id="export-overwrite-panel">
+                    <label id="export-overwrite-title" class="heading" />
+                    <label id="export-overwrite-copy" class="wrap" />
+                    <element class="row">
+                        <button id="export-overwrite-confirm" text="duelcraft.collection.export_replace" />
+                        <button id="export-overwrite-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>

@@ -5,6 +5,7 @@ import com.haxerus.duelcraft.client.carddata.CardStringHelper;
 import com.haxerus.duelcraft.collection.CollectionCommand;
 import com.haxerus.duelcraft.collection.CollectionReply;
 import com.haxerus.duelcraft.collection.DeckEligibility;
+import com.haxerus.duelcraft.collection.SavedDeck;
 import com.haxerus.duelcraft.core.DeckLoader;
 import com.haxerus.duelcraft.core.DeckRegistry;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
@@ -23,6 +24,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -31,6 +33,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -49,6 +53,12 @@ final class CollectionController {
     private final IntFunction<ResourceLocation> art;
     private final SavedDeckController lists;
     private final DeckImportService imports;
+    private final DeckExportService exports;
+    private final Executor client;
+    private SavedDeck exportSnapshot;
+    private String exportFileName;
+    private long exportToken;
+    private boolean exporting;
     private final CardTransferController transfers;
     private int carried = -1;
     private DeckEligibility.Report displayedEligibility;
@@ -91,9 +101,11 @@ final class CollectionController {
         this.textures = textures;
         this.art = art;
         this.search = search;
+        this.client = client;
         lists = new SavedDeckController(model, id, "New list", saveDraft, request, refresh, client, this::lifecycleChanged);
         imports = new DeckImportService(DeckRegistry.open(Minecraft.getInstance().gameDirectory.toPath()
                 .resolve("duelcraft/decks")));
+        exports = new DeckExportService(Minecraft.getInstance().gameDirectory.toPath().resolve("duelcraft/decks"));
         transfers = new CardTransferController(lists);
         this.close = close;
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
@@ -229,8 +241,20 @@ final class CollectionController {
                 }
             });
         });
-        button("list-export").setOnClick(event -> ((TextElement) element("editor-status")).setText(
-                Component.translatable("duelcraft.collection.export_coming_soon")));
+        button("list-export").setOnClick(event -> beginExport());
+        button("export-submit").setOnClick(event -> export(false));
+        button("export-cancel").setOnClick(event -> cancelExport());
+        button("export-overwrite-confirm").setOnClick(event -> export(true));
+        button("export-overwrite-cancel").setOnClick(event -> element("export-overwrite-dialog").setDisplay(false));
+        ((TextField) element("export-filename")).setTextResponder(value -> {
+            exportFileName = null;
+            element("export-overwrite-dialog").setDisplay(false);
+            text("export-error", "");
+        });
+        for (String id : List.of("export-title", "export-copy", "export-overwrite-title"))
+            ((TextElement) element(id)).setText(Component.translatable("duelcraft.collection." + id.replace('-', '_')));
+        element("export-dialog").setDisplay(false);
+        element("export-overwrite-dialog").setDisplay(false);
         button("list-delete").setOnClick(event -> {
             UUID selected = ((Selector<UUID>) element("list-picker")).getValue();
             deleteTarget = selected == null ? lists.id() : selected;
@@ -257,6 +281,76 @@ final class CollectionController {
         button("list-refresh").setOnClick(event -> lists.refresh());
         element("lists-dialog").setDisplay(false);
         element("delete-dialog").setDisplay(false);
+    }
+
+    private void beginExport() {
+        if (!SavedDeck.validName(lists.name())) {
+            ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.export_name_error"));
+            return;
+        }
+        exportSnapshot = lists.snapshot();
+        exportFileName = null;
+        ((TextField) element("export-filename")).setText(DeckExportService.suggestFileName(exportSnapshot.name()), false);
+        text("export-error", "");
+        element("export-overwrite-dialog").setDisplay(false);
+        element("export-dialog").setDisplay(true);
+    }
+
+    private void cancelExport() {
+        exportToken++;
+        exportSnapshot = null;
+        exportFileName = null;
+        exporting = false;
+        element("export-dialog").setDisplay(false);
+        element("export-overwrite-dialog").setDisplay(false);
+        element("export-submit").setActive(true);
+        element("export-overwrite-confirm").setActive(true);
+        element("export-filename").setActive(true);
+    }
+
+    private void export(boolean replace) {
+        if (exporting || exportSnapshot == null) return;
+        if (!SavedDeck.validName(lists.name()) || !exportSnapshot.equals(lists.snapshot())) {
+            cancelExport();
+            beginExport();
+            return;
+        }
+        String fileName = ((TextField) element("export-filename")).getText();
+        boolean confirmed = replace && fileName.equals(exportFileName);
+        SavedDeck snapshot = exportSnapshot;
+        long token = ++exportToken;
+        exporting = true;
+        element("export-submit").setActive(false);
+        element("export-overwrite-confirm").setActive(false);
+        element("export-filename").setActive(false);
+        text("export-error", "");
+        CompletableFuture.supplyAsync(() -> {
+            try { return exports.export(fileName, snapshot.cards(), confirmed); }
+            catch (IOException error) { throw new CompletionException(error); }
+        }).whenCompleteAsync((path, error) -> {
+            if (disposed || token != exportToken) return;
+            exporting = false;
+            element("export-submit").setActive(true);
+            element("export-overwrite-confirm").setActive(true);
+            element("export-filename").setActive(true);
+            if (error == null) {
+                cancelExport();
+                ((TextElement) element("editor-status")).setText(
+                        Component.translatable("duelcraft.collection.export_done", path.getFileName().toString()));
+                return;
+            }
+            Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+            if (cause instanceof FileAlreadyExistsException) {
+                exportFileName = fileName;
+                ((TextElement) element("export-overwrite-copy")).setText(
+                        Component.translatable("duelcraft.collection.export_overwrite_copy", fileName));
+                element("export-overwrite-dialog").setDisplay(true);
+            } else {
+                element("export-overwrite-dialog").setDisplay(false);
+                ((TextElement) element("export-error")).setText(
+                        Component.translatable("duelcraft.collection.export_failed", cause.getMessage()));
+            }
+        }, client);
     }
 
     private void refreshImportPicker(Selector<String> picker) {
@@ -700,6 +794,14 @@ final class CollectionController {
 
     @SuppressWarnings("unchecked")
     public boolean dismissTopLayer() {
+        if (element("export-overwrite-dialog").isDisplayed()) {
+            element("export-overwrite-dialog").setDisplay(false);
+            return true;
+        }
+        if (element("export-dialog").isDisplayed()) {
+            cancelExport();
+            return true;
+        }
         var selectors = List.<Selector<?>>of(
                 (Selector<Object>) element("collection-ownership"),
                 (Selector<Object>) element("card-sort"),

@@ -41,7 +41,7 @@ public record SavedDeck(UUID id, String name, DeckList cards) {
         }
     }
 
-    private static boolean validName(String name) {
+    public static boolean validName(String name) {
         return name != null && !name.isBlank() && name.length() <= CollectionLimits.NAME_LENGTH
                 && name.codePoints().noneMatch(code -> Character.isISOControl(code)
                         || Character.getType(code) == Character.FORMAT
