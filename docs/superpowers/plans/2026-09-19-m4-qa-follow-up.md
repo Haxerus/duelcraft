@@ -49,7 +49,7 @@ Java paths in this table are relative to `src/main/java/com/haxerus/duelcraft/`;
 
 - [x] A1: source-backed hidden/public identity handling, with red/green regressions and engine trace.
 - [x] B1: invitation/notification cardinality, including tie rounds and dedicated evidence.
-- [x] A2: reveal/selection integration, original candidate indices and read-only reveal presentation.
+- [x] A2: reveal/selection integration, original candidate indices and read-only reveal presentation. Final-review R1 corrected in `e2da8c0`: field-only authorized identities use prompt dialogs; scoped independent rereview pending.
 - [x] A3: independent left details and right stacked zone/log panels.
 - [x] A4: face-down banish badges and read-only Materials action.
 - [x] C1: aggregate copy cap and pointer gestures.
@@ -59,6 +59,10 @@ Java paths in this table are relative to `src/main/java/com/haxerus/duelcraft/`;
 - [ ] I1: full regression, packaged QA.2 and documentation below. Automated layers and package are verified; actual two-client packaged duel remains blocked by three native GLFW crashes in A. Independent gate remains pending.
 
 A1/B1 are the correctness priority. Do not close either using screenshots alone. Update both this index and each task's detailed checkboxes as evidence arrives.
+
+## Final review correction
+
+R1 is corrected in clean build source `e2da8c05071a8fcdbf5396c49177a592c28da3f5`. Fresh scoped checks passed: 300 unit tests, eight UI scenarios/2,004 checks, both-policy native visibility/2,366 checks (all six child exits 0), full build 1,097 passed/one expected skip. The replacement QA.2 ZIP SHA256 is `C9493341445CC14A968C76356C53CCF3BED3FAACD45C15A0A9AB2FCBE47F85CE`; prior ZIP/staging/evidence are preserved. New server/B startup and native-module checks passed and both exited normally. The user stopped Computer Use, so the new editor GUI was not rerun; no further A launch or packaged two-client duel occurred. I1 and its packaged duel checkbox remain open. See the verification report's final-review section and local `final-fix/` evidence. Two Minor observations remain deferred; scoped rereview is next, without merge/push/M5 work.
 
 ## Task I1: Verify and package the combined checkpoint
 

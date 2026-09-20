@@ -1,6 +1,27 @@
 # M4 QA follow-up verification
 
-**QA.2 is built and the automated regression layers pass, but I1 is not fully accepted. Packaged two-client duel acceptance remains open:** client A crashed in native GLFW on three bounded launches before mod UI input. Packaged server startup, native extraction and client B's collection/export/reimport/save checks passed. The final package, exact build source and preserved failure evidence are recorded below.
+**Corrected QA.2 is built from `e2da8c05071a8fcdbf5396c49177a592c28da3f5`; I1 and packaged two-client duel acceptance remain open.** Final review R1 is corrected and the affected automated checks pass. New-package server/B startup and native-module checks passed; its editor GUI was not rerun because the user stopped Computer Use. Earlier B collection/export/reimport/save evidence belongs to the preserved original package. Client A's three historical native GLFW crashes remain unresolved; no further A launch was made.
+
+## Final review R1 correction (2026-09-20)
+
+The one Important/P2 finding was a consumed reveal whose identity remained invisible in a field-only selection. Card, Unselect, Sum and Tribute now use their existing candidate dialogs when the ordinary field cannot draw an authorized identity. Coordinate resolution, candidate order, response indices, weights and read-only acknowledgement behavior are unchanged. Unknown candidates remain anonymous and ordinary field privacy is unchanged. The two Minor observations (layout warnings and transient import reflow) remain deferred.
+
+Fresh evidence is isolated under `build/evidence/qa-m4-follow-up/final-fix/`. Scoped tests ran with the source diff atop `da47c62`; the full build and package used clean commit `e2da8c0`. Each run preserves exact arguments, source, dirty state and exit in its JSON/log archive.
+
+| Fresh verification | Result |
+|---|---|
+| New field-reveal scenario before production change | RED: 76/100 checks; 24 expected assertions across four modes and both batched/separate refreshes; no scenario error |
+| Eight affected real UI scenarios | 8/8 scenarios, 2,004/2,004 checks; new field regression 124 checks; exit 0 |
+| Seven focused state/response/gate/sanitizer suites | 300 tests; no failures/errors/skips; exit 0 |
+| Dedicated actual native visibility, default and required ownership | Each 1,183/1,183 checks; all six child exits and both coordinator exits 0 |
+| Full build from clean source | 67 suites, 1,098 cases: 1,097 passed, one expected Windows symlink skip; zero failures/errors; exit 0 |
+| Corrected production package on isolated loopback server/B | Startup/join and loaded server core/JNI/SQLite plus B SQLite hashes passed; normal exits 0 |
+
+The sandbox wrapper-lock denial was not behavioral RED. An initial fixture assumed Waiting cleared a pending prompt; explicit fixture reset produced the clean RED above. The first post-fix run was 122/124: only the Unselect fixture expected four bytes instead of the established count/index pair `0100000001000000`. Correcting that literal yielded the final covering UI run without another production change. All four new mode screenshots were inspected. The focused log retains 74 dirty-layout warnings and zero `/ERROR` entries. SERVER config bytes and temporary GRADLE_OPTS were restored. Dedicated runs used the scoped problems-report workaround and `--no-configuration-cache`; native/data traces and child exits are archived. Their effective DB hash was `E7D62831EA192B0A5E696D605DC2416D2E61AC362F263C935A01DD69013EDB0A`, distinct from earlier task data packs.
+
+The replacement canonical ZIP is `build/distributions/duelcraft-m4-qa.2-windows-x64.zip` (24,245,065 bytes), SHA256 **`C9493341445CC14A968C76356C53CCF3BED3FAACD45C15A0A9AB2FCBE47F85CE`**. Its mod JAR hash is `C908AB9FF7270457975F0D40AA0FD62DEF28855607F282F2EEB2833A455EABCE`. Manifest, native binaries, SQLite, dependency metadata and sidecar passed inspection. Updated guide/README bytes match exactly, SHA256 `C4E134E466856432A1E070F4651C4AD5FB4A94132303A1BBE061905797FAC9B9`. Original ZIP, sidecar, staging and I1 identity remain under `build/distributions/preserved-qa2-7985fca-a110ca7d/` with their original hashes. Version, protocol 7 and dependencies are unchanged.
+
+Fresh runtime roots are `run-packaged-qa2/final-fix/server` and `clientB`, port 25567. Server PID 39992 and B PID 34760 booted the new hashes; B joined. After the user stopped Computer Use, no GUI input was sent. Loaded modules matched packaged bytes under separate instance roots. B received a normal process CloseMainWindow request and exited 0 at 11:35:08 UTC-04:00; console stop saved the server world and exited 0 at 11:35:09. No owned process remains. No editor/export GUI pass is claimed for these new bytes, no authenticated-account test was performed, and the packaged two-client duel stays open. Scoped independent rereview follows; no merge, push or M5 work was performed.
 
 ## B1 preparation notifications
 
