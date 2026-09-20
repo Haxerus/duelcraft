@@ -81,8 +81,8 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
 
 **Interfaces:** Add `public void openInitial(ClientCollectionState.View view)` and `public boolean needsDiscardConfirmation()` to `SavedDeckController`. Add `public boolean dismissTopLayer()` to `CollectionController` (true only when one child layer was dismissed). Keep `requestClose()` as the common top-level navigation path. `CollectionScreen.keyPressed(int,int,int)` consumes Escape explicitly.
 
-- [ ] Add tests to `SavedDeckControllerTest`: initial active saved ID loads once with its exact contents; null active ID starts empty; missing/deleted/failed active read reports failure without selecting some other list; delayed read cannot overwrite edits, another selection, a newer view, or disposal. Resume refresh preserves a dirty suspended draft. Use the existing request futures/read-token fixture and assert request identity and resulting UUID/cards, not just captions.
-- [ ] Add a separate discard-decision test so an empty unsaved draft stays savable:
+- [x] Add tests to `SavedDeckControllerTest`: initial active saved ID loads once with its exact contents; null active ID starts empty; missing/deleted/failed active read reports failure without selecting some other list; delayed read cannot overwrite edits, another selection, a newer view, or disposal. Resume refresh preserves a dirty suspended draft. Use the existing request futures/read-token fixture and assert request identity and resulting UUID/cards, not just captions.
+- [x] Add a separate discard-decision test so an empty unsaved draft stays savable:
 
   ```java
   @Test void emptyUnsavedDraftNeedsNoDiscardDecision() {
@@ -99,8 +99,8 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
   ```
 
   Also assert that an acknowledged saved list emptied or renamed remains subject to the normal dirty decision, and a pending save defers navigation until its actual success. Failure keeps the draft and editor. Existing stale-callback/disconnect tests remain required.
-- [ ] Run `./gradlew.bat test --tests '*SavedDeckControllerTest'`; confirm behavioral failures before the lifecycle changes.
-- [ ] Implement `openInitial` as a one-shot startup operation: create the blank draft, apply the initial view, and read its active ID using the existing `select` guards if nonnull. For the no-initial-view startup path, perform one refresh and feed that result through this method. Do not put auto-selection in ordinary `applyView` or `resume`. Preserve catalog-loading independence. Implement the decision predicate independently of `dirty()`:
+- [x] Run `./gradlew.bat test --tests '*SavedDeckControllerTest'`; confirm behavioral failures before the lifecycle changes.
+- [x] Implement `openInitial` as a one-shot startup operation: create the blank draft, apply the initial view, and read its active ID using the existing `select` guards if nonnull. For the no-initial-view startup path, perform one refresh and feed that result through this method. Do not put auto-selection in ordinary `applyView` or `resume`. Preserve catalog-loading independence. Implement the decision predicate independently of `dirty()`:
 
   ```java
   if (!stored && model.draft().main().isEmpty()
@@ -111,8 +111,8 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
   ```
 
   Use it only for navigation/discard decisions. Keep pending-save gating before this decision and retain existing save acknowledgement snapshots/revisions.
-- [ ] Add a visible Close control in the collection header and visible dismissal controls on child dialogs. Implement `dismissTopLayer` against actual owned controls in visual stacking order: an open selector/dropdown first; then the topmost confirmation/export/delete dialog; then My decks/eligibility/filter subview. Dismissing the unsaved-changes dialog means Keep editing and cancels the queued navigation. Dismissing an overwrite dialog cancels only export. Do not discard the draft on child dismissal.
-- [ ] Override Escape handling so Minecraft's default screen-close branch cannot run for the same event after a child closes:
+- [x] Add a visible Close control in the collection header and visible dismissal controls on child dialogs. Implement `dismissTopLayer` against actual owned controls in visual stacking order: an open selector/dropdown first; then the topmost confirmation/export/delete dialog; then My decks/eligibility/filter subview. Dismissing the unsaved-changes dialog means Keep editing and cancels the queued navigation. Dismissing an overwrite dialog cancels only export. Do not discard the draft on child dismissal.
+- [x] Override Escape handling so Minecraft's default screen-close branch cannot run for the same event after a child closes:
 
   ```java
   @Override public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -125,7 +125,7 @@ Read existing `DeckImportService`, `DeckListLoader`, `SavedDeckControllerTest`, 
   ```
 
   Verify actual LDLib2 selector-dialog ownership/visibility; closing a dropdown must not leave its input capture or focus behind. Use existing dialog close APIs, not just hiding the wrong parent. Main Close and top-level Escape share `requestClose` and server-pending safety. Do not cancel an in-flight server save when merely cancelling deferred navigation.
-- [ ] Extend `collection_editor_qa` with nested dropdown→My decks→editor Escape presses, delete/cancel, dirty/empty/saved-empty cases and delayed save success/failure. Use actual key events and press/release input. Rerun focused unit tests, `./gradlew.bat runClient -PldTest=collection_editor_qa`, and `./gradlew.bat runClient -PldTest=collection_preparation_retention`. Expected: one layer per Escape, active list only on fresh opening and retained dirty draft after suspension. Commit `fix: open active decks and close editor layers predictably`.
+- [x] Extend `collection_editor_qa` with nested dropdown→My decks→editor Escape presses, delete/cancel, dirty/empty/saved-empty cases and delayed save success/failure. Use actual key events and press/release input. Rerun focused unit tests, `./gradlew.bat runClient -PldTest=collection_editor_qa`, and `./gradlew.bat runClient -PldTest=collection_preparation_retention`. Expected: one layer per Escape, active list only on fresh opening and retained dirty draft after suspension. Commit `fix: open active decks and close editor layers predictably`.
 
 ## Task C3: Simplify My decks and make Save the explicit persistence action
 
