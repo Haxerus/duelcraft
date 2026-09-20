@@ -4,6 +4,12 @@ Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is imple
 
 QA follow-up: `codex/qa-m4` packages the reviewed checkpoint for Windows x64 friend testing, with the existing collection command enabled in packaged clients. Main `bc2fcba` was already included; `codex/player-collections` remains at `45b7460`. See the [QA installation and test guide](../../qa-m4.md). This is separate from M5 implementation.
 
+## M4 QA.2 integration (2026-09-20)
+
+The approved A/B/C follow-up fixes are integrated on `codex/qa-m4`. QA.2 retains protocol 7 and the pinned dependencies. The [QA.2 friend guide](../../qa-m4-qa2.md) describes the command entry points, collection save/export behavior and manual checks; the [combined verification report](../reports/2026-09-19-m4-qa-follow-up-verification.md) distinguishes unit/native, synthetic UI, dedicated transport, fresh lifecycle and packaged acceptance. The QA.1 guide/artifact and historical worlds remain separate evidence. This does not implement M5 or complete M6.
+
+I1 verification is in progress: the unit/native suite passed 1,097 of 1,098 cases with one expected Windows symlink-privilege skip; the corrected full UI group passed 51 scenarios and 12,036 checks. Fresh lifecycle and dirty-editor disconnect checks passed. The report records initial fixture failures and their focused corrections; the ten required dedicated runs passed 2,712 checks with all 30 child exits 0. Package hashes and actual packaged acceptance will be added before delivery.
+
 ## Workspace and starting point
 
 - Implementation worktree: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor`

@@ -55,7 +55,7 @@ Java paths in this table are relative to `src/main/java/com/haxerus/duelcraft/`;
 - [x] C1: aggregate copy cap and pointer gestures.
 - [x] C2: initial active selection, empty draft dismissal and layered Escape/Close.
 - [x] C3: simplified My decks and explicit Save lifecycle.
-- [ ] C4: safe client-local YDK export. Implementation verified (90 passed / 1 platform skip; editor 115/115 checks); independent review pending. Evidence: `build/evidence/qa-m4-follow-up/c4/`.
+- [x] C4: safe client-local YDK export. Implementation verified (90 passed / 1 platform skip; editor 115/115 checks); independent review approved. Evidence: `build/evidence/qa-m4-follow-up/c4/`.
 - [ ] I1: full regression, packaged QA.2 and documentation below.
 
 A1/B1 are the correctness priority. Do not close either using screenshots alone. Update both this index and each task's detailed checkboxes as evidence arrives.
@@ -66,8 +66,8 @@ A1/B1 are the correctness priority. Do not close either using screenshots alone.
 
 **Interfaces:** Consumes the completed A/B/C contracts and scenario names from the linked plans. Produces version `1.0.0-m4-qa.2`, an exact source-commit reference, SHA-256 manifest, a Windows x64 ZIP containing both pinned mod JARs, and a report distinguishing each verification layer.
 
-- [ ] Review the combined diff and all task review findings. Ensure debug fixtures are DEV_ONLY, client classes do not load on a dedicated server, localization keys exist, and no raw hidden identities were added to public logs or packets. Resolve shared-file integration issues before full testing.
-- [ ] Run the complete unit/native suite and real UI group once after integration. Archive each report before the next runtime overwrites its output:
+- [x] Review the combined diff and all task review findings. Ensure debug fixtures are DEV_ONLY, client classes do not load on a dedicated server, localization keys exist, and no raw hidden identities were added to public logs or packets. Resolve shared-file integration issues before full testing.
+- [x] Run the complete unit/native suite and real UI group once after integration. Archive each report before the next runtime overwrites its output:
 
   ```powershell
   $env:GRADLE_USER_HOME = 'C:/Users/haxer/.gradle'
@@ -76,7 +76,7 @@ A1/B1 are the correctness priority. Do not close either using screenshots alone.
   ```
 
   Expected: all tests pass, zero unexpected skips, real Minecraft scenarios complete without clipping/overlap or privacy failures. Count actual tests and checks; do not reuse or predict the historical count. Preserve logs/screenshots under `build/evidence/qa-m4-follow-up/` with separate run directories and a source SHA. Include scales 2 and 3 and each existing rule-layout scenario. Do not erase old failures to make the report appear clean.
-- [ ] Run A's dedicated native visibility scenario and B's dedicated notification scenario under both policy modes using their child-plan commands. Then run the existing dedicated regressions separately, preserving each report before continuing. `collection_duel_policy_mp` must run alone because it deliberately disconnects clients:
+- [x] Run A's dedicated native visibility scenario and B's dedicated notification scenario under both policy modes using their child-plan commands. Then run the existing dedicated regressions separately, preserving each report before continuing. `collection_duel_policy_mp` must run alone because it deliberately disconnects clients:
 
   ```powershell
   ./gradlew.bat runMpTest -PldMpTest=duel_preparation_commands -PldMpOwnership=default
@@ -88,8 +88,8 @@ A1/B1 are the correctness priority. Do not close either using screenshots alone.
   ```
 
   Keep integrated, dedicated and synthetic outcomes separate.
-- [ ] Recheck fresh editor startup after leaving/rejoining, and after stopping/restarting the server JVM: active saved list loads under ownership off; missing ownership under ownership on clears activation but keeps the saved list and opens a blank draft. Confirm that valid required ownership preserves activation. Exercise suspended dirty editor restoration during invite acceptance/cancellation, and disconnect disposal. Use disposable worlds, preserving M2/M3/M4 restart evidence. Record each server/client PID and effective config path; changing a file without restarting is not a restart check.
-- [ ] Review protocol compatibility against baseline 7. Keep 7 for internal-only changes. If wire shapes changed, bump the current registrar version, test codec round trips and actual old-client rejection, and put the new number in the QA guide. Do not imply a version bump fixes privacy logic.
+- [x] Recheck fresh editor startup after leaving/rejoining, and after stopping/restarting the server JVM: active saved list loads under ownership off; missing ownership under ownership on clears activation but keeps the saved list and opens a blank draft. Confirm that valid required ownership preserves activation. Exercise suspended dirty editor restoration during invite acceptance/cancellation, and disconnect disposal. Use disposable worlds, preserving M2/M3/M4 restart evidence. Record each server/client PID and effective config path; changing a file without restarting is not a restart check.
+- [x] Review protocol compatibility against baseline 7. Keep 7 for internal-only changes. If wire shapes changed, bump the current registrar version, test codec round trips and actual old-client rejection, and put the new number in the QA guide. Do not imply a version bump fixes privacy logic.
 - [ ] Set `mod_version=1.0.0-m4-qa.2`, run `./gradlew.bat build`, inspect the JAR for native DLLs/SQLite and pinned dependency metadata, and record actual build results. Keep QA.1 artifacts intact. Stage only reviewed source/docs/version files and commit `build: prepare M4 QA follow-up checkpoint`; do not use a blanket `git add .`.
 - [ ] Assemble `build/distributions/duelcraft-m4-qa.2-windows-x64.zip` with `mods/duelcraft-1.0.0-m4-qa.2.jar`, `mods/ldlib2-neoforge-1.21.1-2.2.39.a-all.jar`, README, `BUILD-INFO.txt` and `SHA256SUMS.txt`. Obtain SHA-256 with `Get-FileHash -Algorithm SHA256`; identify the build's exact committed source and record whether its tree was clean. Use the README content from the new QA guide. Do not upload the ZIP or push the branch.
 - [ ] Boot the packaged JARs in separate Windows x64 client and dedicated-server test instances with Java 21/NeoForge 21.1.224. Test the QA collection entry point, one export/reimport and a two-client duel. Verify DLL loading without relying on the development native-library path. Existing native-only smoke evidence cannot substitute for this launch. If launcher access, a second account or runtime prerequisites block this, record the precise gap and leave packaged acceptance open.
