@@ -108,6 +108,10 @@ final class CollectionController {
         collection = new CollectionCardGrid(textures, code -> {
             selectedStoredSection = null;
             selectCard(code);
+        }, code -> {
+            selectedStoredSection = null;
+            selectCard(code);
+            edit(true);
         });
         collection.setId("collection-results");
         element("collection-results-host").addChild(collection);
@@ -424,7 +428,7 @@ final class CollectionController {
     private void refreshInspector(boolean changedCard) {
         refreshTransfers();
         var card = byCode.get(selectedCode);
-        button("add-card").setActive(!lists.pending() && card != null);
+        button("add-card").setActive(!lists.pending() && card != null && model.canAdd(selectedCode));
         button("remove-card").setActive(!lists.pending() && canRemoveSelected());
         boolean selected = selectedCode != 0;
         element("inspector-empty").setDisplay(!selected);
@@ -476,8 +480,16 @@ final class CollectionController {
         var card = byCode.get(selectedCode);
         if (add) {
             if (card == null) return;
-            if (editMode == EditMode.DECK) model.addToDeck(card.type(), selectedCode);
-            else model.add(DeckEditorModel.Section.SIDE, selectedCode);
+            boolean added = editMode == EditMode.DECK
+                    ? model.addToDeck(card.type(), selectedCode)
+                    : model.add(DeckEditorModel.Section.SIDE, selectedCode);
+            if (!added) {
+                ((TextElement) element("editor-status")).setText(
+                        Component.translatable("duelcraft.collection.copy_limit"));
+                refreshInspector(false);
+                refreshSelection();
+                return;
+            }
         } else if (editMode == EditMode.SIDE) {
             if (!model.remove(DeckEditorModel.Section.SIDE, selectedCode)) return;
         } else if (!model.removeFromDeck(card == null ? 0 : card.type(), selectedCode, selectedStoredSection)) {
@@ -526,6 +538,7 @@ final class CollectionController {
 
     private void refreshDecks() {
         var seen = new HashMap<Integer, Integer>();
+        var renderedDraft = model.draft();
         for (var section : DeckEditorModel.Section.values()) {
             String id = section.name().toLowerCase(Locale.ROOT);
             var grid = (ScrollerView) element(id + "-grid");
@@ -544,6 +557,21 @@ final class CollectionController {
                 });
                 tile.setId(id + "-card-" + index);
                 tile.addClass("deck-card");
+                int renderedIndex = index;
+                tile.addEventListener(UIEvents.MOUSE_DOWN, event -> {
+                    if (event.button != 1) return;
+                    event.stopPropagation();
+                    if (lists.pending() || model.draft() != renderedDraft
+                            || !model.removeAt(section, renderedIndex)) return;
+                    if (section == DeckEditorModel.Section.SIDE) sideOpen = true;
+                    refreshDecks();
+                    refreshPanes();
+                    refreshInspector(false);
+                    refreshResults(false);
+                    text("editor-status", "Removed one card from "
+                            + (section == DeckEditorModel.Section.SIDE ? "Side" : "Deck")
+                            + ". Draft only; ownership is unchanged.");
+                });
                 if (seen.merge(code, 1, Integer::sum) > model.owned().getOrDefault(code, 0L)) {
                     var missing = new Label().setText("Missing").addClass("missing-copy");
                     if (!lists.ownershipRequired()) missing.addClass("neutral");

@@ -3,7 +3,9 @@ package com.haxerus.duelcraft.client.uitest;
 import com.haxerus.duelcraft.client.collection.CollectionCardGrid;
 import com.haxerus.duelcraft.client.collection.CollectionScreen;
 import com.haxerus.duelcraft.client.collection.DeckEditorModel;
+import com.haxerus.duelcraft.client.collection.SavedDeckController;
 import com.haxerus.duelcraft.collection.DeckList;
+import com.haxerus.duelcraft.collection.SavedDeck;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
@@ -14,6 +16,8 @@ import com.lowdragmc.lowdraglib2.uitest.UIScenario;
 import org.lwjgl.glfw.GLFW;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +79,15 @@ public final class CollectionOverflowScenario implements UIScenario {
          .scroll("#main-grid", 1).ticks(2)
          .check("next wheel scroll is not undone by edit restoration", ctx -> pixels(ctx, "main-grid") < ctx.<Float>get("sameRowPixels"))
          .step("remember pixels before row growth", ctx -> ctx.put("beforeGrowth", pixels(ctx, "main-grid")))
-         .repeat(4, step -> step.click("#add-card")).ticks(3)
+         .step("bulk-load imported overflow row", ctx -> {
+             var model = ctx.<DeckEditorModel>get("model");
+             var main = new ArrayList<>(model.draft().main());
+             main.addAll(Collections.nCopies(4, 10060));
+             Object controller = ctx.getField(ctx.screen(), "controller");
+             SavedDeckController lists = ctx.getField(controller, "lists");
+             lists.importDraft(new SavedDeck(lists.id(), lists.name(),
+                     new DeckList(main, model.draft().extra(), model.draft().side())));
+         }).ticks(3)
          .check("adding a row preserves pixel offset", ctx -> Math.abs(pixels(ctx, "main-grid") - ctx.<Float>get("beforeGrowth")) < 1)
          .step("reach new last row", ctx -> ctx.el("#main-grid").as(ScrollerView.class)
                  .verticalScroller.setNormalizedValue(1, true)).ticks(2)

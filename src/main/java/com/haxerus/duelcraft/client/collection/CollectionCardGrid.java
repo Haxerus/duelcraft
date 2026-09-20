@@ -7,6 +7,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.VirtualItemHeightMode;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.VirtualScrollerView;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -22,10 +23,12 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
     private int selectedCode;
     private float mountedOffset = Float.NaN;
     private float mountedHeight = Float.NaN;
+    private final List<MountedPresentation> mountedPresentations = new ArrayList<>();
 
-    public CollectionCardGrid(IntFunction<ResourceLocation> textures, IntConsumer selectCard) {
+    public CollectionCardGrid(IntFunction<ResourceLocation> textures, IntConsumer selectCard, IntConsumer addCard) {
         virtualScrollerViewStyle(style -> style.itemHeightMode(VirtualItemHeightMode.FIXED)
                 .estimatedItemHeight(ROW_HEIGHT).overscanPixels(ROW_HEIGHT));
+        setBeforeMountItems(mountedPresentations::clear);
         setItemUIProvider(cards -> {
             var row = new UIElement().addClass("collection-row");
             for (var card : cards) {
@@ -33,10 +36,16 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
                 tile.refreshTexture();
                 tile.setId("collection-card-" + card.code());
                 tile.addClass("collection-card");
+                tile.addEventListener(UIEvents.DOUBLE_CLICK, event -> {
+                    if (event.button == 0) addCard.accept(card.code());
+                });
                 if (card.code() == selectedCode) tile.addClass("selected");
                 var cell = new UIElement().addClass("collection-cell");
-                cell.addChildren(tile, new Label().setText(Component.literal(caption.apply(card.code())))
-                        .addClass("collection-caption"));
+                var cardCaption = new Label();
+                cardCaption.setText(Component.literal(caption.apply(card.code())));
+                cardCaption.addClass("collection-caption");
+                mountedPresentations.add(new MountedPresentation(card.code(), tile, cardCaption));
+                cell.addChildren(tile, cardCaption);
                 row.addChild(cell);
             }
             return row;
@@ -54,8 +63,14 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
     void setPresentation(int selectedCode, IntFunction<String> caption) {
         this.selectedCode = selectedCode;
         this.caption = caption;
-        refreshVisibleItems();
+        for (var mounted : mountedPresentations) {
+            if (mounted.code == selectedCode) mounted.tile.addClass("selected");
+            else mounted.tile.removeClass("selected");
+            mounted.caption.setText(Component.literal(caption.apply(mounted.code)));
+        }
     }
+
+    private record MountedPresentation(int code, CardTile tile, Label caption) {}
 
     @Override
     protected void onVerticalScroll(float value) {

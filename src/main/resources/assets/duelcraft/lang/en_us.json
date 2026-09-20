@@ -16,6 +16,7 @@
   "item.duelcraft.card.passcode": "Passcode: %s",
   "duelcraft.collection.sort_deck": "Sort deck",
   "duelcraft.collection.sort_deck_help": "Normal Monsters → Effect Monsters → Spells → Traps. Sorts each section separately, preserving order within each type.",
+  "duelcraft.collection.copy_limit": "Three copies is the manual limit for this list.",
   "itemGroup.duelcraft": "Example Mod Tab",
   "block.duelcraft.example_block": "Example Block",
   "item.duelcraft.example_item": "Example Item",

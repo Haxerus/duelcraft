@@ -50,14 +50,78 @@ class DeckEditorModelTest {
     })
     void deckAddRoutesExtraDeckKindsToExtra(int type) {
         var model = new DeckEditorModel(empty(), Map.of());
-        model.addToDeck(type, 10);
+        assertTrue(model.addToDeck(type, 10));
         assertEquals(new DeckList(List.of(), List.of(10), List.of()), model.draft());
     }
 
     @Test void pendulumAloneRoutesToMain() {
         var model = new DeckEditorModel(empty(), Map.of());
-        model.addToDeck(TYPE_MONSTER | TYPE_PENDULUM, 10);
+        assertTrue(model.addToDeck(TYPE_MONSTER | TYPE_PENDULUM, 10));
         assertEquals(new DeckList(List.of(10), List.of(), List.of()), model.draft());
+    }
+
+    @Test void capCountsAllSectionsWithoutChangingImportedDrafts() {
+        var cards = new DeckList(List.of(7), List.of(7), List.of(7));
+        var model = new DeckEditorModel(cards, Map.of());
+        assertFalse(model.add(DeckEditorModel.Section.SIDE, 7));
+        assertEquals(cards, model.draft());
+        assertFalse(model.dirty());
+        assertTrue(model.add(DeckEditorModel.Section.MAIN, 8));
+        var imported = new DeckList(List.of(7, 7, 7, 7), List.of(), List.of());
+        model.load(imported);
+        assertEquals(imported, model.draft());
+        assertFalse(model.canAdd(7));
+    }
+
+    @ParameterizedTest
+    @EnumSource(DeckEditorModel.Section.class)
+    void manualAddReturnsSuccessForEverySection(DeckEditorModel.Section section) {
+        var model = new DeckEditorModel(empty(), Map.of());
+        assertTrue(model.add(section, 7));
+        assertEquals(1, model.draft().requiredCopies().get(7));
+    }
+
+    @Test void fourthCopyIsRejectedAcrossSections() {
+        var initial = new DeckList(List.of(7), List.of(7), List.of());
+        var model = new DeckEditorModel(initial, Map.of());
+        assertTrue(model.add(DeckEditorModel.Section.SIDE, 7));
+        assertFalse(model.add(DeckEditorModel.Section.MAIN, 7));
+        assertEquals(new DeckList(List.of(7), List.of(7), List.of(7)), model.draft());
+    }
+
+    @Test void removingACopyAllowsAnotherManualAdd() {
+        var model = new DeckEditorModel(new DeckList(List.of(7, 8, 7), List.of(), List.of(7)), Map.of());
+        assertFalse(model.canAdd(7));
+        assertTrue(model.removeAt(DeckEditorModel.Section.MAIN, 2));
+        assertTrue(model.canAdd(7));
+        assertTrue(model.add(DeckEditorModel.Section.EXTRA, 7));
+        assertEquals(new DeckList(List.of(7, 8), List.of(7), List.of(7)), model.draft());
+    }
+
+    @Test void rightClickRemovalKeepsOtherCopiesInPlace() {
+        var model = new DeckEditorModel(
+                new DeckList(List.of(7, 8, 7), List.of(), List.of()), Map.of());
+        assertTrue(model.removeAt(DeckEditorModel.Section.MAIN, 2));
+        assertEquals(List.of(7, 8), model.draft().main());
+    }
+
+    @Test void invalidRemovalIndexLeavesDraftUnchanged() {
+        var initial = new DeckList(List.of(7), List.of(), List.of());
+        var model = new DeckEditorModel(initial, Map.of());
+        assertFalse(model.removeAt(DeckEditorModel.Section.MAIN, -1));
+        assertFalse(model.removeAt(DeckEditorModel.Section.MAIN, 1));
+        assertEquals(initial, model.draft());
+        assertFalse(model.dirty());
+    }
+
+    @Test void frozenDraftRejectsManualAddAndIndexedRemoval() {
+        var initial = new DeckList(List.of(7), List.of(), List.of());
+        var model = new DeckEditorModel(initial, Map.of());
+        model.setFrozen(true);
+        assertThrows(IllegalStateException.class, () -> model.add(DeckEditorModel.Section.MAIN, 8));
+        assertThrows(IllegalStateException.class, () -> model.removeAt(DeckEditorModel.Section.MAIN, 0));
+        assertEquals(initial, model.draft());
+        assertFalse(model.dirty());
     }
 
     @Test void deckRemovalHonorsClickedStoredSectionEvenWhenMisplaced() {
@@ -130,12 +194,11 @@ class DeckEditorModelTest {
     }
 
     @Test void fourthCopyAndOversizedSectionsRemainSavable() {
+        var main = java.util.Collections.nCopies(61, 1);
+        var extra = java.util.Collections.nCopies(16, 1);
+        var side = java.util.Collections.nCopies(16, 1);
         var model = new DeckEditorModel(empty(), Map.of(1, 2L));
-        for (int i = 0; i < 61; i++) model.add(DeckEditorModel.Section.MAIN, 1);
-        for (int i = 0; i < 16; i++) {
-            model.add(DeckEditorModel.Section.EXTRA, 1);
-            model.add(DeckEditorModel.Section.SIDE, 1);
-        }
+        model.load(new DeckList(main, extra, side));
         assertEquals(93, model.draft().requiredCopies().get(1));
         assertEquals(91, model.missing(1));
         model.markSaved();

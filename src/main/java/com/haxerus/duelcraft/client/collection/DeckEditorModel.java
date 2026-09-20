@@ -32,11 +32,26 @@ public final class DeckEditorModel {
     void acknowledge(DeckList cards) { saved = cards; }
     void discard() { draft = saved; }
 
-    public void add(Section section, int code) {
+    public boolean add(Section section, int code) {
         requireEditable();
+        if (!canAdd(code)) return false;
         var cards = new ArrayList<>(cards(section));
         cards.add(code);
         replace(section, cards);
+        return true;
+    }
+
+    public boolean canAdd(int code) {
+        return draft.requiredCopies().getOrDefault(code, 0) < 3;
+    }
+
+    public boolean removeAt(Section section, int index) {
+        requireEditable();
+        var cards = new ArrayList<>(cards(section));
+        if (index < 0 || index >= cards.size()) return false;
+        cards.remove(index);
+        replace(section, cards);
+        return true;
     }
 
     public boolean remove(Section section, int code) {
@@ -87,8 +102,8 @@ public final class DeckEditorModel {
         if (frozen) throw new IllegalStateException("Wait for the pending collection operation");
     }
 
-    public void addToDeck(int type, int code) {
-        add(naturalSection(type), code);
+    public boolean addToDeck(int type, int code) {
+        return add(naturalSection(type), code);
     }
 
     public boolean removeFromDeck(int type, int code, Section storedSection) {
