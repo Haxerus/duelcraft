@@ -49,9 +49,8 @@ final class CollectionRuntimeFixture {
          .step("release " + id, CollectionLayoutScenario::release).ticks(2);
     }
 
-    static void discardNewDraft(ScenarioBuilder s) {
-        s.checkVisible("#close-dialog");
-        press(s, "#close-discard");
+    static void expectEmptyDraftNavigation(ScenarioBuilder s) {
+        s.checkHidden("#close-dialog");
     }
 
     static boolean draftMatches(TestContext ctx, DeckList expected) {

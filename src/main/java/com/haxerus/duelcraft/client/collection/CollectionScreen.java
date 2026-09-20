@@ -140,6 +140,15 @@ public final class CollectionScreen extends ModularUIScreen {
         controller.requestClose();
     }
 
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            if (!controller.dismissTopLayer()) controller.requestClose();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
     @Override public void removed() {
         if (!suspended) controller.dispose();
         super.removed();

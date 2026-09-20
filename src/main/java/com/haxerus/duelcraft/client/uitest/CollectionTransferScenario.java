@@ -48,7 +48,7 @@ public final class CollectionTransferScenario implements UIScenario {
         CollectionRuntimeFixture.open(s);
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ID);
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "M3 transfer draft");
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.click("#main-card-0").typeInto("#transfer-amount", "20");

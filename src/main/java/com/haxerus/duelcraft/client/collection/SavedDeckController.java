@@ -26,6 +26,7 @@ public final class SavedDeckController {
     private boolean ready;
     private boolean pending;
     private boolean disposed;
+    private boolean initialOpened;
     private long readToken;
     private Runnable navigation;
     private boolean decision;
@@ -60,6 +61,13 @@ public final class SavedDeckController {
     public boolean stored() { return stored; }
     public boolean needsDecision() { return decision; }
     public boolean dirty() { return !stored || model.dirty() || !name.equals(savedName); }
+    public boolean needsDiscardConfirmation() {
+        if (!stored && model.draft().main().isEmpty()
+                && model.draft().extra().isEmpty() && model.draft().side().isEmpty()) {
+            return false;
+        }
+        return dirty();
+    }
     public String status() { return status; }
     public String detail() { return detail; }
     public DeckEligibility.Report eligibility() { return eligibility; }
@@ -109,6 +117,37 @@ public final class SavedDeckController {
 
     public void importFailed(Throwable error) {
         if (!disposed) fail(error);
+    }
+
+    public void openInitial(ClientCollectionState.View view) {
+        if (!beginInitial()) return;
+        applyInitialView(view);
+    }
+
+    public void openInitial() {
+        if (!beginInitial()) return;
+        long token = readToken;
+        long expectedRevision = revision;
+        UUID blankId = id;
+        String blankName = name;
+        DeckList blankDraft = model.draft();
+        refresh.get().whenCompleteAsync((view, error) -> {
+            if (!readCurrent(token, blankId, blankName, blankDraft) || revision != expectedRevision) return;
+            if (error != null) refreshFailed(error);
+            else applyInitialView(view);
+        }, client);
+    }
+
+    private boolean beginInitial() {
+        if (disposed || initialOpened) return false;
+        initialOpened = true;
+        newDraft();
+        return true;
+    }
+
+    private void applyInitialView(ClientCollectionState.View view) {
+        applyView(view);
+        if (view.activeId() != null) select(view.activeId());
     }
 
     public void applyView(ClientCollectionState.View view) {
@@ -182,7 +221,7 @@ public final class SavedDeckController {
         if (disposed) return;
         navigation = action;
         if (pending) return;
-        if (dirty()) { decision = true; changed.run(); }
+        if (needsDiscardConfirmation()) { decision = true; changed.run(); }
         else finishNavigation();
     }
 

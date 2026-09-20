@@ -36,7 +36,7 @@ public final class CollectionRetainedWorldScenario implements UIScenario {
          .check("counts, summaries, revision and active ID exact", CollectionRuntimeFixture::snapshotMatches);
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<PlayerCollectionData>get("expected").activeDeckId());
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "Retained M2 all sections")
          .checkTextContains("#list-active-status", "is active")
          .check("real ReadDeck loads exact UUID name Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx,
@@ -83,7 +83,7 @@ public final class CollectionRetainedWorldScenario implements UIScenario {
         CollectionRuntimeFixture.open(s);
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<SavedDeck>get("saved").id());
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "Retained M2 all sections");
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.click("#activate-deck")

@@ -6,6 +6,7 @@ import com.haxerus.duelcraft.client.collection.DeckEditorModel;
 import com.haxerus.duelcraft.collection.DeckList;
 import com.haxerus.duelcraft.collection.SavedDeck;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
@@ -17,6 +18,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -43,11 +45,13 @@ public final class CollectionEditorQAScenario implements UIScenario {
                 && ctx.mc().getWindow().getHeight() == 720)
           .openScreen("collection pointer editing", ctx -> {
               var model = ctx.put("model", new DeckEditorModel(empty(), CollectionFixture.owned()));
-              var pending = ctx.put("pending", new CompletableFuture<SavedDeck>());
+              ctx.put("attempts", new ArrayList<CompletableFuture<SavedDeck>>());
               return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
                       CollectionFixture.LIST_ID, (name, draft) -> {
                           var submitted = new SavedDeck(CollectionFixture.LIST_ID, name, draft);
                           ctx.put("submitted", submitted);
+                          var pending = new CompletableFuture<SavedDeck>();
+                          ctx.<ArrayList<CompletableFuture<SavedDeck>>>get("attempts").add(pending);
                           return pending;
                       }, CollectionFixture.query());
           }).awaitModularUI().ticks(3)
@@ -93,7 +97,12 @@ public final class CollectionEditorQAScenario implements UIScenario {
         doubleLeft(s, "rejected fourth Main copy", "#collection-card-" + MAIN);
         s.check("fourth copy is rejected without a false success", ctx ->
                  model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN, MAIN), List.of(), List.of()))
-                         && ctx.el("#editor-status").text().contains("Three copies"));
+                         && ctx.el("#editor-status").text().contains("Three copies"))
+         .step("filter to a different inspector identity", ctx -> ctx.el("#collection-search").as(TextField.class)
+                 .setText(String.valueOf(OTHER), true)).ticks(2);
+        leftPress(s, "preselect different identity", "#collection-card-" + OTHER);
+        s.check("different identity is selected before deck removal", ctx ->
+                ctx.el("#inspector-name").text().equals("Beacon Spell"));
 
         rightPress(s, "exact repeated tile", "#main-card-2");
         s.check("right press removes the rendered index only", ctx ->
@@ -101,7 +110,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
          .step("release exact repeated tile", CollectionEditorQAScenario::rightRelease)
          .check("right release does not remove again or fire left selection", ctx ->
                  model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of()))
-                         && ctx.el("#inspector-name").text().equals("Cinder Dragon"));
+                         && ctx.el("#inspector-name").text().equals("Beacon Spell"));
 
         s.step("restore all virtual rows", ctx -> ctx.el("#collection-search").as(TextField.class).setText("", true))
          .ticks(2)
@@ -145,10 +154,91 @@ public final class CollectionEditorQAScenario implements UIScenario {
         s.step("release pending deck tile", CollectionEditorQAScenario::rightRelease)
          .check("pending pointer gestures leave the frozen draft unchanged", ctx ->
                  model(ctx).draft().equals(ctx.get("frozenDraft")))
-         .step("acknowledge delayed Save", ctx -> ctx.<CompletableFuture<SavedDeck>>get("pending")
-                 .complete(ctx.get("submitted"))).ticks(2)
-         .check("Save acknowledgement unfreezes the draft", ctx -> ctx.el("#sort-deck").isActive())
+         .step("fail delayed Save", ctx -> ctx.<ArrayList<CompletableFuture<SavedDeck>>>get("attempts")
+                 .getLast().completeExceptionally(new IllegalStateException("delayed save failed"))).ticks(2)
+         .check("failed delayed Save retains the dirty editor", ctx -> ctx.screen() instanceof CollectionScreen
+                 && model(ctx).dirty() && ctx.el("#sort-deck").isActive()
+                 && ctx.el("#editor-status").text().contains("delayed save failed"))
+         .step("press visible Close with dirty draft", ctx -> CollectionLayoutScenario.press(ctx, "#close-editor"))
+         .step("release visible Close with dirty draft", CollectionLayoutScenario::release).ticks(2)
+         .checkVisible("#close-dialog")
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .check("Escape keeps editing and cancels queued dirty navigation", ctx ->
+                 ctx.screen() instanceof CollectionScreen && !ctx.el("#close-dialog").isVisible()
+                         && model(ctx).dirty())
+         .keyUp(GLFW.GLFW_KEY_ESCAPE)
+         .step("retry delayed Save", ctx -> CollectionLayoutScenario.press(ctx, "#save-deck"))
+         .step("release delayed Save retry", CollectionLayoutScenario::release).ticks(2)
+         .check("retry remains pending until acknowledgement", ctx ->
+                 ctx.<ArrayList<CompletableFuture<SavedDeck>>>get("attempts").size() == 2
+                         && !ctx.el("#sort-deck").isActive())
+         .step("acknowledge delayed Save", ctx -> ctx.<ArrayList<CompletableFuture<SavedDeck>>>get("attempts")
+                 .getLast().complete(ctx.get("submitted"))).ticks(2)
+         .check("Save acknowledgement unfreezes and cleans the draft", ctx ->
+                 ctx.el("#sort-deck").isActive() && !model(ctx).dirty())
+         .step("open My decks", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
+         .step("release My decks", CollectionLayoutScenario::release).ticks(2)
+         .step("open delete confirmation", ctx -> CollectionLayoutScenario.press(ctx, "#list-delete"))
+         .step("release delete confirmation", CollectionLayoutScenario::release).ticks(2)
+         .checkVisible("#delete-dialog")
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .check("Escape dismisses only delete confirmation", ctx -> !ctx.el("#delete-dialog").isVisible()
+                 && ctx.el("#lists-dialog").isVisible())
+         .keyUp(GLFW.GLFW_KEY_ESCAPE)
+         .step("reopen delete confirmation", ctx -> CollectionLayoutScenario.press(ctx, "#list-delete"))
+         .step("release reopened delete confirmation", CollectionLayoutScenario::release).ticks(2)
+         .step("cancel delete visibly", ctx -> CollectionLayoutScenario.press(ctx, "#delete-cancel"))
+         .step("release delete cancel", CollectionLayoutScenario::release).ticks(2)
+         .check("visible delete cancel keeps My decks", ctx -> !ctx.el("#delete-dialog").isVisible()
+                 && ctx.el("#lists-dialog").isVisible())
+         .step("open saved-list dropdown", ctx -> CollectionLayoutScenario.press(ctx, "#list-picker"))
+         .step("release saved-list dropdown", CollectionLayoutScenario::release).ticks(2)
+         .check("saved-list dropdown is attached to the root", ctx ->
+                 ctx.el("#list-picker").as(Selector.class).isOpen())
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .check("first nested Escape dismisses only the dropdown", ctx ->
+                 !ctx.el("#list-picker").as(Selector.class).isOpen() && ctx.el("#lists-dialog").isVisible()
+                         && ctx.screen() instanceof CollectionScreen)
+         .keyUp(GLFW.GLFW_KEY_ESCAPE)
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .check("second nested Escape dismisses only My decks", ctx -> !ctx.el("#lists-dialog").isVisible()
+                 && ctx.screen() instanceof CollectionScreen)
+         .keyUp(GLFW.GLFW_KEY_ESCAPE)
          .hoverAt(-100, -100).screenshot("collection-editor-pointer-qa")
+         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
+         .check("third nested Escape closes the clean editor", ctx -> !(ctx.screen() instanceof CollectionScreen))
+         .keyUp(GLFW.GLFW_KEY_ESCAPE)
+         .openScreen("empty unsaved draft closes without discard", ctx -> {
+             var model = ctx.put("emptyModel", new DeckEditorModel(empty(), CollectionFixture.owned()));
+             return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
+                     CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
+         }).awaitModularUI().ticks(2)
+         .step("open My decks for New", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
+         .step("release My decks for New", CollectionLayoutScenario::release).ticks(2)
+         .step("create empty unsaved draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-new"))
+         .step("release New", CollectionLayoutScenario::release).ticks(2)
+         .step("close My decks after New", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
+         .step("release My decks after New", CollectionLayoutScenario::release).ticks(2)
+         .check("empty unsaved draft remains saveable", ctx -> ctx.el("#save-deck").isActive()
+                 && ctx.el("#deck-summary").text().contains("Unsaved"))
+         .step("close empty unsaved draft", ctx -> CollectionLayoutScenario.press(ctx, "#close-editor"))
+         .step("release empty unsaved Close", CollectionLayoutScenario::release).ticks(2)
+         .check("empty unsaved draft closes without a discard decision", ctx ->
+                 !(ctx.screen() instanceof CollectionScreen))
+         .openScreen("renamed saved empty list still prompts", ctx -> CollectionScreen.create(
+                 new DeckEditorModel(empty(), CollectionFixture.owned()), CollectionFixture.cards(), code -> null,
+                 CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query()))
+         .awaitModularUI().ticks(2)
+         .step("open My decks for saved-empty rename", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
+         .step("release My decks for saved-empty rename", CollectionLayoutScenario::release).ticks(2)
+         .typeInto("#list-name", "Renamed empty saved list").ticks(2)
+         .step("close My decks after saved-empty rename", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
+         .step("release My decks after saved-empty rename", CollectionLayoutScenario::release).ticks(2)
+         .step("close renamed saved empty list", ctx -> CollectionLayoutScenario.press(ctx, "#close-editor"))
+         .step("release renamed saved empty Close", CollectionLayoutScenario::release).ticks(2)
+         .checkVisible("#close-dialog")
+         .check("saved empty rename still requires a discard decision", ctx ->
+                 ctx.screen() instanceof CollectionScreen)
          .teardown("restore pointer viewport", ctx -> {
              ctx.mc().setScreen(null);
              GLFW.glfwSetWindowSize(ctx.mc().getWindow().getWindow(),

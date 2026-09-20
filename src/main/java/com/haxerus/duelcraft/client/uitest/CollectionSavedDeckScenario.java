@@ -88,7 +88,7 @@ public final class CollectionSavedDeckScenario implements UIScenario {
          .check("reopen preserves complete private snapshot", CollectionRuntimeFixture::snapshotMatches);
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<PlayerCollectionData>get("expected").decks().keySet().iterator().next());
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "Runtime unowned draft")
          .check("ReadDeck loads every saved section exactly", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().values().iterator().next().cards()));
         CollectionRuntimeFixture.press(s, "#lists-close");

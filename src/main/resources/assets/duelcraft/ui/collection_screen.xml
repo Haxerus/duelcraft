@@ -10,7 +10,7 @@
         #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #list-new, #list-rename, #list-duplicate,
         #list-delete, #list-import, #list-activate, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
-        #delete-cancel, #close-save, #close-discard, #close-cancel, #alternate-formats {
+        #delete-cancel, #close-save, #close-discard, #close-cancel, #close-editor, #alternate-formats {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
         button text { font-size: 12; text-color: #ffffff; }
@@ -26,6 +26,7 @@
         #deck-summary { height: 14; }
         #editor-title { height: 22; width: 100%; text-wrap: hover_roll; overflow: hidden; }
         #saved-lists, #save-deck { width: 146; height: 36; }
+        #close-editor { width: 96; height: 36; }
         #lists-dialog, #delete-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
         #delete-dialog { z-index: 110; }
         #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
@@ -137,6 +138,7 @@
                 </element>
                 <button id="saved-lists" text="duelcraft.collection.lists" />
                 <button id="save-deck" text="duelcraft.collection.save" />
+                <button id="close-editor" text="duelcraft.collection.close" />
             </element>
             <element id="editor-body">
                 <element id="card-inspector">
@@ -287,7 +289,7 @@
                     <element class="row">
                         <button id="close-save" text="Save" />
                         <button id="close-discard" text="Discard" />
-                        <button id="close-cancel" text="Cancel" />
+                        <button id="close-cancel" text="duelcraft.collection.keep_editing" />
                     </element>
                 </element>
             </element>

@@ -7,6 +7,241 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SavedDeckControllerTest {
+    @Test void startupWithoutAnInitialViewRefreshesOnceThenOpensTheActiveList() {
+        var active = UUID.randomUUID();
+        var cards = new DeckList(List.of(7), List.of(8), List.of(9));
+        var refresh = new CompletableFuture<ClientCollectionState.View>();
+        int[] refreshes = {0};
+        var c = new SavedDeckController(model, id, "List", null,
+                command -> { commands.add(command); var reply = new CompletableFuture<CollectionReply>(); replies.add(reply); return reply; },
+                () -> { refreshes[0]++; return refresh; }, Runnable::run, () -> {});
+
+        c.openInitial();
+        c.openInitial();
+        assertEquals(1, refreshes[0]);
+
+        refresh.complete(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        assertEquals(List.of(new CollectionCommand.ReadDeck(active)), commands);
+        replies.getFirst().complete(new CollectionReply.Deck(4, new SavedDeck(active, "Active", cards)));
+        assertEquals(active, c.id());
+        assertEquals(cards, model.draft());
+        assertFalse(c.dirty());
+    }
+
+    @Test void initialActiveSavedIdLoadsOnceWithExactContents() {
+        var active = UUID.randomUUID();
+        var cards = new DeckList(List.of(7, 8), List.of(9), List.of(10));
+        var c = productionController();
+        var view = new ClientCollectionState.View(4, Map.of(7, 2L),
+                List.of(new CollectionReply.Summary(active, "Active", 2, 1, 1)), active);
+
+        c.openInitial(view);
+        c.openInitial(view);
+
+        assertEquals(List.of(new CollectionCommand.ReadDeck(active)), commands);
+        replies.getFirst().complete(new CollectionReply.Deck(4, new SavedDeck(active, "Active", cards)));
+        assertEquals(active, c.id());
+        assertEquals("Active", c.name());
+        assertEquals(cards, model.draft());
+        assertFalse(c.dirty());
+    }
+
+    @Test void initialViewWithoutActiveSavedIdStartsAnEmptyUnsavedDraft() {
+        var c = productionController();
+
+        c.openInitial(new ClientCollectionState.View(4, Map.of(7, 2L), List.of(), null));
+
+        assertTrue(commands.isEmpty());
+        assertEquals(EMPTY, model.draft());
+        assertFalse(c.stored());
+        assertTrue(c.dirty());
+        assertFalse(c.needsDiscardConfirmation());
+    }
+
+    @Test void missingInitialActiveReadReportsFailureWithoutSelectingAnotherSummary() {
+        var active = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(),
+                List.of(new CollectionReply.Summary(other, "Other", 1, 0, 0)), active));
+        UUID blank = c.id();
+
+        replies.getFirst().complete(new CollectionReply.Rejected(CollectionError.NOT_FOUND, 4,
+                new DeckEligibility.Report(List.of(), Map.of(), false, false, null)));
+
+        assertEquals(new CollectionCommand.ReadDeck(active), commands.getFirst());
+        assertEquals(blank, c.id());
+        assertNotEquals(other, c.id());
+        assertEquals(EMPTY, model.draft());
+        assertEquals("operation_failed", c.status());
+        assertTrue(c.detail().contains("NOT_FOUND"));
+    }
+
+    @Test void failedInitialActiveReadKeepsTheBlankDraftIdentity() {
+        var active = UUID.randomUUID();
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        UUID blank = c.id();
+
+        replies.getFirst().completeExceptionally(new IllegalStateException("read failed"));
+
+        assertEquals(new CollectionCommand.ReadDeck(active), commands.getFirst());
+        assertEquals(blank, c.id());
+        assertEquals(EMPTY, model.draft());
+        assertEquals("operation_failed", c.status());
+        assertEquals("read failed", c.detail());
+    }
+
+    @Test void deletedInitialActiveReplyCannotSelectAReplacementIdentity() {
+        var active = UUID.randomUUID();
+        var replacement = UUID.randomUUID();
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        UUID blank = c.id();
+
+        replies.getFirst().complete(new CollectionReply.Deck(4,
+                new SavedDeck(replacement, "Replacement", new DeckList(List.of(99), List.of(), List.of()))));
+
+        assertEquals(new CollectionCommand.ReadDeck(active), commands.getFirst());
+        assertEquals(blank, c.id());
+        assertNotEquals(replacement, c.id());
+        assertEquals(EMPTY, model.draft());
+        assertEquals("operation_failed", c.status());
+    }
+
+    @Test void delayedInitialReadCannotOverwriteLocalEdits() {
+        var active = UUID.randomUUID();
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        UUID blank = c.id();
+        model.add(DeckEditorModel.Section.MAIN, 7);
+
+        replies.getFirst().complete(new CollectionReply.Deck(4,
+                new SavedDeck(active, "Active", new DeckList(List.of(8), List.of(), List.of()))));
+
+        assertEquals(blank, c.id());
+        assertEquals(List.of(7), model.draft().main());
+    }
+
+    @Test void delayedInitialReadCannotOverwriteAnotherSelection() {
+        var active = UUID.randomUUID();
+        var selected = UUID.randomUUID();
+        var selectedCards = new DeckList(List.of(8), List.of(), List.of());
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        c.select(selected);
+
+        replies.get(0).complete(new CollectionReply.Deck(4, new SavedDeck(active, "Active", EMPTY)));
+        replies.get(1).complete(new CollectionReply.Deck(4, new SavedDeck(selected, "Selected", selectedCards)));
+
+        assertEquals(List.of(new CollectionCommand.ReadDeck(active), new CollectionCommand.ReadDeck(selected)), commands);
+        assertEquals(selected, c.id());
+        assertEquals(selectedCards, model.draft());
+    }
+
+    @Test void delayedInitialReadCannotOverwriteANewerView() {
+        var active = UUID.randomUUID();
+        var newerActive = UUID.randomUUID();
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        UUID blank = c.id();
+        c.applyView(new ClientCollectionState.View(5, Map.of(9, 2L), List.of(), newerActive));
+
+        replies.getFirst().complete(new CollectionReply.Deck(4,
+                new SavedDeck(active, "Active", new DeckList(List.of(8), List.of(), List.of()))));
+
+        assertEquals(blank, c.id());
+        assertEquals(newerActive, c.activeId());
+        assertEquals(Map.of(9, 2L), model.owned());
+        assertEquals(EMPTY, model.draft());
+    }
+
+    @Test void delayedInitialReadCannotOverwriteDisposal() {
+        var active = UUID.randomUUID();
+        var c = productionController();
+        c.openInitial(new ClientCollectionState.View(4, Map.of(), List.of(), active));
+        UUID blank = c.id();
+        c.dispose();
+
+        replies.getFirst().complete(new CollectionReply.Deck(4,
+                new SavedDeck(active, "Active", new DeckList(List.of(8), List.of(), List.of()))));
+
+        assertEquals(blank, c.id());
+        assertEquals(EMPTY, model.draft());
+    }
+
+    @Test void ordinaryRefreshPreservesDirtySuspendedDraft() {
+        var refresh = new CompletableFuture<ClientCollectionState.View>();
+        var c = new SavedDeckController(model, id, "List", null,
+                command -> CompletableFuture.failedFuture(new IllegalStateException()),
+                () -> refresh, Runnable::run, () -> {});
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), id));
+        model.add(DeckEditorModel.Section.MAIN, 7);
+        c.rename("Suspended edit");
+        var dirty = model.draft();
+
+        c.refresh();
+        refresh.complete(new ClientCollectionState.View(5, Map.of(7, 3L), List.of(), id));
+
+        assertEquals(id, c.id());
+        assertEquals("Suspended edit", c.name());
+        assertEquals(dirty, model.draft());
+        assertTrue(c.dirty());
+        assertEquals(Map.of(7, 3L), model.owned());
+    }
+
+    @Test void emptyUnsavedDraftNeedsNoDiscardDecision() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), null));
+        c.newDraft();
+        assertTrue(c.dirty());
+        assertFalse(c.needsDiscardConfirmation());
+        model.add(DeckEditorModel.Section.MAIN, 7);
+        assertTrue(c.needsDiscardConfirmation());
+        model.removeAt(DeckEditorModel.Section.MAIN, 0);
+        assertFalse(c.needsDiscardConfirmation());
+    }
+
+    @Test void storedEmptyListStillNeedsADecisionAfterRenameOrCardRemoval() {
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(), id));
+        c.rename("Renamed");
+        assertTrue(c.needsDiscardConfirmation());
+
+        var cards = new DeckList(List.of(7), List.of(), List.of());
+        model.load(cards);
+        model.acknowledge(cards);
+        c.rename("List");
+        assertFalse(c.needsDiscardConfirmation());
+        model.removeAt(DeckEditorModel.Section.MAIN, 0);
+        assertTrue(c.needsDiscardConfirmation());
+    }
+
+    @Test void pendingSaveDefersNavigationUntilActualSuccessAndFailureKeepsTheEditor() {
+        var attempts = new ArrayList<CompletableFuture<SavedDeck>>();
+        var c = new SavedDeckController(model, id, "List", (name, cards) -> {
+            var result = new CompletableFuture<SavedDeck>();
+            attempts.add(result);
+            return result;
+        }, command -> CompletableFuture.failedFuture(new IllegalStateException()),
+                () -> CompletableFuture.failedFuture(new IllegalStateException()), Runnable::run, () -> {});
+        c.newDraft();
+        int[] navigated = {0};
+        c.save();
+        c.navigate(() -> navigated[0]++);
+        assertFalse(c.needsDecision());
+        attempts.getFirst().completeExceptionally(new IllegalStateException("save failed"));
+        assertEquals(0, navigated[0]);
+        assertTrue(c.dirty());
+        assertEquals("save failed", c.detail());
+
+        c.save();
+        c.navigate(() -> navigated[0]++);
+        attempts.getLast().complete(new SavedDeck(c.id(), c.name(), EMPTY));
+        assertEquals(1, navigated[0]);
+        assertFalse(c.dirty());
+    }
+
     @Test void importedDraftUsesProvidedIdentityAndCardsUntilAcknowledgedSave() {
         var importedId = UUID.randomUUID();
         var importedCards = new DeckList(List.of(1), List.of(2), List.of(3));

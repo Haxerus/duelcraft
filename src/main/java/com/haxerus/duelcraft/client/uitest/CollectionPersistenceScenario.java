@@ -44,7 +44,7 @@ public final class CollectionPersistenceScenario implements UIScenario {
         });
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "Runtime owned all sections");
         CollectionRuntimeFixture.press(s, "#lists-close");
         s.click("#activate-deck")
@@ -73,7 +73,7 @@ public final class CollectionPersistenceScenario implements UIScenario {
          .check("respawn private counts, summaries, revisions and active selection match", CollectionRuntimeFixture::snapshotMatches);
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "Runtime owned all sections")
          .checkTextContains("#list-active-status", "is active")
          .check("ReadDeck after respawn loads complete owned Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().get(CollectionRuntimeFixture.OWNED_ID).cards()));

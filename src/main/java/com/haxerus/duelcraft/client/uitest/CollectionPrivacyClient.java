@@ -61,7 +61,7 @@ public final class CollectionPrivacyClient {
          .waitUntil("editor applies complete snapshot", ctx -> ctx.el("#save-deck").isActive());
         CollectionRuntimeFixture.press(b, "#saved-lists");
         CollectionRuntimeFixture.select(b, ctx -> CollectionPrivacyScenario.id(role, changed));
-        CollectionRuntimeFixture.discardNewDraft(b);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(b);
         b.waitForText("#editor-title", "Private same name")
          .check("own UUID ReadDeck loads exact ordered Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, CollectionPrivacyScenario.cards()));
         if (changed) b.checkTextContains("#list-active-status", "is active");

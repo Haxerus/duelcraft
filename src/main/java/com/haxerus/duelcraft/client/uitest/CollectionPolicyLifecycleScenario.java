@@ -157,7 +157,7 @@ public final class CollectionPolicyLifecycleScenario implements UIScenario {
     private static void load(ScenarioBuilder s) {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<SavedDeck>get("saved").id());
-        CollectionRuntimeFixture.discardNewDraft(s);
+        CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
         s.waitForText("#editor-title", "Policy retained all sections")
          .check("ReadDeck retains every ordered section", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<SavedDeck>get("saved").cards()));
         CollectionRuntimeFixture.press(s, "#lists-close");

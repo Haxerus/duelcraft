@@ -116,6 +116,7 @@ final class CollectionController {
         collection.setId("collection-results");
         element("collection-results-host").addChild(collection);
         button("save-deck").setOnClick(event -> lists.save());
+        button("close-editor").setOnClick(event -> requestClose());
         button("sort-deck").setText(Component.translatable("duelcraft.collection.sort_deck"));
         button("sort-deck").getStyle().tooltips(Component.translatable("duelcraft.collection.sort_deck_help"));
         button("sort-deck").setOnClick(event -> {
@@ -357,8 +358,8 @@ final class CollectionController {
 
     void refreshCollections() { lists.refresh(); }
 
-    void initializeCollections() { lists.newDraft(); lists.refresh(); }
-    void initializeCollections(ClientCollectionState.View view) { lists.newDraft(); lists.applyView(view); }
+    void initializeCollections() { lists.openInitial(); }
+    void initializeCollections(ClientCollectionState.View view) { lists.openInitial(view); }
 
     void setCatalog(List<CardInfo> cards, boolean failed) {
         if (disposed) return;
@@ -683,6 +684,47 @@ final class CollectionController {
 
     void requestClose() {
         lists.navigate(close);
+    }
+
+    @SuppressWarnings("unchecked")
+    boolean dismissTopLayer() {
+        var selectors = List.<Selector<?>>of(
+                (Selector<Object>) element("collection-ownership"),
+                (Selector<Object>) element("card-sort"),
+                (Selector<Object>) element("filter-measure"),
+                (Selector<Object>) element("list-picker"),
+                (Selector<Object>) element("list-import-picker"));
+        var rootChildren = ui.rootElement.getChildren();
+        for (int index = rootChildren.size() - 1; index >= 0; index--) {
+            UIElement child = rootChildren.get(index);
+            for (var selector : selectors) {
+                if (selector.isOpen() && selector.dialog == child) {
+                    selector.hide();
+                    return true;
+                }
+            }
+        }
+        if (element("delete-dialog").isDisplayed()) {
+            element("delete-dialog").setDisplay(false);
+            return true;
+        }
+        if (element("close-dialog").isDisplayed()) {
+            lists.cancelNavigation();
+            return true;
+        }
+        if (element("eligibility-dialog").isDisplayed()) {
+            element("eligibility-dialog").setDisplay(false);
+            return true;
+        }
+        if (element("lists-dialog").isDisplayed()) {
+            element("lists-dialog").setDisplay(false);
+            return true;
+        }
+        if (filtersOpen) {
+            showFilters(false);
+            return true;
+        }
+        return false;
     }
 
     private void showFilters(boolean open) {
