@@ -54,14 +54,14 @@
 
 ### Task 3: Regression, review and playtest checkpoint
 
-Phase A evidence is in [the QA.3 verification report](../reports/2026-10-01-collection-controls-qa3-verification.md). The full build passed, but the first full UI group and one focused rerun reproduced a stale `duel_selection_captions` fixture failure. Keep Task 3 open until its correction, review, covering verification and package are complete.
+The [QA.3 verification report](../reports/2026-10-01-collection-controls-qa3-verification.md) preserves the initial and intermediate UI failures, final fixes, passing group, source provenance and package checks. User visual and packaged two-client acceptance remain open.
 
 **Files:** New `docs/superpowers/reports/2026-10-01-collection-controls-qa3-verification.md`; update this plan and `docs/superpowers/handoffs/2026-09-17-deck-editor-implementation.md`. Packaging may update `gradle.properties` and add `docs/qa-m4-qa3.md` using established QA packaging procedure; preserve QA.2 files.
 
 **Interfaces:** Consume task commits and fresh reports; retain protocol 7 and pinned dependencies.
 
-- [ ] Run full `./gradlew.bat build --console=plain` after task reviews. Parse actual XML counts and preserve logs. Run the complete `group:duelcraft` UI harness once against final source; retain initial failures and fix only batch regressions through the implementer.
-- [ ] Obtain independent whole-change review from starting HEAD, fix substantive findings through the implementer and run covering checks. Do not repeat successful unrelated suites without changed code or an unresolved concern.
-- [ ] Record source commits, test counts, real screenshot inspection and limitations in verification report. Include concise manual checks for My decks scrolling/selection, New/save/close, folder-limited import/export/overwrite, Help/Esc, identical sorting, intact filters/artwork and pending errors. Record previous omitted QA.2 items as user-reported passes, distinct from historical automation failures.
-- [ ] Produce a local versioned QA.3 JAR/package after automated checks, following the existing QA.2 package procedure. Verify JAR version/protocol, native dependencies and hashes; no upload. If runtime checks are blocked, mark artifact and instructions accordingly rather than claiming acceptance. User visual acceptance remains pending.
-- [ ] Update checkboxes/handoff, commit scoped documentation/build changes and report remaining manual checkpoint. No merge or push.
+- [x] Run full `./gradlew.bat build --console=plain` at the QA.3 version checkpoint. Parse actual XML counts and preserve logs. Run the complete `group:duelcraft` UI harness against final source; retain initial failures and fix only regressions through the implementer. The final-source UI group passed; the earlier full unit build was not repeated after review fixes.
+- [x] Obtain independent whole-change and scoped fix reviews from starting HEAD, fix substantive findings through the implementer and run covering checks. Do not repeat successful unrelated suites without changed code or an unresolved concern.
+- [x] Record source commits, test counts, real screenshot inspection and limitations in verification report. Include concise manual checks for My decks scrolling/selection, New/save/close, folder-limited import/export/overwrite, Help/Esc, identical sorting, intact filters/artwork and pending errors. Record previous omitted QA.2 items as user-reported passes, distinct from historical automation failures.
+- [x] Produce a local versioned QA.3 JAR/package after automated checks, following the existing QA.2 package procedure. Verify JAR version/protocol, native dependencies and hashes; no upload. Mark packaged runtime and user visual acceptance pending.
+- [x] Update checkboxes/handoff, commit scoped documentation/build changes and report remaining manual checkpoint. No merge or push.
