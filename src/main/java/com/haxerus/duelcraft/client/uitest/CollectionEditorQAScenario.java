@@ -127,12 +127,27 @@ public final class CollectionEditorQAScenario implements UIScenario {
         rightPress(s, "exact repeated tile", "#main-card-2");
         s.check("right press removes the rendered index only", ctx ->
                  model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of())))
-          .check("successful tile removal keeps the copy-limit detail", ctx ->
-                  ctx.el("#editor-status").text().contains("Three copies"))
+          .check("removing a copy below the limit clears its obsolete error", ctx ->
+                  ctx.el("#editor-status").text().isEmpty())
          .step("release exact repeated tile", CollectionEditorQAScenario::rightRelease)
          .check("right release does not remove again or fire left selection", ctx ->
                  model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of()))
                          && ctx.el("#inspector-name").text().equals("Beacon Spell"));
+
+        s.step("show an unrelated actionable failure", ctx ->
+                 lists(ctx).importFailed(new IllegalArgumentException("fixture import failure")))
+         .check("import failure is visible", ctx ->
+                 ctx.el("#editor-status").text().contains("fixture import failure"));
+        rightPress(s, "remove another Main copy", "#main-card-2");
+        s.check("successful removal retains unrelated failure", ctx ->
+                 model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER), List.of(), List.of()))
+                         && ctx.el("#editor-status").text().contains("fixture import failure"))
+         .step("release second removal", CollectionEditorQAScenario::rightRelease);
+        s.step("filter back to Main for replacement", ctx ->
+                 ctx.el("#collection-search").as(TextField.class).setText(String.valueOf(MAIN), true)).ticks(2);
+        doubleLeft(s, "restore Main copy", "#collection-card-" + MAIN);
+        s.check("replacement restores the following test's draft", ctx ->
+                model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of())));
 
         s.step("restore all virtual rows", ctx -> ctx.el("#collection-search").as(TextField.class).setText("", true))
          .ticks(2)

@@ -72,6 +72,7 @@ final class CollectionController {
     private final Runnable close;
     private final CollectionCardGrid collection;
     private int selectedCode;
+    private int copyLimitCode;
     private enum EditMode { DECK, SIDE }
     private EditMode editMode = EditMode.DECK;
     private DeckEditorModel.Section selectedStoredSection;
@@ -313,6 +314,7 @@ final class CollectionController {
 
     private void beginExport() {
         if (!SavedDeck.validName(lists.name())) {
+            copyLimitCode = 0;
             ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.export_name_error"));
             return;
         }
@@ -416,6 +418,7 @@ final class CollectionController {
         element("list-clear-active").setActive(!lists.pending() && lists.activeId() != null);
         element("list-clear-active").setDisplay(lists.activeId() != null);
         element("close-dialog").setDisplay(lists.needsDecision());
+        copyLimitCode = 0;
         ((TextElement) element("list-active-status")).setText(Component.literal(
                 lists.id().equals(lists.activeId()) ? "Active" : ""));
         ((TextElement) element("editor-status")).setText(
@@ -651,6 +654,7 @@ final class CollectionController {
                     ? model.addToDeck(card.type(), selectedCode)
                     : model.add(DeckEditorModel.Section.SIDE, selectedCode);
             if (!added) {
+                copyLimitCode = selectedCode;
                 ((TextElement) element("editor-status")).setText(
                         Component.translatable("duelcraft.collection.copy_limit"));
                 refreshInspector(false);
@@ -662,12 +666,20 @@ final class CollectionController {
         } else if (!model.removeFromDeck(card == null ? 0 : card.type(), selectedCode, selectedStoredSection)) {
             return;
         }
+        clearObsoleteCopyLimit();
         if (editMode == EditMode.SIDE) sideOpen = true;
         refreshDecks();
         refreshPanes();
         refreshInspector(false);
         // Requery ownership filters, but keep the scroll position if membership/order is unchanged.
         refreshResults(false);
+    }
+
+    private void clearObsoleteCopyLimit() {
+        if (copyLimitCode != 0 && model.draft().requiredCopies().getOrDefault(copyLimitCode, 0) < 3) {
+            copyLimitCode = 0;
+            text("editor-status", "");
+        }
     }
 
     void refreshTransfers() {
@@ -728,6 +740,7 @@ final class CollectionController {
                     event.stopPropagation();
                     if (lists.pending() || model.draft() != renderedDraft
                             || !model.removeAt(section, renderedIndex)) return;
+                    clearObsoleteCopyLimit();
                     if (section == DeckEditorModel.Section.SIDE) sideOpen = true;
                     refreshDecks();
                     refreshPanes();
@@ -962,6 +975,7 @@ final class CollectionController {
             refreshChips();
             return true;
         } catch (IllegalArgumentException invalid) {
+            copyLimitCode = 0;
             text("editor-status", "Enter whole numbers with minimum no greater than maximum.");
             return false;
         }

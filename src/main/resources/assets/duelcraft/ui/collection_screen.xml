@@ -34,7 +34,6 @@
         #help-button { width: 34; }
         #list-clear-active { width: 96; height: 24; }
         #deck-summary { height: 14; }
-        #editor-title { display: none; }
         #editor-title { display: flex; }
         #list-name { width: 100%; }
         #list-active-status { height: 18; text-wrap: hover_roll; overflow: hidden; }
