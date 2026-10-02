@@ -33,10 +33,10 @@
 
 **Interfaces:** Preserve `sortByType(IntUnaryOperator cardType)`, `draft()`, `dirty()` and existing frozen guard. No new public API.
 
-- [ ] Run the existing focused test as baseline, then add a regression with interleaved same-type cards in Main, Extra and Side. Example all-spell Main `[7,8,7,8,7]` must become `[7,7,7,8,8]`, while Side `[8,7,8]` becomes `[8,8,7]`. Assert per-section multisets, unchanged ownership, dirty flag, idempotence after markSaved, empty sections and unknown types.
-- [ ] Run `./gradlew.bat test --tests '*DeckEditorModelTest' --console=plain` and record the expected new regression failure.
-- [ ] Implement minimal per-section stable grouping: build first-seen indices for that section; compare `typeOrder(cardType.applyAsInt(code))`, then the section's first index for that exact passcode. Do not replace grouping with a global numeric/name sort.
-- [ ] Rerun the focused test, inspect the diff, commit only task files, and report command/output evidence.
+- [x] Run the existing focused test as baseline, then add a regression with interleaved same-type cards in Main, Extra and Side. Example all-spell Main `[7,8,7,8,7]` must become `[7,7,7,8,8]`, while Side `[8,7,8]` becomes `[8,8,7]`. Assert per-section multisets, unchanged ownership, dirty flag, idempotence after markSaved, empty sections and unknown types.
+- [x] Run `./gradlew.bat test --tests '*DeckEditorModelTest' --console=plain` and record the expected new regression failure.
+- [x] Implement minimal per-section stable grouping: build first-seen indices for that section; compare `typeOrder(cardType.applyAsInt(code))`, then the section's first index for that exact passcode. Do not replace grouping with a global numeric/name sort.
+- [x] Rerun the focused test, inspect the diff, commit only task files, and report command/output evidence.
 
 ### Task 2: Refine collection menus and controls
 
@@ -44,13 +44,13 @@
 
 **Interfaces:** Reuse SavedDeckController navigation/save/request methods, CollectionController selector/modal wiring, DeckImportService and DeckExportService. Keep server commands/payload shapes unchanged. Task 1's `sortByType` signature is unchanged.
 
-- [ ] Read controller, XML, saved-deck tests/scenarios and `docs/ldlib2-ui-guide.md` / `docs/ui-wiring-guide.md`. Map existing controls and pending-state paths before editing. Keep changes within current classes; no new generic UI framework.
-- [ ] Add/update meaningful scenario checks before implementing: at least six saved decks with duplicate names/different UUIDs, explicit Open, dirty navigation/cancel/failure, empty new close, nested Esc, empty import list, and long name/busy state. Use existing `ScenarioBuilder` clicks/checks and real controller requests. Update only obsolete assertions affected by approved text/control changes.
-- [ ] Implement compact header and separate top-level navigation. Replace `list-picker` with a scrollable saved list and explicit Open. Keep selection separate from the currently edited list; selected-row copy/delete must use the selected saved list. Preserve clear-activation access as a context action near active status. Use one X on My decks.
-- [ ] Move existing import picker/export launch into a separate modal: dropdown plus Import YDK row, Export YDK row below; normal button sizes. Retain safe exporter/overwrite dialog. Add Help modal with ownership and supported-check text. Remove routine helper captions and edit-success narration; preserve actionable failures and eligibility details.
-- [ ] Configure selectors for at least five visible rows where enough entries exist. Update Esc handling for all new surfaces. Use concise Save changes / Save / Discard / Keep editing wording and short active status. Preserve complete browser, inspector, deck body and transfer behavior.
-- [ ] Run focused unit tests: `./gradlew.bat test --tests 'com.haxerus.duelcraft.client.collection.*' --console=plain`. Run focused real UI scenarios at `1280x720` scale 2 and `1920x1080` scale 3 using `-PldTest=<affected scenario names> -PldTestWindow=<size> -PldTestGuiScale=<scale>`. Archive fresh output/screenshots under `build/evidence/collection-controls-qa3/`; inspect screenshots. Report actual failures/blockers without substituting old evidence.
-- [ ] Self-review, commit scoped source/tests, and write full test/evidence report. Do not run the entire suite during visual iteration.
+- [x] Read controller, XML, saved-deck tests/scenarios and `docs/ldlib2-ui-guide.md` / `docs/ui-wiring-guide.md`. Map existing controls and pending-state paths before editing. Keep changes within current classes; no new generic UI framework.
+- [x] Add/update meaningful scenario checks before implementing: at least six saved decks with duplicate names/different UUIDs, explicit Open, dirty navigation/cancel/failure, empty new close, nested Esc, empty import list, and long name/busy state. Use existing `ScenarioBuilder` clicks/checks and real controller requests. Update only obsolete assertions affected by approved text/control changes.
+- [x] Implement compact header and separate top-level navigation. Replace `list-picker` with a scrollable saved list and explicit Open. Keep selection separate from the currently edited list; selected-row copy/delete must use the selected saved list. Preserve clear-activation access as a context action near active status. Use one X on My decks.
+- [x] Move existing import picker/export launch into a separate modal: dropdown plus Import YDK row, Export YDK row below; normal button sizes. Retain safe exporter/overwrite dialog. Add Help modal with ownership and supported-check text. Remove routine helper captions and edit-success narration; preserve actionable failures and eligibility details.
+- [x] Configure selectors for at least five visible rows where enough entries exist. Update Esc handling for all new surfaces. Use concise Save changes / Save / Discard / Keep editing wording and short active status. Preserve complete browser, inspector, deck body and transfer behavior.
+- [x] Run focused unit tests: `./gradlew.bat test --tests 'com.haxerus.duelcraft.client.collection.*' --console=plain`. Run focused real UI scenarios at `1280x720` scale 2 and `1920x1080` scale 3 using `-PldTest=<affected scenario names> -PldTestWindow=<size> -PldTestGuiScale=<scale>`. Archive fresh output/screenshots under `build/evidence/collection-controls-qa3/`; inspect screenshots. Report actual failures/blockers without substituting old evidence.
+- [x] Self-review, commit scoped source/tests, and write full test/evidence report. Do not run the entire suite during visual iteration.
 
 ### Task 3: Regression, review and playtest checkpoint
 
