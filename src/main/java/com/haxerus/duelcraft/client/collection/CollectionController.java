@@ -668,8 +668,6 @@ final class CollectionController {
         refreshInspector(false);
         // Requery ownership filters, but keep the scroll position if membership/order is unchanged.
         refreshResults(false);
-        text("editor-status", (add ? "Added one card to " : "Removed one card from ")
-                + title(editMode.name()) + ". Draft only; ownership is unchanged.");
     }
 
     void refreshTransfers() {
@@ -735,9 +733,6 @@ final class CollectionController {
                     refreshPanes();
                     refreshInspector(false);
                     refreshResults(false);
-                    text("editor-status", "Removed one card from "
-                            + (section == DeckEditorModel.Section.SIDE ? "Side" : "Deck")
-                            + ". Draft only; ownership is unchanged.");
                 });
                 if (seen.merge(code, 1, Integer::sum) > model.owned().getOrDefault(code, 0L)) {
                     var missing = new Label().setText("Missing").addClass("missing-copy");

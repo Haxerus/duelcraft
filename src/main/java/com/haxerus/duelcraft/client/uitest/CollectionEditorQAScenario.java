@@ -94,7 +94,8 @@ public final class CollectionEditorQAScenario implements UIScenario {
 
         doubleLeft(s, "first Main double click", "#collection-card-" + MAIN);
         s.check("two left clicks add exactly one Main copy", ctx ->
-                model(ctx).draft().equals(new DeckList(List.of(MAIN), List.of(), List.of())));
+                model(ctx).draft().equals(new DeckList(List.of(MAIN), List.of(), List.of())))
+         .check("successful Add leaves routine status quiet", ctx -> ctx.el("#editor-status").text().isEmpty());
 
         s.step("filter to the interleaving card", ctx -> ctx.el("#collection-search").as(TextField.class)
                     .setText(String.valueOf(OTHER), true)).ticks(2)
@@ -125,7 +126,9 @@ public final class CollectionEditorQAScenario implements UIScenario {
 
         rightPress(s, "exact repeated tile", "#main-card-2");
         s.check("right press removes the rendered index only", ctx ->
-                model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of())))
+                 model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of())))
+          .check("successful tile removal keeps the copy-limit detail", ctx ->
+                  ctx.el("#editor-status").text().contains("Three copies"))
          .step("release exact repeated tile", CollectionEditorQAScenario::rightRelease)
          .check("right release does not remove again or fire left selection", ctx ->
                  model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of()))
