@@ -4,6 +4,7 @@ import com.haxerus.duelcraft.collection.DeckList;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntUnaryOperator;
@@ -64,9 +65,16 @@ public final class DeckEditorModel {
 
     public void sortByType(IntUnaryOperator cardType) {
         requireEditable();
-        Comparator<Integer> order = Comparator.comparingInt(code -> typeOrder(cardType.applyAsInt(code)));
-        draft = new DeckList(draft.main().stream().sorted(order).toList(),
-                draft.extra().stream().sorted(order).toList(), draft.side().stream().sorted(order).toList());
+        draft = new DeckList(sortSection(draft.main(), cardType),
+                sortSection(draft.extra(), cardType), sortSection(draft.side(), cardType));
+    }
+
+    private static List<Integer> sortSection(List<Integer> cards, IntUnaryOperator cardType) {
+        var firstIndex = new HashMap<Integer, Integer>();
+        for (int i = 0; i < cards.size(); i++) firstIndex.putIfAbsent(cards.get(i), i);
+        Comparator<Integer> order = Comparator.comparingInt((Integer code) -> typeOrder(cardType.applyAsInt(code)))
+                .thenComparingInt(firstIndex::get);
+        return cards.stream().sorted(order).toList();
     }
 
     private static int typeOrder(int type) {

@@ -23,13 +23,40 @@ class DeckEditorModelTest {
 
         model.sortByType(code -> types.getOrDefault(code, 0));
 
-        assertEquals(new DeckList(List.of(1, 7, 5, 2, 5, 3, 4, 99), List.of(6, 6), List.of(1, 6, 3, 4)), model.draft());
+        assertEquals(new DeckList(List.of(1, 7, 5, 5, 2, 3, 4, 99), List.of(6, 6), List.of(1, 6, 3, 4)), model.draft());
         assertEquals(initial.requiredCopies(), model.draft().requiredCopies());
         assertEquals(Map.of(1, 1L), model.owned());
         assertTrue(model.dirty());
         model.markSaved();
         model.sortByType(code -> types.getOrDefault(code, 0));
         assertFalse(model.dirty());
+    }
+
+    @Test void sortGroupsIdenticalCardsWithinEachTypeAndSection() {
+        var initial = new DeckList(List.of(7, 8, 7, 8, 7), List.of(), List.of(8, 7, 8));
+        var owned = Map.of(7, 2L, 8, 1L);
+        var model = new DeckEditorModel(initial, owned);
+
+        model.sortByType(code -> TYPE_SPELL);
+
+        assertEquals(List.of(7, 7, 7, 8, 8), model.draft().main());
+        assertEquals(List.of(), model.draft().extra());
+        assertEquals(List.of(8, 8, 7), model.draft().side());
+        assertEquals(initial.requiredCopies(), model.draft().requiredCopies());
+        assertEquals(owned, model.owned());
+        assertTrue(model.dirty());
+
+        var sorted = model.draft();
+        model.sortByType(code -> TYPE_SPELL);
+        assertEquals(sorted, model.draft());
+        model.markSaved();
+        assertFalse(model.dirty());
+        model.sortByType(code -> TYPE_SPELL);
+        assertFalse(model.dirty());
+
+        var unknownTypes = new DeckEditorModel(new DeckList(List.of(9, 10, 9), List.of(10, 9), List.of()), Map.of());
+        unknownTypes.sortByType(code -> 0);
+        assertEquals(new DeckList(List.of(9, 9, 10), List.of(10, 9), List.of()), unknownTypes.draft());
     }
 
     @Test void sortCannotChangeAFrozenDraft() {
