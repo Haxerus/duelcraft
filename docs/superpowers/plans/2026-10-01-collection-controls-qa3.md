@@ -54,6 +54,8 @@
 
 ### Task 3: Regression, review and playtest checkpoint
 
+Phase A evidence is in [the QA.3 verification report](../reports/2026-10-01-collection-controls-qa3-verification.md). The full build passed, but the first full UI group and one focused rerun reproduced a stale `duel_selection_captions` fixture failure. Keep Task 3 open until its correction, review, covering verification and package are complete.
+
 **Files:** New `docs/superpowers/reports/2026-10-01-collection-controls-qa3-verification.md`; update this plan and `docs/superpowers/handoffs/2026-09-17-deck-editor-implementation.md`. Packaging may update `gradle.properties` and add `docs/qa-m4-qa3.md` using established QA packaging procedure; preserve QA.2 files.
 
 **Interfaces:** Consume task commits and fresh reports; retain protocol 7 and pinned dependencies.

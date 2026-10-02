@@ -4,6 +4,10 @@ Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is imple
 
 QA follow-up: `codex/qa-m4` packages the reviewed checkpoint for Windows x64 friend testing, with the existing collection command enabled in packaged clients. Main `bc2fcba` was already included; `codex/player-collections` remains at `45b7460`. See the [QA installation and test guide](../../qa-m4.md). This is separate from M5 implementation.
 
+## M4 QA.3 phase A checkpoint (2026-10-01)
+
+`codex/qa-m4` now includes the approved collection controls and identical-card sort batch (`fcded07`, `3029b27`, `fdc8741`, `9d927ca`). Version and playtest guide were committed as `6c18203` (`1.0.0-m4-qa.3`, protocol 7; pinned dependencies retained). A fresh full build passed 1,099/1,100 JUnit tests with one expected Windows symlink skip. The first complete UI group passed 52/53 scenarios and 12,250/12,257 checks; all 14 collection scenarios passed, while a stale `duel_selection_captions` synthetic candidate code reproduced the same seven failures in isolation. See [the QA.3 verification report](../reports/2026-10-01-collection-controls-qa3-verification.md) for the cause, archived evidence and manual checkpoint. The scenario correction, final whole-change review, package and user visual acceptance remain open. Historical QA.2 artifacts and worlds are preserved.
+
 ## M4 QA.2 integration (2026-09-20)
 
 **Current QA.2 source is `e2da8c05071a8fcdbf5396c49177a592c28da3f5`, correcting final-review R1. I1 and packaged two-client duel acceptance remain open.** Face-down field reveals now appear in prompt-owned choices without changing ordinary privacy or response indices. Fresh checks passed: 300 focused unit tests; eight UI scenarios/2,004 checks; both-policy native visibility/2,366 checks with all six child exits 0; and the full build (1,097 passed, one expected skip). Scoped independent rereview approved this correction and its package provenance; R1 is closed with no new breakage.
