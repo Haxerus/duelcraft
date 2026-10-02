@@ -48,18 +48,12 @@ public final class CollectionEligibilityScenario implements UIScenario {
                 throw new IllegalStateException("Could not create controlled editor", error);
             }
         }).awaitModularUI().ticks(3)
-         .checkTextContains("#deck-shortages", "Ownership optional")
-         .checkHidden("#deck-warnings")
-         .check("ownership feedback spans the available footer space", ctx -> {
-             var feedback = ctx.el("#deck-feedback").bounds();
-             var text = ctx.el("#deck-shortages").bounds();
-             return Math.abs(text.center().x - feedback.center().x) < 1
-                     && Math.abs(text.width() - feedback.width()) < 1;
-         });
-        CollectionRuntimeFixture.press(s, "#saved-lists");
-        s.checkTextContains("#list-supported-checks", "Activation does not require deposited copies.")
+         .checkHidden("#deck-shortages")
+         .checkHidden("#deck-warnings");
+        CollectionRuntimeFixture.press(s, "#help-button");
+        s.checkTextContains("#help-supported-checks", "Activation does not require deposited copies.")
          .hoverAt(-100, -100).screenshot("optional-ownership-help");
-        CollectionRuntimeFixture.press(s, "#lists-close");
+        CollectionRuntimeFixture.press(s, "#help-close");
         s.checkClass("#main-card-0 .missing-copy", "neutral")
          .click("#main-card-0")
          .checkClass("#inspector-missing", "neutral")
@@ -69,17 +63,17 @@ public final class CollectionEligibilityScenario implements UIScenario {
                  new DeckEligibility.Report(List.of(), Map.of(CollectionFixture.FIRST, 1), false, false, null))))
          .ticks(3)
          .checkHidden("#eligibility-dialog")
-         .checkTextContains("#list-active-status", "active")
+         .checkTextContains("#list-active-status", "Active")
          .hoverAt(-100, -100).screenshot("optional-ownership-activation")
          .step("switch controlled snapshot to required ownership", ctx ->
                  ctx.<SavedDeckController>get("lists").applyView(new ClientCollectionState.View(
                          5, ctx.<DeckEditorModel>get("model").owned(), List.of(), null, true, null)))
          .ticks(3)
          .checkTextContains("#deck-shortages", "Ownership required");
-        CollectionRuntimeFixture.press(s, "#saved-lists");
-        s.checkTextContains("#list-supported-checks", "Activation requires deposited copies")
+        CollectionRuntimeFixture.press(s, "#help-button");
+        s.checkTextContains("#help-supported-checks", "Activation requires deposited copies")
          .hoverAt(-100, -100).screenshot("required-ownership-help");
-        CollectionRuntimeFixture.press(s, "#lists-close");
+        CollectionRuntimeFixture.press(s, "#help-close");
         s.check("required shortage uses warning treatment", ctx ->
                  !ctx.el("#main-card-0 .missing-copy").element().hasClass("neutral"))
          .click("#activate-deck")

@@ -61,16 +61,16 @@ final class CollectionRuntimeFixture {
     }
 
     static void select(ScenarioBuilder s, java.util.function.Function<TestContext, UUID> target) {
-        press(s, "#list-picker");
-        s.step("identify saved UUID dropdown row", ctx -> {
+        s.step("identify saved UUID row", ctx -> {
+            Object controller = ctx.getField(ctx.screen(), "controller");
             Map<UUID, com.lowdragmc.lowdraglib2.gui.ui.elements.Button> buttons =
-                    ctx.getField(ctx.el("#list-picker").element(), "candidateButtons");
+                    ctx.getField(controller, "savedRows");
             var button = buttons.get(target.apply(ctx));
-            ctx.require("saved UUID has a real dropdown row", button != null);
-            buttons.forEach((id, candidate) -> candidate.setId("runtime-list-" + id));
+            ctx.require("saved UUID has a real row", button != null);
             button.setId("runtime-list-choice");
         });
         press(s, "#runtime-list-choice");
+        press(s, "#list-open");
     }
 
     static PlayerCollectionData data(ServerContext sc) {

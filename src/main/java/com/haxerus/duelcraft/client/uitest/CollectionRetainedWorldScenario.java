@@ -37,11 +37,10 @@ public final class CollectionRetainedWorldScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<PlayerCollectionData>get("expected").activeDeckId());
         CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
-        s.waitForText("#editor-title", "Retained M2 all sections")
-         .checkTextContains("#list-active-status", "is active")
+        s.waitForText("#list-name", "Retained M2 all sections")
+         .checkTextContains("#list-active-status", "Active")
          .check("real ReadDeck loads exact UUID name Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx,
                  ctx.<PlayerCollectionData>get("expected").decks().values().iterator().next().cards()));
-        CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkCount("#main-grid .card-tile", 40).checkCount("#extra-grid .card-tile", 1)
          .click("#toggle-side").checkCount("#side-grid .card-tile", 2)
          .click("#main-card-0").checkTextContains("#inspector-owned", "1000")
@@ -84,8 +83,7 @@ public final class CollectionRetainedWorldScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<SavedDeck>get("saved").id());
         CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
-        s.waitForText("#editor-title", "Retained M2 all sections");
-        CollectionRuntimeFixture.press(s, "#lists-close");
+        s.waitForText("#list-name", "Retained M2 all sections");
         s.click("#activate-deck")
          .waitUntilServer("real editor Activate packet accepted", sc -> CollectionRuntimeFixture.data(sc).revision() == 12
                  && sc.<SavedDeck>get("saved").id().equals(CollectionRuntimeFixture.data(sc).activeDeckId()))

@@ -505,6 +505,26 @@ class SavedDeckControllerTest {
         assertEquals("save_first", controller.status());
     }
 
+    @Test void copyingSelectedDeckWaitsForReadAndUsesItsCardsDespiteDuplicateName() {
+        var selected = UUID.randomUUID();
+        var cards = new DeckList(List.of(7, 8), List.of(9), List.of());
+        var c = productionController();
+        c.applyView(new ClientCollectionState.View(4, Map.of(), List.of(
+                new CollectionReply.Summary(id, "List", 0, 0, 0),
+                new CollectionReply.Summary(selected, "List", 2, 1, 0)), null));
+
+        c.copy(selected);
+        assertEquals(id, c.id());
+        assertEquals(new CollectionCommand.ReadDeck(selected), commands.getFirst());
+        replies.getFirst().complete(new CollectionReply.Deck(4, new SavedDeck(selected, "List", cards)));
+
+        assertNotEquals(id, c.id());
+        assertNotEquals(selected, c.id());
+        assertEquals("List copy", c.name());
+        assertEquals(cards, model.draft());
+        assertFalse(c.stored());
+    }
+
     @Test void explicitSaveKeepsSelectedIdentityUpdatesBaselineAndNeverActivates() {
         var selected = UUID.randomUUID();
         var active = UUID.randomUUID();

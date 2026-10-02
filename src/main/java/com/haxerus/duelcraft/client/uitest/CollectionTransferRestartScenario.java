@@ -57,7 +57,7 @@ public final class CollectionTransferRestartScenario implements UIScenario {
             CollectionLifecycleLauncher.writeManifest(manifest);
         });
         CollectionRuntimeFixture.open(s);
-        s.checkTextContains("#editor-title", "New list")
+        s.checkTextContains("#list-name", "New list")
          .hoverAt(-100, -100).screenshot("transfer-" + stage)
          .teardown("close transfer editor", ctx -> ctx.mc().setScreen(null));
     }

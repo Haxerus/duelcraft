@@ -62,10 +62,9 @@ public final class CollectionPrivacyClient {
         CollectionRuntimeFixture.press(b, "#saved-lists");
         CollectionRuntimeFixture.select(b, ctx -> CollectionPrivacyScenario.id(role, changed));
         CollectionRuntimeFixture.expectEmptyDraftNavigation(b);
-        b.waitForText("#editor-title", "Private same name")
+        b.waitForText("#list-name", "Private same name")
          .check("own UUID ReadDeck loads exact ordered Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, CollectionPrivacyScenario.cards()));
-        if (changed) b.checkTextContains("#list-active-status", "is active");
-        CollectionRuntimeFixture.press(b, "#lists-close");
+        if (changed) b.checkTextContains("#list-active-status", "Active");
         b.checkCount("#main-grid .card-tile", 40).checkCount("#extra-grid .card-tile", 1)
          .checkTextContains("#side-count", "2").ticks(3)
          .screenshot(role + (changed ? "-own-saved-active" : "-own-initial"));

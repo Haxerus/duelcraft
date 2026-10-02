@@ -45,8 +45,7 @@ public final class CollectionPersistenceScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
         CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
-        s.waitForText("#editor-title", "Runtime owned all sections");
-        CollectionRuntimeFixture.press(s, "#lists-close");
+        s.waitForText("#list-name", "Runtime owned all sections");
         s.click("#activate-deck")
          .waitUntilServer("known owned activation accepted", sc -> CollectionRuntimeFixture.OWNED_ID.equals(CollectionRuntimeFixture.data(sc).activeDeckId()))
          .waitUntil("activation acknowledgement snapshot", ctx -> {
@@ -74,10 +73,9 @@ public final class CollectionPersistenceScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OWNED_ID);
         CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
-        s.waitForText("#editor-title", "Runtime owned all sections")
-         .checkTextContains("#list-active-status", "is active")
+        s.waitForText("#list-name", "Runtime owned all sections")
+         .checkTextContains("#list-active-status", "Active")
          .check("ReadDeck after respawn loads complete owned Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().get(CollectionRuntimeFixture.OWNED_ID).cards()));
-        CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkCount("#main-grid .card-tile", 40).checkCount("#extra-grid .card-tile", 1)
          .click("#toggle-side").checkCount("#side-grid .card-tile", 2)
          .click("#main-card-0").checkTextContains("#inspector-owned", "1000")
@@ -85,9 +83,8 @@ public final class CollectionPersistenceScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> CollectionRuntimeFixture.OTHER_ID);
         s
-         .waitForText("#editor-title", "Runtime second saved UUID")
+         .waitForText("#list-name", "Runtime second saved UUID")
          .check("second UUID ReadDeck preserves complete Main Extra Side", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().get(CollectionRuntimeFixture.OTHER_ID).cards()));
-        CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkTextContains("#main-count", "1").checkTextContains("#extra-count", "1").checkTextContains("#side-count", "1")
          .click("#main-card-0").checkTextContains("#inspector-name", "99999999")
          .checkServer("reads leave complete cloned authority unchanged", sc -> CollectionRuntimeFixture.data(sc).equals(sc.<PlayerCollectionData>get("expected")));

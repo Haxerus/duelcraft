@@ -68,11 +68,10 @@ final class CollectionWidgetPlaytest {
           .check("requested GUI scale is active", ctx -> ctx.mc().getWindow().getGuiScale() == guiScale)
           .check("only Deck and Side edit modes are exposed", ctx -> ctx.exists("#section-deck")
                   && ctx.exists("#section-side") && !ctx.exists("#section-main") && !ctx.exists("#section-extra"))
-          .check("My decks and Save align", ctx -> {
+          .check("My decks is a separate top-level action", ctx -> {
               var lists = ctx.el("#saved-lists").bounds();
               var save = ctx.el("#save-deck").bounds();
-              return Math.abs(lists.width() - save.width()) < 1 && Math.abs(lists.height() - save.height()) < 1
-                      && Math.abs(lists.y() - save.y()) < 1;
+              return lists.y() > save.y() && DuelScreenScenario.insideViewport(lists);
           })
           .checkVisible("#inspector-empty")
           .checkText("#inspector-empty-prompt", "Select a card to inspect.")
@@ -119,8 +118,8 @@ final class CollectionWidgetPlaytest {
           .click("#filter-measure")
           .step("choose Measure through its real popup row", ctx -> choose(ctx, "filter-measure", CardSearch.Measure.RANK))
           .click("#toggle-filters").ticks(2)
-          .step("open Saved lists with real mouse input", ctx -> click(ctx, "saved-lists")).ticks(2)
-          .checkText("#list-import-label", "Import a local .ydk list")
+          .step("open Import / export with real mouse input", ctx -> click(ctx, "import-export")).ticks(2)
+          .checkText("#import-title", "Import / export")
           .step("record initial local import state", ctx -> {
               var picker = ctx.el("#list-import-picker").as(Selector.class);
               Map<String, Button> candidates = ctx.getField(picker, "candidateButtons");
@@ -142,7 +141,7 @@ final class CollectionWidgetPlaytest {
                       && ctx.el("#list-import").element().isActive() == !candidates.isEmpty();
           })
           .click("#list-import-picker").ticks(2)
-          .step("close Saved lists before adding a local deck", ctx -> click(ctx, "lists-close")).ticks(2)
+          .step("close Import / export before adding a local deck", ctx -> click(ctx, "import-close")).ticks(2)
           .step("write populated local deck", ctx -> {
               Path importFile = ctx.get("importFile");
               try {
@@ -150,7 +149,7 @@ final class CollectionWidgetPlaytest {
                   Files.writeString(importFile, "#main\n10001\n10002\n#extra\n10066\n!side\n10003\n");
               } catch (IOException error) { throw new UncheckedIOException(error); }
           })
-          .step("reopen Saved lists with a local deck", ctx -> click(ctx, "saved-lists")).ticks(2)
+          .step("reopen Import / export with a local deck", ctx -> click(ctx, "import-export")).ticks(2)
           .click("#list-import-picker").ticks(2)
           .step("choose populated Import row", ctx -> choose(ctx, "list-import-picker", "collection-import-ui"))
           .check("populated local picker enables Import", ctx ->
@@ -172,7 +171,7 @@ final class CollectionWidgetPlaytest {
                       && model.draft().side().equals(List.of(10003))
                       && lists.dirty() && !lists.stored() && "collection-import-ui".equals(lists.name());
           })
-          .step("close My decks before explicit import Save", ctx -> click(ctx, "lists-close")).ticks(2)
+          .step("close Import / export before explicit import Save", ctx -> click(ctx, "import-close")).ticks(2)
           .click("#save-deck").ticks(2)
           .check("explicit Save acknowledges the imported draft", ctx -> {
               var model = ctx.<com.haxerus.duelcraft.client.collection.DeckEditorModel>get("model");
@@ -186,8 +185,8 @@ final class CollectionWidgetPlaytest {
                       CollectionFixture.model(false).draft()));
               lists.save();
           }).ticks(2)
-          .click("#list-picker")
-          .step("choose Saved list through its real popup row", ctx -> choose(ctx, "list-picker", CollectionFixture.LIST_ID))
+          .check("restored draft keeps its original UUID", ctx ->
+                  CollectionFixture.LIST_ID.equals(ctx.<SavedDeckController>get("lists").id()))
           .hoverAt(-100, -100).screenshot("collection-playtest-scale" + guiScale)
           .step("close Saved lists with real mouse input", ctx -> click(ctx, "lists-close")).ticks(2)
           .click("#sort-deck").ticks(2)
@@ -244,7 +243,7 @@ final class CollectionWidgetPlaytest {
             var scroll = ctx.el("#" + id).as(ScrollerView.class);
             if (!compact(scroll.verticalScroller, false) || !compact(scroll.horizontalScroller, true)) return false;
         }
-        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-picker", "list-import-picker")) {
+        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-import-picker")) {
             var selector = ctx.el("#" + id).as(Selector.class);
             if (!compact(selector.scrollerView.verticalScroller, false)
                     || !compact(selector.scrollerView.horizontalScroller, true)) return false;

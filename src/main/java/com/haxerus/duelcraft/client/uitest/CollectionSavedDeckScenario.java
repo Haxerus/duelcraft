@@ -35,7 +35,7 @@ public final class CollectionSavedDeckScenario implements UIScenario {
           });
         CollectionRuntimeFixture.open(s);
         s.checkVisible("#inspector-empty").checkHidden("#card-edit-controls")
-         .checkTextContains("#deck-shortages", "Ownership optional")
+         .checkHidden("#deck-shortages")
          .step("search real Main passcode", ctx -> ctx.el("#collection-search").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class)
                     .setText(String.valueOf(ctx.<Integer>get("mainCode")), true))
          .waitUntil("real Main search result mounted", ctx -> ctx.elOpt("#collection-card-" + ctx.<Integer>get("mainCode")).isPresent())
@@ -57,7 +57,8 @@ public final class CollectionSavedDeckScenario implements UIScenario {
             ctx.check("draft remains unsaved before acknowledgement", ctx.el("#deck-summary").text().contains("Unsaved"));
             CollectionLayoutScenario.release(ctx);
         }).waitUntilServer("submitted draft stored", sc -> CollectionRuntimeFixture.data(sc).revision() == 21)
-         .waitUntil("Save acknowledgement applied", ctx -> ctx.el("#save-deck").isActive() && ctx.el("#editor-status").text().contains("List saved"))
+         .waitUntil("Save acknowledgement applied", ctx -> ctx.el("#save-deck").isActive()
+                 && ctx.el("#deck-summary").text().contains("Saved list"))
          .checkTextContains("#deck-summary", "Saved list")
          .serverGet("capture authoritative saved state", "expected", CollectionRuntimeFixture::data)
          .step("record exact server-confirmed saved fixture", ctx -> ctx.attach("saved-state", ctx.<PlayerCollectionData>get("expected").toString()))
@@ -87,9 +88,8 @@ public final class CollectionSavedDeckScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ctx.<PlayerCollectionData>get("expected").decks().keySet().iterator().next());
         CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
-        s.waitForText("#editor-title", "Runtime unowned draft")
+        s.waitForText("#list-name", "Runtime unowned draft")
          .check("ReadDeck loads every saved section exactly", ctx -> CollectionRuntimeFixture.draftMatches(ctx, ctx.<PlayerCollectionData>get("expected").decks().values().iterator().next().cards()));
-        CollectionRuntimeFixture.press(s, "#lists-close");
         s.checkCount("#main-grid .card-tile", 40).checkCount("#extra-grid .card-tile", 1)
          .click("#toggle-side").checkCount("#side-grid .card-tile", 1)
          .click("#main-card-0").checkTextContains("#inspector-missing", "1")
@@ -97,9 +97,9 @@ public final class CollectionSavedDeckScenario implements UIScenario {
              CollectionLayoutScenario.press(ctx, "#activate-deck");
              CollectionLayoutScenario.release(ctx);
          })
-         .waitUntil("optional-ownership activation acknowledged", ctx -> ctx.el("#editor-status").text().contains("updated"))
+         .waitUntil("optional-ownership activation acknowledged", ctx -> ctx.el("#list-active-status").text().contains("Active"))
          .checkHidden("#eligibility-dialog")
-         .checkTextContains("#deck-shortages", "Ownership optional")
+         .checkHidden("#deck-shortages")
          .checkServer("optional-ownership activation selects the saved list", sc -> {
              var expected = sc.<PlayerCollectionData>get("expected");
              var actual = CollectionRuntimeFixture.data(sc);

@@ -16,6 +16,8 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
+import com.lowdragmc.lowdraglib2.gui.ui.data.Horizontal;
+import com.lowdragmc.lowdraglib2.gui.ui.data.TextWrap;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
 import net.minecraft.network.chat.Component;
@@ -89,6 +91,8 @@ final class CollectionController {
     private final Map<ScrollerView, Float> pendingScrollOffsets = new HashMap<>();
     private List<CardInfo> results = List.of();
     private UUID deleteTarget;
+    private UUID selectedSavedId;
+    private final Map<UUID, Button> savedRows = new HashMap<>();
 
     CollectionController(UI ui, DeckEditorModel model, List<CardInfo> cards,
             IntFunction<ResourceLocation> textures, IntFunction<ResourceLocation> art, UUID id,
@@ -110,11 +114,11 @@ final class CollectionController {
         this.close = close;
         ((TextElement) element("editor-status")).setText(Component.translatable("duelcraft.collection.unavailable"));
         ((TextElement) element("inspector-empty-prompt")).setText(Component.translatable("duelcraft.collection.select_card"));
-        for (var entry : Map.of("lists-title", "lists", "list-name-label", "list_name",
-                "list-import-label", "import_local",
-                "list-save-first", "save_first",
+        for (var entry : Map.of("lists-title", "lists", "import-title", "import_export",
+                "help-title", "help", "help-controls", "help_controls",
+                "help-navigation", "help_navigation",
                 "delete-title", "delete_confirm", "delete-copy", "delete_copy",
-                "close-title", "save_changes", "close-copy", "save_changes_copy").entrySet()) {
+                "close-title", "save_changes").entrySet()) {
             ((TextElement) element(entry.getKey())).setText(Component.translatable("duelcraft.collection." + entry.getValue()));
         }
         cards.forEach(card -> byCode.put(card.code(), card));
@@ -217,19 +221,38 @@ final class CollectionController {
     @SuppressWarnings("unchecked")
     private void configureLists() {
         var importPicker = (Selector<String>) element("list-import-picker");
+        importPicker.selectorStyle(style -> style.maxItemCount(5).scrollerViewHeight(110));
         importPicker.dialog.style(style -> style.zIndex(95));
         button("saved-lists").setOnClick(event -> {
-            refreshImportPicker(importPicker);
+            lists.refresh();
             element("lists-dialog").setDisplay(true);
         });
         button("lists-close").setOnClick(event -> element("lists-dialog").setDisplay(false));
-        ((TextField) element("list-name")).setTextResponder(lists::rename);
-        ((Selector<UUID>) element("list-picker")).dialog.style(style -> style.zIndex(95));
-        ((Selector<UUID>) element("list-picker")).setOnValueChanged(target -> {
-            if (target != null && !target.equals(lists.id())) lists.navigate(() -> lists.select(target));
+        button("new-deck").setOnClick(event -> lists.navigate(lists::newDraft));
+        button("import-export").setOnClick(event -> {
+            refreshImportPicker(importPicker);
+            element("import-dialog").setDisplay(true);
         });
-        button("list-new").setOnClick(event -> lists.navigate(lists::newDraft));
-        button("list-duplicate").setOnClick(event -> lists.duplicate());
+        button("import-close").setOnClick(event -> element("import-dialog").setDisplay(false));
+        button("help-button").setOnClick(event -> element("help-dialog").setDisplay(true));
+        button("help-close").setOnClick(event -> element("help-dialog").setDisplay(false));
+        ((TextField) element("list-name")).setTextResponder(lists::rename);
+        button("list-open").setOnClick(event -> {
+            UUID target = selectedSavedId;
+            if (target == null || !savedExists(target)) return;
+            lists.navigate(() -> {
+                lists.select(target);
+                element("lists-dialog").setDisplay(false);
+            });
+        });
+        button("list-duplicate").setOnClick(event -> {
+            UUID target = selectedSavedId;
+            if (target == null || !savedExists(target)) return;
+            lists.navigate(() -> {
+                lists.copy(target);
+                element("lists-dialog").setDisplay(false);
+            });
+        });
         button("list-import").setOnClick(event -> {
             String name = importPicker.getValue();
             if (name == null) return;
@@ -256,11 +279,11 @@ final class CollectionController {
         element("export-dialog").setDisplay(false);
         element("export-overwrite-dialog").setDisplay(false);
         button("list-delete").setOnClick(event -> {
-            UUID selected = ((Selector<UUID>) element("list-picker")).getValue();
-            deleteTarget = selected == null ? lists.id() : selected;
+            if (selectedSavedId == null || !savedExists(selectedSavedId)) return;
+            deleteTarget = selectedSavedId;
             String targetName = lists.summaries().stream()
                     .filter(summary -> summary.id().equals(deleteTarget))
-                    .map(CollectionReply.Summary::name).findFirst().orElse(lists.name());
+                    .map(CollectionReply.Summary::name).findFirst().orElse("");
             ((TextElement) element("delete-title")).setText(
                     Component.translatable("duelcraft.collection.delete_confirm", targetName));
             element("delete-dialog").setDisplay(true);
@@ -269,7 +292,7 @@ final class CollectionController {
             element("delete-dialog").setDisplay(false);
             UUID target = deleteTarget;
             deleteTarget = null;
-            if (target != null) lists.delete(target);
+            if (target != null && savedExists(target)) lists.delete(target);
         });
         button("delete-cancel").setOnClick(event -> {
             deleteTarget = null;
@@ -278,9 +301,14 @@ final class CollectionController {
         button("activate-deck").setText(Component.translatable("duelcraft.collection.use_for_duels"));
         button("activate-deck").setOnClick(event -> lists.activate());
         button("list-clear-active").setOnClick(event -> lists.clearActive());
-        button("list-refresh").setOnClick(event -> lists.refresh());
         element("lists-dialog").setDisplay(false);
+        element("import-dialog").setDisplay(false);
+        element("help-dialog").setDisplay(false);
         element("delete-dialog").setDisplay(false);
+    }
+
+    private boolean savedExists(UUID id) {
+        return lists.summaries().stream().anyMatch(summary -> summary.id().equals(id));
     }
 
     private void beginExport() {
@@ -335,8 +363,6 @@ final class CollectionController {
             element("export-filename").setActive(true);
             if (error == null) {
                 cancelExport();
-                ((TextElement) element("editor-status")).setText(
-                        Component.translatable("duelcraft.collection.export_done", path.getFileName().toString()));
                 return;
             }
             Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
@@ -374,41 +400,73 @@ final class CollectionController {
     @SuppressWarnings("unchecked")
     private void lifecycleChanged() {
         if (disposed) return;
-        var selector = (Selector<UUID>) element("list-picker");
-        var ids = lists.summaries().stream().map(CollectionReply.Summary::id).toList();
-        UIElementProvider<UUID> options = UIElementProvider.text(id -> {
-            var summary = lists.summaries().stream().filter(value -> value.id().equals(id)).findFirst().orElse(null);
-            return summary == null ? Component.translatable("duelcraft.collection.unsaved_list", lists.name())
-                    : Component.literal(summary.name()).append(id.equals(lists.activeId())
-                            ? Component.translatable("duelcraft.collection.active_suffix") : Component.empty());
-        });
-        selector.setCandidates(ids).setCandidateUIProvider(id -> options.apply(id).addClass("selector-option"));
-        selector.setValue(lists.id(), false);
+        if (!savedExists(selectedSavedId)) selectedSavedId = lists.summaries().isEmpty() ? null : lists.summaries().getFirst().id();
+        refreshSavedRows();
         ((TextField) element("list-name")).setText(lists.name(), false);
         element("list-name").setActive(!lists.pending());
         element("sort-deck").setActive(!lists.pending());
-        element("list-picker").setActive(!lists.pending() && lists.ready());
         element("list-import-picker").setActive(!lists.pending());
         element("list-import").setActive(importsAvailable && !lists.pending());
-        for (String id : List.of("save-deck", "list-new", "list-duplicate", "list-export", "close-save")) {
+        for (String id : List.of("save-deck", "new-deck", "list-export", "close-save")) {
             element(id).setActive(!lists.pending() && lists.ready());
         }
+        for (String id : List.of("list-open", "list-duplicate", "list-delete"))
+            element(id).setActive(!lists.pending() && lists.ready() && selectedSavedId != null);
         for (String id : List.of("close-discard", "close-cancel")) element(id).setActive(!lists.pending());
-        element("list-delete").setActive(!lists.pending() && lists.ready() && lists.stored());
         element("list-clear-active").setActive(!lists.pending() && lists.activeId() != null);
-        element("list-refresh").setActive(!lists.pending());
+        element("list-clear-active").setDisplay(lists.activeId() != null);
         element("close-dialog").setDisplay(lists.needsDecision());
-        ((TextElement) element("editor-title")).setText(Component.literal(lists.name()));
-        ((TextElement) element("list-active-status")).setText(Component.translatable("duelcraft.collection." +
-                (lists.id().equals(lists.activeId()) ? "active" : "not_active")));
-        if (!lists.status().isEmpty()) ((TextElement) element("editor-status")).setText(
+        ((TextElement) element("list-active-status")).setText(Component.literal(
+                lists.id().equals(lists.activeId()) ? "Active" : ""));
+        ((TextElement) element("editor-status")).setText(
                 "transfer_done".equals(lists.status())
                         ? Component.translatable("duelcraft.collection.transfer_done", lists.transferred(), lists.skipped())
-                        : Component.translatable("duelcraft.collection." + lists.status(), failureDetail()));
+                        : List.of("saved", "updated", "export_done", "").contains(lists.status())
+                                ? Component.empty() : Component.translatable("duelcraft.collection." + lists.status(), failureDetail()));
         refreshEligibility();
         refreshDecks();
         refreshInspector(false);
         refreshResults(false);
+    }
+
+    private void refreshSavedRows() {
+        var rows = (ScrollerView) element("saved-list-scroll");
+        rows.clearAllScrollViewChildren();
+        savedRows.clear();
+        int index = 0;
+        for (var summary : lists.summaries()) {
+            UUID id = summary.id();
+            var row = new UIElement();
+            row.addClass("saved-row");
+            var name = new Button();
+            name.setId("saved-row-" + index++);
+            name.addClass("saved-name");
+            if (id.equals(selectedSavedId)) name.addClass("selected");
+            name.setText(Component.literal(summary.name()));
+            name.textStyle(style -> style.textAlignHorizontal(Horizontal.LEFT)
+                    .textWrap(TextWrap.NONE).adaptiveWidth(false));
+            name.text.setOverflowVisible(false);
+            name.getStyle().tooltips(Component.literal(summary.name()));
+            name.setActive(!lists.pending());
+            name.setOnClick(event -> {
+                selectedSavedId = id;
+                savedRows.forEach((rowId, button) -> {
+                    if (rowId.equals(id)) button.addClass("selected");
+                    else button.removeClass("selected");
+                });
+                for (String action : List.of("list-open", "list-duplicate", "list-delete"))
+                    element(action).setActive(!lists.pending() && lists.ready());
+            });
+            row.addChild(name);
+            if (id.equals(lists.activeId())) {
+                var active = new Label();
+                active.addClass("saved-active");
+                active.setText(Component.literal("Active"));
+                row.addChild(active);
+            }
+            rows.addScrollViewChild(row);
+            savedRows.put(id, name);
+        }
     }
 
     private void refreshEligibility() {
@@ -709,13 +767,16 @@ final class CollectionController {
                         : lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
         text("deck-warnings", String.join(" · ", warnings));
         element("deck-warnings").setDisplay(!warnings.isEmpty());
-        ((TextElement) element("list-supported-checks")).setText(Component.translatable("duelcraft.collection." +
+        ((TextElement) element("help-supported-checks")).setText(Component.translatable("duelcraft.collection." +
                 (lists.ownershipRequired() ? "supported_checks_required" : "supported_checks_optional")));
+        ((TextElement) element("help-ownership")).setText(Component.translatable("duelcraft.collection." +
+                (lists.ownershipRequired() ? "ownership_required_help" : "ownership_optional_help")));
         var shortages = element("deck-shortages");
         String key = lists.ownershipRequired()
                 ? (missing > 0 ? "ownership_required_missing" : "ownership_required")
                 : (missing > 0 ? "ownership_optional_missing" : "ownership_optional");
         ((TextElement) shortages).setText(Component.translatable("duelcraft.collection." + key, missing));
+        shortages.setDisplay(lists.ownershipRequired() && missing > 0);
         if (lists.ownershipRequired() && missing > 0) shortages.addClass("warning").removeClass("neutral");
         else shortages.addClass("neutral").removeClass("warning");
         shortages.getStyle().tooltips(Component.translatable("duelcraft.collection." +
@@ -735,7 +796,7 @@ final class CollectionController {
 
     @SuppressWarnings("unchecked")
     private void installSelectorAlignment() {
-        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-picker")) {
+        for (String id : List.of("collection-ownership", "card-sort", "filter-measure", "list-import-picker")) {
             var selector = (Selector<Object>) element(id);
             // Pinned LDLib clamps root-hosted dialogs against the screen with unscaled layout coordinates.
             var listeners = selector.dialog.getBubbleListeners(UIEvents.LAYOUT_CHANGED);
@@ -806,7 +867,6 @@ final class CollectionController {
                 (Selector<Object>) element("collection-ownership"),
                 (Selector<Object>) element("card-sort"),
                 (Selector<Object>) element("filter-measure"),
-                (Selector<Object>) element("list-picker"),
                 (Selector<Object>) element("list-import-picker"));
         var rootChildren = ui.rootElement.getChildren();
         for (int index = rootChildren.size() - 1; index >= 0; index--) {
@@ -833,6 +893,14 @@ final class CollectionController {
         }
         if (element("lists-dialog").isDisplayed()) {
             element("lists-dialog").setDisplay(false);
+            return true;
+        }
+        if (element("import-dialog").isDisplayed()) {
+            element("import-dialog").setDisplay(false);
+            return true;
+        }
+        if (element("help-dialog").isDisplayed()) {
+            element("help-dialog").setDisplay(false);
             return true;
         }
         if (filtersOpen) {

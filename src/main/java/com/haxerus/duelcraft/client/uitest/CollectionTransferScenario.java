@@ -49,8 +49,7 @@ public final class CollectionTransferScenario implements UIScenario {
         CollectionRuntimeFixture.press(s, "#saved-lists");
         CollectionRuntimeFixture.select(s, ctx -> ID);
         CollectionRuntimeFixture.expectEmptyDraftNavigation(s);
-        s.waitForText("#editor-title", "M3 transfer draft");
-        CollectionRuntimeFixture.press(s, "#lists-close");
+        s.waitForText("#list-name", "M3 transfer draft");
         s.click("#main-card-0").typeInto("#transfer-amount", "20");
         CollectionRuntimeFixture.press(s, "#deposit-card");
         s.waitUntilServer("deposit twenty authoritative", sc -> carried(sc) == 0 && stored(sc) == 20)

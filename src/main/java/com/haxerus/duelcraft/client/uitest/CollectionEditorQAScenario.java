@@ -197,36 +197,14 @@ public final class CollectionEditorQAScenario implements UIScenario {
                  ctx.el("#sort-deck").isActive() && !model(ctx).dirty())
          .step("open My decks", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
          .step("release My decks", CollectionLayoutScenario::release).ticks(2)
-         .step("open delete confirmation", ctx -> CollectionLayoutScenario.press(ctx, "#list-delete"))
-         .step("release delete confirmation", CollectionLayoutScenario::release).ticks(2)
-         .checkVisible("#delete-dialog")
-         .checkTextContains("#delete-title", "New list")
+         .check("sample has no saved rows to delete", ctx -> !ctx.el("#list-delete").isActive())
          .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
-         .check("Escape dismisses only delete confirmation", ctx -> !ctx.el("#delete-dialog").isVisible()
-                 && ctx.el("#lists-dialog").isVisible())
-         .keyUp(GLFW.GLFW_KEY_ESCAPE)
-         .step("reopen delete confirmation", ctx -> CollectionLayoutScenario.press(ctx, "#list-delete"))
-         .step("release reopened delete confirmation", CollectionLayoutScenario::release).ticks(2)
-         .step("cancel delete visibly", ctx -> CollectionLayoutScenario.press(ctx, "#delete-cancel"))
-         .step("release delete cancel", CollectionLayoutScenario::release).ticks(2)
-         .check("visible delete cancel keeps My decks", ctx -> !ctx.el("#delete-dialog").isVisible()
-                 && ctx.el("#lists-dialog").isVisible())
-         .step("open saved-list dropdown", ctx -> CollectionLayoutScenario.press(ctx, "#list-picker"))
-         .step("release saved-list dropdown", CollectionLayoutScenario::release).ticks(2)
-         .check("saved-list dropdown is attached to the root", ctx ->
-                 ctx.el("#list-picker").as(Selector.class).isOpen())
-         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
-         .check("first nested Escape dismisses only the dropdown", ctx ->
-                 !ctx.el("#list-picker").as(Selector.class).isOpen() && ctx.el("#lists-dialog").isVisible()
-                         && ctx.screen() instanceof CollectionScreen)
-         .keyUp(GLFW.GLFW_KEY_ESCAPE)
-         .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
-         .check("second nested Escape dismisses only My decks", ctx -> !ctx.el("#lists-dialog").isVisible()
+         .check("Escape dismisses only My decks", ctx -> !ctx.el("#lists-dialog").isVisible()
                  && ctx.screen() instanceof CollectionScreen)
          .keyUp(GLFW.GLFW_KEY_ESCAPE)
          .hoverAt(-100, -100).screenshot("collection-editor-pointer-qa")
          .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2)
-         .check("third nested Escape closes the clean editor", ctx -> !(ctx.screen() instanceof CollectionScreen))
+         .check("next Escape closes the clean editor", ctx -> !(ctx.screen() instanceof CollectionScreen))
           .keyUp(GLFW.GLFW_KEY_ESCAPE)
           .step("write disposable explicit-Save import fixture", ctx -> {
               String name = "collection-editor-c3-" + UUID.randomUUID();
@@ -240,7 +218,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
           })
           .openScreen("explicit Save and My decks", CollectionEditorQAScenario::commandScreen)
           .awaitModularUI().ticks(3)
-          .checkText("#editor-title", "Active fixture")
+          .checkText("#editor-title", "My Collection")
           .check("current name is a primary visible header field", ctx ->
                   ctx.el("#list-name").isVisible() && !ctx.el("#lists-dialog").isVisible()
                           && ctx.el("#list-name").bounds().y() < ctx.el("#editor-body").bounds().y())
@@ -249,23 +227,22 @@ public final class CollectionEditorQAScenario implements UIScenario {
                           && ctx.el("#activate-deck").bounds().y() < ctx.el("#editor-body").bounds().y())
           .step("open My decks for saved selection", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
           .step("release My decks for saved selection", CollectionLayoutScenario::release).ticks(2)
-          .checkVisible("#list-export")
+          .checkVisible("#saved-list-scroll")
           .check("My decks starts with zero persistence or activation requests", ctx ->
                   count(ctx, CollectionCommand.Save.class) == 0 && count(ctx, CollectionCommand.Activate.class) == 0)
-          .step("open saved list picker for explicit selection", ctx -> CollectionLayoutScenario.press(ctx, "#list-picker"))
-          .step("release saved list picker", CollectionLayoutScenario::release).ticks(2)
           .step("identify different saved list row", ctx -> {
               Map<UUID, com.lowdragmc.lowdraglib2.gui.ui.elements.Button> buttons =
-                      ctx.getField(ctx.el("#list-picker").element(), "candidateButtons");
-              ctx.check("saved list picker exposes many saved lists", buttons.size() == 12);
+                      ctx.getField(ctx.getField(ctx.screen(), "controller"), "savedRows");
+              ctx.check("saved list view exposes many saved lists", buttons.size() == 12);
               buttons.get(SELECTED).setId("c3-selected-list");
           })
           .step("choose different saved list", ctx -> CollectionLayoutScenario.press(ctx, "#c3-selected-list"))
           .step("release different saved list", CollectionLayoutScenario::release).ticks(2)
-          .checkText("#editor-title", "Selected fixture")
-          .checkTextContains("#list-active-status", "not active")
-          .step("close My decks after selection", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
-          .step("release My decks after selection", CollectionLayoutScenario::release).ticks(2)
+          .check("selection alone keeps the active draft", ctx -> lists(ctx).id().equals(ACTIVE))
+          .step("open selected saved list", ctx -> CollectionLayoutScenario.press(ctx, "#list-open"))
+          .step("release Open", CollectionLayoutScenario::release).ticks(2)
+          .check("Open changes the current saved UUID", ctx -> lists(ctx).id().equals(SELECTED))
+          .checkText("#list-name", "Selected fixture")
           .typeInto("#list-name", LONG_NAME).ticks(2)
           .check("typing keeps current-name focus and exact value", ctx -> {
               var field = ctx.el("#list-name").as(TextField.class);
@@ -316,15 +293,21 @@ public final class CollectionEditorQAScenario implements UIScenario {
           .step("release activation details", CollectionLayoutScenario::release).ticks(2)
           .step("open My decks for draft actions", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
           .step("release My decks for draft actions", CollectionLayoutScenario::release).ticks(2)
-          .step("create New draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-new"))
+          .step("close My decks before New", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
+          .step("release My decks", CollectionLayoutScenario::release).ticks(2)
+          .step("create New draft", ctx -> CollectionLayoutScenario.press(ctx, "#new-deck"))
           .step("release New draft", CollectionLayoutScenario::release).ticks(2)
           .step("capture New identity", ctx -> ctx.put("c3NewId", lists(ctx).id()))
+          .step("open My decks for selected copy", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
+          .step("release My decks for copy", CollectionLayoutScenario::release).ticks(2)
           .step("make a copy without saving", ctx -> CollectionLayoutScenario.press(ctx, "#list-duplicate"))
           .step("release Make a copy", CollectionLayoutScenario::release).ticks(2)
           .check("New and Make a copy create distinct unsaved identities without requests", ctx ->
                   !lists(ctx).stored() && !lists(ctx).id().equals(ctx.get("c3NewId"))
                           && count(ctx, CollectionCommand.Save.class) == 2
                           && count(ctx, CollectionCommand.Activate.class) == 1)
+          .step("open import/export", ctx -> CollectionLayoutScenario.press(ctx, "#import-export"))
+          .step("release import/export", CollectionLayoutScenario::release).ticks(2)
           .step("open import picker for explicit draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-import-picker"))
           .step("release import picker", CollectionLayoutScenario::release).ticks(2)
           .step("identify disposable import row", ctx -> {
@@ -336,6 +319,9 @@ public final class CollectionEditorQAScenario implements UIScenario {
           .step("release disposable import row", CollectionLayoutScenario::release).ticks(2)
           .step("load import as draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-import"))
           .step("release import draft", CollectionLayoutScenario::release).ticks(2)
+          .checkVisible("#close-dialog")
+          .step("discard unsaved copy before import", ctx -> CollectionLayoutScenario.press(ctx, "#close-discard"))
+          .step("release Discard", CollectionLayoutScenario::release).ticks(2)
           .check("Import loads all sections and remains explicitly unsaved", ctx ->
                   model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER), List.of(10080), List.of(10004)))
                           && !lists(ctx).stored() && count(ctx, CollectionCommand.Save.class) == 2
@@ -348,12 +334,8 @@ public final class CollectionEditorQAScenario implements UIScenario {
              return CollectionScreen.create(model, CollectionFixture.cards(), code -> null,
                      CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
          }).awaitModularUI().ticks(2)
-         .step("open My decks for New", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
-         .step("release My decks for New", CollectionLayoutScenario::release).ticks(2)
-         .step("create empty unsaved draft", ctx -> CollectionLayoutScenario.press(ctx, "#list-new"))
+         .step("create empty unsaved draft", ctx -> CollectionLayoutScenario.press(ctx, "#new-deck"))
          .step("release New", CollectionLayoutScenario::release).ticks(2)
-         .step("close My decks after New", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
-         .step("release My decks after New", CollectionLayoutScenario::release).ticks(2)
          .check("empty unsaved draft remains saveable", ctx -> ctx.el("#save-deck").isActive()
                  && ctx.el("#deck-summary").text().contains("Unsaved"))
          .step("close empty unsaved draft", ctx -> CollectionLayoutScenario.press(ctx, "#close-editor"))
@@ -364,11 +346,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
                  new DeckEditorModel(empty(), CollectionFixture.owned()), CollectionFixture.cards(), code -> null,
                  CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query()))
          .awaitModularUI().ticks(2)
-         .step("open My decks for saved-empty rename", ctx -> CollectionLayoutScenario.press(ctx, "#saved-lists"))
-         .step("release My decks for saved-empty rename", CollectionLayoutScenario::release).ticks(2)
          .typeInto("#list-name", "Renamed empty saved list").ticks(2)
-         .step("close My decks after saved-empty rename", ctx -> CollectionLayoutScenario.press(ctx, "#lists-close"))
-         .step("release My decks after saved-empty rename", CollectionLayoutScenario::release).ticks(2)
          .step("close renamed saved empty list", ctx -> CollectionLayoutScenario.press(ctx, "#close-editor"))
          .step("release renamed saved empty Close", CollectionLayoutScenario::release).ticks(2)
          .checkVisible("#close-dialog")
@@ -421,7 +399,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
                  .getText().equals(lists(ctx).name() + ".ydk"))
          .keyDown(GLFW.GLFW_KEY_ESCAPE).ticks(2).keyUp(GLFW.GLFW_KEY_ESCAPE)
          .check("Escape cancels only filename dialog", ctx -> !ctx.el("#export-dialog").isVisible()
-                 && ctx.el("#lists-dialog").isVisible() && lists(ctx).dirty());
+                 && ctx.el("#import-dialog").isVisible() && lists(ctx).dirty());
         leftPress(s, "reopen local export", "#list-export");
         s.step("submit traversal filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("../escape.ydk", true));
         leftPress(s, "reject traversal export", "#export-submit");
@@ -430,7 +408,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
          .step("choose new filename", ctx -> ctx.el("#export-filename").as(TextField.class).setText("Unsaved draft.ydk", true))
          .hoverAt(-100, -100).screenshot("collection-export-filename");
         leftPress(s, "write new local export", "#export-submit");
-        s.waitUntil("new export feedback names output", ctx -> ctx.el("#editor-status").text().contains("Exported Unsaved draft.ydk"))
+        s.waitUntil("new export closes filename dialog", ctx -> !ctx.el("#export-dialog").isVisible())
          .check("exported unsaved draft round trips every section", ctx -> {
              try {
                  return ctx.<SavedDeck>get("c4Snapshot").cards().equals(DeckListLoader.loadFromFile(
@@ -484,8 +462,7 @@ public final class CollectionEditorQAScenario implements UIScenario {
              catch (IOException error) { throw new UncheckedIOException(error); }
          });
         leftPress(s, "confirm replacement", "#export-overwrite-confirm");
-        s.waitUntil("replacement feedback is visible", ctx -> !ctx.el("#export-dialog").isVisible())
-         .checkTextContains("#editor-status", "Exported Unsaved draft.ydk")
+        s.waitUntil("replacement closes filename dialog", ctx -> !ctx.el("#export-dialog").isVisible())
          .check("confirmed replacement imports all captured sections", ctx -> {
              try { return ctx.<SavedDeck>get("c4Snapshot").cards().equals(new com.haxerus.duelcraft.client.collection.DeckImportService(
                      com.haxerus.duelcraft.core.DeckRegistry.open(ctx.get("c4Directory"))).load("Unsaved draft").cards()); }
@@ -573,11 +550,13 @@ public final class CollectionEditorQAScenario implements UIScenario {
         var activeDeck = new SavedDeck(ACTIVE, "Active fixture", empty());
         var selectedDeck = new SavedDeck(SELECTED, "Selected fixture",
                 new DeckList(List.of(OTHER), List.of(), List.of()));
+        var current = new java.util.concurrent.atomic.AtomicReference<SavedDeckController>();
         Function<CollectionCommand, CompletionStage<CollectionReply>> request = command -> {
             commands.add(command);
             if (command instanceof CollectionCommand.ReadDeck read) {
                 var deck = read.id().equals(ACTIVE) ? activeDeck : selectedDeck;
-                return CompletableFuture.completedFuture(new CollectionReply.Deck(4, deck));
+                return CompletableFuture.completedFuture(new CollectionReply.Deck(
+                        current.get() == null ? 4 : current.get().revision(), deck));
             }
             var reply = new CompletableFuture<CollectionReply>();
             mutations.add(reply);
@@ -591,7 +570,11 @@ public final class CollectionEditorQAScenario implements UIScenario {
                     "Saved fixture " + (index + 1), index, 0, 0));
         }
         var view = new ClientCollectionState.View(4, CollectionFixture.owned(), List.copyOf(summaries), ACTIVE);
-        Supplier<CompletionStage<ClientCollectionState.View>> refresh = () -> CompletableFuture.completedFuture(view);
+        Supplier<CompletionStage<ClientCollectionState.View>> refresh = () -> {
+            var lists = current.get();
+            return CompletableFuture.completedFuture(lists == null ? view : new ClientCollectionState.View(
+                    lists.revision(), model.owned(), List.copyOf(summaries), lists.activeId()));
+        };
         try {
             var method = CollectionScreen.class.getDeclaredMethod("create", DeckEditorModel.class, List.class,
                     java.util.function.IntFunction.class, UUID.class,
@@ -604,7 +587,8 @@ public final class CollectionEditorQAScenario implements UIScenario {
                     UUID.randomUUID(), null, CollectionFixture.query(), request, refresh,
                     (java.util.concurrent.Executor) ctx.mc()::execute);
             Object controller = ctx.getField(screen, "controller");
-            ctx.<SavedDeckController>getField(controller, "lists").openInitial(view);
+            current.set(ctx.getField(controller, "lists"));
+            current.get().openInitial(view);
             return screen;
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException(error);

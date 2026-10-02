@@ -84,6 +84,7 @@ public final class SavedDeckController {
     public void newDraft() {
         requireEditable();
         eligibility = EMPTY;
+        status = "";
         readToken++;
         id = UUID.randomUUID();
         name = "New list";
@@ -95,6 +96,7 @@ public final class SavedDeckController {
 
     public void duplicate() {
         requireEditable();
+        status = "";
         readToken++;
         id = UUID.randomUUID();
         // Keep the name valid even when its original was already 128 characters.
@@ -107,6 +109,7 @@ public final class SavedDeckController {
     public void importDraft(SavedDeck imported) {
         requireEditable();
         eligibility = EMPTY;
+        status = "";
         readToken++;
         id = imported.id();
         name = imported.name();
@@ -177,6 +180,14 @@ public final class SavedDeckController {
     }
 
     public void select(UUID target) {
+        select(target, null);
+    }
+
+    public void copy(UUID target) {
+        select(target, this::duplicate);
+    }
+
+    private void select(UUID target, Runnable afterRead) {
         requireEditable();
         long token = ++readToken;
         UUID origin = id;
@@ -188,9 +199,9 @@ public final class SavedDeckController {
                 if (error != null) { refreshFailed(error); return; }
                 applyView(view);
                 if (viewRevision < revision) { refreshFailed(new IllegalStateException("Collection snapshot is outdated")); return; }
-                readDeck(target, token, origin, originName, originDraft);
+                readDeck(target, token, origin, originName, originDraft, afterRead);
             }, client);
-        } else readDeck(target, token, origin, originName, originDraft);
+        } else readDeck(target, token, origin, originName, originDraft, afterRead);
     }
 
     private boolean readCurrent(long token, UUID origin, String originName, DeckList originDraft) {
@@ -198,7 +209,7 @@ public final class SavedDeckController {
                 && originName.equals(name) && originDraft.equals(model.draft());
     }
 
-    private void readDeck(UUID target, long token, UUID origin, String originName, DeckList originDraft) {
+    private void readDeck(UUID target, long token, UUID origin, String originName, DeckList originDraft, Runnable afterRead) {
         long expected = revision;
         request.apply(new CollectionCommand.ReadDeck(target)).whenCompleteAsync((reply, error) -> {
             if (!readCurrent(token, origin, originName, originDraft)) return;
@@ -215,6 +226,7 @@ public final class SavedDeckController {
             status = "";
             eligibility = EMPTY;
             changed.run();
+            if (afterRead != null) afterRead.run();
         }, client);
     }
 
