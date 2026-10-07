@@ -140,6 +140,9 @@ public final class CollectionScreen extends ModularUIScreen {
         controller.requestClose();
     }
 
+    public void navigate(Runnable action) { controller.navigate(action); }
+    public void setBackAction(Runnable action) { controller.setBackAction(action); }
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
@@ -154,7 +157,7 @@ public final class CollectionScreen extends ModularUIScreen {
         super.removed();
     }
 
-    public void suspend() { suspended = true; }
+    public void suspend() { suspended = true; controller.cancelNavigation(); }
     public void resume() { suspended = false; controller.refreshCollections(); }
 
     /** Logout invalidates private callbacks before Minecraft replaces the screen. */

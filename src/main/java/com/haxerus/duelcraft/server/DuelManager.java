@@ -152,19 +152,19 @@ public class DuelManager {
         var data = players.data(owner).orElse(null);
         var deck = data == null || data.activeDeckId() == null ? null : data.decks().get(data.activeDeckId());
         if (deck == null) {
-            tell(owner, "No active deck; use /duel deck set <name> or activate a saved list.");
+            preparationDenial(owner, "No active deck. Select a saved deck in your collection.");
             notifyUnreadyPeer(owner);
             return new DuelPreparationService.Selection(null, collections.emptyReport());
         }
         var change = collections.revalidateActive(data, owner, rule);
         if (!change.success()) {
-            tell(owner, "Deck permission check failed; try again or contact the server administrator.");
+            preparationDenial(owner, "Deck permission check failed; try again or contact the server administrator.");
             notifyUnreadyPeer(owner);
             return new DuelPreparationService.Selection(null, collections.emptyReport());
         }
         if (!data.equals(change.data())) {
             players.persist(owner, change.data()); snapshots.invalidate(owner);
-            tell(owner, "Active deck cleared: " + explain(change.eligibility()));
+            preparationDenial(owner, "Active deck cleared: " + explain(change.eligibility()));
             notifyUnreadyPeer(owner);
         }
         return new DuelPreparationService.Selection(change.data().activeDeckId() == null ? null : deck, change.eligibility());
@@ -361,6 +361,10 @@ public class DuelManager {
         return !key.equals(announcements.put(owner, key));
     }
     private void tell(UUID owner, String message) { players.message(owner, Component.literal(message)); }
+    private void preparationDenial(UUID owner, String message) {
+        tell(owner, message);
+        players.send(owner, new PreparationNoticePayload(message.length() > 2048 ? message.substring(0, 2047) + "…" : message));
+    }
     private static String explain(DeckEligibility.Report report) {
         if (report.restrictionReason() != null) return report.restrictionReason();
         if (!report.problems().isEmpty()) return report.problems().stream().map(issue -> issue.key() + " (card " + issue.code() + ")").collect(java.util.stream.Collectors.joining("; "));

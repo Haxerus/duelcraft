@@ -30,7 +30,12 @@ public final class DuelClientCommand {
     public static void register(RegisterClientCommandsEvent event) {
         // QA entry point until the M5 screens provide player-facing navigation.
         event.getDispatcher().register(Commands.literal("duel")
-                .then(Commands.literal("collection").executes(DuelClientCommand::collection)));
+                .then(Commands.literal("collection").executes(DuelClientCommand::collection))
+                .then(Commands.literal("lobby").executes(ctx -> {
+                    com.haxerus.duelcraft.client.interaction.DuelcraftScreens.request(
+                            com.haxerus.duelcraft.interaction.ScreenRoute.LOBBY);
+                    return 1;
+                })));
         event.getDispatcher().register(
                 Commands.literal("duel")
                         .then(Commands.literal("show")

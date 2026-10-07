@@ -78,7 +78,9 @@ public final class DuelDeckUploadScenario implements UIScenario {
           .teardownServer("restore attachment", sc -> {
               CollectionAttachment original = sc.get("originalCollection");
               if (original != null) sc.player().setData(CollectionAttachments.COLLECTION, original);
-          }).teardown("remove fixture file", ctx -> {
+          }).teardown("discard revisions from the restored fixture", ctx ->
+                  com.haxerus.duelcraft.DuelcraftClient.getCollectionClient().connect())
+          .teardown("remove fixture file", ctx -> {
               Path file = ctx.get("uploadFile");
               try { if (file != null) Files.deleteIfExists(file); }
               catch (IOException e) { throw new UncheckedIOException(e); }

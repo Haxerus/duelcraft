@@ -39,6 +39,11 @@ public final class CollectionCardGrid extends VirtualScrollerView<List<CardInfo>
                 tile.addEventListener(UIEvents.DOUBLE_CLICK, event -> {
                     if (event.button == 0) addCard.accept(card.code());
                 });
+                tile.addEventListener(UIEvents.MOUSE_DOWN, event -> {
+                    if (event.button != 1) return;
+                    event.stopPropagation();
+                    addCard.accept(card.code());
+                });
                 if (card.code() == selectedCode) tile.addClass("selected");
                 var cell = new UIElement().addClass("collection-cell");
                 var cardCaption = new Label();

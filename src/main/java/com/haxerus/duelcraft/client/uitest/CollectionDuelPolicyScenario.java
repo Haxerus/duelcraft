@@ -59,7 +59,8 @@ public final class CollectionDuelPolicyScenario implements UIScenario {
             ctx.mc().player.connection.sendCommand("duel test");
         }).waitUntil("failure returns a newer idle state", ctx -> DuelcraftClient.preparation().view().revision() > ctx.<Long>get("revision")
                 && DuelcraftClient.preparation().view().mode() == PreparationView.Mode.IDLE)
-          .waitUntil("failed start restores editor", CollectionDuelPolicyScenario::retained)
+          .step("explicitly resume failed-start draft", ctx -> ctx.require("draft available", com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()))
+          .waitUntil("failed start retains editor", CollectionDuelPolicyScenario::retained)
           .check("failure has no live duel or fake result screen", ctx -> !LDLibDuelScreen.isDuelLive() && !(ctx.screen() instanceof DuelScreen))
           .server("actual native close and persistent selection", sc -> {
               CollectionStartFailureFixture fault = sc.get("fault");

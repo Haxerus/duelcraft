@@ -861,6 +861,13 @@ final class CollectionController {
         lists.navigate(close);
     }
 
+    void navigate(Runnable action) { lists.navigate(action); }
+    void cancelNavigation() { lists.cancelNavigation(); }
+    void setBackAction(Runnable action) {
+        element("collection-back").setDisplay(true);
+        button("collection-back").setOnClick(event -> action.run());
+    }
+
     @SuppressWarnings("unchecked")
     public boolean dismissTopLayer() {
         if (element("export-overwrite-dialog").isDisplayed()) {

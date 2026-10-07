@@ -1,4 +1,8 @@
 {
+  "key.categories.duelcraft": "Duelcraft",
+  "key.duelcraft.home": "Open Duelcraft",
+  "item.duelcraft.card_binder": "Card Binder",
+  "block.duelcraft.duel_mat": "Duel Mat",
   "duelcraft.card.granted": "Gave physical cards to %s.",
   "duelcraft.collection.deposit": "Deposit",
   "duelcraft.collection.withdraw": "Withdraw",
@@ -37,7 +41,7 @@
   "duelcraft.collection.new_deck": "New deck",
   "duelcraft.collection.import_export": "Import / export",
   "duelcraft.collection.help": "Help",
-  "duelcraft.collection.help_controls": "Browse cards on the right. Click to inspect, double-click to add, or right-click to remove. Deck / Side chooses where cards go.",
+  "duelcraft.collection.help_controls": "Right-click or double-left-click a browser card to add it. Right-click a deck card to remove it. Deck / Side chooses where cards go.",
   "duelcraft.collection.help_navigation": "Save keeps your deck. Open, New, Import and Close ask before leaving unsaved changes. Esc closes the topmost menu or dialog.",
   "duelcraft.collection.open": "Open",
   "duelcraft.collection.import_ydk": "Import YDK",

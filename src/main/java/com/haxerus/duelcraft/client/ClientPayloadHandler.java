@@ -32,9 +32,27 @@ public class ClientPayloadHandler {
     }
 
     public static void handlePreparation(com.haxerus.duelcraft.server.PreparationStatePayload payload, IPayloadContext context) {
+        var previous = com.haxerus.duelcraft.DuelcraftClient.preparation().view();
         if (com.haxerus.duelcraft.DuelcraftClient.preparation().receive(payload)) {
             com.haxerus.duelcraft.client.interaction.PreparationRouting.apply(payload);
+            var view = payload.view();
+            var player = net.minecraft.client.Minecraft.getInstance().player;
+            if (player != null && view.mode() == com.haxerus.duelcraft.duel.PreparationView.Mode.INVITED
+                    && !view.outgoing() && (previous == null || !Objects.equals(previous.flowId(), view.flowId()))) {
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("Open invitation")
+                        .withStyle(style -> style.withColor(net.minecraft.ChatFormatting.AQUA)
+                                .withUnderlined(true).withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                                        net.minecraft.network.chat.ClickEvent.Action.RUN_COMMAND, "/duel lobby"))));
+            }
         }
+    }
+
+    public static void handleInteraction(com.haxerus.duelcraft.server.InteractionStatePayload payload, IPayloadContext context) {
+        com.haxerus.duelcraft.client.interaction.DuelcraftScreens.apply(payload);
+    }
+
+    public static void handlePreparationNotice(com.haxerus.duelcraft.server.PreparationNoticePayload payload, IPayloadContext context) {
+        com.haxerus.duelcraft.DuelcraftClient.preparation().notice(payload.detail());
     }
 
     public static void handleStart(DuelStartPayload payload, IPayloadContext context) {

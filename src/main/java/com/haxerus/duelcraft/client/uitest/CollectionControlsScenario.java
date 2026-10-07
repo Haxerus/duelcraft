@@ -79,7 +79,7 @@ public final class CollectionControlsScenario implements UIScenario {
         s.key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
          .checkHidden("#import-dialog").checkScreen(CollectionScreen.class);
         CollectionRuntimeFixture.press(s, "#help-button");
-        s.checkTextContains("#help-controls", "Browse cards")
+        s.checkTextContains("#help-controls", "Right-click or double-left-click a browser card to add it")
          .checkTextContains("#help-navigation", "Esc closes")
          .checkTextContains("#help-supported-checks", "Activation")
          .checkTextContains("#help-ownership", "deposited copies")

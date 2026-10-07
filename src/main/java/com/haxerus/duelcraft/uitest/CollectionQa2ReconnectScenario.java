@@ -39,14 +39,14 @@ public final class CollectionQa2ReconnectScenario implements MPScenario {
          .server("cancel accepted flow", sc -> {
              var prep = DuelManager.get().preparation(); var a = sc.player("A").getUUID();
              sc.check("cancel succeeds", prep.cancel(a, prep.view(a, System.currentTimeMillis()).flowId(), System.currentTimeMillis()).code() == PreparationResult.OK);
-         }).allClients("cancel restores dirty draft", b -> b.waitUntil("same editor draft restored", CollectionDuelPolicyScenario::retained)
+         }).allClients("cancel restores dirty draft", b -> b.waitUntil("explicit draft resume", ctx -> com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()).waitUntil("same editor draft restored", CollectionDuelPolicyScenario::retained)
                  .check("same unsaved ID name cards and controller", CollectionDuelPolicyScenario::retained).screenshot("qa2-dirty-restored"));
         accept(s);
         s.allClients("second acceptance suspends again", b -> b.waitUntil("editor suspended again", ctx -> !(ctx.screen() instanceof com.haxerus.duelcraft.client.collection.CollectionScreen)))
          .client("B", "real disconnect disposes suspended controller", b -> {
              CollectionDuelPolicyClient.disconnect(b);
              b.check("suspended saved-deck controller disposed", ctx -> ctx.<Boolean>getField(ctx.get("lists"), "disposed"));
-         }).client("A", "opponent disconnect restores survivor draft", b -> b.waitUntil("survivor original editor", CollectionDuelPolicyScenario::retained))
+         }).client("A", "opponent disconnect restores survivor draft", b -> b.waitUntil("explicit survivor draft resume", ctx -> com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()).waitUntil("survivor original editor", CollectionDuelPolicyScenario::retained))
          .server("disconnect releases survivor lock", sc -> sc.check("survivor editable", !DuelManager.get().isBusy(sc.player("A"))))
          .teardownAllClients("close surviving fixture screen", b -> b.closeScreen());
     }

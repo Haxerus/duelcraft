@@ -107,8 +107,9 @@ public final class CollectionEditorQAScenario implements UIScenario {
         s.step("filter back to the repeated card", ctx -> ctx.el("#collection-search").as(TextField.class)
                     .setText(String.valueOf(MAIN), true)).ticks(2)
          .checkExists("#collection-card-" + MAIN);
-        doubleLeft(s, "second Main double click", "#collection-card-" + MAIN);
-        s.check("second double click adds one more copy", ctx ->
+        rightPress(s, "browser right click", "#collection-card-" + MAIN);
+        s.step("release browser right click", CollectionEditorQAScenario::rightRelease);
+        s.check("browser right click adds exactly one copy", ctx ->
                 model(ctx).draft().equals(new DeckList(List.of(MAIN, OTHER, MAIN), List.of(), List.of())))
          .click("#add-card").ticks(2)
          .check("button route adds the third aggregate copy", ctx ->
@@ -187,6 +188,10 @@ public final class CollectionEditorQAScenario implements UIScenario {
         doubleLeft(s, "pending collection double click", "#collection-card-" + OTHER);
         s.check("pending double click leaves the frozen draft unchanged", ctx ->
                 model(ctx).draft().equals(ctx.get("frozenDraft")));
+        rightPress(s, "pending browser right click", "#collection-card-" + OTHER);
+        s.step("release pending browser right click", CollectionEditorQAScenario::rightRelease)
+         .check("pending browser right click leaves the frozen draft unchanged", ctx ->
+                 model(ctx).draft().equals(ctx.get("frozenDraft")));
         rightPress(s, "pending deck tile", "#main-card-0");
         s.step("release pending deck tile", CollectionEditorQAScenario::rightRelease)
          .check("pending pointer gestures leave the frozen draft unchanged", ctx ->

@@ -43,6 +43,8 @@ public class DuelcraftClient {
     public DuelcraftClient(IEventBus modBus, ModContainer container) {
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         modBus.addListener(DuelcraftClient::onClientSetup);
+        modBus.addListener(com.haxerus.duelcraft.client.interaction.DuelcraftKeys::register);
+        NeoForge.EVENT_BUS.addListener(com.haxerus.duelcraft.client.interaction.DuelcraftKeys::tick);
         NeoForge.EVENT_BUS.addListener(DuelClientCommand::register);
         NeoForge.EVENT_BUS.addListener(com.haxerus.duelcraft.client.collection.CardItemTooltip::append);
         NeoForge.EVENT_BUS.addListener(DuelcraftClient::onLoggingOut);

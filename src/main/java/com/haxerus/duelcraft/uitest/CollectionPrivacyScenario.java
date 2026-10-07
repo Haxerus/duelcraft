@@ -108,8 +108,8 @@ public final class CollectionPrivacyScenario implements MPScenario {
             var ours = current.stream().filter(c -> c.id().getNamespace().equals("duelcraft")).toList();
             sc.check("legacy raw deck upload has no dispatch registration", ours.stream().noneMatch(c ->
                     c.id().equals(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("duelcraft", "duel_deck"))));
-            sc.check("real request and reply channels registered as mandatory current version 7", ours.size() == 9
-                    && ours.stream().allMatch(c -> c.version().equals("7") && !c.optional())
+            sc.check("real request and reply channels registered as mandatory current version 8", ours.size() == 12
+                    && ours.stream().allMatch(c -> c.version().equals("8") && !c.optional())
                     && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.PreparationRequestPayload.TYPE.id()))
                     && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.PreparationStatePayload.TYPE.id()))
                     && ours.stream().anyMatch(c -> c.id().equals(com.haxerus.duelcraft.server.collection.CollectionRequestPayload.TYPE.id()))
@@ -117,9 +117,9 @@ public final class CollectionPrivacyScenario implements MPScenario {
             var compatible = net.neoforged.neoforge.network.negotiation.NetworkComponentNegotiator.negotiate(current, current);
             sc.check("registered current channel pair negotiates successfully", compatible.success());
             var prior = current.stream().map(c -> c.id().getNamespace().equals("duelcraft")
-                    ? new net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent(c.id(), "6", c.flow(), c.optional()) : c).toList();
+                    ? new net.neoforged.neoforge.network.negotiation.NegotiableNetworkComponent(c.id(), "7", c.flow(), c.optional()) : c).toList();
             var incompatible = net.neoforged.neoforge.network.negotiation.NetworkComponentNegotiator.negotiate(current, prior);
-            sc.check("prior wire 6 rejected on every Duelcraft channel: " + incompatible.failureReasons(), !incompatible.success()
+            sc.check("prior wire 7 rejected on every Duelcraft channel: " + incompatible.failureReasons(), !incompatible.success()
                     && incompatible.failureReasons().keySet().equals(ours.stream().map(c -> c.id()).collect(java.util.stream.Collectors.toSet()))
                     && incompatible.failureReasons().values().stream().allMatch(c -> c.toString().contains("failure.version.mismatch")));
         } catch (ReflectiveOperationException exception) {

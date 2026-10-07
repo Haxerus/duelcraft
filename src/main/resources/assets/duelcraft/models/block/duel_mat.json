@@ -1,0 +1,8 @@
+{
+  "textures": {"top":"minecraft:block/green_wool","border":"minecraft:block/brown_wool","particle":"minecraft:block/green_wool"},
+  "elements": [{"from":[0,0,0],"to":[16,1,16],"faces":{
+    "up":{"texture":"#top"},"down":{"texture":"#border"},
+    "north":{"texture":"#border"},"south":{"texture":"#border"},
+    "east":{"texture":"#border"},"west":{"texture":"#border"}
+  }}]
+}

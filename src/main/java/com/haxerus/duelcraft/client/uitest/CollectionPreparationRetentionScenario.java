@@ -25,7 +25,8 @@ public final class CollectionPreparationRetentionScenario implements UIScenario 
     @Override public void configure(ScenarioOptions options) { options.tags("collection", "preparation"); }
 
     @Override public void define(ScenarioBuilder s) {
-        s.closeScreen().timeoutMs(60000).step("capture collection receiver", ctx -> {
+        s.closeScreen().timeoutMs(60000).server("capture collection before delayed Save", CollectionRuntimeFixture::capture)
+         .step("capture collection receiver", ctx -> {
             try {
                 var field = ClientPayloadHandler.class.getDeclaredField("collectionReceiver");
                 field.setAccessible(true);
@@ -52,10 +53,32 @@ public final class CollectionPreparationRetentionScenario implements UIScenario 
           .step("next preparation update", ctx -> push(PreparationView.Mode.RPS))
           .step("cancel preparation", ctx -> push(PreparationView.Mode.IDLE))
           .ticks(10)
+          .check("cancel does not force the suspended editor open", ctx -> !(ctx.screen() instanceof CollectionScreen))
+          .step("explicitly resume cancelled draft", ctx -> ctx.require("draft can resume", PreparationRouting.restoreEditor()))
           .check("cancel restores original dirty identity name and cards", CollectionPreparationRetentionScenario::retained);
         delayedOpen(s, false);
         delayedOpen(s, true);
         s.screenshot("retained-draft-after-reopen-and-delayed-refresh")
+         .step("hold Save acknowledgement with navigation queued", ctx -> {
+             var held = new ArrayList<CollectionReplyPayload>(); ctx.put("held", held);
+             ClientPayloadHandler.setCollectionReceiver(held::add);
+             SavedDeckController lists = ctx.get("lists");
+             lists.navigate(() -> ctx.put("unexpectedNavigation", true));
+             lists.save();
+         }).waitUntil("real Save reply held", ctx -> !ctx.<List<CollectionReplyPayload>>get("held").isEmpty())
+         .step("preparation interrupts pending Save", ctx -> push(PreparationView.Mode.RPS))
+         .step("release Save after forced route", ctx -> {
+             ClientPayloadHandler.setCollectionReceiver(ctx.<Consumer<CollectionReplyPayload>>get("receiver"));
+             release(ctx);
+         }).ticks(5)
+         .check("acknowledged Save cannot execute superseded navigation", ctx -> ctx.get("unexpectedNavigation") == null
+                 && ctx.screen() instanceof com.haxerus.duelcraft.client.interaction.DuelLobbyScreen)
+         .step("cancel and resume acknowledged draft", ctx -> {
+             push(PreparationView.Mode.IDLE);
+             ctx.require("saved session can resume", PreparationRouting.restoreEditor());
+         }).check("same editor retains acknowledged cards and name", ctx -> ctx.screen() == ctx.get("originalScreen")
+                 && ctx.<DeckEditorModel>get("model").draft().equals(ctx.get("draft"))
+                 && !ctx.<SavedDeckController>get("lists").dirty())
          .teardown("restore receiver and clear connection routing", ctx -> {
              ClientPayloadHandler.setCollectionReceiver(ctx.<Consumer<CollectionReplyPayload>>get("receiver"));
              release(ctx);
@@ -64,6 +87,7 @@ public final class CollectionPreparationRetentionScenario implements UIScenario 
              if (ctx.mc().player != null && ctx.mc().getConnection() != null) DuelcraftClient.preparation().connect();
              ctx.mc().setScreen(null);
          });
+        CollectionRuntimeFixture.teardown(s);
     }
 
     private static void delayedOpen(ScenarioBuilder s, boolean cancelBeforeReply) {
@@ -89,7 +113,9 @@ public final class CollectionPreparationRetentionScenario implements UIScenario 
              .step("another preparation update after reply", ctx -> push(PreparationView.Mode.RPS))
              .step("cancel after old open completes", ctx -> push(PreparationView.Mode.IDLE)).ticks(10);
         }
-        s.check("original dirty editor retained " + timing, CollectionPreparationRetentionScenario::retained);
+        s.check("late refresh does not restore the editor " + timing, ctx -> !(ctx.screen() instanceof CollectionScreen))
+         .step("explicitly resume draft " + timing, ctx -> ctx.require("draft can resume", PreparationRouting.restoreEditor()))
+         .check("original dirty editor retained " + timing, CollectionPreparationRetentionScenario::retained);
     }
 
     private static void release(TestContext ctx) {

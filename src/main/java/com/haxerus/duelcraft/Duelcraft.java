@@ -49,6 +49,11 @@ public class Duelcraft {
     // Create a Deferred Register to hold Items which will all be registered under the "duelcraft" namespace
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
     public static final DeferredItem<CardItem> CARD = ITEMS.registerItem("card", CardItem::new);
+    public static final DeferredItem<com.haxerus.duelcraft.item.CardBinderItem> CARD_BINDER =
+            ITEMS.registerItem("card_binder", com.haxerus.duelcraft.item.CardBinderItem::new);
+    public static final DeferredBlock<com.haxerus.duelcraft.block.DuelMatBlock> DUEL_MAT = BLOCKS.register("duel_mat",
+            () -> new com.haxerus.duelcraft.block.DuelMatBlock(BlockBehaviour.Properties.of().strength(0.1f).mapColor(MapColor.COLOR_GREEN)));
+    public static final DeferredItem<BlockItem> DUEL_MAT_ITEM = ITEMS.registerSimpleBlockItem("duel_mat", DUEL_MAT);
     // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "duelcraft" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
@@ -67,6 +72,8 @@ public class Duelcraft {
             .withTabsBefore(CreativeModeTabs.COMBAT)
             .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> {
+                output.accept(CARD_BINDER.get());
+                output.accept(DUEL_MAT_ITEM.get());
                 output.accept(EXAMPLE_ITEM.get()); // Add the example item to the tab. For your own tabs, this method is preferred over the event
             }).build());
 

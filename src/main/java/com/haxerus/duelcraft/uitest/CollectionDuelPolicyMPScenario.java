@@ -118,7 +118,7 @@ public final class CollectionDuelPolicyMPScenario implements MPScenario {
          }).client("A", "editor suspended in real RPS", b -> b.waitUntil("editor suspended", ctx -> !(ctx.screen() instanceof CollectionScreen)));
         mutations(s, true);
         s.server("cancel real preparation", sc -> DuelManager.get().preparation().cancel(sc.player("A").getUUID(), sc.get("flow"), now()))
-         .client("A", "original dirty draft on real cancel", b -> b.waitUntil("editor restored", CollectionDuelPolicyScenario::retained).check("exact dirty draft retained", CollectionDuelPolicyScenario::retained));
+         .client("A", "original dirty draft on real cancel", b -> b.waitUntil("explicit draft resume", ctx -> com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()).waitUntil("editor restored", CollectionDuelPolicyScenario::retained).check("exact dirty draft retained", CollectionDuelPolicyScenario::retained));
         mutations(s, false);
         s.server("hold real first-turn choice", sc -> {
             sc.put("flow", ready(sc)); sc.put("before", data(sc.player("A")));
@@ -139,7 +139,7 @@ public final class CollectionDuelPolicyMPScenario implements MPScenario {
             sc.check("post-setup failure returned", DuelManager.get().preparation().first(sc.player("A").getUUID(), flow, true, now()).code() == PreparationResult.START_FAILED);
             sc.check("native setup and delegated close once", fault.setups == 1 && fault.closes == 1);
             sc.check("saved selection survives failure", before.equals(data(sc.player("A"))));
-        }).client("A", "failed native startup restores dirty editor", b -> b.waitUntil("restored after failed setup", CollectionDuelPolicyScenario::retained).check("no fake victory", ctx -> !(ctx.screen() instanceof com.haxerus.duelcraft.client.DuelScreen)));
+        }).client("A", "failed native startup restores dirty editor", b -> b.waitUntil("explicit failed draft resume", ctx -> com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()).waitUntil("restored after failed setup", CollectionDuelPolicyScenario::retained).check("no fake victory", ctx -> !(ctx.screen() instanceof com.haxerus.duelcraft.client.DuelScreen)));
         mutations(s, false);
         s.server("normal native retry", sc -> {
             var flow = ready(sc);

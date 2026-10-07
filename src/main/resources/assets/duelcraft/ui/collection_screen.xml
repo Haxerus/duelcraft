@@ -170,6 +170,7 @@
                 <button id="activate-deck" text="duelcraft.collection.use_for_duels" />
             </element>
             <element id="editor-nav">
+                <button id="collection-back" text="Back" style="display: none; width: 72;" />
                 <button id="new-deck" text="duelcraft.collection.new_deck" />
                 <button id="saved-lists" text="duelcraft.collection.lists" />
                 <button id="import-export" text="duelcraft.collection.import_export" />

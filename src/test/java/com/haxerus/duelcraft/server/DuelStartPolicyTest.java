@@ -19,16 +19,18 @@ class DuelStartPolicyTest {
         final List<PreparationStatePayload> states = new ArrayList<>();
         final Map<UUID, List<PreparationStatePayload>> statesByOwner = new HashMap<>();
         final Map<UUID, List<String>> messages = new HashMap<>();
+        final Map<UUID, List<String>> notices = new HashMap<>();
         final DuelManager manager;
         int allocations, closes;
         String failure = "";
         boolean deny, throwing, immediate;
+        UUID deniedOwner;
         Deck first, second;
         Fixture(boolean ownership) { this(ownership, true); }
         Fixture(boolean ownership, boolean hook) {
             var service = new CollectionService(CollectionTestData.facts(), new DeckUsePolicy(ownership, hook ? context -> {
                 if (throwing) throw new IllegalStateException("private hook internals");
-                return deny ? "Private progression requirement" : null;
+                return deny && (deniedOwner == null || deniedOwner.equals(context.owner())) ? "Private progression requirement" : null;
             } : null));
             for (var id : List.of(a, b)) {
                 var deck = CollectionTestData.deck(UUID.randomUUID());
@@ -71,6 +73,7 @@ class DuelStartPolicyTest {
         public Optional<PlayerCollectionData> data(UUID id) { return Optional.ofNullable(data.get(id)); }
         public void persist(UUID id, PlayerCollectionData value) { data.put(id, value); }
         public void send(UUID id, CustomPacketPayload payload) {
+            if (payload instanceof PreparationNoticePayload notice) notices.computeIfAbsent(id, ignored -> new ArrayList<>()).add(notice.detail());
             if (payload instanceof DuelStartPayload) events.add("start");
             if (payload instanceof DuelMessagePayload) events.add("refresh");
             if (payload instanceof PreparationStatePayload state) {
@@ -157,8 +160,11 @@ class DuelStartPolicyTest {
         var service = f.manager.preparation();
         service.invite(f.a, f.b, DuelRule.MR5, 1L, PlayerOptions.standard(), NOW);
         f.deny = true;
+        f.deniedOwner = f.b;
         assertEquals(PreparationResult.INELIGIBLE, service.accept(f.b, service.view(f.b, NOW).flowId(), NOW).code());
         assertTrue(f.messages.get(f.a).contains("Opponent's deck is not ready"));
+        assertFalse(f.notices.containsKey(f.a), "opponent receives no private rejection payload");
+        assertEquals(List.of("Active deck cleared: Private progression requirement"), f.notices.get(f.b));
         assertEquals(0, f.allocations);
     }
     @Test void loginRevalidationClearsInvalidPersistedActivationOnceAndNeverDeletesUnknownSavedIds() {
