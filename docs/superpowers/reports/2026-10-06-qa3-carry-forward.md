@@ -20,6 +20,8 @@ The trial observed no browser right-click action. Its interpretation that the br
 
 Preserve the original report as historical evidence; this correction supersedes its expected-behavior wording. A focused follow-up must add the missing browser action and clarify Help. Verify the fourth-copy limit, routing, pending/disabled guards and no modal click-through. The correction is not implemented by this documentation commit.
 
+**M5 update, 2026-10-07:** browser right-click add and matching Help are now implemented. The real editor regression reproduced the missing action before the fix and passed afterward. [M5 evidence](2026-10-07-player-entry-m5.md) also records navigation, pending-save and keyboard-focus regressions. Installed-candidate acceptance below remains open.
+
 ## Remaining acceptance register
 
 Every row below is still open for the final candidate. Existing automated or historical passes remain separate evidence.

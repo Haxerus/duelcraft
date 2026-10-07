@@ -1,6 +1,6 @@
 # M5 Home and lobby visual review
 
-Status: mockup ready for review; production screens have not started.
+Status: illustrated Home approved by the user and implemented in M5. See [verification and remaining acceptance](../reports/2026-10-07-player-entry-m5.md).
 
 The user approved moving to M5 on 2026-10-06 and carrying outstanding QA.3 acceptance into M6. The existing [M5 plan](../plans/2026-09-17-player-entry-points-milestone-5.md), [interaction design](2026-09-15-player-interaction-design.md) and [contracts](2026-09-17-player-interaction-contracts.md) still define scope and authority. This note specifies the proposed presentation, not a new subsystem.
 
@@ -41,7 +41,7 @@ Featured-art revision verification: the 160-combination preview regression and i
 - [x] Carry open acceptance checks into the [M6 register](../reports/2026-10-06-qa3-carry-forward.md) without marking them passed.
 - [x] Prepare interactive Home/lobby mockup using the current preparation states and settings bounds.
 - [x] User reviews initial Home/lobby structure and approves the lobby/settings layout and featured-art direction.
-- [ ] User reviews the revised illustrated Home before LDLib implementation.
+- [x] User reviews the revised illustrated Home before LDLib implementation.
 - [ ] Implement M5's five existing tasks with focused tests and real UI checks; include the browser right-click add correction as a scoped change.
 - [ ] Complete M5's integrated/dedicated journey checks, recording any blocked manual checks accurately.
 - [ ] Run M6's consolidated manual QA, bounded fixes and release/documentation audit.

@@ -1,6 +1,12 @@
 # Collection and deck editor implementation handoff
 
-## Current execution checkpoint (2026-10-06)
+## Current execution checkpoint (2026-10-07)
+
+M5 Home, remappable J entry, private lobby, Card Binder and Duel Mat are implemented at `a07b651` on `codex/qa-m4` in the existing deck-editor worktree. Final verification passed 1,112 JUnit cases with one existing skip, 57/57 UI scenarios and 12,227 checks, plus both-policy dedicated journeys. The user approved the featured monster artwork fading into the left menu. Browser right-click now adds through the existing editor rules, and Help reflects the corrected controls. Protocol is **8**; persistence formats are unchanged. See [the M5 verification report](../reports/2026-10-07-player-entry-m5.md) for exact automated results, review fixes and artifact hash, and [the M5 playtest guide](../../qa-m5.md) for the remaining installed-build checks.
+
+M6 owns consolidated QA.3/M5 packaged acceptance, documentation/compatibility audit and final polish. Fixture results do not close human readability, OS key rebinding, actual client item/offhand dispatch or the same installed-JAR two-client/server matrix. Preserve the ordinary development ownership-enabled configuration and earlier evidence/worlds. No merge or push.
+
+## Scheduling checkpoint (2026-10-06)
 
 The user approved moving into M5 with Home/lobby mockups first, followed by M5 implementation and M6 consolidated QA/polish. The worktree is on `codex/qa-m4`, clean at `22e5f70` before this documentation/mockup batch. [The review note](../specs/2026-10-06-m5-entry-screen-review.md) links the interactive mockup and tracks the next checkpoint. [The QA.3 carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) retains open checks and corrects the computer-control trial's browser input expectation: browser right-click adds, deck right-click removes, double-left-click is a second add method. That code correction remains pending. No production M5 implementation, merge or push has occurred. Earlier reports below remain historical evidence; their outstanding acceptance no longer blocks beginning M5.
 

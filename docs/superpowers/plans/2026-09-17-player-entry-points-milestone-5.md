@@ -28,7 +28,7 @@ Java paths start at `src/main/java/com/haxerus/duelcraft/`, tests at `src/test/j
 
 **Interfaces:** `ScreenRoute` enum HOME/COLLECTION/LOBBY/DUEL. Request `(UUID requestId, ScreenRoute requested)` accepts only the first three. Reply `(UUID requestId, ScreenRoute resolved, PreparationView preparation)` comes only from the server. `InteractionPayloadHandler.resolve(ScreenRoute requested, boolean live, boolean preparing)` is a pure function; `.open(ServerPlayer,ScreenRoute,UUID requestId)` sends the response. `DuelcraftScreens.request(ScreenRoute)` sends a packet; `.apply(InteractionStatePayload)` applies only the current request; `.disconnect()` clears state and pending drafts. The coordinator owns parent-screen navigation and one suspended editor session for this connection.
 
-- [ ] Write routing tests:
+- [x] Write routing tests:
 
 ```java
 assertEquals(ScreenRoute.DUEL, InteractionPayloadHandler.resolve(ScreenRoute.COLLECTION, true, false));
@@ -37,9 +37,9 @@ assertEquals(ScreenRoute.COLLECTION, InteractionPayloadHandler.resolve(ScreenRou
 ```
 
 Add a delayed HOME reply after a newer COLLECTION request and assert no navigation; changing connection generation must also invalidate it. Server push of new preparation/duel state always takes precedence over older management replies.
-- [ ] Run `./gradlew.bat test --tests '*ScreenRouteTest' --tests '*InteractionPayloadTest' --tests '*DuelcraftScreensTest'`.
-- [ ] Resolve server state first: live -> DUEL; RPS/FIRST_CHOICE/STARTING -> LOBBY; otherwise requested management route. Do not treat a pending invitation as a lock. If management becomes busy before its data request is handled, the existing collection gate still rejects it. A route reply never grants authority to mutate.
-- [ ] Register a `KeyMapping` through `RegisterKeyMappingsEvent`, category `key.categories.duelcraft`, default GLFW_KEY_J. Handle `ClientTickEvent.Post` through NeoForge's client event bus:
+- [x] Run `./gradlew.bat test --tests '*ScreenRouteTest' --tests '*InteractionPayloadTest' --tests '*DuelcraftScreensTest'`.
+- [x] Resolve server state first: live -> DUEL; RPS/FIRST_CHOICE/STARTING -> LOBBY; otherwise requested management route. Do not treat a pending invitation as a lock. If management becomes busy before its data request is handled, the existing collection gate still rejects it. A route reply never grants authority to mutate.
+- [x] Register a `KeyMapping` through `RegisterKeyMappingsEvent`, category `key.categories.duelcraft`, default GLFW_KEY_J. Handle `ClientTickEvent.Post` through NeoForge's client event bus:
 
 ```java
 while (HOME.consumeClick()) {
@@ -50,7 +50,7 @@ while (HOME.consumeClick()) {
 ```
 
 Consumption while another screen is open must not queue a later surprise navigation. Expose rebinding through standard Controls. No duplicate polling on both tick phases.
-- [ ] On live-route response use `LDLibDuelScreen.reopen()`; if client duel state is absent, show a recoverable error and retain the server lock instead of opening collection. Do not add engine resync in this task. On preparing state suspend a dirty editor locally and open the lobby; after cancel/end offer Resume draft. Never auto-save or discard that suspended draft. On ClientPayloadHandler.handleStart and a forced preparation transition, invalidate all pending management route request IDs before opening the required screen. Disconnect clears the local draft and pending routes as documented.
+- [x] On live-route response use `LDLibDuelScreen.reopen()`; if client duel state is absent, show a recoverable error and retain the server lock instead of opening collection. Do not add engine resync in this task. On preparing state suspend a dirty editor locally and open the lobby; after cancel/end offer Resume draft. Never auto-save or discard that suspended draft. On ClientPayloadHandler.handleStart and a forced preparation transition, invalidate all pending management route request IDs before opening the required screen. Disconnect clears the local draft and pending routes as documented.
 - [ ] Test key while chat/textfield open, repeat presses, game menu, no world, busy-state races, and dirty close/nav prompts. Commit `feat: route Duelcraft screens through server state`.
 
 ## Task 2: Home screen and connected collection navigation
@@ -60,9 +60,9 @@ Consumption while another screen is open must not queue a later surprise navigat
 **Interfaces:** `HomeScreen.create(ClientCollectionState collection, ClientPreparationState preparation)` returns the LDLib host; callbacks call `DuelcraftScreens.request`. Home reads summaries/status rather than cloning editor data. It can render loading/error state while opening a collection summary snapshot.
 
 - [ ] Add a failing real-screen scenario for two primary buttons `#home-collection`, `#home-duels`, active-deck status `#home-active-deck`, and `#home-close`; click both routes and verify destination screen without needing items. Use injected state fixtures for layout and real packets in the network scenario.
-- [ ] Build the home using the editor's visual vocabulary: Minecraft-style framed panels, clear Collection & Decks and Duel buttons, current active deck or no-selection status, received invitation notification, and optional Resume draft when suspended. Do not add currencies, quests, shops, or empty placeholder destinations.
-- [ ] Use a compact centered content panel within a uniformly scaled 1280x720 management canvas. Keep main actions visible in smaller viewports and navigation keyboard-accessible. Preserve editor's fixed layout rather than embedding it inside the home.
-- [ ] Home -> Collection opens the authoritative saved-list picker/editor; Collection -> Home uses Save/Discard/Cancel if dirty. Bind New/Rename/Duplicate/Delete/Activate and UI Import from milestone 4; do not hide these behind commands. Initial empty collection/deck list has New deck and Import as usable actions.
+- [x] Build the home using the editor's visual vocabulary: Minecraft-style framed panels, clear Collection & Decks and Duel buttons, current active deck or no-selection status, received invitation notification, and optional Resume draft when suspended. Do not add currencies, quests, shops, or empty placeholder destinations.
+- [x] Use the approved compact left-side menu and featured artwork within a uniformly scaled 1280x720 management canvas. Keep main actions visible in smaller viewports and navigation keyboard-accessible. Preserve editor's fixed layout rather than embedding it inside the home.
+- [x] Home -> Collection opens the authoritative saved-list picker/editor; Collection -> Home uses Save/Discard/Cancel if dirty. Bind New/Rename/Duplicate/Delete/Activate and UI Import from milestone 4; do not hide these behind commands. Initial empty collection/deck list has New deck and Import as usable actions.
 - [ ] Run `./gradlew.bat runClient -PldTest=duelcraft_home -PldTestWindow=1280x720` and a smaller-window capture. Verify no-item navigation, pending-save close behavior, loading/error retries, and return navigation; commit `feat: add Duelcraft home screen`.
 
 ## Task 3: Private invitation and preparation UI
@@ -71,7 +71,7 @@ Consumption while another screen is open must not queue a later surprise navigat
 
 **Interfaces:** `DuelLobbyScreen.create(ClientPreparationState)` returns the management host. `ClientPreparationState.request(PreparationCommand)` returns a `CompletionStage<PreparationStatePayload>`; state notifications update subscribed controller during screen lifetime, then unsubscribe on removal. Keep revisions/flow IDs/round IDs from milestone 4. Do not dispatch command strings from buttons.
 
-- [ ] Test this mapping through a recording packet sink:
+- [x] Test this mapping through a recording packet sink:
 
 ```java
 // On a view with flowId and roundId, clicking Rock must preserve both IDs.
@@ -94,8 +94,8 @@ Create the controller with an explicit `Consumer<PreparationCommand>` sink and c
 | Live | Transition to existing duel screen |
 
 Defaults/bounds come from DuelSettings and contract. Invalid text input disables Invite and identifies the field. UI selection accepts only online nonself UUIDs; server validates again. Pending-invite settings remain immutable; to change them cancel and resend.
-- [ ] Preserve the user's unsaved invitation form when opening collection for deck selection, but re-read current authoritative preparation view on return. Display server-provided ownership mode and actual own activation/companion denials; present missing-copy counts neutrally when ownership is optional; show only generic readiness for the opponent. Countdown derives from server-provided remaining time and local receipt time; reaching zero requests a view instead of locally manufacturing cancellation.
-- [ ] Closing the lobby returns to world/home without cancelling; pending invites expire normally. Explicit Cancel cancels the displayed flow ID only. Notifications expose an Open invitation action; they do not forcibly replace a dirty editor for an unaccepted invite. Accepted preparation must suspend management and route both players.
+- [x] Preserve the user's unsaved invitation form when opening collection for deck selection, but re-read current authoritative preparation view on return. Display server-provided ownership mode and actual own activation/companion denials; present missing-copy counts neutrally when ownership is optional; show only generic readiness for the opponent. Countdown derives from server-provided remaining time and local receipt time; reaching zero requests a view instead of locally manufacturing cancellation.
+- [x] Closing the lobby returns to world/home without cancelling; pending invites expire normally. Explicit Cancel cancels the displayed flow ID only. Notifications expose an Open invitation action; they do not forcibly replace a dirty editor for an unaccepted invite. Accepted preparation must suspend management and route both players.
 - [ ] Add fixture scenarios for each state, long names, invalid options, expired invite, declined invite, offline target, stale response, RPS tie and winner/loser. Assert no opponent choice/list data appears. Run `./gradlew.bat test --tests '*DuelLobbyControllerTest'` and `./gradlew.bat runClient -PldTest=duel_lobby`; capture/screens inspect before committing `feat: add private duel lobby interface`.
 
 ## Task 4: Binder and placed mat entry points
@@ -105,8 +105,8 @@ Defaults/bounds come from DuelSettings and contract. Invalid text input disables
 **Interfaces:** binder server-side Item.use delegates to `InteractionPayloadHandler.open(player,COLLECTION,requestId)`. Mat server-side block interaction delegates to LOBBY. Item/block opens carry a generated request ID plus an explicit `boolean unsolicited` on InteractionStatePayload, added to the codec/tests: the client may accept unsolicited physical entry only while in world/no screen and still applies current authoritative duel/preparation state. This avoids requiring a matching client route request for server-triggered use.
 
 - [ ] Add a failing scenario that uses the binder in either hand and a mat with empty/nonempty hand, then verifies the correct route for the interacting player. A second player must see their own collection/status when using the same mat.
-- [ ] Register `duelcraft:card_binder` stack size1; `duelcraft:duel_mat` block and BlockItem. Use a thin full-block footprint (one-sixteenth-block height), carpet-like outline, no collision, no block entity, no ownership storage, and no range tether after opening. Verify the pinned block interaction override handles ordinary nonempty-hand use as intended; item-specific interactions must not produce two open replies.
-- [ ] Provide initial resource definitions using existing vanilla/mod textures:
+- [x] Register `duelcraft:card_binder` stack size1; `duelcraft:duel_mat` block and BlockItem. Use a thin full-block footprint (one-sixteenth-block height), carpet-like outline, no collision, no block entity, no ownership storage, and no range tether after opening. Verify the pinned block interaction override handles ordinary nonempty-hand use as intended; item-specific interactions must not produce two open replies.
+- [x] Provide initial resource definitions using existing vanilla/mod textures:
 
 ```text
 assets/duelcraft/models/item/card_binder.json      item/generated; layer0 minecraft:item/book
@@ -124,10 +124,28 @@ Use vanilla wool textures (e.g. green/brown) for the initial mat model; no new i
 
 **Create:** `client/uitest/DuelcraftJourneyScenario.java` (DEV_ONLY `duelcraft_journey`); extend existing network/UI scenarios for navigation state. **Modify:** only behavior surfaced by failing scenarios; maintain model/packet contracts.
 
-- [ ] Add deterministic integrated-server coverage for hotkey -> empty collection -> create/save legal draft -> activate -> lobby form -> collection back navigation with default ownership off and no companion, without any grant or deposit. Repeat with ownership on/no companion: save succeeds, activation fails with shortages until deposit. Verify ordinary interaction requires no chat commands and selection/count indicators survive screen changes.
+- [x] Add deterministic integrated-server coverage for hotkey -> empty collection -> create/save legal draft -> activate -> lobby form -> collection back navigation with default ownership off and no companion, without any grant or deposit. Repeat with ownership on/no companion: save succeeds, activation fails with shortages until deposit. Verify ordinary interaction requires no chat commands and selection/count indicators survive screen changes.
 - [ ] Run a two-client dedicated-server journey with ownership off/no companion, starting from empty collections without granting cards. Repeat with core ownership on/no companion: grant physical fixture cards as operator, deposit and activate independently, invite via home, accept via mat UI, finish RPS/first choice, complete or concede a duel, return home, withdraw and observe active invalidation. Repeat collection entry with binder. Verify an independent test companion restriction denies use via home/binder/mat under either setting, with the actual private denial reason. Use the same installed JAR on server/clients; no integrated-server fixture access in this manual check.
 - [ ] Test accepted preparation during dirty editing, save reply arriving during forced route, late management reply after duel start, closing/reopening lobby, target disconnect, and post-result home entry. No unsaved draft loss within the connection and no stale response replacing the duel screen.
 - [ ] Run `./gradlew.bat test`, `./gradlew.bat runClient -PldTest=group:duelcraft`, and GUI scale/window checks from milestone 1 for all new screens. Record actual results and commit `test: verify Duelcraft player entry journeys`.
+
+## Verification notes — 2026-10-07
+
+Implementation and review fixes are recorded in [the M5 report](../reports/2026-10-07-player-entry-m5.md). Unchecked combined steps retain their remaining acceptance requirements; they do not mean the associated feature is absent. Some UI fixtures were written alongside implementation rather than strictly before it. The browser gesture and three review findings have observed failing/passing real-screen regressions.
+
+Completed implementation checkpoints:
+
+- [x] Task 1: typed server routes, J registration, latest-request/generation guards, forced preparation/duel routing and draft retention.
+- [x] Task 2: approved Home/artwork, private summary, retry/invitation/Resume and collection Back navigation.
+- [x] Task 3: typed private lobby, settings/target validation, RPS/first choice, owner-only denial notice and keyboard/modal controls.
+- [x] Task 4: binder/mat registration, resources and real server-side interaction/network fixtures, including each player's own shared-mat view.
+- [x] Task 5: integrated default-ownership journey; dedicated journeys under both ownership modes with physical deposit, native duel and private companion-denial checks.
+- [x] Final full suite: 1112 passed/one skipped JUnit cases; 57/57 UI scenarios, 12,227 checks. Home/lobby scale checks passed at GUI 2/3/4. Implementation commit `a07b651`; verification documentation accompanies it.
+- [ ] M6 acceptance: actual OS input/rebinding, client-side item/offhand dispatch, installed same-JAR journey and human readability, plus the unexercised combinations in the original steps above.
+
+The first-state UI fixtures were written alongside implementation; their creation is not claimed as an observed RED run. Browser right-click, the three review findings and the import-fixture revision leak do have preserved RED/GREEN evidence. Related tasks share the coordinator and protocol, so commits group the coherent feature and its tests, followed by verification documentation.
+
+World hotkey fixtures enter through Minecraft KeyMapping rather than LDLib's screen-only key driver. Item/block fixtures call real server interaction methods and observe client replies; OS input, physical offhand dispatch and the same installed-JAR journey remain manual acceptance in M6. This follows the user's QA.3/M5/M6 sequencing decision. Earlier evidence is preserved. The final report names every run and remaining check.
 
 ## Completion
 

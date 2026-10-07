@@ -67,6 +67,8 @@ Replace session-only `playerCurrentDeck` as the authoritative selection. Pending
 
 ## 5. Home, binder, mat, and invitation screens
 
+**Implemented 2026-10-07:** [M5 report](../reports/2026-10-07-player-entry-m5.md) and [manual guide](../../qa-m5.md). Protocol 8; approved featured-art Home, typed private lobby and physical entry points share server authority. The report separates automated evidence from the installed-JAR acceptance carried into M6. No merge or push.
+
 Create `client/interaction/DuelcraftScreens`, key registration/handling, `HomeScreen`, and `DuelLobbyScreen`, with their XML resources. Register a binder item and a placed duel-mat block/item that open the corresponding route. Give the mat no collection inventory or ownership data; access through a mat still uses the interacting player's collection. Add item/block textures/models/lang resources as part of their implementation task.
 
 The remappable home key provides collection/deckbuilding and duel preparation without carrying an item. Bind the same routing policy to item/block interactions. During a live duel, return to that duel instead of opening management; during accepted preparation, return to preparation. Route from server state as well as local state so stale screens cannot bypass locks. Respect text input and other open screens.
