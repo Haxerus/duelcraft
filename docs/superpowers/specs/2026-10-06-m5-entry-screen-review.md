@@ -8,7 +8,9 @@ The user approved moving to M5 on 2026-10-06 and carrying outstanding QA.3 accep
 
 Open [the interactive Home/lobby mockup](../../mockups/m5-player-entry.html) in a browser. Controls above the canvas switch example states and are not part of the game. Names, timers, server events and deck status are fixtures. No network requests, saves or Minecraft changes occur.
 
-The preview uses a uniformly scaled 1280x720 canvas. Home occupies a compact centred panel; the lobby has a fixed header/footer and scrollable content. The dark panel colours and restrained purple selection follow the approved collection mockup. LDLib implementation will use the existing Minecraft font and framed GDP widgets; HTML typography is approximate.
+The preview uses a uniformly scaled 1280x720 canvas. Home places compact controls on the left and a featured monster illustration on the right, fading the art behind the controls. The lobby has a fixed header/footer and scrollable content. The dark panel colours and restrained purple selection follow the approved collection mockup. LDLib implementation will use the existing Minecraft font and framed GDP widgets; HTML typography is approximate.
+
+After the initial review, the user approved static featured monster artwork until original Minecraft-styled Duelcraft renders are available. The revised preview offers Blue-Eyes White Dragon, Dark Magician and Stardust Dragon through a review-only selector. Those examples use existing cached artwork, not generated replacements. There is no automatic slideshow or new in-game artwork settings menu in this proposal. Keep the lobby/settings layout; Help wording is provisional and the user may edit it later. Expanded duel rules are a separate pass. Duelist levels/progression belong to the companion mod; do not add a core level system or placeholder indicator in M5.
 
 ## Proposed layout
 
@@ -33,10 +35,13 @@ The preview simulates these transitions but does not prove server routing, async
 
 Preview verification: headless Chrome exercised all 16 scene choices with five deck fixtures at 1320px and 900px browser widths (160 combinations; full-size and uniformly scaled canvas). Button/heading/panel bounds checks and settings, invitation close/reopen, RPS submission, busy binder routing, dirty Escape and suspended-draft interactions passed, with no JavaScript errors. Home, incoming-invitation and RPS screenshots were visually inspected. Local script/screenshots: `build/evidence/m5-mockup-2026-10-06/`. Browser automation through the app failed to initialize; the check used installed Chrome with Playwright instead. These are HTML preview checks only, not new Minecraft/LDLib or multiplayer results. No Gradle suite was needed for this documentation/prototype batch.
 
+Featured-art revision verification: the 160-combination preview regression and its interaction checks passed again. All three local images decoded; 12 additional combinations covered the three artworks at both widths with normal content and long names plus invitation/Resume draft together. Screenshots were inspected for the artwork placement and text separation. Revised evidence is separate at `build/evidence/m5-art-preview-2026-10-06/`; the original preview evidence remains intact.
+
 - [x] Inspect existing worktree, branch and HEAD; preserve QA.3 source/evidence.
 - [x] Carry open acceptance checks into the [M6 register](../reports/2026-10-06-qa3-carry-forward.md) without marking them passed.
 - [x] Prepare interactive Home/lobby mockup using the current preparation states and settings bounds.
-- [ ] User reviews the Home/lobby layout and interactions before LDLib implementation.
+- [x] User reviews initial Home/lobby structure and approves the lobby/settings layout and featured-art direction.
+- [ ] User reviews the revised illustrated Home before LDLib implementation.
 - [ ] Implement M5's five existing tasks with focused tests and real UI checks; include the browser right-click add correction as a scoped change.
 - [ ] Complete M5's integrated/dedicated journey checks, recording any blocked manual checks accurately.
 - [ ] Run M6's consolidated manual QA, bounded fixes and release/documentation audit.

@@ -24,6 +24,13 @@
   #canvas { position:absolute; width:1280px; height:720px; transform-origin:top left; background:#18171e; border:1px solid #3f3949; display:grid; place-items:center; }
   .panel { width:940px; height:584px; background:#24212c; border:2px solid #68606e; box-shadow:inset 0 0 0 2px #302c38,0 12px 28px #0006; display:flex; flex-direction:column; }
   .panel.home { width:620px; height:auto; min-height:386px; }
+  .featured { position:relative; width:100%; height:100%; display:flex; align-items:center; padding:48px; overflow:hidden; }
+  .featured-art { position:absolute; right:0; top:0; width:760px; height:720px; object-fit:cover; pointer-events:none; }
+  .featured::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#18171e 41%,#18171ef0 46%,#18171e00 70%),linear-gradient(0deg,#18171eaa,transparent 25%,transparent 85%,#18171e66); pointer-events:none; }
+  .featured .panel.home { position:relative; z-index:1; width:480px; min-height:0; background:#24212cf5; }
+  .featured .home-body { padding:22px; gap:16px; }
+  .featured .home-actions { flex-direction:column; align-items:stretch; }
+  .featured .home-actions button { flex:none; min-height:54px; }
   header { display:flex; align-items:center; gap:12px; padding:18px 22px; border-bottom:1px solid #48414f; flex-shrink:0; }
   h1,h2,h3,p { margin:0; }
   h1 { font-size:24px; font-weight:500; }
@@ -81,6 +88,7 @@
     <option value="offline">Player left</option><option value="loading">Loading</option><option value="error">Connection error</option>
   </select></label>
   <label>Your deck <select id="deck-state"><option value="ready">Ready</option><option value="empty">None active</option><option value="missing">Missing copies</option><option value="denied">Companion denial</option><option value="long">Long name</option></select></label>
+  <label>Home artwork <select id="artwork"><option value="blue-eyes">Blue-Eyes White Dragon</option><option value="dark-magician">Dark Magician</option><option value="stardust">Stardust Dragon</option></select></label>
   <label><input type="checkbox" id="draft"> Suspended draft</label>
   <label><input type="checkbox" id="invite"> Home invitation</label>
   <button id="reset">Reset</button>
@@ -93,6 +101,7 @@
   const $ = s => document.querySelector(s), canvas = $('#canvas'), modal = $('#modal');
   const players = ['Alex','MapleMage','RedstoneDuelist','BlueEyesBuilder','EnderKnight','PlayerWithLongName','OakWizard','Player2'];
   let scene = 'home', flow = 'idle', selected = 'Alex', deck = 'ready', suspended = false, homeInvite = false, returnTo = 'home';
+  let artwork = 'blue-eyes';
   let settings = {rule:'MR5',lp:'8000',hand:'5',draw:'1',seed:''};
   const busy = () => ['rps','submitted','tie','first','other-first','starting','live'].includes(flow);
   const eligible = () => ['ready','long'].includes(deck);
@@ -107,7 +116,7 @@
   function render() {
     $('#scene').value=scene; $('#deck-state').value=deck; $('#draft').checked=suspended; $('#invite').checked=homeInvite;
     if (scene==='home') {
-      canvas.innerHTML=`<section class="panel home"><header><h1>Duelcraft</h1><span class="spacer"></span>${button('help','?')}${button('close','Close')}</header><div class="home-body">${deckSummary(false)}<div class="actions home-actions">${button('collection','Collection & Decks')}${button('lobby','Duel',true)}</div>${homeInvite?`<div class="notice"><span>Alex invited you to duel.</span>${button('incoming','View invitation')}</div>`:''}${suspended?button('resume','Resume draft'):''}</div></section>`;
+      canvas.innerHTML=`<div class="featured"><img class="featured-art" src="featured-art/${artwork}.png" alt=""><section class="panel home"><header><h1>Duelcraft</h1><span class="spacer"></span>${button('help','?')}${button('close','Close')}</header><div class="home-body">${deckSummary(false)}<div class="actions home-actions">${button('lobby','Duel',true)}${button('collection','Collection & Decks')}</div>${homeInvite?`<div class="notice"><span>Alex invited you to duel.</span>${button('incoming','View invitation')}</div>`:''}${suspended?button('resume','Resume draft'):''}</div></section></div>`;
       return;
     }
     if(scene==='world'||scene==='live') {
@@ -184,6 +193,7 @@
   $('#dismiss').addEventListener('click',closeDialog);
   $('#scene').addEventListener('change',event=>{const next=event.target.value;flow=['home','loading','error'].includes(next)?'idle':next;show(next);});
   $('#deck-state').addEventListener('change',event=>{deck=event.target.value;render();});
+  $('#artwork').addEventListener('change',event=>{artwork=event.target.value;render();});
   $('#draft').addEventListener('change',event=>{suspended=event.target.checked;render();});
   $('#invite').addEventListener('change',event=>{homeInvite=event.target.checked;render();});
   $('#reset').addEventListener('click',()=>{flow='idle';deck='ready';suspended=false;homeInvite=false;selected='Alex';settings={rule:'MR5',lp:'8000',hand:'5',draw:'1',seed:''};if(modal.open)closeDialog();show('home');});
