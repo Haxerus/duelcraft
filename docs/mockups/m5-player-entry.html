@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Duelcraft M5 · Home and lobby mockup</title>
+<style>
+  :root { color-scheme:dark; font:16px/1.45 Arial,sans-serif; color:#ecebf2; background:#111116; }
+  * { box-sizing:border-box; }
+  body { margin:0; }
+  button,input,select { font:inherit; color:inherit; }
+  button,select,input { background:#302d39; border:1px solid #615969; border-radius:2px; min-height:40px; padding:8px 14px; }
+  button { cursor:pointer; }
+  button:hover:not(:disabled) { background:#47404f; }
+  button:disabled { opacity:.45; cursor:default; }
+  :focus-visible { outline:2px solid #c0a4d7; outline-offset:3px; }
+  .primary { background:#60487a; border-color:#a389bd; }
+  .primary:hover:not(:disabled) { background:#72568e; }
+  .review { padding:12px 20px; background:#23212a; border-bottom:1px solid #51445f; display:flex; gap:14px; align-items:center; flex-wrap:wrap; font-size:13px; }
+  .review p { margin:0; color:#bbb5c5; }
+  .review label { display:flex; gap:8px; align-items:center; }
+  .review select,.review button { min-height:32px; padding:4px 8px; }
+  .review input { min-height:unset; }
+  #viewport { position:relative; margin:20px auto; width:1280px; height:720px; overflow:hidden; }
+  #canvas { position:absolute; width:1280px; height:720px; transform-origin:top left; background:#18171e; border:1px solid #3f3949; display:grid; place-items:center; }
+  .panel { width:940px; height:584px; background:#24212c; border:2px solid #68606e; box-shadow:inset 0 0 0 2px #302c38,0 12px 28px #0006; display:flex; flex-direction:column; }
+  .panel.home { width:620px; height:auto; min-height:386px; }
+  header { display:flex; align-items:center; gap:12px; padding:18px 22px; border-bottom:1px solid #48414f; flex-shrink:0; }
+  h1,h2,h3,p { margin:0; }
+  h1 { font-size:24px; font-weight:500; }
+  h2 { font-size:21px; font-weight:500; }
+  h3 { font-size:16px; font-weight:500; }
+  .spacer { flex:1; }
+  .home-body { padding:26px; display:grid; gap:20px; }
+  .deck { padding:18px; border:1px solid #4d4657; background:#1b1923; overflow-wrap:anywhere; }
+  .deck h2 { margin:8px 0; }
+  .muted { color:#b6afc1; }
+  .small { font-size:14px; }
+  .ready { color:#bdd2ac; }
+  .warning { color:#ebc68f; }
+  .actions { display:flex; gap:12px; align-items:center; }
+  .home-actions button { flex:1; min-height:64px; font-size:19px; }
+  .notice { display:flex; align-items:center; gap:16px; border:1px solid #837092; background:#332c3d; padding:14px; }
+  .notice span { flex:1; }
+  .body { display:grid; grid-template-columns:260px minmax(0,1fr); gap:22px; padding:22px; flex:1; min-height:0; }
+  aside { display:flex; flex-direction:column; gap:18px; overflow:auto; }
+  aside .deck button { margin-top:16px; width:100%; }
+  .settings-summary { padding:0 6px; }
+  dl { margin:12px 0; display:grid; grid-template-columns:1fr auto; gap:6px 18px; font-size:14px; }
+  dt { color:#b6afc1; } dd { margin:0; text-align:right; overflow-wrap:anywhere; max-width:180px; }
+  .content { min-height:0; overflow:auto; display:flex; flex-direction:column; gap:18px; }
+  .players { display:grid; gap:5px; overflow:auto; max-height:278px; padding:3px; }
+  .player { text-align:left; min-height:40px; display:flex; justify-content:space-between; gap:16px; }
+  .player[aria-pressed=true] { background:#493955; border-color:#b59ac6; }
+  .player span { color:#b6afc1; font-size:14px; }
+  .center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; text-align:center; padding:12px; }
+  .center p { max-width:450px; }
+  .versus { font-size:25px; overflow-wrap:anywhere; }
+  .hands { display:flex; gap:12px; }
+  .hands button { width:136px; height:94px; font-size:21px; }
+  footer { padding:16px 22px; border-top:1px solid #48414f; display:flex; align-items:center; gap:12px; min-height:75px; flex-shrink:0; }
+  footer p { flex:1; font-size:14px; }
+  footer button { min-width:120px; }
+  dialog { position:absolute; margin:auto; width:480px; padding:0; background:#24212c; color:#ecebf2; border:2px solid #9b85ac; box-shadow:0 12px 40px #0009; }
+  dialog::backdrop { background:#08070cc9; }
+  .dialog-body { padding:22px; display:grid; gap:18px; }
+  .dialog-body label { display:grid; gap:6px; }
+  .numbers { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .numbers input { width:100%; }
+  dialog footer { justify-content:flex-end; }
+  .world { text-align:center; display:grid; gap:20px; }
+  .world .actions { justify-content:center; }
+  [hidden] { display:none!important; }
+</style>
+<div class="review" aria-label="Mockup controls, not part of the game">
+  <strong>M5 mockup</strong>
+  <label>Scene <select id="scene">
+    <option value="home">Home</option><option value="idle">Invite a player</option><option value="incoming">Received invitation</option>
+    <option value="outgoing">Sent invitation</option><option value="rps">Rock, paper, scissors</option><option value="submitted">Hand submitted</option>
+    <option value="tie">Tied round</option><option value="first">Choose first player</option><option value="other-first">Opponent chooses</option>
+    <option value="starting">Starting duel</option><option value="live">Existing duel / return</option><option value="expired">Expired invitation</option><option value="declined">Declined invitation</option>
+    <option value="offline">Player left</option><option value="loading">Loading</option><option value="error">Connection error</option>
+  </select></label>
+  <label>Your deck <select id="deck-state"><option value="ready">Ready</option><option value="empty">None active</option><option value="missing">Missing copies</option><option value="denied">Companion denial</option><option value="long">Long name</option></select></label>
+  <label><input type="checkbox" id="draft"> Suspended draft</label>
+  <label><input type="checkbox" id="invite"> Home invitation</label>
+  <button id="reset">Reset</button>
+  <p>Layout preview only. Scene controls simulate server events; the game keeps its existing collection editor.</p>
+</div>
+<div id="viewport"><main id="canvas" aria-label="1280 by 720 game canvas"></main></div>
+<dialog id="modal"><header><h2 id="dialog-title"></h2><span class="spacer"></span><button id="dismiss" aria-label="Close dialog">×</button></header><div id="dialog-content"></div></dialog>
+<script>
+(() => {
+  const $ = s => document.querySelector(s), canvas = $('#canvas'), modal = $('#modal');
+  const players = ['Alex','MapleMage','RedstoneDuelist','BlueEyesBuilder','EnderKnight','PlayerWithLongName','OakWizard','Player2'];
+  let scene = 'home', flow = 'idle', selected = 'Alex', deck = 'ready', suspended = false, homeInvite = false, returnTo = 'home';
+  let settings = {rule:'MR5',lp:'8000',hand:'5',draw:'1',seed:''};
+  const busy = () => ['rps','submitted','tie','first','other-first','starting','live'].includes(flow);
+  const eligible = () => ['ready','long'].includes(deck);
+  const button = (action,text,primary=false,disabled=false) => `<button data-action="${action}" class="${primary?'primary':''}" ${disabled?'disabled':''}>${text}</button>`;
+  const deckName = () => deck==='long' ? 'Spell toolbox with a deliberately long saved deck name for layout review' : 'Spell toolbox';
+  const deckSummary = editable => `<div class="deck"><p class="small muted">Your active deck</p><h2>${deck==='empty'?'No active deck':deckName()}</h2>${deck==='empty'?'': '<p class="small muted">Main 40 · Extra 5 · Side 5</p>'}<p class="small ${eligible()?'ready':'warning'}">${{ready:'Ready',long:'Ready',empty:'Choose a saved deck to duel.',missing:'Missing 2 deposited copies of Pot of Greed.',denied:'This deck needs a permit on this server.'}[deck]}</p>${editable?button('collection','Select deck'):''}</div>`;
+  const summary = () => `<div class="settings-summary"><h3>${settings.rule==='MR5'?'Master Rule 5':settings.rule}</h3><dl><dt>Life points</dt><dd>${settings.lp}</dd><dt>Starting hand</dt><dd>${settings.hand}</dd><dt>Draw per turn</dt><dd>${settings.draw}</dd>${settings.seed?`<dt>Seed</dt><dd>${settings.seed}</dd>`:''}</dl>${flow==='idle'?button('settings','Settings'):''}</div>`;
+  function show(next) { scene=next; render(); }
+  function setFlow(next) { flow=next; show(next); }
+  function closeDialog() { modal.close(); }
+  function dialog(title,html) { $('#dialog-title').textContent=title; $('#dialog-content').innerHTML=html; modal.showModal(); }
+  function render() {
+    $('#scene').value=scene; $('#deck-state').value=deck; $('#draft').checked=suspended; $('#invite').checked=homeInvite;
+    if (scene==='home') {
+      canvas.innerHTML=`<section class="panel home"><header><h1>Duelcraft</h1><span class="spacer"></span>${button('help','?')}${button('close','Close')}</header><div class="home-body">${deckSummary(false)}<div class="actions home-actions">${button('collection','Collection & Decks')}${button('lobby','Duel',true)}</div>${homeInvite?`<div class="notice"><span>Alex invited you to duel.</span>${button('incoming','View invitation')}</div>`:''}${suspended?button('resume','Resume draft'):''}</div></section>`;
+      return;
+    }
+    if(scene==='world'||scene==='live') {
+      canvas.innerHTML=`<section class="world"><h1>${scene==='live'?'Existing duel screen':'Back in the world'}</h1><p class="muted">${scene==='live'?'The current duel UI takes over here.':'Preview the entry points below.'}</p><div class="actions">${scene==='live'?button('finish','Simulate duel end'):button('home','Open Home (J)')+button('binder','Use binder')+button('mat','Use mat')}</div></section>`; return;
+    }
+    if(scene==='collection') {
+      canvas.innerHTML=`<section class="panel home"><header><h1>My Collection</h1><span class="spacer"></span>${button('return','Back')}${button('close','Close')}</header><div class="home-body"><p>The existing collection editor opens here.</p><p class="muted">Inspector left, deck in the middle, full card browser on the right.</p><div class="actions">${button('choose-deck','Simulate selecting a legal deck',true)}</div>${button('edit','Simulate editing a draft')}${button('forced','Simulate accepted preparation')}</div></section>`; return;
+    }
+    let title='Duel', content='', footer='', editable=!busy();
+    if(scene==='loading'||scene==='error') {
+      content=`<div class="center"><h2>${scene==='loading'?'Loading…':'Could not load duel status.'}</h2>${scene==='error'?button('retry','Retry',true):''}</div>`;
+    } else if(scene==='idle') {
+      content=`<h2>Invite a player</h2><div class="players" aria-label="Online players">${players.map(p=>`<button class="player" data-player="${p}" aria-pressed="${p===selected}">${p}<span>${p===selected?'Selected':'Online'}</span></button>`).join('')}</div>`;
+      footer=`<p>${eligible()?'': 'Select an eligible deck before inviting.'}</p>${button('send','Invite '+selected,true,!eligible())}`;
+    } else if(scene==='incoming'||scene==='outgoing') {
+      title=scene==='incoming'?'Duel invitation':'Invitation sent';
+      content=`<div class="center"><h2 class="versus">${selected}</h2><p>${scene==='incoming'?'has invited you to duel.':'Waiting for a response.'}</p><p class="muted">Expires in 0:48</p></div>`;
+      footer=scene==='incoming'?`<p></p>${button('decline','Decline')}${button('accept','Accept',true,!eligible())}`:`<p></p>${button('cancel','Cancel invitation')}`;
+    } else if(['rps','tie','submitted'].includes(scene)) {
+      title='Choose a hand';
+      content=`<div class="center"><p class="muted">You vs ${selected}</p><h2>${scene==='tie'?'Tie. Choose again.':scene==='submitted'?'Waiting for '+selected+'…':'Rock, paper, scissors'}</h2><div class="hands">${['Rock','Paper','Scissors'].map(h=>button('hand',h,false,scene==='submitted')).join('')}</div><p class="muted">0:48 remaining</p></div>`;
+      footer=`<p></p>${button('cancel','Cancel duel')}`;
+    } else if(scene==='first'||scene==='other-first') {
+      title='First player';
+      content=`<div class="center"><p class="muted">You vs ${selected}</p><h2>${scene==='first'?'You won the roll.':'Waiting for '+selected+' to choose.'}</h2>${scene==='first'?`<div class="actions">${button('first','Go first',true)}${button('second','Go second')}</div>`:''}<p class="muted">0:48 remaining</p></div>`;
+      footer=`<p></p>${button('cancel','Cancel duel')}`;
+    } else if(scene==='starting') {
+      title='Starting duel';
+      content=`<div class="center"><h2>Starting duel…</h2><p class="muted">You vs ${selected}</p></div>`;
+    } else {
+      content=`<div class="center"><h2>${{expired:'Invitation expired.',declined:selected+' declined the invitation.',offline:selected+' is no longer online.'}[scene]}</h2>${button('retry','Back to invitations',true)}</div>`;
+    }
+    canvas.innerHTML=`<section class="panel"><header>${busy()?'':button('home','Home')}<h1>${title}</h1><span class="spacer"></span>${button('help','?')}${button('close','Close')}</header><div class="body"><aside>${scene==='loading'||scene==='error'?'<p class="muted">Deck status unavailable.</p>':deckSummary(editable)+summary()}</aside><section class="content">${content}</section></div><footer>${footer}</footer></section>`;
+  }
+  function openCollection() { if(busy()){show(flow);return;} returnTo=scene; show('collection'); }
+  function home() { show(busy()?flow:'home'); }
+  function settingsDialog() {
+    dialog('Duel settings',`<form id="settings-form"><div class="dialog-body"><label>Rule preset<select name="rule">${['MR1','GOAT','MR2','MR3','MR4','MR5','SPEED','RUSH'].map(r=>`<option ${r===settings.rule?'selected':''}>${r}</option>`).join('')}</select></label><div class="numbers"><label>Life points<input name="lp" type="number" min="1" max="99999" value="${settings.lp}" required></label><label>Starting hand<input name="hand" type="number" min="0" max="20" value="${settings.hand}" required></label><label>Draw per turn<input name="draw" type="number" min="0" max="10" value="${settings.draw}" required></label></div><label>Seed (optional)<input name="seed" value="${settings.seed}" placeholder="Random" inputmode="numeric" pattern="-?[0-9]+"></label></div><footer><button type="submit" class="primary">Apply</button></footer></form>`);
+    $('#settings-form').addEventListener('submit',event=>{event.preventDefault();settings=Object.fromEntries(new FormData(event.target));closeDialog();render();});
+  }
+  function leave(next) {
+    if(scene==='collection'&&suspended) {
+      dialog('Save changes?',`<div class="dialog-body"><p>Spell toolbox</p></div><footer>${button('save-leave','Save',true)}${button('discard-leave','Discard')}${button('dismiss','Keep editing')}</footer>`);
+      modal.dataset.next=next;
+    } else show(next);
+  }
+  document.addEventListener('click',event=>{
+    const b=event.target.closest('button'); if(!b||b.disabled)return;
+    if(b.dataset.player){selected=b.dataset.player;render();return;}
+    switch(b.dataset.action){
+      case 'home': home(); break;
+      case 'close': leave('world'); break;
+      case 'lobby': case 'mat': show(flow==='idle'&&homeInvite?'incoming':flow); break;
+      case 'binder': case 'collection': openCollection(); break;
+      case 'incoming': flow='incoming';show('incoming');break;
+      case 'send': homeInvite=false;setFlow('outgoing'); break;
+      case 'accept': homeInvite=false;setFlow('rps');break;
+      case 'hand': setFlow('submitted');break;
+      case 'first': case 'second': setFlow('starting');break;
+      case 'cancel': case 'decline': homeInvite=false;setFlow('idle');break;
+      case 'retry': setFlow('idle');break;
+      case 'settings': settingsDialog();break;
+      case 'help': dialog('Duelcraft help',`<div class="dialog-body"><p>J opens Home. Change the key in Minecraft Controls.</p><p>A binder opens your collection. A duel mat opens this lobby. Both are optional.</p><p>Close hides the lobby. Use Cancel to end preparation.</p><p>${deck==='missing'?'This server requires deposited copies of every card in your deck.':'Card ownership is optional in this example. Legal decks and server restrictions still apply.'}</p><p>Unsaved drafts can resume after preparation or a duel, until you disconnect.</p></div>`);break;
+      case 'resume': returnTo='home';show('collection');break;
+      case 'return': leave(returnTo);break;
+      case 'choose-deck': deck='ready';show(returnTo);break;
+      case 'edit': suspended=true;render();break;
+      case 'forced': suspended=true;setFlow('rps');break;
+      case 'save-leave': case 'discard-leave': suspended=false;closeDialog();show(modal.dataset.next);break;
+      case 'dismiss':closeDialog();break;
+      case 'finish': flow='idle';show('home');break;
+    }
+  });
+  $('#dismiss').addEventListener('click',closeDialog);
+  $('#scene').addEventListener('change',event=>{const next=event.target.value;flow=['home','loading','error'].includes(next)?'idle':next;show(next);});
+  $('#deck-state').addEventListener('change',event=>{deck=event.target.value;render();});
+  $('#draft').addEventListener('change',event=>{suspended=event.target.checked;render();});
+  $('#invite').addEventListener('change',event=>{homeInvite=event.target.checked;render();});
+  $('#reset').addEventListener('click',()=>{flow='idle';deck='ready';suspended=false;homeInvite=false;selected='Alex';settings={rule:'MR5',lp:'8000',hand:'5',draw:'1',seed:''};if(modal.open)closeDialog();show('home');});
+  document.addEventListener('keydown',event=>{
+    if(modal.open||event.target.closest('.review')||['INPUT','SELECT'].includes(event.target.tagName))return;
+    if(event.key==='Escape'){event.preventDefault();leave('world');}
+    if(event.key.toLowerCase()==='j'&&scene==='world')home();
+  });
+  function resize(){const scale=Math.min(1,(innerWidth-24)/1280);$('#viewport').style.width=1280*scale+'px';$('#viewport').style.height=720*scale+'px';canvas.style.transform=`scale(${scale})`;}
+  addEventListener('resize',resize);resize();render();
+})();
+</script>
+</html>

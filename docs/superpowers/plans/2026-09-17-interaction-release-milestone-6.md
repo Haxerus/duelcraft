@@ -12,6 +12,8 @@
 
 ## Global constraints
 
+**2026-10-06 acceptance carry-over:** include the open checks in the [QA.3 carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) in this milestone's editor, input, policy and dedicated-server passes. They no longer block starting M5 and have not been marked passed. Retain M5's own verification requirements.
+
 - Use the term **collection**.
 - Determine final readability, density, and minimum comfortable window size through in-game playtesting.
 - Support the hotkey, binder, and mat through the same server policies and player data.

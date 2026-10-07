@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Current execution checkpoint (2026-10-06)
+
+The user approved moving into M5 with Home/lobby mockups first, followed by M5 implementation and M6 consolidated QA/polish. The worktree is on `codex/qa-m4`, clean at `22e5f70` before this documentation/mockup batch. [The review note](../specs/2026-10-06-m5-entry-screen-review.md) links the interactive mockup and tracks the next checkpoint. [The QA.3 carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) retains open checks and corrects the computer-control trial's browser input expectation: browser right-click adds, deck right-click removes, double-left-click is a second add method. That code correction remains pending. No production M5 implementation, merge or push has occurred. Earlier reports below remain historical evidence; their outstanding acceptance no longer blocks beginning M5.
+
 Updated 2026-09-19. This replaces the original M1 startup handoff. **M3 is implemented, verified and user-accepted after all manual checks passed. M4 is complete, verified and independently reviewed. The user reported no playtest issues and confirmed rejoin persistence and ownership invalidation; two-player manual acceptance remains pending. M5–M6 remain later checkpoints.** The user has accepted the M2 follow-up and the final editor polish after manual playtesting. Continue the approved design and implementation plans. See the [M3 verification report and manual playtest](../reports/2026-09-19-card-transfers-m3.md) for the completed transfer work.
 
 QA follow-up: `codex/qa-m4` packages the reviewed checkpoint for Windows x64 friend testing, with the existing collection command enabled in packaged clients. Main `bc2fcba` was already included; `codex/player-collections` remains at `45b7460`. See the [QA installation and test guide](../../qa-m4.md). This is separate from M5 implementation.

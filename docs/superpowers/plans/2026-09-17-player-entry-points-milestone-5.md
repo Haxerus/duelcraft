@@ -12,6 +12,8 @@
 
 ## Global constraints
 
+**2026-10-06 execution decision:** the user approved starting M5 while open QA.3 acceptance moves to M6. Complete the [Home/lobby mockup review](../specs/2026-10-06-m5-entry-screen-review.md) before implementing new screens. The [carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) preserves unverified checks and the corrected browser right-click add expectation. The five tasks and their correctness/integration checks below remain required.
+
 - Use the term **collection**.
 - Support the hotkey, binder, and mat through the same server policies and player data.
 - Players need not carry either item. All routes use the core ownership setting (default false) and optional companion restrictions; clients cannot override them.
