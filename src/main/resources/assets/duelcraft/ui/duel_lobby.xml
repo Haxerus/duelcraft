@@ -10,7 +10,7 @@
         .grow { flex: 1; min-width: 0; min-height: 0; }
         .wrap { width: 100%; text-wrap: wrap; adaptive-height: true; }
         .heading { font-size: 22; }
-        button { height: 40; min-width: 100; flex-shrink: 0; background: built-in(ui-gdp:RECT); }
+        #lobby-canvas button { height: 40; min-width: 100; flex-shrink: 0; background: built-in(ui-gdp:RECT); }
         .keyboard-focus { background: rect(#FF665378); }
         .keyboard-focus text { text-color: #FFF0B8; }
         #lobby-help { min-width: 40; width: 40; }
@@ -29,6 +29,8 @@
         #management-help, #lobby-settings-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC08070C); z-index: 90; }
         .dialog-panel { width: 480; padding-all: 22; gap-all: 16; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         text-field, selector { height: 36; width: 100%; flex-shrink: 0; }
+        .__selector_preview__ label, .__selector_dialog__ label { height: 28; flex-shrink: 0; }
+        .__selector_dialog__ { z-index: 95; }
         #settings-seed { height: 36; }
     </style>
     <root id="lobby-root"><element id="lobby-canvas">
