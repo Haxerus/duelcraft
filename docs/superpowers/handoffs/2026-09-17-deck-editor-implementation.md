@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## M5 user playtest update (2026-10-08)
+
+The user tested everything in the M5 playtest except multiplayer and reports no issues beyond the lobby's visual design and the Settings rule dropdown. Carry multiplayer forward. Treat the lobby's nested panels, dead space and placement as work for a separate full UI pass with an LDLib2 style guide and mockup-to-widget review process. The dropdown has a scoped correction and real mouse-input regression; [the follow-up report](../reports/2026-10-08-m5-playtest.md) records its verification and artifact. Do not restart the approved M5 design or treat broader visual acceptance as complete.
+
 ## Current execution checkpoint (2026-10-07)
 
 M5 Home, remappable J entry, private lobby, Card Binder and Duel Mat are implemented at `a07b651` on `codex/qa-m4` in the existing deck-editor worktree. Final verification passed 1,112 JUnit cases with one existing skip, 57/57 UI scenarios and 12,227 checks, plus both-policy dedicated journeys. The user approved the featured monster artwork fading into the left menu. Browser right-click now adds through the existing editor rules, and Help reflects the corrected controls. Protocol is **8**; persistence formats are unchanged. See [the M5 verification report](../reports/2026-10-07-player-entry-m5.md) for exact automated results, review fixes and artifact hash, and [the M5 playtest guide](../../qa-m5.md) for the remaining installed-build checks.

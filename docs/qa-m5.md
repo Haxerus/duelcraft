@@ -2,6 +2,8 @@
 
 M5 adds the illustrated Home screen, private duel lobby, Card Binder and Duel Mat. M6 remains the consolidated QA and release-acceptance checkpoint. Use this alongside the [QA.3 carry-forward register](superpowers/reports/2026-10-06-qa3-carry-forward.md); earlier manual results do not automatically cover this build.
 
+**2026-10-08 playtest:** the user reports that all non-multiplayer checks worked except the lobby presentation and broken rule-preset dropdown. Multiplayer checks carry forward. The lobby redesign and an LDLib2 style guide belong to a separate full UI pass. See [the feedback and correction report](superpowers/reports/2026-10-08-m5-playtest.md); keep the checklist below as the procedure for remaining checks and affected regressions.
+
 ## Installation
 
 Windows x64 throughout, Java 21, Minecraft 1.21.1, NeoForge 21.1.224, LDLib2 2.2.39.a, and the Microsoft Visual C++ 2015–2022 x64 runtime. Replace the Duelcraft JAR in a separate test instance and use the same version on both clients and the server. M5 uses protocol **8**; M4/protocol-7 peers are incompatible. Saved collections and decks retain their existing format.

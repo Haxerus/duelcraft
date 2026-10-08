@@ -14,6 +14,8 @@
 
 **2026-10-06 acceptance carry-over:** include the open checks in the [QA.3 carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) in this milestone's editor, input, policy and dedicated-server passes. They no longer block starting M5 and have not been marked passed. Retain M5's own verification requirements.
 
+**2026-10-08 M5 feedback:** the user passed the non-multiplayer checklist except lobby presentation and the rule dropdown; multiplayer carries forward. See [the playtest update](../reports/2026-10-08-m5-playtest.md). The lobby redesign belongs to a separate full UI pass that first establishes an LDLib2 style guide and mockup-to-widget review process. Do not treat functional bounds checks as visual approval or expand the scoped dropdown correction into that redesign.
+
 - Use the term **collection**.
 - Determine final readability, density, and minimum comfortable window size through in-game playtesting.
 - Support the hotkey, binder, and mat through the same server policies and player data.

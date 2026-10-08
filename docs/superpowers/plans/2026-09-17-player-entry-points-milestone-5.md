@@ -141,7 +141,8 @@ Completed implementation checkpoints:
 - [x] Task 4: binder/mat registration, resources and real server-side interaction/network fixtures, including each player's own shared-mat view.
 - [x] Task 5: integrated default-ownership journey; dedicated journeys under both ownership modes with physical deposit, native duel and private companion-denial checks.
 - [x] Final full suite: 1112 passed/one skipped JUnit cases; 57/57 UI scenarios, 12,227 checks. Home/lobby scale checks passed at GUI 2/3/4. Implementation commit `a07b651`; verification documentation accompanies it.
-- [ ] M6 acceptance: actual OS input/rebinding, client-side item/offhand dispatch, installed same-JAR journey and human readability, plus the unexercised combinations in the original steps above.
+- [x] User-reported non-multiplayer playtest completed 2026-10-08, except lobby presentation and the rule dropdown. See [the feedback report](../reports/2026-10-08-m5-playtest.md).
+- [ ] Remaining acceptance: multiplayer/installed same-JAR journey and the full UI pass; the original combined steps above retain any unexercised multiplayer combinations.
 
 The first-state UI fixtures were written alongside implementation; their creation is not claimed as an observed RED run. Browser right-click, the three review findings and the import-fixture revision leak do have preserved RED/GREEN evidence. Related tasks share the coordinator and protocol, so commits group the coherent feature and its tests, followed by verification documentation.
 
