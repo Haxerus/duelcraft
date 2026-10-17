@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## UI redesign begins (2026-10-17)
+
+The user merged PR #7 into `main` (`ef0599d`) and explicitly carried open multiplayer playtests forward without blocking new work. The next task is the UI redesign. Its [audit/design brief](../specs/2026-10-17-ui-redesign-brief.md) and [three-direction review checkpoint](../reports/2026-10-17-ui-directions-review.md) live on `codex/ui-redesign` in this existing worktree. This phase changes only documentation/mockups; the user will critique the directions before the style guide, tooling and LDLib2 implementation. The earlier M6 checkpoints below retain their original acceptance limits.
+
 ## Template cleanup (2026-10-16)
 
 Source `60e7e46` removes template items/block, unused config/logging and sample metadata comments, and gives the Duelcraft tab a Card Binder icon. [Verification and M6 QA.2 artifact identity](../../testing/template-cleanup.md): targeted real-client 7/7 checks, zero template resource/logging matches, full test/build successful (1,112 passed, one existing skip). The template-resource warning exception is closed. Multiplayer acceptance remains pending; the full UI redesign stays separate. No merge or push. Earlier checkpoints retain their original evidence.
