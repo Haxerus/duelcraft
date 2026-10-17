@@ -67,5 +67,3 @@ foreach ($scenario in $report.scenarios) {
 <body>$body</body></html>
 "@ | Set-Content -Encoding UTF8 (Join-Path $destination 'index.html')
 Write-Output (Join-Path $destination 'index.html')
-
-

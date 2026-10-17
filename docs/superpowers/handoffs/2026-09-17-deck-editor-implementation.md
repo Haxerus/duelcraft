@@ -1,5 +1,11 @@
 # Collection and deck editor implementation handoff
 
+## Current Gallery tooling implementation checkpoint (2026-10-17)
+
+Gallery tooling Tasks 1–5 are implemented on `codex/ui-redesign` through `a8609b0`; this cleanup synchronizes the handoff and adds nested capture-path regression coverage. The [runtime proof](../reports/2026-10-17-gallery-runtime-proof.md#task-5--real-lobby-popup-modal-and-handoff) links the retained [combined Gallery evidence](../../../build/ui-gallery/task5-reviewed-group-duelcraft_gallery-1280x720-s2/index.html): **4/4 scenarios, 3470/3470 checks**. Final JUnit verification recorded **1113 tests, 1112 passed, zero failures/errors, one existing Windows symlink-privilege skip**. Seven collection cases passed 3017 checks each; seven lobby cases passed 186 each. Requested 1280×720 scale 4 clamps to effective 3; it is not effective-scale-4 proof.
+
+The scoped final review found no critical or blocking tooling issue, with four minor cleanup findings addressed for rereview. Human hierarchy/legibility/sharpness acceptance remains pending, and production migration is not approved. Focus restoration remains unmet; Gallery popup offsets and repeated dirty-layout warnings require investigation against the pinned artifact before migration. Preserve the collection popup correction and Task 4's explicit initial test-first chronology exception. Production layouts/styles/routes remain unchanged. The retained ignored evidence archives must stay with this checkout. No merge or push; use the separate reviewed migration plan after proof acceptance. Earlier checkpoints below describe their original state.
+
 ## Gallery style and tooling checkpoint (2026-10-17)
 
 The user approved Gallery, including the content-first collection layout and Change deck beside Settings in the lobby. The [Gallery style guide](../specs/2026-10-17-gallery-style-guide.md) records that direction, shared component rules and candidate measurements for the real-client proof. The [LDLib2 tooling plan](../plans/2026-10-17-ui-tooling.md) defines the next work; its tasks remain unchecked. Use `codex/ui-redesign` in this existing deck-editor worktree. Current work changes documentation only; no new production UI, tooling, game build or runtime acceptance is claimed.
