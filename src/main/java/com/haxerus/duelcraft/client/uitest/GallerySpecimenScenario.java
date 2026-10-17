@@ -20,6 +20,9 @@ import java.util.concurrent.CompletableFuture;
 public final class GallerySpecimenScenario implements UIScenario {
     @Override public void configure(ScenarioOptions options) { options.requiresWorld(false); }
     @Override public void define(ScenarioBuilder s) {
+        var backdrop = new com.haxerus.duelcraft.client.uitest.GalleryBackdrop();
+        s.step("install Gallery backdrop", ctx -> backdrop.install());
+        s.teardown("remove Gallery backdrop", ctx -> backdrop.close());
         s.step("preflight Gallery fixture", ctx -> {
             var result = GalleryPreflight.check(GalleryPreflightScenario.SPECIMEN, GalleryPreflightScenario.REQUIRED);
             ctx.attach("resource preflight", result.toString());
@@ -28,7 +31,7 @@ public final class GallerySpecimenScenario implements UIScenario {
         });
         for (boolean duel : new boolean[]{false, true}) {
             String canvas = duel ? "duel" : "management";
-            s.openScreen(canvas + " vocabulary", ctx -> new Specimen(duel ? 960 : 1280, duel ? 540 : 720, "gallery-" + canvas))
+            s.openScreen(canvas + " vocabulary", ctx -> backdrop.include(new Specimen(duel ? 960 : 1280, duel ? 540 : 720, "gallery-" + canvas)))
              .awaitModularUI().ticks(3)
              .step("component centering and scroller contracts", ctx -> {
                  GalleryVisualAssertions.disabled(ctx, "#gallery-disabled");
@@ -55,7 +58,7 @@ public final class GallerySpecimenScenario implements UIScenario {
                  var screen = (Specimen) ctx.screen();
                  ctx.attach(canvas + " runtime", "LDLib=" + ModList.get().getModContainerById("ldlib2").orElseThrow().getModInfo().getVersion()
                          + " UI.codeSource=" + UI.class.getProtectionDomain().getCodeSource().getLocation());
-                 ctx.attach(canvas + " viewport", "requestedWindow=1280x720 requestedScale=2 configuredScale=" + ctx.mc().options.guiScale().get()
+                 ctx.attach(canvas + " viewport", "requestedWindow=" + System.getProperty("ldlib2.uitest.window") + " requestedScale=" + System.getProperty("ldlib2.uitest.guiScale") + " configuredScale=" + ctx.mc().options.guiScale().get()
                          + " window=" + w.getScreenWidth() + "x" + w.getScreenHeight() + " framebuffer=" + w.getWidth() + "x" + w.getHeight()
                          + " GUI=" + w.getGuiScaledWidth() + "x" + w.getGuiScaledHeight() + " effectiveScale=" + w.getGuiScale()
                          + " design=" + screen.designWidth + "x" + screen.designHeight + " rootScale=" + screen.scale());

@@ -36,6 +36,9 @@ public final class CollectionGalleryScenario implements UIScenario {
     private static final String LONG_NAME = "Amber Dragon, Guardian of the Ancient Library and the Last Unbroken Covenant";
     @Override public void configure(ScenarioOptions options) { options.tags("gallery", "collection").requiresWorld(false); }
     @Override public void define(ScenarioBuilder s) {
+        var backdrop = new com.haxerus.duelcraft.client.uitest.GalleryBackdrop();
+        s.step("install Gallery backdrop", ctx -> backdrop.install());
+        s.teardown("remove Gallery backdrop", ctx -> backdrop.close());
         s.openScreen("unchanged collection behavioral baseline", ctx -> CollectionScreen.create(
                 CollectionFixture.model(true), CollectionFixture.cards(), code -> null, CollectionFixture.LIST_ID,
                 CollectionFixture::saved, CollectionFixture.query())).awaitModularUI().ticks(3)
@@ -70,7 +73,7 @@ public final class CollectionGalleryScenario implements UIScenario {
                      new CollectionReply.Summary(CollectionFixture.LIST_ID, "Dragon study", 40, 5, 0)), CollectionFixture.LIST_ID));
              lists.rename("Dragon study");
              lists.save();
-             return screen;
+             return backdrop.include(screen);
          }).awaitModularUI().ticks(4).click("#main-card-0").ticks(2)
          .check("normal composition has 40 Main", ctx -> counts(ctx, 40, 5, 0))
          .checkText("#list-active-status", "Active")
@@ -114,7 +117,7 @@ public final class CollectionGalleryScenario implements UIScenario {
              SavedDeckController lists = ctx.getField(controller, "lists");
              lists.applyView(new ClientCollectionState.View(1, model.owned(), List.of(
                      new CollectionReply.Summary(CollectionFixture.LIST_ID, "N".repeat(128), 60, 15, 15)), null));
-             return screen;
+             return backdrop.include(screen);
          }).awaitModularUI().ticks(4).click("#main-card-0").click("#toggle-side").ticks(3)
          .check("actual 60 Main / 15 Extra / 15 Side", ctx -> counts(ctx, 60, 15, 15))
          .checkTextContains("#inspector-name", LONG_NAME)

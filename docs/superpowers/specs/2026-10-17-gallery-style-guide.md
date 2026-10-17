@@ -70,7 +70,7 @@ Use management spacing steps **4, 8, 12, 16, 24, 32**: 4 for a badge/detail, 8 w
 
 Text owners must set height as well as font size. LDLib2 Label's default height is too small for these proposed sizes. Constrain width before enabling wrapping; avoid adaptive width on bounded labels. Reserve error/pending space within the relevant region or use an overlay that does not move cards.
 
-Use one-unit quiet edges and at most a small corner treatment for controls, with a slightly larger treatment for dialogs. Test supported textures before depending on rounded corners or shadows. Flat edges with the approved palette are the first proof fallback. Avoid thick bevels and drop shadows on each panel.
+Use quiet edges and at most a small corner treatment for controls, with a slightly larger treatment for dialogs. Gallery fixtures use 1.25 design-unit straight edges: at the tested minimum framebuffer scale of 0.8 this preserves one rendered pixel on every side; a one-unit edge can disappear. Focus edges remain two units. Check native pixels after scaling, including live resize; geometry alone cannot prove an outline. Test supported textures before depending on rounded corners or shadows. Flat edges with the approved palette are the first proof fallback. Avoid thick bevels and drop shadows on each panel.
 
 ## Screen composition
 

@@ -23,6 +23,9 @@ public final class LobbyGalleryScenario implements UIScenario {
     private static final UUID OTHER = UUID.fromString("00000000-0000-0000-0000-000000000005");
     @Override public void configure(ScenarioOptions options) { options.requiresWorld(false); }
     @Override public void define(ScenarioBuilder s) {
+        var backdrop = new com.haxerus.duelcraft.client.uitest.GalleryBackdrop();
+        s.step("install Gallery backdrop", ctx -> backdrop.install());
+        s.teardown("remove Gallery backdrop", ctx -> backdrop.close());
         s.step("restore iconified fixture window", ctx -> {
             var window = ctx.mc().getWindow();
             int iconified = GLFW.glfwGetWindowAttrib(window.getWindow(), GLFW.GLFW_ICONIFIED);
@@ -41,7 +44,7 @@ public final class LobbyGalleryScenario implements UIScenario {
             var result = GalleryPreflight.check(resource("uitest/gallery_lobby"), GalleryPreflight.ids(original));
             ctx.attach("preflight", result.toString());
             ctx.require("all production IDs and supported Gallery styles", result.errors().isEmpty());
-        }).openScreen("Gallery real lobby", ctx -> fixture(ctx, true)).awaitModularUI().ticks(3)
+        }).openScreen("Gallery real lobby", ctx -> backdrop.include(fixture(ctx, true))).awaitModularUI().ticks(3)
          .step("viewport and visible text", LobbyGalleryScenario::audit)
          .step("approved lobby composition", LobbyGalleryScenario::composition)
          .screenshot("gallery-lobby-normal")
@@ -125,15 +128,15 @@ public final class LobbyGalleryScenario implements UIScenario {
          .check("pending invite disables action", ctx -> !ctx.el("#lobby-invite").isActive())
          .step("native pending presentation", ctx -> GalleryVisualAssertions.disabled(ctx, "#lobby-invite"))
          .screenshot("gallery-lobby-pending")
-         .openScreen("zero-player lobby", ctx -> fixture(ctx, true, 0)).awaitModularUI().ticks(3)
+         .openScreen("zero-player lobby", ctx -> backdrop.include(fixture(ctx, true, 0))).awaitModularUI().ticks(3)
          .checkHidden("#gallery-roster-slot").checkCount(".player-row", 0).checkTextContains("#lobby-prompt", "No other players")
          .check("zero roster cannot invite", ctx -> !ctx.el("#lobby-invite").isActive())
          .screenshot("gallery-lobby-empty")
-         .openScreen("one-player lobby", ctx -> fixture(ctx, true, 1)).awaitModularUI().ticks(3)
+         .openScreen("one-player lobby", ctx -> backdrop.include(fixture(ctx, true, 1))).awaitModularUI().ticks(3)
          .checkCount(".player-avatar", 1)
          .step("one card stays centered", ctx -> ctx.check("one card centered", Math.abs(ctx.all(".player-row").getFirst().bounds().centerX() - ctx.el("#lobby-players").bounds().centerX()) < 8))
          .screenshot("gallery-lobby-one")
-         .openScreen("long-roster lobby", ctx -> fixture(ctx, true, 18)).awaitModularUI().ticks(3)
+         .openScreen("long-roster lobby", ctx -> backdrop.include(fixture(ctx, true, 18))).awaitModularUI().ticks(3)
          .checkCount(".player-avatar", 18).checkCount(".player-name", 18).checkCount(".player-availability", 18)
          .step("long roster retains card structure", ctx -> {
              GalleryVisualAssertions.scroller(ctx, "#lobby-players");

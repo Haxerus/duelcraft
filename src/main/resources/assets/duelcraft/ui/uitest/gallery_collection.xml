@@ -207,7 +207,7 @@
         #deck-warnings, #deck-shortages { font-size: 12; height: auto; }
         #editor-status { height: 24; font-size: 14; }
         #status-row { height: 24; }
-        #lists-panel, #import-panel, #help-panel, #delete-panel, #export-panel, #export-overwrite-panel, #close-panel { background: rect(#FF34273e, 0, 1, #FF8c7495); }
+        #lists-panel, #import-panel, #help-panel, #delete-panel, #export-panel, #export-overwrite-panel, #close-panel { background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
         #saved-list-scroll { height: 160; }
         #import-panel, #export-panel { width: 600; }
         #collection-canvas .selector-option { height: 24; font-size: 14; }

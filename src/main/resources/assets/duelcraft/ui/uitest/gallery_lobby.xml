@@ -10,6 +10,7 @@
         .grow { flex: 1; min-width: 0; min-height: 0; }
         .wrap { width: 100%; text-wrap: wrap; adaptive-height: true; }
         #lobby-canvas .gallery-action { min-width: 120; }
+        #lobby-canvas #lobby-select-deck { min-width: 144; }
         #lobby-canvas #lobby-help { width: 40; min-width: 40; }
         #lobby-body { flex: 1; min-height: 0; gap-all: 12; }
         #lobby-left { display: none; }
@@ -23,11 +24,11 @@
         #lobby-options { width: 360; height: 48; font-size: 14; horizontal-align: right; }
         #lobby-actions { height: 40; justify-content: center; }
         #management-help, #lobby-settings-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC19151f); z-index: 90; }
-        .dialog-panel { width: 560; padding-all: 24; gap-all: 8; background: rect(#FF34273e, 0, 1, #FF8c7495); }
+        .dialog-panel { width: 560; padding-all: 24; gap-all: 8; background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
         #settings-error { height: 32; }
         .keyboard-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
         .keyboard-focus text { text-color: #efd18e; }
-        #lobby-root .__selector_dialog__ { z-index: 95; background: rect(#FF19151f, 0, 1, #FF8c7495); }
+        #lobby-root .__selector_dialog__ { z-index: 95; background: rect(#FF19151f, 0, 1.25, #FF8c7495); }
         #lobby-root .__selector_dialog__ label { height: 28; font-size: 16; text-color: #eee5d4; }
         #lobby-root .__selector_dialog__ text { font-size: 16; text-color: #eee5d4; }
         #lobby-root .__selector_preview__ label { height: 28; }
@@ -40,7 +41,7 @@
         .player-row .player-avatar { width: 76; height: 76; font-size: 28; horizontal-align: center; vertical-align: center; background: rect(#FF493851, 38); }
         .player-row .player-name { width: 148; height: 28; font-size: 20; horizontal-align: center; vertical-align: center; }
         .player-row .player-availability { width: 148; height: 22; font-size: 14; horizontal-align: center; vertical-align: center; text-color: #b8afbe; }
-        .player-row.gallery-selected { base-background: rect(#FF211c2a, 0, 1, #FFc6ab77); }
+        .player-row.gallery-selected { base-background: rect(#FF211c2a, 0, 1.25, #FFc6ab77); }
         .player-row.gallery-selected .player-avatar { background: rect(#FF63516b, 38, 1, #FFc6ab77); }
         .player-row.gallery-selected .player-availability { text-color: #c6ab77; }
         #gallery-lobby-art { width: 66; height: 96; background: sprite(duelcraft:textures/uitest/gallery/89631139.png); }
@@ -49,7 +50,7 @@
         #lobby-invite text { text-color: #211c2a; }
         #lobby-invite.__disabled__ text { text-color: #b8afbe; }
         #lobby-feedback { position: absolute; left: 0; bottom: 0; height: 28; horizontal-align: center; }
-        #gallery-settings-sheet { position: absolute; right: 0; top: 0; width: 382; height: 100%; padding-all: 32; gap-all: 24; background: rect(#FF34273e, 0, 1, #FF8c7495); }
+        #gallery-settings-sheet { position: absolute; right: 0; top: 0; width: 382; height: 100%; padding-all: 32; gap-all: 24; background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
         #gallery-settings-sheet .gallery-title { font-size: 22; }
         #gallery-settings-sheet #settings-close { min-width: 40; width: 40; }
         .settings-pair { width: 100%; gap-all: 8; }

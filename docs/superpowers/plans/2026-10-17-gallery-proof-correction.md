@@ -76,3 +76,13 @@ Files: `ui/uitest/gallery_lobby.xml`, `LobbyGalleryScenario.java`, optional narr
 Proof implementation is complete only when requirements above have evidence and independent visual review has no unaddressed basic composition/control defects. Human taste/legibility approval is a separate remaining checkpoint, not a waiver for mismatching the approved mockup.
 
 Verification execution is complete on frozen `0ce1a6a`; the final correction report records 29,736 matrix checks, 235 unchanged-production checks and 1113 JUnit tests (one existing skip). Focused independent reviews approved Tasks 1–3. **Overall visual completion is unchecked**: the 1024×768 selected lobby has missing button/card edges and a prominent Minecraft backdrop. Whole-change review and human approval remain pending. Handoff/report updated; verification-doc commit follows. No runtime edit, merge or push.
+
+## Consolidated final-review fix wave
+
+- [x] Correct all four review findings in fixtures/tooling only: fractional outlines, deterministic full-viewport backdrop, request metadata and Change deck padding. Preserve production behavior and dependencies.
+- [x] Freeze runtime source before launch and retain exact hashes. Final manifest: build/gallery-proof/correction-fix-source/manifest.json (266 files). Preserve all seven pre-fix matrix archives.
+- [x] Recheck group:duelcraft_gallery at 1280x720/effective 2, 1024x768/effective 2 and 1920x1080/effective 4, including 1100x800 live resize. All 12 scenario executions and 12,744 checks passed. Open native fullscreens and affected crops; record exact image list and pixel red/green diagnostic in the correction report.
+- [x] Run unchanged production regressions (3/3, 235 checks) and full JUnit once (1113 tests, 1112 passed, one existing skip), recheck source hashes, update handoff/report and retain earlier evidence. Runtime/Gradle ownership released.
+- [ ] Independent scoped final rereview opens actual native references, normal/fractional/large fullscreens and affected crops; approve all four findings before marking visual completion.
+
+Human aesthetic approval and production migration remain separate pending gates. The old seven-case counts above describe pre-fix source. No push or merge.

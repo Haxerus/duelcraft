@@ -229,3 +229,48 @@ Exact unresolved native capture:
 No dirty-layout or flat-image warnings in the seven matrix launches or unchanged scenarios. Generic Minecraft/NeoForge resource, command, mipmap, sound/shader and Gradle warnings remain in original logs; this is not a warning-free claim. Preflight typo-property/`--color` DEBUG messages are deliberate negative checks. Existing production focus restoration remains unmet and unchanged. Production XML/LSS, navigation/network/policy remain unchanged; the narrow renderer seam defaults to the original text row. `src/test` is unchanged from frozen source; `git diff --check c5cf505..HEAD` passed. Archive tooling was unchanged, so no extra tool test run was needed.
 
 Runtime/Gradle ownership is released after this documentation handoff. Whole-change review is next; overall visual completion stays open for the 1024 finding. No merge or push.
+## Final review fix wave (2026-10-17; supersedes the unresolved findings above)
+
+The four final-review findings were corrected together using fixture-only changes. Straight Gallery borders now use 1.25 design units, the minimum width that reaches one framebuffer pixel at the tested 0.8 scale. Two-unit focus edges, semantic colors, disabled state, centered text and native scrollbar arrows remain unchanged. The Change deck fixture button is 144 units wide rather than 120, with its font unchanged.
+
+GalleryBackdrop draws the neutral Canvas color across the actual GUI viewport before each exact registered Gallery screen renders. It uses NeoForge ScreenEvent.Render.Pre, scoped by screen identity; scenario teardown unregisters the same Consumer and clears its screen set. Both specimen canvases, both collection fixtures and all Gallery lobby roster states opt in. Baseline screens do not opt in. Production ManagementScreen, controllers, layout resources, canvas sizing and navigation are untouched. Local NeoForge ClientHooks source confirms Pre precedes screen.renderWithTooltip; local bus 8.0.5 bytecode confirms unregister removes listener entries keyed by the Consumer. No LDLib source or dependency change.
+
+Specimen requestedWindow/requestedScale now read the actual harness system properties. Historical original reports, including the seven-case pre-fix matrix and its stale literal metadata, remain untouched. Those seven cases are pre-fix evidence, not final-source coverage.
+
+Source was frozen before launch at c98119656e5c0a09b2b04a24b06b2182dc2a876d plus the retained runtime diff and GalleryBackdrop.java. The 266-file Java/resource/build-property manifest is build/gallery-proof/correction-fix-source/manifest.json, SHA256 93A0E9C29CC179B7E72DD1197EA01BEE46AE9A74EBCD40B1D206B8D7F1996DFB. LDLib2 remains 2.2.39.a, runtime SHA256 563F4D2A60C5ACF63992BAB9917045A35B740BB543C134BFDBFAA8DE64DF6F46. Rechecked hashes before each launch. Runtime source has not changed after freeze; only proof documentation and build-only diagnostics followed.
+
+The initial sandbox attempt failed at the Gradle wrapper cache lock before compilation. Its archive correction-fix-gallery-1024x768-s2 is explicitly REJECTED: its copied report was stale production evidence. The escalated retry uses correction-fix-v1-gallery-* archives. No auto-review rejection occurred.
+
+Each final-source command used GRADLE_USER_HOME=C:/Users/haxer/.gradle and `./gradlew.bat runClient '-PldTest=group:duelcraft_gallery' -PldTestWindow=<window> -PldTestGuiScale=<scale> -PskipNative`. All three fresh runs exited 0, each with 4/4 scenarios, 4248/4248 checks, 1043 steps and 118 captures: total 12 scenario executions, 12,744 checks, 3,129 steps and 354 captures. Six additional per-run install/teardown steps account for the step-count change; no repeated assertion inflation. No dirty-layout or flat-capture warnings. Generic Minecraft/NeoForge/Gradle warnings remain in the logs.
+
+| Final archive suffix | Requested/effective scale | Actual GUI | Duration |
+|---|---|---|---|
+| 1024x768-s2 | 2 / 2 | 512x384 | 100791 ms |
+| 1280x720-s2 | 2 / 2 | 640x360 | 103554 ms |
+| 1920x1080-s4 | 4 / 4 | 480x270 | 109791 ms |
+
+Archive prefix is `build/gallery-proof/correction-fix-v1-gallery-`; each has original report, screenshots, launch log and verified-metadata.json. Matching browsable reports use `build/ui-gallery/correction-fix-v1-gallery-<suffix>/index.html`. Actual framebuffer matches the requested suffix in every non-resize viewport attachment. Built-in 1100x800 live resize was covered in every run: effective 2/GUI 550x400 for the first two cases; effective 3/GUI 367x267 for requested scale 4, restored to effective 4 afterward. `build/gallery-proof/correction-fix-verified-summary.json` retains exact per-scenario fields and the corrected specimen request strings. No viewport leakage.
+
+Unchanged production regression command: `./gradlew.bat runClient '-PldTest=collection_layout,collection_overflow,duel_lobby' -PldTestWindow=1280x720 -PldTestGuiScale=2 -PskipNative`. Exit 0: 3/3 scenarios, 235/235 checks, 423 steps, 13 captures, 39376 ms. Archive: build/gallery-proof/correction-fix-production-regressions; matching gallery under build/ui-gallery. Opened exact native screenshots collection_layout/105_collection-standard.png, collection_overflow/78_collection-large-expanded.png, duel_lobby/45_m5-lobby-idle.png and duel_lobby/17_m5-rule-dropdown.png. The original gray layouts and text-only rows remain intact; no dirty-layout/flat-capture warnings.
+
+Full `./gradlew.bat test` ran once after final source, actually executing :test, exit 0 / BUILD SUCCESSFUL in 1m 4s: 72 suites, 1113 tests, 1112 passed, zero failures/errors and one existing skip. DeckExportServiceTest.rejectsSymlinkTargetWithoutChangingOutsideFile() reports unavailable Windows symlink privilege. Fresh XML/HTML are retained under correction-fix-junit-results / correction-fix-junit-html, with correction-fix-junit.log and correction-fix-junit-summary.json. All are under build/gallery-proof. All 266 runtime/source hashes matched again after JUnit; archive tooling and tests are unchanged, so no archive-tool test rerun was required. Production source/resources/dependencies remain unchanged in this fix wave. Diff whitespace check passes.
+
+Visual self-review opened correction-reference/collection-surface.png and lobby-surface.png; original correction-final-gallery-1024x768-s2/screenshots/gallery_lobby/41_gallery-lobby-selected.png; original correction-final-gallery-1280x720-s2/screenshots/gallery_collection/28_gallery-collection-normal.png and 676_gallery-collection-live-resize.png. These are comparison references, not accepted goldens.
+
+In **each** of the three final archives, opened these five exact native screenshots and four unscaled review crops:
+
+- screenshots/gallery_collection/29_gallery-collection-normal.png
+- screenshots/gallery_collection/677_gallery-collection-live-resize.png
+- screenshots/gallery_lobby/42_gallery-lobby-selected.png
+- screenshots/gallery_lobby/75_gallery-lobby-rule-popup.png
+- screenshots/gallery_specimen/136_gallery-duel.png
+- review/lobby-actions.png
+- review/selected-alex.png
+- review/collection-actions.png
+- review/resize-actions.png
+
+Additionally opened the 1024 archive's screenshots/gallery_lobby/141_gallery-lobby-empty.png and 162_gallery-lobby-long-roster.png, plus the two native `88_management-dense-hover-gallery-confirm__...` and `185_duel-dense-hover-gallery-confirm__...` crops under screenshots/gallery_specimen. Each archive's visual-inspection.json supplies the full exact filenames (31 final images total). Compared normal, fractional and large images with the reference and retained failure images. The whole selected Alex boundary and ordinary header sides are complete; dense button tops are present; normal outlines remain thin. Change deck text has clear side padding without font reduction. Neutral margins remove the uncontrolled logo/panorama/version text, including live resize and empty/long rosters. Selected/focus/disabled/pending colors, centered labels, compact native arrows, collection column hierarchy and Settings popup anchoring remain intact. These are self-review findings awaiting independent rereview.
+
+Build-only correction-fix-pixels.py samples the deterministic selected Alex perimeter and all letterbox rows outside its unchanged design canvas. The retained red original has 0/130 matching right-edge samples; final 1024 has 130/130, with top/bottom 133/133 and left 130/130. Its 96-pixel outer margins are uniformly Canvas-colored. The diagnostic allows a two-pixel coordinate search around the expected boundary, excludes corners, and is a focused defect probe, not a screenshot golden or substitute for image review. Originals are never rewritten. Native crops are unscaled, with exact source/rectangle mappings under each final archive's review/capture-map.json.
+
+Final independent rereview remains pending. Human aesthetic approval, production migration and the historical focus-restoration limitation remain open. No push or merge.

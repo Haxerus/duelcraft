@@ -1,6 +1,15 @@
 # Collection and deck editor implementation handoff
 
-## Current Gallery correction verification checkpoint (2026-10-17)
+## Current Gallery final-fix checkpoint (2026-10-17)
+
+The four whole-change review findings are corrected in fixture/tooling scope: 1.25-unit straight borders survive fractional scaling; exact Gallery screen instances receive a neutral full-viewport backdrop; specimen request metadata reads actual properties; Change deck is widened without reducing its font. Production layouts/controllers/navigation and both fixed design canvases are unchanged. [Final fix evidence](../reports/2026-10-17-gallery-proof-correction.md#final-review-fix-wave-2026-10-17-supersedes-the-unresolved-findings-above) records the frozen 266-file source manifest, unchanged LDLib2 hash, native comparisons, retained red originals and exact final screenshots.
+
+Final-source Gallery verification passed at 1280x720/effective 2, 1024x768/effective 2 and 1920x1080/effective 4: 12/12 scenario executions, 12,744/12,744 checks, plus the built-in 1100x800 resize in each case. Native self-review opened 31 final images, including unscaled affected crops; selected Alex's previously absent right border is complete, and the surrounding viewport is uniformly quiet. The retained seven-case matrix below is explicitly pre-fix evidence and is not attributed to this final source.
+
+Fresh unchanged production regressions passed 3/3 scenarios and 235/235 checks. Full JUnit ran once: 72 suites, 1113 tests, 1112 passed, no failures/errors, one existing Windows symlink-privilege skip. All frozen source hashes still match. Exact final-source archives use correction-fix-v1-gallery-*, correction-fix-production-regressions and correction-fix-junit-* under build/gallery-proof. Runtime/Gradle ownership is released.
+
+**Independent final rereview is pending.** Human aesthetic approval and production migration remain pending; the historical focus-restoration limitation is unchanged. No push or merge. Earlier checkpoints below retain their historical findings and results.
+## Historical pre-fix Gallery correction verification checkpoint (2026-10-17)
 
 Runtime source is frozen at `0ce1a6a`. [Correction verification](../reports/2026-10-17-gallery-proof-correction.md#final-correction-verification-2026-10-17) records independent focused Task 1–3 approvals, seven archived Gallery cases (29,736/29,736 checks), unchanged production scenarios (235/235), and full JUnit once (1113 tests; 1112 passed, one existing Windows symlink privilege skip; no failures/errors). Actual per-scenario framebuffer/GUI/effective scale fields confirm no resize leakage; 1280 requested scale 4 clamps to 3. The specimen's requested-size literal is stale; use driver request and live viewport metadata.
 
