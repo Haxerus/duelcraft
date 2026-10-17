@@ -9,7 +9,7 @@
         .row { flex-direction: row; gap-all: 12; align-items: center; }
         .grow { flex: 1; min-width: 0; min-height: 0; }
         .wrap { width: 100%; text-wrap: wrap; adaptive-height: true; }
-        #lobby-canvas button { min-width: 120; }
+        #lobby-canvas .gallery-action { min-width: 120; }
         #lobby-canvas #lobby-help { width: 40; min-width: 40; }
         #lobby-body { flex: 1; min-height: 0; gap-all: 12; }
         #lobby-left { display: none; }
@@ -35,21 +35,21 @@
     </style>
     <root id="lobby-root" class="gallery-management"><element id="lobby-canvas">
         <element id="lobby-panel">
-            <element class="row"><button id="lobby-home" text="Home" /><label class="gallery-title grow">Duel lobby</label><button id="lobby-select-deck" text="Change deck" /><button id="lobby-settings" text="Settings" /><button id="lobby-help" text="?" /><button id="lobby-close" text="Close" /></element>
+            <element class="row"><button class="gallery-action" id="lobby-home" text="Home" /><label class="gallery-title grow">Duel lobby</label><button class="gallery-action" id="lobby-select-deck" text="Change deck" /><button class="gallery-action" id="lobby-settings" text="Settings" /><button class="gallery-action" id="lobby-help" text="?" /><button class="gallery-action" id="lobby-close" text="Close" /></element>
             <element id="lobby-body">
                 <scroller-view id="lobby-left"><element id="lobby-deck-box" /></scroller-view>
                 <scroller-view id="lobby-right">
                     <text id="lobby-prompt" class="gallery-section wrap" />
                     <scroller-view id="lobby-players" />
-                    <element id="lobby-hands" class="row"><button id="lobby-rock" text="Rock" /><button id="lobby-paper" text="Paper" /><button id="lobby-scissors" text="Scissors" /></element>
-                    <element id="lobby-first-choice" class="row"><button id="lobby-first" text="Go first" /><button id="lobby-second" text="Go second" /></element>
-                    <label id="lobby-countdown" class="gallery-meta" /><button id="lobby-retry" text="Retry" />
+                    <element id="lobby-hands" class="row"><button class="gallery-action" id="lobby-rock" text="Rock" /><button class="gallery-action" id="lobby-paper" text="Paper" /><button class="gallery-action" id="lobby-scissors" text="Scissors" /></element>
+                    <element id="lobby-first-choice" class="row"><button class="gallery-action" id="lobby-first" text="Go first" /><button class="gallery-action" id="lobby-second" text="Go second" /></element>
+                    <label id="lobby-countdown" class="gallery-meta" /><button class="gallery-action" id="lobby-retry" text="Retry" />
                 </scroller-view>
             </element>
-            <element id="lobby-actions" class="row"><text id="lobby-feedback" class="grow wrap gallery-warning" /><button id="lobby-invite" text="Invite" class="gallery-primary" /><button id="lobby-accept" text="Accept" /><button id="lobby-decline" text="Decline" /><button id="lobby-cancel" text="Cancel invitation" style="min-width: 200;" /></element>
+            <element id="lobby-actions" class="row"><text id="lobby-feedback" class="grow wrap gallery-warning" /><button id="lobby-invite" text="Invite" class="gallery-action gallery-primary" /><button class="gallery-action" id="lobby-accept" text="Accept" /><button class="gallery-action" id="lobby-decline" text="Decline" /><button class="gallery-action" id="lobby-cancel" text="Cancel invitation" style="min-width: 200;" /></element>
             <element id="lobby-footer" class="gallery-panel"><text id="lobby-deck" class="wrap" /><text id="lobby-options" class="wrap gallery-meta" /></element>
         </element>
-        <element id="lobby-settings-dialog"><element class="dialog-panel"><element class="row"><label class="gallery-title grow">Duel settings</label><button id="settings-close" text="Close" /></element><label>Rule preset</label><selector id="settings-rule" /><label>Life points</label><text-field id="settings-lp" /><label>Starting hand</label><text-field id="settings-hand" /><label>Draw per turn</label><text-field id="settings-draw" /><label>Seed (optional)</label><text-field id="settings-seed" /><text id="settings-error" class="wrap gallery-error" /></element></element>
-        <element id="management-help"><element class="dialog-panel"><label class="gallery-title">Duel help</label><text id="lobby-help-copy" class="wrap" /><button id="help-close" text="Close" /></element></element>
+        <element id="lobby-settings-dialog"><element class="dialog-panel"><element class="row"><label class="gallery-title grow">Duel settings</label><button class="gallery-action" id="settings-close" text="Close" /></element><label>Rule preset</label><selector id="settings-rule" /><label>Life points</label><text-field id="settings-lp" /><label>Starting hand</label><text-field id="settings-hand" /><label>Draw per turn</label><text-field id="settings-draw" /><label>Seed (optional)</label><text-field id="settings-seed" /><text id="settings-error" class="wrap gallery-error" /></element></element>
+        <element id="management-help"><element class="dialog-panel"><label class="gallery-title">Duel help</label><text id="lobby-help-copy" class="wrap" /><button class="gallery-action" id="help-close" text="Close" /></element></element>
     </element></root>
 </ldlib2-ui>

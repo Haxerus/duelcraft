@@ -16,18 +16,18 @@
             <element class="gallery-columns">
                 <element class="gallery-column gallery-panel">
                     <label class="gallery-section">Actions and input</label>
-                    <button id="gallery-action" class="gallery-primary" text="Invite" />
+                    <button id="gallery-action" class="gallery-action gallery-primary" text="Invite player" />
                     <label>Deck name</label><text-field id="gallery-name" />
                     <label>Rule preset</label>
                     <selector id="gallery-selector" />
-                    <button id="gallery-disabled" class="gallery-disabled" text="Unavailable" />
-                    <button id="gallery-save" class="gallery-primary" text="Save" />
+                    <button id="gallery-disabled" class="gallery-action gallery-disabled" text="Unavailable" />
+                    <button id="gallery-save" class="gallery-action gallery-primary" text="Save" />
                     <label id="gallery-feedback" class="gallery-warning">Ready to save</label>
-                    <button id="gallery-confirm" class="gallery-dense" text="Delete deck…" />
+                    <button id="gallery-confirm" class="gallery-action gallery-dense" text="Delete saved copy…" />
                 </element>
                 <element class="gallery-column gallery-panel">
                     <label class="gallery-section">Selected deck · Active</label>
-                    <button id="gallery-selected" class="gallery-selected" text="Selected · Active" />
+                    <button id="gallery-selected" class="gallery-action gallery-selected" text="Selected · Active" />
                     <text class="gallery-name">Étoile of the Ancient Dragon — a deliberately long deck and card name, shown in full in the selected detail</text>
                     <label class="gallery-meta">Accents: Étoile · naïve · 日本語 ★</label>
                     <label class="gallery-section">Scrollable saved decks</label>
@@ -44,7 +44,7 @@
         <element id="gallery-modal"><element id="gallery-dialog" class="gallery-panel">
             <label class="gallery-title">Delete this deck?</label>
             <text class="gallery-name">Your deposited cards remain in your collection.</text>
-            <button id="gallery-dismiss" text="Cancel" />
+            <button class="gallery-action" id="gallery-dismiss" text="Cancel" />
         </element></element>
     </root>
 </ldlib2-ui>

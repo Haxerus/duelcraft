@@ -30,6 +30,12 @@ public final class GallerySpecimenScenario implements UIScenario {
             String canvas = duel ? "duel" : "management";
             s.openScreen(canvas + " vocabulary", ctx -> new Specimen(duel ? 960 : 1280, duel ? 540 : 720, "gallery-" + canvas))
              .awaitModularUI().ticks(3)
+             .step("component centering and scroller contracts", ctx -> {
+                 GalleryVisualAssertions.control(ctx, "#gallery-action");
+                 GalleryVisualAssertions.control(ctx, "#gallery-confirm");
+                 GalleryVisualAssertions.scroller(ctx, "#gallery-rows");
+             })
+             .step("default component crops", ctx -> captureControls(ctx, canvas + "-default"))
              .step("font and bounded text contracts", ctx -> {
                  for (var text : ctx.all("*")) {
                      if (!(text.element() instanceof TextElement element)) continue;
@@ -79,6 +85,7 @@ public final class GallerySpecimenScenario implements UIScenario {
                      instanceof com.lowdragmc.lowdraglib2.gui.texture.RectTexture rect && rect.getBorderColor() == 0xffefd18e && rect.getStroke() == 2)
              .check("separate state markers", ctx -> ctx.el("#gallery-selected").element().getClasses().contains("gallery-selected")
                      && ctx.el("#gallery-selected").element().getClasses().contains("gallery-focus"))
+             .step("focused component crops", ctx -> captureControls(ctx, canvas + "-focused"))
              .hoverAt(-100, -100).ticks(2).screenshot("gallery-" + canvas)
              .step("failed acknowledgement", ctx -> ((Specimen) ctx.screen()).pending.completeExceptionally(new IllegalStateException("fixture")))
              .checkTextContains("#gallery-feedback", "Try again")
@@ -131,11 +138,37 @@ public final class GallerySpecimenScenario implements UIScenario {
              .checkTextContains("#gallery-name", "é")
              .hover("#gallery-action")
              .check("real button hover state", ctx -> ctx.el("#gallery-action").as(Button.class).getState() == Button.State.HOVERED)
+             .step("hover component crops", ctx -> captureControls(ctx, canvas + "-hover"))
              .screenshot("gallery-" + canvas + "-hover")
              .step("hold real mouse press", ctx -> CollectionLayoutScenario.press(ctx, "#gallery-action"))
              .check("real button pressed state", ctx -> ctx.el("#gallery-action").as(Button.class).getState() == Button.State.PRESSED)
+             .step("pressed component crops", ctx -> captureControls(ctx, canvas + "-pressed"))
              .screenshot("gallery-" + canvas + "-pressed")
-             .step("release mouse", CollectionLayoutScenario::release);
+             .step("release mouse", CollectionLayoutScenario::release)
+             .step("isolate dense component states after confirmation tests", ctx ->
+                     ctx.el("#gallery-confirm").as(Button.class).setOnClick(event -> {}))
+             .hover("#gallery-confirm")
+             .check("real dense hover state", ctx -> ctx.el("#gallery-confirm").as(Button.class).getState() == Button.State.HOVERED)
+             .step("dense hover crops", ctx -> captureControls(ctx, canvas + "-dense-hover"))
+             .step("dense press", ctx -> CollectionLayoutScenario.press(ctx, "#gallery-confirm"))
+             .check("real dense pressed state", ctx -> ctx.el("#gallery-confirm").as(Button.class).getState() == Button.State.PRESSED)
+             .step("dense pressed crops", ctx -> captureControls(ctx, canvas + "-dense-pressed"))
+             .step("release dense", ctx -> { ctx.input().mouseUp(-100, -100, 0); ((Specimen) ctx.screen()).dismiss(); })
+             .hoverAt(-100, -100)
+             .step("ordinary focus", ctx -> ctx.el("#gallery-action").element().focus())
+             .check("focused primary keeps readable cream fill", ctx -> ctx.el("#gallery-action").as(Button.class).getButtonStyle().baseTexture()
+                     instanceof com.lowdragmc.lowdraglib2.gui.texture.RectTexture rect && rect.getColor() == 0xffeee5d4
+                     && rect.getBorderColor() == 0xffefd18e && rect.getStroke() == 2)
+             .checkHidden("#gallery-modal")
+             .step("ordinary focused crops", ctx -> captureControls(ctx, canvas + "-action-focused"))
+             .step("dense focus", ctx -> ctx.el("#gallery-confirm").element().focus())
+             .step("dense focused crops", ctx -> captureControls(ctx, canvas + "-dense-focused"));
+        }
+    }
+
+    private static void captureControls(TestContext ctx, String state) {
+        for (String id : new String[]{"gallery-action", "gallery-confirm", "gallery-disabled", "gallery-selected", "gallery-rows"}) {
+            ctx.screenshotElement(state + "-" + id, ctx.el("#" + id));
         }
     }
 

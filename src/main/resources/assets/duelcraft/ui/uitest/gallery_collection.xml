@@ -16,7 +16,7 @@
         #import-export, #import-close, #help-button, #help-close, .saved-row {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
-        button text { font-size: 12; text-color: #ffffff; }
+        .gallery-action text { font-size: 12; text-color: #ffffff; }
         selector text, selector label { text-color: #ffffff; }
         text-field, selector { height: 30; flex-shrink: 0; }
         .row { flex-direction: row; gap-all: 6; align-items: center; }
@@ -149,7 +149,7 @@
         .__scroller_view_view-port__ { padding-all: 3; background: rect(#00000000); }
         .__scroller_view_vertical-scroller__ { width: 12; }
         .__scroller_view_horizontal-scroller__ { height: 12; }
-        .__scroller_head_button__, .__scroller_tail_button__ { width: 12; height: 12; flex-shrink: 0; }
+        /* Shared Gallery component styles own compact arrow geometry. */
         #close-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 100; }
         #close-panel { width: 460; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #close-panel label { text-color: #ffffff; }
@@ -171,7 +171,7 @@
         #inspector-stats { font-size: 14; height: auto; }
         #card-edit-controls label { font-size: 14; height: 18; }
         #card-edit-controls button { height: 32; }
-        #card-edit-controls button text { font-size: 16; height: 24; }
+        #card-edit-controls .gallery-action text { font-size: 16; height: 24; }
         #gallery-lower-decks { height: 150; flex-shrink: 0; flex-direction: row; gap-all: 8; }
         #extra-section, #side-section { flex: 1; min-width: 0; }
         #extra-grid .__scroller_view_view-container__, #side-grid .__scroller_view_view-container__ { grid-template-columns: repeat(4, 54px); }
@@ -192,8 +192,8 @@
         #collection-pane { width: 348; gap-all: 4; }
         #collection-pane .heading { font-size: 20; height: 28; }
         #collection-pane .muted { font-size: 14; height: 20; }
-        #collection-pane button, #collection-pane text-field, #collection-pane selector { height: 32; }
-        #collection-pane button text { height: 24; }
+        #collection-pane .gallery-action, #collection-pane text-field, #collection-pane selector { height: 32; }
+        #collection-pane .gallery-action text { height: 24; }
         #collection-canvas .collection-caption { height: 14; font-size: 10; }
         #collection-canvas .missing-copy { height: 13; font-size: 9; }
         #filter-panel { background: rect(#FF34273e); }
@@ -222,18 +222,18 @@
                 <element id="header-spacer" />
                 <element id="header-state">
                     <element id="header-state-labels"><label id="list-active-status" /><label id="deck-summary" /></element>
-                    <button id="list-clear-active" text="duelcraft.collection.clear_active" />
+                    <button class="gallery-action" id="list-clear-active" text="duelcraft.collection.clear_active" />
                 </element>
-                <button class="gallery-primary" id="save-deck" text="duelcraft.collection.save" />
-                <button id="activate-deck" text="duelcraft.collection.use_for_duels" />
+                <button class="gallery-action gallery-primary" id="save-deck" text="duelcraft.collection.save" />
+                <button class="gallery-action" id="activate-deck" text="duelcraft.collection.use_for_duels" />
             </element>
             <element id="editor-nav">
-                <button id="collection-back" text="Back" style="display: none; width: 72;" />
-                <button id="new-deck" text="duelcraft.collection.new_deck" />
-                <button id="saved-lists" text="duelcraft.collection.lists" />
-                <button id="import-export" text="duelcraft.collection.import_export" />
-                <button id="help-button" text="?" />
-                <button id="close-editor" text="duelcraft.collection.close" />
+                <button class="gallery-action" id="collection-back" text="Back" style="display: none; width: 72;" />
+                <button class="gallery-action" id="new-deck" text="duelcraft.collection.new_deck" />
+                <button class="gallery-action" id="saved-lists" text="duelcraft.collection.lists" />
+                <button class="gallery-action" id="import-export" text="duelcraft.collection.import_export" />
+                <button class="gallery-action" id="help-button" text="?" />
+                <button class="gallery-action" id="close-editor" text="duelcraft.collection.close" />
             </element>
             <element id="editor-body">
                 <element id="card-inspector">
@@ -254,22 +254,22 @@
                         <label id="inspector-missing" />
                         <element class="row"><label id="transfer-amount-label" class="grow" /><text-field id="transfer-amount" /></element>
                         <element id="transfer-actions" class="row">
-                            <button id="deposit-card" text="duelcraft.collection.deposit" />
-                            <button id="withdraw-card" text="duelcraft.collection.withdraw" />
+                            <button class="gallery-action" id="deposit-card" text="duelcraft.collection.deposit" />
+                            <button class="gallery-action" id="withdraw-card" text="duelcraft.collection.withdraw" />
                         </element>
                         <element class="row">
-                            <button id="section-deck" class="mode-button" text="Deck" />
-                            <button id="section-side" class="mode-button" text="Side" />
+                            <button id="section-deck" class="gallery-action mode-button" text="Deck" />
+                            <button id="section-side" class="gallery-action mode-button" text="Side" />
                         </element>
                         <element class="row">
-                            <button id="add-card" text="+1 Add" />
-                            <button id="remove-card" text="−1 Remove" />
+                            <button class="gallery-action" id="add-card" text="+1 Add" />
+                            <button class="gallery-action" id="remove-card" text="−1 Remove" />
                         </element>
                     </element>
                 </element>
                 <element id="deck-sections">
                     <element id="main-section" class="deck-section">
-                        <element id="main-header" class="section-header"><label id="main-count" /><button id="sort-deck" /><button id="card-density" text="Cards: Standard" /></element>
+                        <element id="main-header" class="section-header"><label id="main-count" /><button class="gallery-action" id="sort-deck" /><button class="gallery-action" id="card-density" text="Cards: Standard" /></element>
                         <scroller-view id="main-grid" class="deck-grid" />
                     </element>
                     <element id="gallery-lower-decks">
@@ -278,7 +278,7 @@
                         <scroller-view id="extra-grid" class="deck-grid" />
                     </element>
                     <element id="side-section" class="deck-section">
-                        <element id="side-header" class="section-header"><label id="side-count" /><button id="toggle-side" text="Expand" /></element>
+                        <element id="side-header" class="section-header"><label id="side-count" /><button class="gallery-action" id="toggle-side" text="Expand" /></element>
                         <scroller-view id="side-grid" class="deck-grid" />
                     </element>
                     </element>
@@ -287,21 +287,21 @@
                     <label class="heading">Card collection</label>
                     <element class="row">
                         <text-field id="collection-search" />
-                        <button id="toggle-filters" text="Filters" />
+                        <button class="gallery-action" id="toggle-filters" text="Filters" />
                     </element>
                     <element id="collection-options" class="row">
                         <selector id="collection-ownership" />
                         <selector id="card-sort" />
                     </element>
                     <scroller-view id="active-filters" />
-                    <button id="alternate-formats" class="mode-button" text="Alternate formats: Off" />
+                    <button id="alternate-formats" class="gallery-action mode-button" text="Alternate formats: Off" />
                     <element id="browse-results">
                         <label id="result-count" />
                         <element id="collection-results-host" />
                         <label id="collection-empty">No matching cards. Open Filters to clear.</label>
                     </element>
                     <element id="filter-panel">
-                        <element class="row"><label class="grow">Filter cards</label><button id="filter-clear" text="Clear all" /></element>
+                        <element class="row"><label class="grow">Filter cards</label><button class="gallery-action" id="filter-clear" text="Clear all" /></element>
                         <scroller-view id="filter-scroll">
                             <element id="filter-groups" />
                             <label class="filter-heading">Level / Rank / Link</label>
@@ -315,12 +315,12 @@
                             <label>Pendulum scale minimum / maximum</label>
                             <element class="range-row"><text-field id="filter-scale-min" /><text-field id="filter-scale-max" /></element>
                         </scroller-view>
-                        <button id="filter-apply" text="Apply filters" />
+                        <button class="gallery-action" id="filter-apply" text="Apply filters" />
                     </element>
                 </element>
             </element>
             <element id="editor-footer">
-                <button id="deposit-cards" text="duelcraft.collection.deposit_all" />
+                <button class="gallery-action" id="deposit-cards" text="duelcraft.collection.deposit_all" />
                 <element id="deck-feedback">
                     <label id="deck-warnings" />
                     <label id="deck-shortages" />
@@ -328,32 +328,32 @@
             </element>
             <element id="status-row" class="row">
                 <label id="editor-status">duelcraft.collection.unavailable</label>
-                <button id="eligibility-details" />
+                <button class="gallery-action" id="eligibility-details" />
             </element>
             <element id="eligibility-dialog">
                 <element id="eligibility-panel">
                     <label id="eligibility-title" class="heading" />
                     <label id="eligibility-summary" class="wrap" />
                     <scroller-view id="eligibility-scroll" />
-                    <button id="eligibility-close" />
+                    <button class="gallery-action" id="eligibility-close" />
                 </element>
             </element>
             <element id="lists-dialog">
                 <element id="lists-panel">
-                    <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button id="lists-close" text="X" /></element>
+                    <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button class="gallery-action" id="lists-close" text="X" /></element>
                     <scroller-view id="saved-list-scroll" />
                     <element class="row list-actions">
-                        <button id="list-open" text="duelcraft.collection.open" />
-                        <button id="list-duplicate" text="duelcraft.collection.duplicate" />
-                        <button id="list-delete" text="duelcraft.collection.delete" />
+                        <button class="gallery-action" id="list-open" text="duelcraft.collection.open" />
+                        <button class="gallery-action" id="list-duplicate" text="duelcraft.collection.duplicate" />
+                        <button class="gallery-action" id="list-delete" text="duelcraft.collection.delete" />
                     </element>
                 </element>
             </element>
             <element id="import-dialog">
                 <element id="import-panel">
-                    <element class="row"><label id="import-title" class="heading grow" /><button id="import-close" text="X" /></element>
-                    <element id="import-choice-row"><selector id="list-import-picker" /><button id="list-import" text="duelcraft.collection.import_ydk" /></element>
-                    <button id="list-export" text="duelcraft.collection.export_ydk" />
+                    <element class="row"><label id="import-title" class="heading grow" /><button class="gallery-action" id="import-close" text="X" /></element>
+                    <element id="import-choice-row"><selector id="list-import-picker" /><button class="gallery-action" id="list-import" text="duelcraft.collection.import_ydk" /></element>
+                    <button class="gallery-action" id="list-export" text="duelcraft.collection.export_ydk" />
                 </element>
             </element>
             <element id="help-dialog">
@@ -363,7 +363,7 @@
                     <label id="help-navigation" class="wrap" />
                     <label id="help-ownership" class="wrap" />
                     <label id="help-supported-checks" class="wrap" />
-                    <button id="help-close" text="duelcraft.collection.done" />
+                    <button class="gallery-action" id="help-close" text="duelcraft.collection.done" />
                 </element>
             </element>
             <element id="delete-dialog">
@@ -371,8 +371,8 @@
                     <label id="delete-title" class="heading">duelcraft.collection.delete_confirm</label>
                     <label id="delete-copy" class="wrap">duelcraft.collection.delete_copy</label>
                     <element class="row">
-                        <button id="delete-confirm" text="duelcraft.collection.delete" />
-                        <button id="delete-cancel" text="duelcraft.collection.cancel" />
+                        <button class="gallery-action" id="delete-confirm" text="duelcraft.collection.delete" />
+                        <button class="gallery-action" id="delete-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>
@@ -383,8 +383,8 @@
                     <text-field id="export-filename" />
                     <label id="export-error" class="wrap warning" />
                     <element class="row">
-                        <button id="export-submit" text="duelcraft.collection.export" />
-                        <button id="export-cancel" text="duelcraft.collection.cancel" />
+                        <button class="gallery-action" id="export-submit" text="duelcraft.collection.export" />
+                        <button class="gallery-action" id="export-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>
@@ -393,8 +393,8 @@
                     <label id="export-overwrite-title" class="heading" />
                     <label id="export-overwrite-copy" class="wrap" />
                     <element class="row">
-                        <button id="export-overwrite-confirm" text="duelcraft.collection.export_replace" />
-                        <button id="export-overwrite-cancel" text="duelcraft.collection.cancel" />
+                        <button class="gallery-action" id="export-overwrite-confirm" text="duelcraft.collection.export_replace" />
+                        <button class="gallery-action" id="export-overwrite-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>
@@ -402,9 +402,9 @@
                 <element id="close-panel">
                     <label id="close-title" class="heading">duelcraft.collection.save_changes</label>
                     <element class="row">
-                        <button id="close-save" text="Save" />
-                        <button id="close-discard" text="Discard" />
-                        <button id="close-cancel" text="duelcraft.collection.keep_editing" />
+                        <button class="gallery-action" id="close-save" text="Save" />
+                        <button class="gallery-action" id="close-discard" text="Discard" />
+                        <button class="gallery-action" id="close-cancel" text="duelcraft.collection.keep_editing" />
                     </element>
                 </element>
             </element>

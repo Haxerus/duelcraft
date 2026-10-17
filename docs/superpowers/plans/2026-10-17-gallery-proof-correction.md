@@ -39,11 +39,11 @@ Font-specific raster differences from HTML are expected; composition, hierarchy 
 
 Files: `lss/gallery.lss`, `ui/uitest/gallery_specimen.xml`, Gallery specimen scenario, new small `client/uitest/GalleryVisualAssertions.java` (or equivalent single-purpose helper), fixture XML class annotations, guide/proof documentation.
 
-- [ ] Add failing checks for label vertical center (not just fit), ordinary and dense controls, and scrollbar head/tail dimensions and arrow textures before style corrections. Retain red evidence.
-- [ ] Replace broad descendant-button presentation with explicit component selectors/classes. Center the child text box and its line box; do not hide glyph errors by shrinking font. Preserve internal selector/scroller geometry and expected textures. Keep shared colors scoped.
-- [ ] Expose reusable `GalleryVisualAssertions.control(TestContext, String)` and `scroller(TestContext, String)` plus compact attachments for actual outer/content bounds, line start Y, font/align settings and winning style/texture values. Reuse StyleBag/ElementRef APIs; no generic inspector or speculative file/line provenance system.
-- [ ] Exercise ordinary/dense/default/hover/pressed/disabled/focused controls and a real scrollbar. Capture native images and component crops on management and duel canvases. Explicitly test internal controls are not ordinary actions. Run focused `gallery_specimen`/preflight checks only.
-- [ ] Update guide with scoped-style ownership, line-box versus glyph review, scroller contract, reference/capture review checklist and separate functional/visual verdicts. Add new correction proof report. Commit scoped changes after verification.
+- [x] Add failing checks for label vertical center (not just fit), ordinary and dense controls, and scrollbar head/tail dimensions and arrow textures before style corrections. Retain red evidence.
+- [x] Replace broad descendant-button presentation with explicit component selectors/classes. Center the child text box and its line box; do not hide glyph errors by shrinking font. Preserve internal selector/scroller geometry and expected textures. Keep shared colors scoped.
+- [x] Expose reusable `GalleryVisualAssertions.control(TestContext, String)` and `scroller(TestContext, String)` plus compact attachments for actual outer/content bounds, line start Y, font/align settings and winning style/texture values. Reuse StyleBag/ElementRef APIs; no generic inspector or speculative file/line provenance system.
+- [x] Exercise ordinary/dense/default/hover/pressed/disabled/focused controls and a real scrollbar. Capture native images and component crops on management and duel canvases. Explicitly test internal controls are not ordinary actions. Run focused `gallery_specimen`/preflight checks only.
+- [x] Update guide with scoped-style ownership, line-box versus glyph review, scroller contract, reference/capture review checklist and separate functional/visual verdicts. Add new correction proof report. Commit scoped changes after verification.
 - [ ] Independent reviewer opens actual component images and compares alignment and scrollbar semantics against C1/C2; also reviews code/spec. Resolve findings before task 2.
 
 ## Task 2 — Match collection composition
