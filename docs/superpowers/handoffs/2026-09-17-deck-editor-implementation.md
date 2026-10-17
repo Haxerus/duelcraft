@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Template cleanup (2026-10-16)
+
+Source `60e7e46` removes template items/block, unused config/logging and sample metadata comments, and gives the Duelcraft tab a Card Binder icon. [Verification and M6 QA.2 artifact identity](../../testing/template-cleanup.md): targeted real-client 7/7 checks, zero template resource/logging matches, full test/build successful (1,112 passed, one existing skip). The template-resource warning exception is closed. Multiplayer acceptance remains pending; the full UI redesign stays separate. No merge or push. Earlier checkpoints retain their original evidence.
+
 ## Local verification continuation (2026-10-16)
 
 The user accepted the corrected lobby dropdown: entries are readable and Escape works as expected. Local continuation began from clean `cfb33a5` on `codex/qa-m4`; [the verification report](../../testing/player-interaction-local-verification.md) records the new candidate and evidence. The full UI group passed 58 scenarios/12,338 checks; all nine window/scale combinations passed 36 required surface executions/2,151 checks. Solo policy/failure fixtures passed 53 checks under each effective ownership setting. Real-catalog and controlled asset-failure probes passed with their retry/timing limits documented.

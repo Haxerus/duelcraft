@@ -1,5 +1,7 @@
 # M6 local verification — 2026-10-16
 
+**Follow-up:** [Template cleanup verification](template-cleanup.md) records M6 QA.2 and closes the template-resource warnings noted below. This report retains the preceding QA.1 results.
+
 This continues the completed [audit checkpoint](player-interaction-release.md) from clean `cfb33a5861364f33e610bfee4089356b0ac76d4c` on `codex/qa-m4`, in the existing deck-editor worktree. The user accepted the lobby dropdown's readable entries and Escape behavior. They authorized remaining checks that need no multiplayer session. The full UI redesign remains separate; the [friend procedure](player-interaction-manual.md) remains pending.
 
 ## Candidate and environment

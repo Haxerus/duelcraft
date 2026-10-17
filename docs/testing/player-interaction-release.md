@@ -4,6 +4,8 @@
 
 ## Local verification continuation
 
+The subsequent [template cleanup](template-cleanup.md) removes the remaining example content and logging. Its M6 QA.2 candidate passed the targeted real-client checks and fresh full test/build; the template-resource warning exception is closed. Installed multiplayer acceptance remains pending.
+
 The [local verification report](player-interaction-local-verification.md) records the subsequent client runs, reproduced card texture defect and candidate preparation. Its current results supersede the pending local checks in the historical audit below. Multiplayer acceptance and the full UI redesign remain separate.
 
 ## Historical audit checkpoint: 2026-10-16
