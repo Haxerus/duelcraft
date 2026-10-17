@@ -8,6 +8,8 @@ import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -20,6 +22,17 @@ import org.lwjgl.glfw.GLFW;
         environment = RegistrationEnvironment.DEV_ONLY)
 public final class DuelcraftEntryScenario implements UIScenario {
     @Override public void define(ScenarioBuilder s) {
+        s.check("template items are absent from the live registry", ctx ->
+                !BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse("duelcraft:example_item"))
+                && !BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse("duelcraft:example_block")))
+         .check("template block is absent from the live registry", ctx ->
+                !BuiltInRegistries.BLOCK.containsKey(ResourceLocation.parse("duelcraft:example_block")))
+         .check("Duelcraft creative tab has its name and binder icon", ctx -> {
+             var tabs = BuiltInRegistries.CREATIVE_MODE_TAB.entrySet().stream()
+                     .filter(entry -> entry.getKey().location().getNamespace().equals(Duelcraft.MODID)).toList();
+             return tabs.size() == 1 && tabs.getFirst().getValue().getDisplayName().getString().equals("Duelcraft")
+                     && tabs.getFirst().getValue().getIconItem().is(Duelcraft.CARD_BINDER.get());
+         });
         s.closeScreen().timeoutMs(60000).server("capture hands and mat position", sc -> {
             sc.put("serverPreparation", com.haxerus.duelcraft.server.DuelManager.get().preparation().view(sc.player().getUUID(), System.currentTimeMillis()).toString());
             sc.put("serverCollectionRevision", CollectionRuntimeFixture.data(sc).revision());
