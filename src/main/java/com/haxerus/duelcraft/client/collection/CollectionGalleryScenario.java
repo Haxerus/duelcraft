@@ -334,6 +334,22 @@ public final class CollectionGalleryScenario implements UIScenario {
         var inspector = ctx.el("#card-inspector").bounds();
         var main = ctx.el("#main-grid").bounds();
         var browser = ctx.el("#collection-results").as(CollectionCardGrid.class);
+        var previousSection = ctx.el("#main-section").bounds();
+        float mainPitch = ctx.el("#main-card-1").bounds().x() - ctx.el("#main-card-0").bounds().x();
+        for (String section : List.of("main", "extra", "side")) {
+            var heading = ctx.el("#" + section + "-header").bounds();
+            var label = ctx.el("#" + section + "-count").as(TextElement.class);
+            ctx.check(section + " heading line vertically centered", label.getTextStyle().textAlignVertical()
+                    == com.lowdragmc.lowdraglib2.gui.ui.data.Vertical.CENTER
+                    && Math.abs(ElementBounds.of(label).centerY() - heading.centerY()) < 1);
+            if (section.equals("main")) continue;
+            var bounds = ctx.el("#" + section + "-section").bounds();
+            ctx.check(section + " follows preceding full-width deck section", bounds.y() >= previousSection.bottom() - 1
+                    && Math.abs(bounds.x() - previousSection.x()) < 1 && Math.abs(bounds.width() - previousSection.width()) < 1);
+            float pitch = ctx.el("#" + section + "-card-1").bounds().x() - ctx.el("#" + section + "-card-0").bounds().x();
+            ctx.check(section + " card spacing matches Main", Math.abs(pitch - mainPitch) < 1);
+            previousSection = bounds;
+        }
         var first = ctx.el("#main-card-0").bounds();
         var right = ctx.el("#collection-results").bounds();
         ctx.attach("content bounds", "inspector=%s main=%s firstMainCard=%s extra=%s side=%s browser=%s mountedRows=%d rowHeight=%s".formatted(

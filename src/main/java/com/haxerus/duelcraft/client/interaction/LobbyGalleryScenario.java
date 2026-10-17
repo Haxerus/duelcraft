@@ -158,6 +158,14 @@ public final class LobbyGalleryScenario implements UIScenario {
          .teardown("close fixture", ctx -> { ctx.mc().setScreen(null); DuelLobbyScreen.clearForm(); });
     }
     private static void composition(TestContext ctx) {
+        var home = ctx.el("#lobby-home").bounds();
+        var title = ctx.el("#gallery-lobby-title").bounds();
+        var settings = ctx.el("#lobby-settings").bounds();
+        var help = ctx.el("#lobby-help").bounds();
+        var close = ctx.el("#lobby-close").bounds();
+        ctx.check("Home precedes the page title as navigation", home.right() <= title.x());
+        ctx.check("Help and Close form utilities after duel actions", help.x() > settings.right() && close.x() > help.right());
+
         var cards = ctx.all(".player-row");
         ctx.check("three normal player cards", cards.size() == 3);
         var stage = ctx.el("#lobby-players").bounds();
@@ -177,7 +185,6 @@ public final class LobbyGalleryScenario implements UIScenario {
         DuelUiAssertions.textFits(ctx, ctx.el("#gallery-lobby-title").as(TextElement.class));
         var deck = ctx.el("#lobby-footer").bounds();
         var change = ctx.el("#lobby-select-deck").bounds();
-        var settings = ctx.el("#lobby-settings").bounds();
         ctx.check("deck strip below decision", deck.y() > invite.bottom());
         ctx.check("top-right deck/settings grouping", Math.abs(change.y() - settings.y()) < 1
                 && settings.x() > change.right() && settings.centerX() > stage.right());

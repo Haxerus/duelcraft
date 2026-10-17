@@ -57,11 +57,32 @@
         .settings-half { flex: 1; min-width: 0; gap-all: 8; }
         .empty-roster #gallery-roster-slot { display: none; }
         #gallery-roster-slot { width: 592; height: 184; }
-        #gallery-lobby-title { width: 80; flex-shrink: 0; }
+        #gallery-lobby-title { width: 80; flex-shrink: 0; vertical-align: center; }
+        #lobby-header { height: 40; flex-shrink: 0; }
+        #lobby-navigation { gap-all: 16; }
+        #lobby-utilities { gap-all: 8; margin-left: 12; padding-left: 24; }
+        #lobby-utilities-divider { position: absolute; left: 0; top: 8; width: 1.25; height: 24; background: rect(#FF57465f); }
+        #lobby-canvas #lobby-home, #lobby-canvas #lobby-close { width: 80; min-width: 80; }
+        #lobby-home { base-background: rect(#FF211c2a); }
     </style>
     <root id="lobby-root" class="gallery-management"><element id="lobby-canvas">
         <element id="lobby-panel">
-            <element class="row"><label id="gallery-lobby-title" class="gallery-title">Duel</label><button class="gallery-action" id="lobby-home" text="Home" /><button class="gallery-action" id="lobby-help" text="?" /><button class="gallery-action" id="lobby-close" text="Close" /><element class="grow" /><button class="gallery-action" id="lobby-select-deck" text="Change deck" /><button class="gallery-action" id="lobby-settings" text="Settings" /></element>
+            <element id="lobby-header" class="row">
+                <element id="lobby-navigation" class="row">
+                    <button class="gallery-action" id="lobby-home" text="‹ Home" />
+                    <label id="gallery-lobby-title" class="gallery-title">Duel</label>
+                </element>
+                <element class="grow" />
+                <element id="lobby-preparation-actions" class="row">
+                    <button class="gallery-action" id="lobby-select-deck" text="Change deck" />
+                    <button class="gallery-action" id="lobby-settings" text="Settings" />
+                </element>
+                <element id="lobby-utilities" class="row">
+                    <element id="lobby-utilities-divider" />
+                    <button class="gallery-action" id="lobby-help" text="?" />
+                    <button class="gallery-action" id="lobby-close" text="Close" />
+                </element>
+            </element>
             <element id="lobby-body"><text id="lobby-feedback" class="wrap gallery-warning" />
                 <scroller-view id="lobby-left"><element id="lobby-deck-box" /></scroller-view>
                 <scroller-view id="lobby-right">

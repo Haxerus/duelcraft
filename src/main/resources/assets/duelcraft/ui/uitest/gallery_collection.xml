@@ -172,12 +172,8 @@
         #card-edit-controls label { font-size: 14; height: 18; }
         #card-edit-controls button { height: 32; }
         #card-edit-controls .gallery-action text { font-size: 16; height: 24; }
-        #gallery-lower-decks { height: 150; flex-shrink: 0; flex-direction: row; gap-all: 8; }
-        #extra-section, #side-section { flex: 1; min-width: 0; }
-        #extra-grid .__scroller_view_view-container__, #side-grid .__scroller_view_view-container__ { grid-template-columns: repeat(4, 54px); }
-        .large #extra-grid .__scroller_view_view-container__, .large #side-grid .__scroller_view_view-container__ { grid-template-columns: repeat(3, 70px); }
-        .section-header { height: 36; padding-horizontal: 8; gap-all: 8; background: rect(#FF19151f); }
-        .section-header label { font-size: 20; height: 28; }
+        .section-header { height: 32; padding-horizontal: 8; gap-all: 8; background: rect(#FF19151f); }
+        .section-header label { font-size: 18; height: 28; vertical-align: center; }
         #side-count { font-size: 18; }
         #toggle-side { height: 32; }
         #import-export { width: 160; }
@@ -296,7 +292,6 @@
                         <element id="main-header" class="section-header"><label id="main-count" /><label id="deck-summary" /><button class="gallery-action" id="sort-deck" /><button class="gallery-action" id="card-density" text="Cards: Standard" /></element>
                         <scroller-view id="main-grid" class="deck-grid" />
                     </element>
-                    <element id="gallery-lower-decks">
                     <element id="extra-section" class="deck-section">
                         <element id="extra-header" class="section-header"><label id="extra-count" /></element>
                         <scroller-view id="extra-grid" class="deck-grid" />
@@ -304,7 +299,6 @@
                     <element id="side-section" class="deck-section">
                         <element id="side-header" class="section-header"><label id="side-count" /><button class="gallery-action" id="toggle-side" text="Expand" /></element>
                         <scroller-view id="side-grid" class="deck-grid" />
-                    </element>
                     </element>
                 </element>
                 <element id="collection-pane">

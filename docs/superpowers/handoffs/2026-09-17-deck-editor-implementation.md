@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Current Gallery layout refinement (2026-10-17)
+
+Following user review, the Gallery collection proof restores full-width stacked Main/Extra/Side sections with shared card spacing and centered headings. The lobby header now groups Home with its title, deck/setup actions together, and Help/Close after a divider. Production UI remains unchanged. [Refinement evidence](../reports/2026-10-17-gallery-layout-refinement.md) records the red checks, two passing real-client runs (4/4 scenario executions, 7930/7930 checks), live resize and independent screenshot review with no actionable findings. Human review of this refinement and production migration remain separate checkpoints. Earlier proof evidence below remains historical.
+
 ## Current Gallery final-fix checkpoint (2026-10-17)
 
 The four whole-change review findings are corrected in fixture/tooling scope: 1.25-unit straight borders survive fractional scaling; exact Gallery screen instances receive a neutral full-viewport backdrop; specimen request metadata reads actual properties; Change deck is widened without reducing its font. Production layouts/controllers/navigation and both fixed design canvases are unchanged. [Final fix evidence](../reports/2026-10-17-gallery-proof-correction.md#final-review-fix-wave-2026-10-17-supersedes-the-unresolved-findings-above) records the frozen 266-file source manifest, unchanged LDLib2 hash, native comparisons, retained red originals and exact final screenshots.
