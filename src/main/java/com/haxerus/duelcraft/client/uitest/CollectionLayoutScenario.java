@@ -73,8 +73,11 @@ public final class CollectionLayoutScenario implements UIScenario {
 
     static void recordViewport(TestContext ctx) {
         var w = ctx.mc().getWindow();
-        ctx.attach("viewport", "framebuffer=%dx%d GUI=%dx%d effectiveScale=%.1f design=1280x720".formatted(
-                w.getWidth(), w.getHeight(), w.getGuiScaledWidth(), w.getGuiScaledHeight(), w.getGuiScale()));
+        ctx.attach("viewport", "requestedWindow=%s requestedScale=%s configuredScale=%d window=%dx%d framebuffer=%dx%d GUI=%dx%d effectiveScale=%.1f design=1280x720".formatted(
+                System.getProperty("ldlib2.uitest.window", "maximized"),
+                System.getProperty("ldlib2.uitest.guiScale", "2"), ctx.mc().options.guiScale().get(),
+                w.getScreenWidth(), w.getScreenHeight(), w.getWidth(), w.getHeight(),
+                w.getGuiScaledWidth(), w.getGuiScaledHeight(), w.getGuiScale()));
     }
 
     /** LDLib buttons act on press; retain the pointer when the action removes its own target. */

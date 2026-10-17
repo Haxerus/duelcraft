@@ -30,7 +30,9 @@ public final class DuelLobbyScenario implements UIScenario {
                 return ctx.put("pending", new CompletableFuture<PreparationStatePayload>());
             }, route -> ctx.put("route", route));
         }).awaitModularUI().ticks(3)
+          .step("effective viewport", CollectionLayoutScenario::recordViewport)
           .checkBounds("#lobby-panel", DuelScreenScenario::insideViewport)
+          .step("visible lobby actions fit", DuelLobbyScenario::visibleActionsFit)
           .checkCount(".player-row", 7)
           .click("#lobby-player-" + OTHER).step("press #lobby-settings", ctx -> com.haxerus.duelcraft.client.uitest.ManagementTestInput.click(ctx, "#lobby-settings"))
           .step("open rule presets", ctx -> ManagementTestInput.click(ctx, "#settings-rule")).ticks(3)
@@ -76,6 +78,9 @@ public final class DuelLobbyScenario implements UIScenario {
           .check("invalid settings disable Invite", ctx -> !ctx.el("#lobby-invite").isActive())
           .step("restore valid life points", ctx -> ctx.el("#settings-lp").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class).setText("8000", true))
           .step("focus life points", ctx -> ctx.el("#settings-lp").element().focus())
+          .check("life points retains visible keyboard focus", ctx -> ctx.el("#settings-lp").isVisible()
+                  && ctx.el("#settings-lp").as(com.lowdragmc.lowdraglib2.gui.ui.elements.TextField.class).isFocused()
+                  && DuelScreenScenario.insideViewport(ctx.el("#settings-lp").bounds()))
           .key(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE).checkHidden("#lobby-settings-dialog")
           .step("typing after Settings is closed", ctx -> ctx.screen().charTyped('j', 0))
           .checkText("#settings-lp", "8000")
@@ -90,11 +95,29 @@ public final class DuelLobbyScenario implements UIScenario {
                 CompletableFuture<PreparationStatePayload> pending = ctx.get("pending");
                 if (pending != null) pending.complete(reply);
             })
-             .ticks(2).checkBounds("#lobby-panel", DuelScreenScenario::insideViewport).screenshot("m5-lobby-" + mode.name().toLowerCase());
+             .ticks(2).checkBounds("#lobby-panel", DuelScreenScenario::insideViewport)
+             .step("visible lobby actions fit " + mode, DuelLobbyScenario::visibleActionsFit)
+             .screenshot("m5-lobby-" + mode.name().toLowerCase());
             if (mode == PreparationView.Mode.RPS) s.step("press #lobby-rock", ctx -> com.haxerus.duelcraft.client.uitest.ManagementTestInput.click(ctx, "#lobby-rock"))
                     .check("Rock carries exact flow and round", ctx -> ctx.get("command").equals(new PreparationCommand.Hand(FLOW, ROUND, FirstTurnLobby.Hand.ROCK)))
                     .check("pending hand disables choices", ctx -> !ctx.el("#lobby-hands").isActive());
             if (mode == PreparationView.Mode.STARTING) s.checkHidden("#lobby-cancel").checkHidden("#lobby-select-deck");
+        }
+    }
+    private static void visibleActionsFit(TestContext ctx) {
+        for (var id : List.of("lobby-home", "lobby-help", "lobby-close", "lobby-deck", "lobby-select-deck",
+                "lobby-settings", "lobby-prompt", "lobby-rock", "lobby-paper", "lobby-scissors",
+                "lobby-first", "lobby-second", "lobby-invite", "lobby-accept", "lobby-decline", "lobby-cancel")) {
+            var target = ctx.el("#" + id);
+            boolean visible = true;
+            for (var element = target.element(); element != null; element = element.getParent()) {
+                if (!element.isVisible() || !element.isDisplayed()) { visible = false; break; }
+            }
+            if (visible) {
+                var bounds = target.bounds();
+                ctx.check("visible action fits: " + id, bounds.width() > 0 && bounds.height() > 0
+                        && DuelScreenScenario.insideViewport(bounds));
+            }
         }
     }
     private static PreparationView view(long revision, PreparationView.Mode mode) {

@@ -32,7 +32,8 @@ public final class CollectionSearchScenario implements UIScenario {
     @Override
     public void define(ScenarioBuilder s) {
         open(s, "collection editing and search");
-        s.checkExists("#close-dialog")
+        s.step("effective viewport", CollectionLayoutScenario::recordViewport)
+         .checkExists("#close-dialog")
          .checkExists("#filter-panel")
          .checkHidden("#close-dialog")
          .checkHidden("#filter-panel")
@@ -75,6 +76,9 @@ public final class CollectionSearchScenario implements UIScenario {
                      > ctx.<Float>get("collapsedSideHeight"));
          })
          .typeInto("#collection-search", "Cinder").ticks(2)
+         .check("search retains visible keyboard focus", ctx -> ctx.el("#collection-search").isVisible()
+                 && ctx.el("#collection-search").as(TextField.class).isFocused()
+                 && DuelScreenScenario.insideViewport(ctx.el("#collection-search").bounds()))
          .checkCount("#collection-results .collection-card", 1)
          .checkExists("#collection-card-10003")
          .checkText("#inspector-name", "Amber Dragon")

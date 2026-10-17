@@ -19,8 +19,14 @@ public final class DuelcraftHomeScenario implements UIScenario {
                     "Spell toolbox with a long name for the Home screen", 40, 5, 5)), id);
             return HomeScreen.create(view, null, route -> ctx.put("route", route));
         }).awaitModularUI().ticks(3)
+          .step("effective viewport", CollectionLayoutScenario::recordViewport)
           .checkTextContains("#home-active-deck", "Spell toolbox")
           .checkBounds("#home-panel", DuelScreenScenario::insideViewport)
+          .checkBounds("#home-active-deck", DuelScreenScenario::insideViewport)
+          .checkBounds("#home-collection", DuelScreenScenario::insideViewport)
+          .checkBounds("#home-duels", DuelScreenScenario::insideViewport)
+          .checkBounds("#home-help", DuelScreenScenario::insideViewport)
+          .checkBounds("#home-close", DuelScreenScenario::insideViewport)
           .click("#home-collection").check("collection route", ctx -> ctx.get("route") == ScreenRoute.COLLECTION)
           .click("#home-duels").check("duel route", ctx -> ctx.get("route") == ScreenRoute.LOBBY)
           .step("clear mouse focus", ctx -> ctx.ui().clearFocus())
