@@ -70,9 +70,9 @@ public final class DuelEffectPromptScenario implements UIScenario {
             var path = directory.resolve("cards.cdb");
             try (var connection = DriverManager.getConnection("jdbc:sqlite:" + path);
                  var sql = connection.createStatement()) {
-                sql.execute("CREATE TABLE datas (id INTEGER, type INTEGER, atk INTEGER, def INTEGER, level INTEGER, race INTEGER, attribute INTEGER)");
+                sql.execute("CREATE TABLE datas (id INTEGER, type INTEGER, atk INTEGER, def INTEGER, level INTEGER, race INTEGER, attribute INTEGER, ot INTEGER)");
                 sql.execute("CREATE TABLE texts (id INTEGER, name TEXT, desc TEXT)");
-                sql.execute("INSERT INTO datas VALUES (99000011, 17, 1800, 1000, 4, 1, 16)");
+                sql.execute("INSERT INTO datas VALUES (99000011, 17, 1800, 1000, 4, 1, 16, 1)");
                 sql.execute("INSERT INTO texts VALUES (99000011, 'Dracotail Lukias', '')");
             }
             database = new CardDatabase(path);

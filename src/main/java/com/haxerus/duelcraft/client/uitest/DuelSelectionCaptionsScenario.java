@@ -180,6 +180,10 @@ public final class DuelSelectionCaptionsScenario implements UIScenario {
     }
 
     private static DuelMessage.CardInfo card(int controller, int location, int sequence) {
-        return new DuelMessage.CardInfo(89631139, controller, location, sequence, POS_FACEUP_ATTACK);
+        int code = controller == 0 && location == LOCATION_MZONE && sequence == 1 ? 33750025
+                : controller == 0 && location == LOCATION_MZONE && sequence == 2 ? 28406301
+                : controller == 0 && location == LOCATION_SZONE && sequence == 1 ? 11091375
+                : 89631139;
+        return new DuelMessage.CardInfo(code, controller, location, sequence, POS_FACEUP_ATTACK);
     }
 }

@@ -342,22 +342,34 @@
         display: none;
         }
 
-        /* ── Duel log (over the card info banner, toggled from the HUD) ── */
-        #duel-log {
+        /* ── Independent right column: zone inspector above duel log ── */
+        #duel-right-column {
+        z-index: 10;
         position: absolute;
-        left: 0;
+        right: 0;
         top: 44;
         bottom: 0;
         width: 210;
+        flex-direction: column;
+        gap-all: 4;
+        }
+
+        #duel-right-column.hidden {
+        width: 0;
+        overflow: hidden;
+        display: none;
+        }
+
+        #duel-log, #zone-inspector {
+        flex: 1;
+        min-height: 0;
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
         background: built-in(ui-gdp:RECT);
         }
 
-        #duel-log.hidden {
-        width: 0;
-        overflow: hidden;
+        #duel-log.hidden, #zone-inspector.hidden {
         display: none;
         }
 
@@ -760,25 +772,6 @@
         adaptive-height: true;
         }
 
-        /* ── Zone Inspector (right overlay) ── */
-        #zone-inspector {
-        position: absolute;
-        right: 0;
-        top: 44;
-        bottom: 0;
-        width: 210;
-        flex-direction: column;
-        gap-all: 2;
-        padding-all: 4;
-        background: built-in(ui-gdp:RECT);
-        }
-
-        #zone-inspector.hidden {
-        width: 0;
-        overflow: hidden;
-        display: none;
-        }
-
         #zone-inspector-title {
         width: 100%;
         min-height: 12;
@@ -802,6 +795,20 @@
         justify-content: space_between;
         gap-all: 2;
         padding-all: 2;
+        }
+
+        .face-down-marker {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        min-height: 7;
+        font-size: 6;
+        horizontal-align: center;
+        vertical-align: center;
+        text-color: #FFFFFF;
+        background: rect(#CC000000);
+        z-index: 2;
         }
 
         .insp-slot {
@@ -1267,6 +1274,12 @@
         justify-content: center;
         }
 
+        .ctx-materials {
+        font-size: 7;
+        text-color: #FFFFFF;
+        background: sdf(#44AACC, 3, 2);
+        }
+
         /* ── Rule-driven visibility (FieldRenderer assigns these classes) ── */
         .rule-hidden {
         display: none;
@@ -1511,24 +1524,6 @@
             <button id="prompt-action-btn" class="prompt-btn hidden" text="Finish" />
         </element>
 
-        <!-- Duel log (left; opening it hides the card info banner) -->
-        <element id="duel-log" class="hidden">
-            <label id="duel-log-title">Duel log</label>
-            <scroller-view id="duel-log-list">
-                <!-- Log lines added dynamically in Java -->
-            </scroller-view>
-            <button id="duel-log-close" text="Close" />
-        </element>
-
-        <!-- Zone Inspector (right, toggled by clicking a pile) -->
-        <element id="zone-inspector" class="hidden">
-            <label id="zone-inspector-title">Graveyard (#)</label>
-            <scroller-view id="zone-inspector-list">
-                <!-- Inspector entries added dynamically in Java -->
-            </scroller-view>
-            <button id="zone-inspector-close" text="Close" />
-        </element>
-
         <!-- Prompt Dialog (centered overlay for selections) -->
         <element id="prompt-overlay" class="hidden">
             <element id="prompt-dialog">
@@ -1540,6 +1535,24 @@
                 <element id="prompt-buttons">
                     <!-- Confirm/Cancel buttons added dynamically -->
                 </element>
+            </element>
+        </element>
+
+        <!-- Independent right-side inspectors remain usable beside an active prompt. -->
+        <element id="duel-right-column" class="hidden">
+            <element id="zone-inspector" class="hidden">
+                <label id="zone-inspector-title">Graveyard (#)</label>
+                <scroller-view id="zone-inspector-list">
+                    <!-- Inspector entries added dynamically in Java -->
+                </scroller-view>
+                <button id="zone-inspector-close" text="Close" />
+            </element>
+            <element id="duel-log" class="hidden">
+                <label id="duel-log-title">Duel log</label>
+                <scroller-view id="duel-log-list">
+                    <!-- Log lines added dynamically in Java -->
+                </scroller-view>
+                <button id="duel-log-close" text="Close" />
             </element>
         </element>
 

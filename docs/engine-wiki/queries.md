@@ -64,7 +64,7 @@ u32 QUERY_END
 | `QUERY_COVER 0x2000000` | `u32` | cover/card-back identifier |
 | `QUERY_END 0x80000000` | none | terminator, emitted regardless of requested flags |
 
-The constant values are declared together in [`ocgapi_constants.h`](../../native/ygopro-core/ocgapi_constants.h#L168). Widths and compound layouts come from [`card::get_infos`](../../native/ygopro-core/card.cpp#L119). Signed attack values use the same four bytes as `u32`; decode them as `i32`. `QUERY_POSITION` calls `get_info_location()`, which substitutes an overlay material's `current.sequence` for position ([implementation](../../native/ygopro-core/card.cpp#L222)).
+The constant values are declared together in [`ocgapi_constants.h`](../../native/ygopro-core/ocgapi_constants.h#L168). Widths and compound layouts come from [`card::get_infos`](../../native/ygopro-core/card.cpp#L119). Signed attack values use the same four bytes as `u32`; decode them as `i32`. `QUERY_POSITION` calls `get_info_location()`, which substitutes an overlay material's `current.sequence` for position ([implementation](../../native/ygopro-core/card.cpp#L222)). The same `location_info` is written for both endpoints of `MSG_MOVE` ([producer example](../../native/ygopro-core/operations.cpp#L5051)), so an overlay destination's `position` is its zero-based material index. A client applying that move inserts at this index and then renumbers the material list; appending would lose engine order when a material is inserted or moved before an existing one.
 
 ## Visibility belongs to the host
 
@@ -105,3 +105,13 @@ A constructed single-card query containing only code `0x12345678` is `08 00 01 0
 - Preserve unknown chunks if a proxy must round-trip newer query data; otherwise skip by size.
 - Reset all destination fields before parsing a new object. An absent flag means "not supplied", not zero.
 - Treat a zero slot marker as one position in MZONE/SZONE so later cards keep their sequence.
+
+## Duelcraft hand presentation state
+
+`ClientCard.isPublic` and `isHidden` retain only explicitly supplied visibility fields. Incremental results without QUERY_CODE or with code zero preserve recipient-known identity; code/position values without their flags are not authoritative. A visibility change dirties the hand even if identity and position are unchanged. Moving to a different location/controller resets the previous location's visibility until the destination query supplies it.
+
+`ClientDuelState.handDisplayCode` is a hand-only artwork/hover decision: the controller sees their recipient-known code; the opponent needs current public=true and hidden=false. Remembered reveal identity alone cannot turn the opponent hand face up. Both tile artwork and hover use this decision, while foreign gameplay actions remain unavailable. It is not a global policy for field cards, Extra Deck inspection or prompt candidates.
+
+The installed Ceremonial Bell script sets EFFECT_PUBLIC on both hands. The native regression removes Bell with Raigeki, observes public=false and a real ShuffleHand, and verifies both sanitized query fields and displayed codes. The engine's public-off hand shuffle (`processor.cpp:4900-4908`) legitimately erases the opponent's remembered codes. Separate incremental-state tests verify public=false hides a card even when no shuffle has erased its cached code. No host redaction or refresh-schedule change was needed. Details: [QA visibility trace](../superpowers/reports/2026-09-19-qa-visibility-trace.md).
+
+A hand-opened inspector retains the originating card object and displayed code. The UI revalidates current hand permission and object presence each tick, immediately hiding a revoked inspector even when its scrollable description is hovered. This supersedes the normal pointer-crossing hide delay only for invalidated hand inspection; `duel_public_hand_hover` covers both stationary hand pointer and already-hovered inspector with a nonzero remembered identity.

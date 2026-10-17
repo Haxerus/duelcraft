@@ -37,6 +37,14 @@ src/main/resources/natives/
 
 ### Minecraft Modding ###
 run/
+runs/
+run-collection-lifecycle/
+run-collection-policy-lifecycle/
+run-collection-m3-ui/
+run-collection-transfer-lifecycle/
+run-collection-m4-lifecycle/
+run-qa-m4-follow-up-lifecycle/
+run-packaged-qa2/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/

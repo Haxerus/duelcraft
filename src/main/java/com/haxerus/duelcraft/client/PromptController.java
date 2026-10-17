@@ -125,11 +125,12 @@ public class PromptController {
     // SelectChain: true while the per-card effect chooser has replaced the chain card list.
     private boolean chainEffectChooserOpen;
     private boolean inspectingField;
+    private ClientDuelState.Reveal displayedReveal;
 
     public boolean isInspectingField() { return inspectingField; }
 
     public boolean hasDialog() {
-        return state.pendingPrompt != null && !promptOverlay.hasClass("hidden");
+        return (state.pendingPrompt != null || displayedReveal != null) && !promptOverlay.hasClass("hidden");
     }
 
     /** Keep the dialog and its selections intact while exposing the field underneath it. */
@@ -276,6 +277,7 @@ public class PromptController {
     // ── Rebuild dispatch (PROMPT dirty) ────────────────────────────────────
 
     public void rebuild() {
+        displayedReveal = null;
         resetInspection();
         clearSourceTitles();
         LOGGER.debug("Rebuilding prompt: {}", state.pendingPrompt != null ? state.pendingPrompt.getClass().getSimpleName() : "null");
@@ -375,6 +377,78 @@ public class PromptController {
             }
             state.retryMessage = null;
         }
+    }
+
+    /** Called after this tick's received messages and prompt rebuild have been coalesced. */
+    public void refreshReveals() {
+        var candidates = revealCandidates(state.pendingPrompt);
+        // Coordinates, never passcodes or list order, associate a reveal with its choice.
+        state.pendingReveals.removeIf(reveal -> !candidates.isEmpty() && reveal.cards().stream().allMatch(
+                card -> candidates.stream().anyMatch(candidate -> candidate.controller() == card.controller()
+                        && candidate.location() == card.location() && candidate.sequence() == card.sequence())));
+        if (state.pendingPrompt != null && !(state.pendingPrompt instanceof DuelMessage.SelectIdleCmd)
+                && !(state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) return;
+        var next = state.pendingReveals.peekFirst();
+        if (next == displayedReveal) return;
+        displayedReveal = next;
+        if (next == null) return;
+        resetInspection();
+        clearSourceTitles();
+        clearPromptContent();
+        dialogActionBtn = null;
+        setActionButton(ActionButton.HIDDEN, null);
+        promptOverlay.removeClass("hidden");
+        if (promptTitle instanceof Label title) title.setText(Component.literal(next.title()));
+        var scroller = createPromptCardScroller();
+        for (var revealed : next.cards()) {
+            int code = revealed.code();
+            var card = new UIElement();
+            card.addClass("card");
+            callbacks.setCardImageBackground(card, code);
+            card.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(code));
+            card.addEventListener(UIEvents.MOUSE_LEAVE, e -> callbacks.hideCardInfo());
+            scroller.addScrollViewChild(card);
+        }
+        var close = new Button();
+        close.setId("reveal-close");
+        close.addClass("prompt-btn");
+        close.setText(Component.literal("Close"));
+        close.setOnClick(e -> acknowledgeReveal());
+        promptButtons.addChild(close);
+    }
+
+    private void acknowledgeReveal() {
+        state.pendingReveals.removeFirst();
+        displayedReveal = null;
+        callbacks.hideCardInfo();
+        promptOverlay.addClass("hidden");
+        refreshReveals();
+    }
+
+    private static List<DuelMessage.CardInfo> revealCandidates(DuelMessage prompt) {
+        if (prompt == null) return List.of();
+        return switch (prompt) {
+            case DuelMessage.SelectCard sel -> sel.cards();
+            case DuelMessage.SelectUnselectCard sel -> {
+                var cards = new ArrayList<>(sel.selectableCards());
+                cards.addAll(sel.unselectableCards());
+                yield cards;
+            }
+            case DuelMessage.SelectTribute sel -> sel.cards().stream().map(c ->
+                    new DuelMessage.CardInfo(c.code(), c.controller(), c.location(), c.sequence(), 0)).toList();
+            case DuelMessage.SelectSum sel -> {
+                var cards = new ArrayList<>(sel.mustSelect());
+                cards.addAll(sel.selectable());
+                yield cards.stream().map(c -> new DuelMessage.CardInfo(c.code(), c.controller(), c.location(), c.sequence(), c.position())).toList();
+            }
+            case DuelMessage.SortCard sel -> sortCandidates(sel.cards());
+            case DuelMessage.SortChain sel -> sortCandidates(sel.cards());
+            default -> List.of();
+        };
+    }
+
+    private static List<DuelMessage.CardInfo> sortCandidates(List<DuelMessage.SortableCard> cards) {
+        return cards.stream().map(c -> new DuelMessage.CardInfo(c.code(), c.controller(), c.location(), c.sequence(), 0)).toList();
     }
 
     /** With no prompt of our own, MSG_WAITING owns the status label. */
@@ -946,7 +1020,9 @@ public class PromptController {
         var sourceLabels = mixedSourceLabels(sources);
         for (int i = 0; i < cards.size(); i++) {
             int idx = i;
-            int code = cards.get(i).code();
+            var candidate = cards.get(i);
+            int code = state.candidateCode(new DuelMessage.CardInfo(candidate.code(), candidate.controller(),
+                    candidate.location(), candidate.sequence(), 0));
 
             var card = new UIElement();
             card.setId("sort-card-" + i);
@@ -987,8 +1063,11 @@ public class PromptController {
     }
 
     private void buildTributePrompt(DuelMessage.SelectTribute sel) {
-        // Tributes are definitionally field-only (you can't tribute from a pile),
-        // so this always renders as field highlights — no scroller dialog.
+        if (sel.cards().stream().anyMatch(c -> (c.location() & LOCATION_ONFIELD) == 0)
+                || needsCandidateIdentityDialog(sel)) {
+            buildPileTributePrompt(sel);
+            return;
+        }
         selectedIndices.clear();
         promptOverlay.addClass("hidden");
 
@@ -1001,6 +1080,35 @@ public class PromptController {
 
         updateTributeStatus(sel);
         setInitialSelectionButton(sel.cancelable(), false, this::sendSelectedCards);
+    }
+
+    private void buildPileTributePrompt(DuelMessage.SelectTribute sel) {
+        selectedIndices.clear();
+        clearPromptContent();
+        promptOverlay.removeClass("hidden");
+        if (promptTitle instanceof Label title) title.setText(Component.literal(hintCaption(
+                "Tribute value " + sel.min() + " (maximum " + sel.max() + " cards)", "")));
+        var scroller = createPromptCardScroller();
+        var labels = mixedSourceLabels(sel.cards().stream().map(c -> source(c.controller(), c.location())).toList());
+        for (int i = 0; i < sel.cards().size(); i++) {
+            int index = i;
+            var candidate = sel.cards().get(i);
+            int code = state.candidateCode(new DuelMessage.CardInfo(candidate.code(), candidate.controller(),
+                    candidate.location(), candidate.sequence(), 0));
+            var card = new UIElement();
+            card.addClass("card");
+            callbacks.setCardImageBackground(card, code);
+            card.addEventListener(UIEvents.MOUSE_ENTER, e -> callbacks.showCardInfo(code));
+            card.addEventListener(UIEvents.MOUSE_LEAVE, e -> callbacks.hideCardInfo());
+            card.addEventListener(UIEvents.CLICK, e -> {
+                e.stopPropagation();
+                handleSelectTributeClick(candidate.controller(), candidate.location(), candidate.sequence(), sel);
+                toggleClass(card, "target", selectedIndices.contains(index));
+            });
+            addPromptCard(scroller, card, "tribute-source-" + i, labels, i);
+        }
+        dialogActionBtn = addDialogActionButton();
+        setInitialSelectionButton(sel.cancelable(), sel.min() == 0, this::sendSelectedCards);
     }
 
     private void updateTributeStatus(DuelMessage.SelectTribute sel) {
@@ -1177,8 +1285,9 @@ public class PromptController {
             var mustCard = sel.mustSelect().get(i);
             var card = new UIElement();
             card.addClasses("card", "selected");
-            callbacks.setCardImageBackground(card, mustCard.code());
-            int code = mustCard.code();
+            int code = state.candidateCode(new DuelMessage.CardInfo(mustCard.code(), mustCard.controller(),
+                    mustCard.location(), mustCard.sequence(), mustCard.position()));
+            callbacks.setCardImageBackground(card, code);
             card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
             card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
             addPromptCard(scroller, card, "sum-source-" + i, sourceLabels, i);
@@ -1188,7 +1297,9 @@ public class PromptController {
         }
 
         for (int i = 0; i < sel.selectable().size(); i++) {
-            int code = sel.selectable().get(i).code();
+            var candidate = sel.selectable().get(i);
+            int code = state.candidateCode(new DuelMessage.CardInfo(candidate.code(), candidate.controller(),
+                    candidate.location(), candidate.sequence(), candidate.position()));
             int index = i;
 
             var card = new UIElement();
@@ -1465,6 +1576,11 @@ public class PromptController {
             e.stopPropagation();
             return true;
         }
+        if (displayedReveal != null) {
+            e.stopPropagation();
+            acknowledgeReveal();
+            return true;
+        }
         // edopro binds right-click to the shared Cancel/Finish button (`event_handler.cpp:1498-1511`).
         if (actionButtonAction != null) {
             e.stopPropagation();
@@ -1499,6 +1615,7 @@ public class PromptController {
     // ── Cleanup after a response is sent ───────────────────────────────────
 
     public void onResponseSent() {
+        displayedReveal = null;
         resetInspection();
         clearSourceTitles();
         if (promptOverlay != null) promptOverlay.addClass("hidden");
@@ -1510,26 +1627,38 @@ public class PromptController {
         ui.rootElement.select(".selected").forEach(e -> e.removeClass("selected"));
         ui.rootElement.select(".selectable").forEach(e -> e.removeClass("selectable"));
         if (statusLabel != null) statusLabel.addClass("hidden");
+        refreshReveals();
     }
 
     // ── "Is this selection all on-field?" helpers ──────────────────────────
 
+    /** The ordinary field deliberately keeps face-down artwork private, even after a reveal. */
+    private boolean needsCandidateIdentityDialog(DuelMessage prompt) {
+        return revealCandidates(prompt).stream().anyMatch(candidate -> {
+            int code = state.candidateCode(candidate);
+            if (code == 0) return false;
+            var card = state.cardAt(candidate.controller(), candidate.location(), candidate.sequence(), candidate.position());
+            return card == null || card.isFaceDown() || card.code != code;
+        });
+    }
+
     private boolean isFieldOnlySelection(DuelMessage.SelectCard sel) {
         return !sel.cards().isEmpty()
+                && !needsCandidateIdentityDialog(sel)
                 && sel.cards().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0
                                 && (c.location() & LOCATION_OVERLAY) == 0);
     }
 
     private boolean isFieldOnlyUnselectCard(DuelMessage.SelectUnselectCard sel) {
-        return sel.selectableCards().stream()
+        return !needsCandidateIdentityDialog(sel) && sel.selectableCards().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
                 && sel.unselectableCards().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);
     }
 
     private boolean isFieldOnlySum(DuelMessage.SelectSum sel) {
-        return sel.selectable().stream()
+        return !needsCandidateIdentityDialog(sel) && sel.selectable().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0)
                 && sel.mustSelect().stream()
                         .allMatch(c -> (c.location() & LOCATION_ONFIELD) != 0);

@@ -69,6 +69,15 @@ public final class DuelScreen extends ModularUIScreen {
     }
 
     @Override
+    public void onClose() {
+        if (!LDLibDuelScreen.isDuelLive()) {
+            LDLibDuelScreen.close();
+            if (com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()) return;
+        }
+        super.onClose();
+    }
+
+    @Override
     public void removed() {
         LDLibDuelScreen.setChainSkipHeld(false);
         super.removed();

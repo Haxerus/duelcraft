@@ -8,13 +8,12 @@ import com.haxerus.duelcraft.duel.message.DuelMessage;
 import com.haxerus.duelcraft.duel.response.ResponseBuilder;
 import com.haxerus.duelcraft.duel.response.SumSelection;
 import com.mojang.logging.LogUtils;
-import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
@@ -31,8 +30,9 @@ public class SoloDuelHandler implements DuelEventListener {
     /** The real player; the AI is player 1. */
     private static final int HUMAN_PLAYER = 0;
 
-    private final ServerPlayer player;
-    private final UUID duelId;
+    private final Consumer<CustomPacketPayload> send;
+    private final Consumer<Boolean> complete;
+    private final Consumer<byte[]> respond;
 
     /** Set by DuelManager after creating the session, used for auto-responses. */
     private Runnable pendingAutoResponse;
@@ -46,9 +46,10 @@ public class SoloDuelHandler implements DuelEventListener {
     // True once MSG_WIN was converted to a DuelEndPayload, so onDuelEnd does not send a second result.
     private boolean winSent;
 
-    public SoloDuelHandler(ServerPlayer player, UUID duelId) {
-        this.player = player;
-        this.duelId = duelId;
+    public SoloDuelHandler(Consumer<CustomPacketPayload> send, Consumer<Boolean> complete, Consumer<byte[]> respond) {
+        this.send = send;
+        this.complete = complete;
+        this.respond = respond;
     }
 
     @Override
@@ -56,7 +57,7 @@ public class SoloDuelHandler implements DuelEventListener {
         return switch (msg) {
             case DuelMessage.Retry ignored -> handleRetry(msg);
             case DuelMessage.Win win -> {
-                PacketDistributor.sendToPlayer(player, new DuelEndPayload(win.winner(), win.reason()));
+                send.accept(new DuelEndPayload(win.winner(), win.reason()));
                 winSent = true;
                 yield DUEL_ENDED;
             }
@@ -111,7 +112,7 @@ public class SoloDuelHandler implements DuelEventListener {
                 // generic_duel.cpp:1326-1343: the duellist who was not prompted is told to wait.
                 sendToPlayer(new DuelMessage.Waiting());
                 // Schedule the response to be applied after this message batch completes
-                pendingAutoResponse = () -> DuelManager.get().handleSoloAutoResponse(duelId, response);
+                pendingAutoResponse = () -> respond.accept(response);
                 // Still pause processing; DuelManager will apply the answer and resume.
                 return AWAIT_RESPONSE;
             }
@@ -153,7 +154,7 @@ public class SoloDuelHandler implements DuelEventListener {
         }
         LOGGER.warn("[Solo AI] Retry {}/{} on {}, re-answering with fallback",
                 retryCount, MAX_AI_RETRIES, lastPrompt.getClass().getSimpleName());
-        pendingAutoResponse = () -> DuelManager.get().handleSoloAutoResponse(duelId, response);
+        pendingAutoResponse = () -> respond.accept(response);
         return AWAIT_RESPONSE;
     }
 
@@ -165,7 +166,7 @@ public class SoloDuelHandler implements DuelEventListener {
     }
 
     private void sendToPlayer(DuelMessage msg) {
-        PacketDistributor.sendToPlayer(player,
+        send.accept(
                 new DuelMessagePayload(MessageSanitizer.forRecipient(msg, HUMAN_PLAYER)));
     }
 
@@ -175,7 +176,7 @@ public class SoloDuelHandler implements DuelEventListener {
      * ({@code generic_duel.cpp:933-977}), which here would blank the human's own cards.
      */
     private void forwardAiPrompt(DuelMessage prompt) {
-        PacketDistributor.sendToPlayer(player, new DuelMessagePayload(prompt));
+        send.accept(new DuelMessagePayload(prompt));
     }
 
     /** The prompt the human is expected to answer; the AI answers its own prompts internally. */
@@ -184,12 +185,7 @@ public class SoloDuelHandler implements DuelEventListener {
 
     @Override
     public void onDuelEnd() {
-        if (winSent) {
-            DuelManager.get().endDuel(duelId);
-        } else {
-            // The engine stopped without MSG_WIN; nobody won, but the client still needs a result.
-            DuelManager.get().finishDuel(duelId, DuelEndPayload.WINNER_DRAW, 0);
-        }
+        complete.accept(winSent);
     }
 
     // ─── AI Auto-Response Logic ───────────────────────────────

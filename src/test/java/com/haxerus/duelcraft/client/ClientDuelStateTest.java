@@ -16,6 +16,131 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ClientDuelStateTest {
 
+    @Test void extraRevealResolvesCandidatesByLocation() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
+                new DuelMessage.ConfirmCard(46986414, 1, LOCATION_EXTRA, 2),
+                new DuelMessage.ConfirmCard(89631139, 1, LOCATION_EXTRA, 0))));
+        assertEquals(89631139, state.candidateCode(new DuelMessage.CardInfo(
+                0, 1, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE)));
+        assertEquals(46986414, state.candidateCode(new DuelMessage.CardInfo(
+                0, 1, LOCATION_EXTRA, 2, POS_FACEDOWN_DEFENSE)));
+        assertEquals(0, state.candidateCode(new DuelMessage.CardInfo(
+                0, 1, LOCATION_EXTRA, 1, POS_FACEDOWN_DEFENSE)));
+    }
+
+    @Test void publicHandTransitionWithUnchangedIdentityMarksHandDirty() {
+        var state = newState();
+        draw(state, 1, 89631139);
+        var visible = new QueriedCard();
+        visible.flags = QUERY_IS_PUBLIC;
+        visible.isPublic = true;
+        state.consumeDirtyFlags();
+        state.applyMessage(new DuelMessage.UpdateCard(1, LOCATION_HAND, 0, visible));
+        assertTrue(state.consumeDirtyFlags().contains(ClientDuelState.DirtyFlag.HAND_1));
+        var hidden = new QueriedCard();
+        hidden.flags = QUERY_IS_PUBLIC;
+        state.applyMessage(new DuelMessage.UpdateCard(1, LOCATION_HAND, 0, hidden));
+        assertTrue(state.consumeDirtyFlags().contains(ClientDuelState.DirtyFlag.HAND_1));
+    }
+
+    @Test void endingPublicEffectHidesKnownOpponentHand() {
+        var state = newState();
+        var card = new ClientCard(89631139, 1, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE);
+        state.hand[1].add(card);
+        var visible = new QueriedCard();
+        visible.flags = QUERY_IS_PUBLIC;
+        visible.isPublic = true;
+        state.applyMessage(new DuelMessage.UpdateCard(1, LOCATION_HAND, 0, visible));
+        assertEquals(89631139, state.handDisplayCode(card));
+        var hidden = new QueriedCard();
+        hidden.flags = QUERY_IS_PUBLIC;
+        state.applyMessage(new DuelMessage.UpdateCard(1, LOCATION_HAND, 0, hidden));
+        assertEquals(0, state.handDisplayCode(card));
+        assertEquals(89631139, card.code);
+    }
+
+    @Test void publicHandQueriesRespectPresenceAndHiddenPrecedenceForBothRecipients() {
+        var owner = newState();
+        var opponent = new ClientDuelState(1, "Opponent", 8000, 8000, 40, 15, 0L);
+        draw(owner, 0, 89631139);
+        draw(opponent, 0, 0);
+        var query = extraQuery(89631139, POS_FACEDOWN_DEFENSE);
+        query.flags |= QUERY_IS_PUBLIC | QUERY_IS_HIDDEN;
+        query.isPublic = true;
+        for (var state : List.of(owner, opponent)) {
+            var packet = (DuelMessage.UpdateCard) MessageSanitizer.forRecipient(
+                    new DuelMessage.UpdateCard(0, LOCATION_HAND, 0, query), state.localPlayer);
+            assertEquals(89631139, packet.card().code);
+            state.applyMessage(packet);
+            assertEquals(89631139, state.handDisplayCode(state.hand[0].getFirst()));
+            // A missing code/visibility field cannot revoke known identity or public permission.
+            var partial = new QueriedCard();
+            partial.flags = QUERY_ATTACK;
+            partial.code = 46986414; // absent flag: this default/stray value is not authoritative
+            state.applyMessage(new DuelMessage.UpdateCard(0, LOCATION_HAND, 0, partial));
+            assertEquals(89631139, state.handDisplayCode(state.hand[0].getFirst()));
+            partial = new QueriedCard();
+            partial.flags = QUERY_CODE;
+            state.applyMessage(new DuelMessage.UpdateCard(0, LOCATION_HAND, 0, partial));
+            assertEquals(89631139, state.handDisplayCode(state.hand[0].getFirst()));
+        }
+        query.isHidden = true;
+        var hidden = (DuelMessage.UpdateCard) MessageSanitizer.forRecipient(
+                new DuelMessage.UpdateCard(0, LOCATION_HAND, 0, query), 1);
+        assertEquals(0, hidden.card().code);
+        assertEquals(0, hidden.card().flags & QUERY_CODE);
+        opponent.applyMessage(hidden);
+        assertEquals(0, opponent.handDisplayCode(opponent.hand[0].getFirst()));
+        assertEquals(89631139, opponent.hand[0].getFirst().code);
+        assertEquals(89631139, owner.handDisplayCode(owner.hand[0].getFirst()));
+    }
+
+    @Test void revealedDeckDuplicatesFollowObjectsThroughResequencingAndShuffle() {
+        var state = newState();
+        var reveal = new DuelMessage.ConfirmCards(0, List.of(
+                new DuelMessage.ConfirmCard(89631139, 1, LOCATION_DECK, 2),
+                new DuelMessage.ConfirmCard(89631139, 1, LOCATION_DECK, 0)));
+        assertTrue(MessageSanitizer.recipientsOf(reveal).includes(0));
+        assertFalse(MessageSanitizer.recipientsOf(reveal).includes(1));
+        state.applyMessage(MessageSanitizer.forRecipient(reveal, 0));
+        var selected = state.deck[1].get(2);
+        move(state, 0, new LocInfo(1, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE),
+                new LocInfo(1, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE));
+        assertSame(selected, state.deck[1].get(1));
+        assertEquals(89631139, state.candidateCode(new DuelMessage.CardInfo(0, 1, LOCATION_DECK, 1, 0)));
+        assertEquals(0, state.candidateCode(new DuelMessage.CardInfo(0, 1, LOCATION_DECK, 0, 0)));
+        assertEquals(0, state.handDisplayCode(state.hand[1].getFirst()));
+        state.applyMessage(new DuelMessage.ShuffleDeck(1));
+        assertEquals(0, selected.code);
+        state.applyMessage(MessageSanitizer.forRecipient(new DuelMessage.ShuffleHand(1, List.of(89631139)), 0));
+        assertEquals(0, state.hand[1].getFirst().code);
+        var reset = newState(); // a new duel owns fresh card objects after logout/reconnect
+        assertEquals(0, reset.candidateCode(new DuelMessage.CardInfo(0, 1, LOCATION_DECK, 1, 0)));
+    }
+
+    @Test void fieldPublicFlagDoesNotAuthorizeAHiddenHandAfterMovement() {
+        var state = newState();
+        move(state, 89631139, new LocInfo(1, 0, 0, 0), new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        var visible = extraQuery(89631139, POS_FACEUP_ATTACK);
+        visible.flags |= QUERY_IS_PUBLIC;
+        visible.isPublic = true;
+        state.applyMessage(new DuelMessage.UpdateCard(1, LOCATION_MZONE, 0, visible));
+        move(state, 0, new LocInfo(1, LOCATION_MZONE, 0, POS_FACEUP_ATTACK),
+                new LocInfo(1, LOCATION_HAND, 0, POS_FACEDOWN_DEFENSE));
+        assertEquals(89631139, state.hand[1].getFirst().code);
+        assertEquals(0, state.handDisplayCode(state.hand[1].getFirst()));
+    }
+
+    @Test void untrackedGeneralRevealDoesNotGuessAPileSlot() {
+        var state = newState();
+        state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
+                new DuelMessage.ConfirmCard(89631139, 1, 0, 0),
+                new DuelMessage.ConfirmCard(46986414, 1, LOCATION_EXTRA, 99))));
+        assertTrue(state.extra[1].stream().allMatch(c -> c.code == 0));
+        assertEquals(2, state.pendingReveals.getFirst().cards().size());
+    }
+
     private static ClientDuelState newState() {
         return new ClientDuelState(0, "Opponent", 8000, 8000, 40, 15, 0L);
     }
@@ -224,7 +349,8 @@ class ClientDuelStateTest {
                 new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
         for (int code : new int[]{22222, 33333, 44444}) {
             move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
-                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0,
+                            state.mzone[0][0].materials.size()));
         }
 
         // Detach the middle material: from.position is the material's index on the host.
@@ -236,6 +362,26 @@ class ClientDuelStateTest {
         assertEquals(0, host.materials.get(0).sequence);
         assertEquals(1, host.materials.get(1).sequence);
         assertEquals(List.of(33333), codesOf(state.grave[0]));
+    }
+
+    @Test
+    void overlayMoveUsesTheEngineDestinationOrder() {
+        var state = newState();
+        draw(state, 0, 11111, 22222, 33333, 44444);
+        move(state, 11111, new LocInfo(0, LOCATION_HAND, 0, 0),
+                new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
+        for (int code : new int[]{22222, 33333, 44444}) {
+            move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0,
+                            state.mzone[0][0].materials.size()));
+        }
+
+        move(state, 44444, new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 2),
+                new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+
+        assertEquals(List.of(44444, 22222, 33333), codesOf(state.mzone[0][0].materials));
+        assertEquals(List.of(0, 1, 2), state.mzone[0][0].materials.stream()
+                .map(card -> card.sequence).toList());
     }
 
     @Test
@@ -356,8 +502,8 @@ class ClientDuelStateTest {
                 new DuelMessage.ConfirmCard(89631139, 0, LOCATION_DECK, 39),
                 new DuelMessage.ConfirmCard(46986414, 0, LOCATION_DECK, 38))));
 
-        assertEquals("Your Deck (top)", state.confirmTitle);
-        assertEquals(2, state.confirmCards.size());
+        assertEquals("Your Deck (top)", state.pendingReveals.getFirst().title());
+        assertEquals(2, state.pendingReveals.getFirst().cards().size());
         assertEquals(89631139, state.deck[0].get(39).code);
         assertEquals(46986414, state.deck[0].get(38).code);
     }
@@ -370,8 +516,8 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.ConfirmExtraTop(1, List.of(
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_EXTRA, 14))));
 
-        assertEquals("Opponent's Extra Deck (top)", state.confirmTitle);
-        assertEquals(1, state.confirmCards.size());
+        assertEquals("Opponent's Extra Deck (top)", state.pendingReveals.getFirst().title());
+        assertEquals(1, state.pendingReveals.getFirst().cards().size());
         assertEquals(89631139, state.extra[1].get(14).code);
     }
 
@@ -382,7 +528,21 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0))));
 
-        assertEquals("Opponent's Revealed Cards", state.confirmTitle);
+        assertEquals("Opponent's Revealed Cards", state.pendingReveals.getFirst().title());
+    }
+
+    @Test
+    void receivedRevealBatchRetainsOrderedImmutableEvents() {
+        var state = newState();
+        var first = new java.util.ArrayList<>(List.of(new DuelMessage.ConfirmCard(89631139, 1, LOCATION_EXTRA, 0)));
+        var second = List.of(new DuelMessage.ConfirmCard(46986414, 1, LOCATION_DECK, 2));
+        state.applyMessage(new DuelMessage.ConfirmCards(0, first));
+        state.applyMessage(new DuelMessage.ConfirmCards(0, second));
+        first.clear();
+        assertEquals(2, state.pendingReveals.size());
+        assertEquals(89631139, state.pendingReveals.removeFirst().cards().getFirst().code());
+        assertEquals(second, state.pendingReveals.getFirst().cards());
+        assertThrows(UnsupportedOperationException.class, () -> state.pendingReveals.getFirst().cards().clear());
     }
 
     @Test
@@ -399,7 +559,7 @@ class ClientDuelStateTest {
         state.applyMessage(new DuelMessage.ConfirmCards(0, List.of(
                 new DuelMessage.ConfirmCard(89631139, 1, LOCATION_HAND, 0),
                 new DuelMessage.ConfirmCard(46986414, 1, LOCATION_HAND, 1))));
-        state.confirmCards = null; // The reveal panel consumes its display list.
+        state.pendingReveals.clear(); // The reveal panel consumes its display list.
         state.applyMessage(sanitized);
         assertEquals(89631139, state.candidateCode(sanitized.cards().get(0)));
         assertEquals(46986414, state.candidateCode(sanitized.cards().get(1)));
@@ -569,7 +729,8 @@ class ClientDuelStateTest {
                 new LocInfo(0, LOCATION_MZONE, 0, POS_FACEUP_ATTACK));
         for (int code : new int[]{22222, 33333, 44444}) {
             move(state, code, new LocInfo(0, LOCATION_HAND, 0, 0),
-                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0, 0));
+                    new LocInfo(0, LOCATION_MZONE | LOCATION_OVERLAY, 0,
+                            state.mzone[0][0].materials.size()));
         }
 
         state.applyMessage(new DuelMessage.RemoveCards(List.of(

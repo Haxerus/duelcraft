@@ -264,14 +264,26 @@ public class LDLibDuelScreen {
         private long bannerUntil;
 
         // Duel log panel
+        private final UIElement rightColumn;
         private final UIElement logPanel;
         private final ScrollerView logList;
+        private final ScrollerView zoneList;
         private final Button logToggle;
         private final Button logClose;
+        private float logScrollOffset;
+        private float zoneScrollOffset;
+        private boolean logAtBottom = true;
+        private int renderedLogEntries;
+        private int rightPanelLayoutRevision;
+        private int logContentRevision;
+        private int zoneContentRevision;
 
         // Overlays
         private final UIElement cardInfoBanner;
         private long cardInfoHideAt;
+        private ClientCard cardInfoOwner;
+        private ClientCard inspectedHandCard;
+        private int inspectedHandCode;
         private final UIElement resultOverlay;
         private final UIElement resultTitle;
         private final UIElement resultReason;
@@ -308,10 +320,14 @@ public class LDLibDuelScreen {
             lpDeltaLabels[1] = byId("lp-delta-1");
             addClassTo(lpDeltaLabels[plr], "lp-left");
             addClassTo(lpDeltaLabels[opp], "lp-right");
+            rightColumn = byId("duel-right-column");
             logPanel = byId("duel-log");
             logList = byId("duel-log-list", ScrollerView.class);
+            zoneList = byId("zone-inspector-list", ScrollerView.class);
             logToggle = byId("log-toggle", Button.class);
             logClose = byId("duel-log-close", Button.class);
+            logList.verticalScroller.setOnValueChanged(value -> rememberLogScroll());
+            zoneList.verticalScroller.setOnValueChanged(value -> zoneScrollOffset = scrollOffset(zoneList));
 
             // ── Field slots (owned by FieldRenderer) ──
             field = new FieldRenderer(ui, state, FieldLayout.fromFlags(state.duelFlags), new FieldRenderer.Callbacks() {
@@ -357,10 +373,13 @@ public class LDLibDuelScreen {
             var canvas = byId("duel-canvas");
             var fieldArea = byId("field-area");
             var controls = byId("duel-controls");
-            fieldArea.addEventListener(UIEvents.LAYOUT_CHANGED, e -> controls.layout(l -> l
-                    .left(fieldArea.getPositionX() - canvas.getPositionX() + fieldArea.getSizeWidth() + 4)
-                    .bottom(canvas.getPositionY() + canvas.getSizeHeight()
-                            - fieldArea.getPositionY() - fieldArea.getSizeHeight() + 8)));
+            fieldArea.addEventListener(UIEvents.LAYOUT_CHANGED, e -> {
+                controls.layout(l -> l
+                        .left(fieldArea.getPositionX() - canvas.getPositionX() + fieldArea.getSizeWidth() + 4)
+                        .bottom(canvas.getPositionY() + canvas.getSizeHeight()
+                                - fieldArea.getPositionY() - fieldArea.getSizeHeight() + 8));
+                refreshRightPanels();
+            });
 
             concedeBtn = byId("concede-btn", Button.class);
 
@@ -385,11 +404,20 @@ public class LDLibDuelScreen {
                 @Override public void onCardClicked(int player, int location, int sequence, UIEvent event) {
                     UIRefresher.this.onCardClicked(player, location, sequence, event);
                 }
-                @Override public void showCardInfo(int code) {
-                    UIRefresher.this.showCardInfo(code);
+                @Override public void showCardInfo(int code, ClientCard owner) {
+                    UIRefresher.this.showCardInfo(code, null, owner);
                 }
                 @Override public void hideCardInfo() {
                     UIRefresher.this.hideCardInfo();
+                }
+                @Override public void clearCardInfo(ClientCard source) {
+                    UIRefresher.this.clearCardInfo(source);
+                }
+                @Override public void onVisibilityChanged() {
+                    UIRefresher.this.refreshRightPanels();
+                }
+                @Override public void restoreScrollAfterContentLayout(float offset) {
+                    UIRefresher.this.restoreZoneAfterContentLayout(offset);
                 }
             });
             var descResolver = new OptionTextResolver(
@@ -438,8 +466,14 @@ public class LDLibDuelScreen {
                     return cards != null ? cards.searchDeclarable(query, opcodes, DECLARABLE_SEARCH_LIMIT) : List.of();
                 }
             });
-            clicks = new ClickDispatcher(ui, state, prompt, canvas,
-                    response -> LDLibDuelScreen.sendResponse(state, response));
+            clicks = new ClickDispatcher(ui, state, prompt, canvas, new ClickDispatcher.Callbacks() {
+                @Override public void sendResponse(Supplier<byte[]> response) {
+                    LDLibDuelScreen.sendResponse(state, response);
+                }
+                @Override public void inspectMaterials(ClientCard host) {
+                    zoneInspector.openMaterials(host);
+                }
+            });
 
             // ── Bind reactive data ──
             bindReactiveData();
@@ -471,6 +505,7 @@ public class LDLibDuelScreen {
             field.wireFieldClicks();
             zoneInspector.wirePileClicks();
             clicks.wireOutsideDismiss();
+            refreshRightPanels();
 
             // Refresh hand/field when card images finish downloading
             CardImageManager images = DuelcraftClient.getCardImageManager();
@@ -541,8 +576,8 @@ public class LDLibDuelScreen {
             bindPileCount(banishedCountLabels[plr], () -> state.banishedCount(plr));
 
             // Refcounted MSG_PLAYER_HINT descs, under the name each LP bar carries.
-            bindPlayerHints(byId("plr-hints", Label.class), plr, cardInfoBanner, logPanel);
-            bindPlayerHints(byId("opp-hints", Label.class), opp, byId("zone-inspector"));
+            bindPlayerHints(byId("plr-hints", Label.class), plr, cardInfoBanner);
+            bindPlayerHints(byId("opp-hints", Label.class), opp, rightColumn);
         }
 
         /** Each standing effect gets its own wrapped paragraph. */
@@ -568,6 +603,7 @@ public class LDLibDuelScreen {
                 if (text.isEmpty()) label.addClass("hidden");
                 else label.removeClass("hidden");
                 positionPanels.run();
+                refreshRightPanels();
             });
         }
 
@@ -622,14 +658,17 @@ public class LDLibDuelScreen {
 
             if (flags.contains(DirtyFlag.PILE_COUNTS)) {
                 field.refreshPiles();
-                zoneInspector.refresh();
             }
 
             if (flags.contains(ClientDuelState.DirtyFlag.PROMPT)) {
                 prompt.rebuild();
                 updatePhaseButtons();
-                zoneInspector.refresh();
             }
+
+            if (flags.contains(DirtyFlag.PILE_COUNTS) || flags.contains(DirtyFlag.PROMPT)
+                    || flags.contains(DirtyFlag.MZONE_0) || flags.contains(DirtyFlag.MZONE_1)
+                    || flags.contains(DirtyFlag.SZONE_0) || flags.contains(DirtyFlag.SZONE_1))
+                zoneInspector.refresh();
 
             // Turn/phase change also affects button visibility (hide on opponent's turn)
             if (flags.contains(DirtyFlag.TURN_PHASE))
@@ -648,8 +687,8 @@ public class LDLibDuelScreen {
                 rebuildLog();
             if (flags.contains(DirtyFlag.WINNER))
                 showResultOverlay();
-            if (flags.contains(DirtyFlag.CONFIRM))
-                zoneInspector.showConfirmCards();
+            if (flags.contains(DirtyFlag.CONFIRM) || flags.contains(DirtyFlag.PROMPT))
+                prompt.refreshReveals();
             updatePromptControls();
         }
 
@@ -673,7 +712,8 @@ public class LDLibDuelScreen {
             container.clearAllScrollViewChildren();
 
             for (int i = 0; i < cards.size(); i++) {
-                int code = cards.get(i).code;
+                ClientCard handCard = cards.get(i);
+                int code = state.handDisplayCode(handCard);
                 int seq = i;
                 var card = new UIElement();
                 card.addClass("card");
@@ -685,7 +725,7 @@ public class LDLibDuelScreen {
                     card.lss("margin", "0 " + right + " 0 " + left);
                 }
 
-                if (isLocal && code != 0) {
+                if (code != 0) {
                     setCardImageBackground(card, code);
                 } else {
                     card.lss("background", CARD_BACK_SPRITE);
@@ -693,7 +733,10 @@ public class LDLibDuelScreen {
 
                 if (isLocal) {
                     card.addEventListener(UIEvents.CLICK, e -> onCardClicked(player, LOCATION_HAND, seq, e));
-                    card.addEventListener(UIEvents.MOUSE_ENTER, e -> showCardInfo(code));
+                }
+                if (code != 0) {
+                    card.addEventListener(UIEvents.MOUSE_ENTER,
+                            e -> showCardInfo(state.handDisplayCode(handCard), handCard));
                     card.addEventListener(UIEvents.MOUSE_LEAVE, e -> hideCardInfo());
                 }
 
@@ -796,7 +839,7 @@ public class LDLibDuelScreen {
             if (resultClose != null) {
                 resultClose.setOnClick(e -> {
                     LDLibDuelScreen.close();
-                    Minecraft.getInstance().setScreen(null);
+                    if (!com.haxerus.duelcraft.client.interaction.PreparationRouting.restoreEditor()) Minecraft.getInstance().setScreen(null);
                 });
             }
             // The pause dialog is itself the confirmation, so its Concede sends straight away.
@@ -818,19 +861,22 @@ public class LDLibDuelScreen {
             if (logToggle != null) {
                 logToggle.setOnClick(e -> {
                     if (logPanel == null) return;
+                    rememberRightPanelScrolls();
                     if (logPanel.hasClass("hidden")) {
-                        if (cardInfoBanner != null) cardInfoBanner.addClass("hidden");
                         logPanel.removeClass("hidden");
                         rebuildLog();
                     } else {
                         logPanel.addClass("hidden");
                     }
+                    refreshRightPanels();
                     e.stopPropagation();
                 });
             }
             if (logClose != null) {
                 logClose.setOnClick(e -> {
+                    rememberRightPanelScrolls();
                     if (logPanel != null) logPanel.addClass("hidden");
+                    refreshRightPanels();
                 });
             }
         }
@@ -840,6 +886,10 @@ public class LDLibDuelScreen {
         /** Rewrites the panel from {@link DuelLog}; only called while it is open. */
         private void rebuildLog() {
             if (logList == null) return;
+            rememberLogScroll();
+            int entryCount = state.duelLog.entries().size();
+            boolean appendOnly = entryCount > renderedLogEntries;
+            boolean followBottom = appendOnly && logAtBottom;
             logList.clearAllScrollViewChildren();
             for (var entry : state.duelLog.entries()) {
                 var line = new Label();
@@ -858,15 +908,75 @@ public class LDLibDuelScreen {
                 if (entry.code() != 0) {
                     int code = entry.code();
                     line.addEventListener(UIEvents.CLICK, e -> {
-                        // The panel and the info banner share the left column, so the panel has to
-                        // step aside for the card it just sent there.
-                        if (logPanel != null) logPanel.addClass("hidden");
                         showCardInfo(code);
                         e.stopPropagation();
                     });
                 }
                 logList.addScrollViewChild(line);
             }
+            renderedLogEntries = entryCount;
+            restoreAfterContentLayout(logList, logScrollOffset, followBottom, ++logContentRevision);
+        }
+
+        private void refreshRightPanels() {
+            if (rightColumn == null) return;
+            int revision = ++rightPanelLayoutRevision;
+            boolean zoneVisible = zoneInspector != null && !byId("zone-inspector").hasClass("hidden");
+            boolean logVisible = logPanel != null && !logPanel.hasClass("hidden");
+            if (zoneVisible || logVisible) rightColumn.removeClass("hidden");
+            else rightColumn.addClass("hidden");
+            if (zoneVisible) restoreAfterViewportLayout(zoneList, zoneScrollOffset, false, revision);
+            if (logVisible) restoreAfterViewportLayout(logList, logScrollOffset, logAtBottom, revision);
+        }
+
+        private void rememberRightPanelScrolls() {
+            if (zoneList != null && !byId("zone-inspector").hasClass("hidden"))
+                zoneScrollOffset = scrollOffset(zoneList);
+            if (logPanel != null && !logPanel.hasClass("hidden")) rememberLogScroll();
+        }
+
+        private void rememberLogScroll() {
+            if (logList == null || logPanel == null || logPanel.hasClass("hidden")) return;
+            logScrollOffset = scrollOffset(logList);
+            logAtBottom = atBottom(logList, logScrollOffset);
+        }
+
+        private static float scrollOffset(ScrollerView list) {
+            return Math.max(0, -list.viewContainer.getTaffyLayout().location().y);
+        }
+
+        private static boolean atBottom(ScrollerView list, float offset) {
+            float range = Math.max(0, list.getContainerHeight() - list.viewPort.getContentHeight());
+            return range - offset <= 1;
+        }
+
+        private void restoreAfterViewportLayout(ScrollerView list, float offset, boolean bottom, int revision) {
+            list.viewPort.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
+                event.currentElement.removeEventListener(UIEvents.LAYOUT_CHANGED, event.currentListener);
+                if (revision == rightPanelLayoutRevision) restoreScroll(list, offset, bottom);
+            });
+            restoreScroll(list, offset, bottom);
+        }
+
+        private void restoreAfterContentLayout(ScrollerView list, float offset, boolean bottom, int revision) {
+            list.viewContainer.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
+                event.currentElement.removeEventListener(UIEvents.LAYOUT_CHANGED, event.currentListener);
+                if (revision == logContentRevision) restoreScroll(list, offset, bottom);
+            });
+        }
+
+        private void restoreZoneAfterContentLayout(float offset) {
+            int revision = ++zoneContentRevision;
+            zoneList.viewContainer.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
+                event.currentElement.removeEventListener(UIEvents.LAYOUT_CHANGED, event.currentListener);
+                if (revision == zoneContentRevision) restoreScroll(zoneList, offset, false);
+            });
+        }
+
+        private static void restoreScroll(ScrollerView list, float offset, boolean bottom) {
+            float range = Math.max(0, list.getContainerHeight() - list.viewPort.getContentHeight());
+            float normalized = range <= 0 ? 0 : bottom ? 1 : Math.min(offset, range) / range;
+            list.verticalScroller.setNormalizedValue(normalized);
         }
 
         private static void addClassTo(UIElement element, String styleClass) {
@@ -917,10 +1027,16 @@ public class LDLibDuelScreen {
                 cardRevealUntil = 0;
             }
 
+            if (inspectedHandCard != null
+                    && (state.handDisplayCode(inspectedHandCard) != inspectedHandCode
+                    || state.cardAt(inspectedHandCard.controller, LOCATION_HAND, inspectedHandCard.sequence) != inspectedHandCard)) {
+                // Revocation wins over the pointer-crossing delay, even while the inspector is hovered.
+                clearCardInfo(inspectedHandCard);
+            }
+
             if (cardInfoHideAt != 0 && now >= cardInfoHideAt
                     && cardInfoBanner != null && !cardInfoBanner.isSelfOrChildHover()) {
-                cardInfoBanner.addClass("hidden");
-                cardInfoHideAt = 0;
+                clearCardInfo();
             }
 
             if (state.pendingModal != null && hintModal != null && hintModal.hasClass("hidden")) {
@@ -1116,13 +1232,20 @@ public class LDLibDuelScreen {
         }
 
         private void showCardInfo(int code) {
-            showCardInfo(code, null);
+            showCardInfo(code, null, null);
         }
 
-        /** {@code onField} is the card object whose hints to list, null when there is none. */
+        /** {@code onField} supplies the card's live hints/stats, or null for an event-only identity. */
         private void showCardInfo(int code, ClientCard onField) {
+            showCardInfo(code, onField, onField);
+        }
+
+        /** {@code owner} permits source-aware clearing without exposing its stale live state. */
+        private void showCardInfo(int code, ClientCard onField, ClientCard owner) {
             if (code == 0 || cardInfoBanner == null) return;
-            if (logPanel != null && !logPanel.hasClass("hidden")) return;
+            cardInfoOwner = owner;
+            inspectedHandCard = onField != null && onField.location == LOCATION_HAND ? onField : null;
+            inspectedHandCode = code;
             cardInfoHideAt = 0;
             cardRevealUntil = 0;   // whatever asks for the banner takes it over from a HINT_CARD reveal
             setCardHints(onField);
@@ -1259,6 +1382,17 @@ public class LDLibDuelScreen {
         private void hideCardInfo() {
             // Allow the pointer to cross the gap to the scrollable description panel.
             cardInfoHideAt = System.currentTimeMillis() + 500;
+        }
+
+        private void clearCardInfo(ClientCard source) {
+            if (cardInfoOwner == source) clearCardInfo();
+        }
+
+        private void clearCardInfo() {
+            if (cardInfoBanner != null) cardInfoBanner.addClass("hidden");
+            cardInfoOwner = null;
+            inspectedHandCard = null;
+            cardInfoHideAt = 0;
         }
 
         private Label findCardCountLabel(String parentId) {

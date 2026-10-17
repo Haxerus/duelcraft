@@ -15,9 +15,8 @@ import java.util.List;
 import static com.haxerus.duelcraft.core.OcgConstants.*;
 
 /**
- * The floating panel that shows pile contents (graveyard, banished, extra deck)
- * or a list of confirmed/revealed cards. Holds its own lifecycle — open/close/refresh —
- * and reacts to PILE_COUNTS and CONFIRM dirty flags so that additions/removals
+ * The floating panel for pile contents (graveyard, banished, extra deck) and Xyz materials.
+ * Owns open/close/refresh and reacts to pile or inspected-host mutations so additions/removals
  * update live without the user reopening the panel.
  */
 public class ZoneInspectorController {
@@ -26,8 +25,11 @@ public class ZoneInspectorController {
     public interface Callbacks {
         void setCardImageBackground(UIElement elem, int code);
         void onCardClicked(int player, int location, int sequence, UIEvent event);
-        void showCardInfo(int code);
+        void showCardInfo(int code, ClientCard owner);
         void hideCardInfo();
+        void clearCardInfo(ClientCard source);
+        void onVisibilityChanged();
+        void restoreScrollAfterContentLayout(float offset);
     }
 
     private final UI ui;
@@ -39,6 +41,8 @@ public class ZoneInspectorController {
     private int inspectedPlayer = -1;
     private int inspectedLocation = -1;
     private String inspectedTitle;
+    private ClientCard inspectedHost;
+    private ClientCard cardInfoOwner;
 
     public ZoneInspectorController(UI ui, ClientDuelState state, Callbacks callbacks) {
         this.ui = ui;
@@ -66,84 +70,104 @@ public class ZoneInspectorController {
     /** Rebuild the inspector list from current state. Safe no-op when hidden. */
     public void refresh() {
         if (inspector == null || inspector.hasClass("hidden")) return;
-        if (inspectedPlayer < 0 || inspectedLocation < 0) return;
+        boolean materials = inspectedHost != null;
+        if (!materials && (inspectedPlayer < 0 || inspectedLocation < 0)) return;
+        if (materials && !isHostOnField(inspectedHost)) {
+            close();
+            return;
+        }
 
         var titleLabel = byId("zone-inspector-title");
         var listElem = byId("zone-inspector-list", ScrollerView.class);
-        if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(inspectedTitle));
+        if (titleLabel instanceof Label lbl) {
+            lbl.setText(materials
+                    ? Component.translatable("duelcraft.duel.materials", inspectedHost.materials.size())
+                    : Component.literal(inspectedTitle));
+        }
         if (listElem == null) return;
+        clearOwnedCardInfo();
 
         int player = inspectedPlayer;
         int location = inspectedLocation;
-        List<ClientCard> cards = getPileCards(player, location);
+        List<ClientCard> cards = materials ? inspectedHost.materials : getPileCards(player, location);
+        float scrollOffset = Math.max(0, -listElem.viewContainer.getTaffyLayout().location().y);
 
         listElem.clearAllScrollViewChildren();
         for (int i = 0; i < cards.size(); i++) {
-            int code = cards.get(i).code;
+            ClientCard inspectedCard = cards.get(i);
+            int code = inspectedCard.code;
             int seq = i;
 
             var card = new UIElement();
             card.addClass("card");
-            if (isActionable(player, location, seq)) card.addClass("selectable");
+            if (materials) card.addClass("material-card");
+            else if (isActionable(player, location, seq)) card.addClass("selectable");
+            if (code == 0) card.addClass("card-back");
             callbacks.setCardImageBackground(card, code);
-            card.addEventListener(UIEvents.CLICK, ev -> {
-                ev.stopPropagation();
-                callbacks.onCardClicked(player, location, seq, ev);
-            });
-            card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
-            card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
+            if (!materials) {
+                card.addEventListener(UIEvents.CLICK, ev -> {
+                    ev.stopPropagation();
+                    callbacks.onCardClicked(player, location, seq, ev);
+                });
+            }
+            if (code != 0) {
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> {
+                    cardInfoOwner = inspectedCard;
+                    callbacks.showCardInfo(code, inspectedCard);
+                });
+                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
+            } else {
+                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> {
+                    clearOwnedCardInfo();
+                    callbacks.hideCardInfo();
+                });
+            }
+            if (!materials && location == LOCATION_REMOVED && inspectedCard.isFaceDown()) {
+                card.addChild(new Label()
+                        .setText(Component.translatable("duelcraft.duel.face_down"))
+                        .addClass("face-down-marker"));
+            }
 
             listElem.addScrollViewChild(card);
         }
+        callbacks.restoreScrollAfterContentLayout(scrollOffset);
     }
 
-    /** Display the reveal/confirm list (consumes state.confirmCards). */
-    public void showConfirmCards() {
-        if (state.confirmCards == null || state.confirmCards.isEmpty()) return;
-        if (inspector == null) return;
-
-        // The reveal is not a pile, so drop the inspection target: a later PILE_COUNTS refresh
-        // would otherwise rebuild the list from whichever pile was open before.
+    /** Open the read-only material list for the exact field card the user inspected. */
+    public void openMaterials(ClientCard host) {
         inspectedPlayer = -1;
         inspectedLocation = -1;
         inspectedTitle = null;
-
-        inspector.removeClass("hidden");
-        var titleLabel = byId("zone-inspector-title");
-        var listElem = byId("zone-inspector-list", ScrollerView.class);
-        if (titleLabel instanceof Label lbl) lbl.setText(Component.literal(state.confirmTitle));
-
-        if (listElem != null) {
-            listElem.clearAllScrollViewChildren();
-            for (var confirmCard : state.confirmCards) {
-                int code = confirmCard.code();
-
-                var card = new UIElement();
-                card.addClass("card");
-                callbacks.setCardImageBackground(card, code);
-                card.addEventListener(UIEvents.MOUSE_ENTER, ev -> callbacks.showCardInfo(code));
-                card.addEventListener(UIEvents.MOUSE_LEAVE, ev -> callbacks.hideCardInfo());
-
-                listElem.addScrollViewChild(card);
-            }
-        }
-
-        state.confirmCards = null;
+        inspectedHost = host;
+        if (inspector != null) inspector.removeClass("hidden");
+        callbacks.onVisibilityChanged();
+        refresh();
     }
 
     private void open(int player, int location, String title) {
         inspectedPlayer = player;
         inspectedLocation = location;
         inspectedTitle = title;
+        inspectedHost = null;
         if (inspector != null) inspector.removeClass("hidden");
+        callbacks.onVisibilityChanged();
         refresh();
     }
 
     private void close() {
+        clearOwnedCardInfo();
         if (inspector != null) inspector.addClass("hidden");
         inspectedPlayer = -1;
         inspectedLocation = -1;
         inspectedTitle = null;
+        inspectedHost = null;
+        callbacks.onVisibilityChanged();
+    }
+
+    private void clearOwnedCardInfo() {
+        if (cardInfoOwner == null) return;
+        callbacks.clearCardInfo(cardInfoOwner);
+        cardInfoOwner = null;
     }
 
     private void bindPileClick(String elementId, String title, int player, int location) {
@@ -167,6 +191,11 @@ public class ZoneInspectorController {
                 || state.pendingPrompt instanceof DuelMessage.SelectBattleCmd)) return false;
         var actions = state.cardActions.get(new ClientDuelState.CardLocation(player, location, sequence));
         return actions != null && !actions.isEmpty();
+    }
+
+    private boolean isHostOnField(ClientCard host) {
+        return (host.location == LOCATION_MZONE || host.location == LOCATION_SZONE)
+                && state.cardAt(host.controller, host.location, host.sequence) == host;
     }
 
     private UIElement byId(String id) {

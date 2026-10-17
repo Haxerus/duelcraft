@@ -1,6 +1,13 @@
 package com.haxerus.duelcraft.core;
 
 import com.haxerus.duelcraft.duel.RefreshSchedule;
+import com.haxerus.duelcraft.duel.MessageSanitizer;
+import com.haxerus.duelcraft.client.ClientDuelState;
+import com.haxerus.duelcraft.duel.message.DuelMessage;
+import com.haxerus.duelcraft.duel.message.LocInfo;
+import com.haxerus.duelcraft.duel.message.MessageParser;
+import com.haxerus.duelcraft.duel.response.ResponseBuilder;
+import com.haxerus.duelcraft.duel.response.ResponseValidator;
 import com.haxerus.duelcraft.duel.message.FieldQuery;
 import com.haxerus.duelcraft.duel.message.QueriedCard;
 import org.junit.jupiter.api.*;
@@ -108,6 +115,217 @@ class OcgCoreTest {
             OcgCore.nDestroyEngine(engine);
             engine = 0;
         }
+    }
+
+    @Test void painfulChoiceRevealsForeignDeckCandidatesByLocation() {
+        try (var game = new VisibilityDuel()) {
+            game.add(74191942, 0, LOCATION_HAND, 0);
+            var next = game.activate(74191942);
+            var own = assertInstanceOf(DuelMessage.SelectCard.class, next);
+            assertEquals(0, own.player());
+            next = game.respond(ResponseValidator.selectCards(own, 4, 2, 0, 3, 1));
+            var choice = assertInstanceOf(DuelMessage.SelectCard.class, next);
+            assertEquals(1, choice.player());
+            game.assertRevealedSelection(choice, LOCATION_DECK);
+            int selectedCode = choice.cards().get(2).code();
+            next = game.respond(ResponseValidator.selectCards(choice, 2));
+            game.finish(next);
+            assertTrue(game.events.stream().anyMatch(m -> m instanceof DuelMessage.Move move
+                    && move.code() == selectedCode && move.from().location() == LOCATION_DECK
+                    && move.to().location() == LOCATION_HAND));
+        }
+    }
+
+    @Test void tridentRevealsOpponentExtraAndShuffleInvalidatesRemainingIdentities() {
+        try (var game = new VisibilityDuel()) {
+            game.add(80159717, 0, LOCATION_MZONE, 0);
+            game.add(67598234, 1, LOCATION_EXTRA, 0);
+            game.add(77637979, 1, LOCATION_EXTRA, 0);
+            game.add(67598234, 1, LOCATION_EXTRA, 0);
+            var cost = assertInstanceOf(DuelMessage.SelectCard.class, game.activate(80159717));
+            assertEquals(LOCATION_MZONE, cost.cards().getFirst().location());
+            var choice = assertInstanceOf(DuelMessage.SelectCard.class,
+                    game.finishChains(game.respond(ResponseValidator.selectCards(cost, 0))));
+            game.assertRevealedSelection(choice, LOCATION_EXTRA);
+            int selectedCode = choice.cards().get(1).code();
+            game.finish(game.respond(ResponseValidator.selectCards(choice, 1)));
+            assertTrue(game.events.stream().anyMatch(m -> m instanceof DuelMessage.Move move
+                    && move.code() == selectedCode && move.to().location() == LOCATION_GRAVE));
+            assertTrue(game.events.stream().anyMatch(m -> m instanceof DuelMessage.ShuffleExtra));
+            assertEquals(2, game.states[0].extra[1].size());
+            assertTrue(game.states[0].extra[1].stream().allMatch(c -> c.code == 0));
+            assertTrue(game.states[1].extra[1].stream().allMatch(c -> c.code != 0));
+        }
+    }
+
+    @Test void ceremonialBellPublicHandTurnsOffAfterItLeavesField() {
+        try (var game = new VisibilityDuel()) {
+            game.add(20228463, 1, LOCATION_MZONE, 0);
+            game.add(89631139, 1, LOCATION_HAND, 0);
+            game.add(12580477, 0, LOCATION_HAND, 0); // Raigeki removes Bell
+            OcgCore.nStartDuel(engine, game.handle);
+            var idle = assertInstanceOf(DuelMessage.SelectIdleCmd.class, game.finishChains(game.pump()));
+            game.assertHandVisibility(true);
+            game.finish(game.activate(idle, 12580477));
+            game.assertHandVisibility(false);
+            assertTrue(game.events.stream().anyMatch(m -> m instanceof DuelMessage.ShuffleHand sh && sh.player() == 1));
+            assertTrue(game.events.stream().anyMatch(m -> m instanceof DuelMessage.Move move
+                    && move.code() == 20228463 && move.to().location() == LOCATION_GRAVE));
+        }
+    }
+
+    /** Real core/script pump with the production refresh and recipient policies; no network or UI. */
+    private static final class VisibilityDuel implements AutoCloseable {
+        final long handle = OcgCore.nCreateDuel(engine, new long[]{42,42,42,42}, DUEL_MODE_MR5,
+                8000,0,0,8000,0,0);
+        final List<DuelMessage> events = new ArrayList<>();
+        final ClientDuelState[] states = {
+                new ClientDuelState(0, "Opponent", 8000,8000,40,0,DUEL_MODE_MR5),
+                new ClientDuelState(1, "Opponent", 8000,8000,40,0,DUEL_MODE_MR5)};
+
+        VisibilityDuel() {
+            assertNotEquals(0, handle);
+            int[] codes = {89631139,46986414,39552864,13039848,43096270};
+            for (int p = 0; p < 2; p++) for (int i = 0; i < 40; i++)
+                OcgCore.nDuelNewCard(engine,handle,p,0,codes[i % codes.length],p,LOCATION_DECK,0,POS_FACEDOWN_DEFENSE);
+        }
+
+        void add(int code, int player, int location, int sequence) {
+            int position = location == LOCATION_MZONE ? POS_FACEUP_ATTACK : POS_FACEDOWN_DEFENSE;
+            OcgCore.nDuelNewCard(engine,handle,player,0,code,player,location,sequence,position);
+            deliver(new DuelMessage.Move(code, new LocInfo(player,0,0,0),
+                    new LocInfo(player,location,sequence,position),0));
+        }
+
+        DuelMessage activate(int code) {
+            OcgCore.nStartDuel(engine, handle);
+            return activate(assertInstanceOf(DuelMessage.SelectIdleCmd.class, finishChains(pump())), code);
+        }
+
+        DuelMessage activate(DuelMessage.SelectIdleCmd idle, int code) {
+            for (int i = 0; i < idle.activatable().size(); i++) {
+                if (idle.activatable().get(i).code() == code)
+                    return finishChains(respond(ResponseValidator.selectCmd(idle, IdleAction.ACTIVATE, i)));
+            }
+            throw new AssertionError("Fixture effect not activatable: " + code);
+        }
+
+        DuelMessage respond(byte[] response) {
+            System.out.println("VISIBILITY response=" + java.util.HexFormat.of().formatHex(response));
+            OcgCore.nDuelSetResponse(engine,handle,response);
+            return pump();
+        }
+
+        DuelMessage finishChains(DuelMessage next) {
+            for (int i = 0; i < 20; i++) {
+                if (next instanceof DuelMessage.SelectChain chain)
+                    next = respond(ResponseValidator.selectChain(chain,-1));
+                else if (next instanceof DuelMessage.SelectPlace place) {
+                    int bit = Integer.numberOfTrailingZeros(~place.field());
+                    next = respond(ResponseBuilder.selectPlace(bit < 16 ? place.player() : 1-place.player(),
+                            bit % 16 < 8 ? LOCATION_MZONE : LOCATION_SZONE,bit % 8));
+                } else return next;
+            }
+            throw new AssertionError("Fixture did not leave chain/place prompts");
+        }
+
+        void finish(DuelMessage next) {
+            assertInstanceOf(DuelMessage.SelectIdleCmd.class, finishChains(next));
+        }
+
+        DuelMessage pump() {
+            for (int i = 0; i < 100; i++) {
+                int status = OcgCore.nDuelProcess(engine,handle);
+                var messages = MessageParser.parse(OcgCore.nDuelGetMessage(engine,handle));
+                for (var message : messages) {
+                    assertFalse(message instanceof DuelMessage.Retry, "Native response rejected");
+                    events.add(message);
+                    for (var refresh : RefreshSchedule.before(message)) refresh(refresh);
+                    deliver(message);
+                    for (var refresh : RefreshSchedule.after(message)) refresh(refresh);
+                }
+                if (status != DUEL_STATUS_CONTINUE) {
+                    assertFalse(messages.isEmpty());
+                    return messages.getLast();
+                }
+            }
+            throw new AssertionError("Core did not reach a prompt");
+        }
+
+        void refresh(RefreshSchedule.Refresh refresh) {
+            if (refresh.isWholeLocation()) {
+                deliver(new DuelMessage.UpdateData(refresh.player(), refresh.location(), FieldQuery.parseLocation(
+                        OcgCore.nDuelQueryLocation(engine,handle,refresh.flags(),refresh.player(),refresh.location()))));
+            } else {
+                deliver(new DuelMessage.UpdateCard(refresh.player(),refresh.location(),refresh.sequence(),FieldQuery.parse(
+                        OcgCore.nDuelQuery(engine,handle,refresh.flags(),refresh.player(),refresh.location(),refresh.sequence(),0))));
+            }
+        }
+
+        void deliver(DuelMessage message) {
+            for (var state : states) {
+                if (!MessageSanitizer.recipientsOf(message).includes(state.localPlayer)) continue;
+                int prompted = switch (message) {
+                    case DuelMessage.SelectCard m -> m.player();
+                    case DuelMessage.SelectIdleCmd m -> m.player();
+                    case DuelMessage.SelectChain m -> m.player();
+                    case DuelMessage.SelectPlace m -> m.player();
+                    default -> -1;
+                };
+                if (prompted >= 0 && prompted != state.localPlayer) continue;
+                var sanitized = MessageSanitizer.forRecipient(message,state.localPlayer);
+                state.applyMessage(sanitized);
+                if (message instanceof DuelMessage.ConfirmCards || message instanceof DuelMessage.SelectCard
+                        || message instanceof DuelMessage.ShuffleHand || message instanceof DuelMessage.ShuffleExtra)
+                    System.out.println("VISIBILITY raw=" + message + " recipient=" + state.localPlayer + " packet=" + sanitized);
+            }
+        }
+
+        void assertRevealedSelection(DuelMessage.SelectCard choice, int location) {
+            var reveal = events.stream().filter(m -> m instanceof DuelMessage.ConfirmCards)
+                    .map(m -> (DuelMessage.ConfirmCards)m).reduce((a,b) -> b).orElseThrow();
+            assertEquals(choice.player(), reveal.player());
+            assertFalse(MessageSanitizer.recipientsOf(reveal).includes(1-choice.player()));
+            var packet = (DuelMessage.SelectCard) MessageSanitizer.forRecipient(choice,choice.player());
+            for (int i = 0; i < choice.cards().size(); i++) {
+                assertEquals(location, choice.cards().get(i).location());
+                assertEquals(0, packet.cards().get(i).code());
+                assertEquals(choice.cards().get(i).code(),states[choice.player()].candidateCode(packet.cards().get(i)));
+                var candidate = choice.cards().get(i);
+                var query = FieldQuery.parse(OcgCore.nDuelQuery(engine,handle,RefreshSchedule.SINGLE_FLAGS,
+                        candidate.controller(),candidate.location(),candidate.sequence(),0));
+                var update = (DuelMessage.UpdateCard) MessageSanitizer.forRecipient(new DuelMessage.UpdateCard(
+                        candidate.controller(),candidate.location(),candidate.sequence(),query),choice.player());
+                assertEquals(0, update.card().code);
+                assertEquals(0, update.card().flags & QUERY_CODE);
+                System.out.println("VISIBILITY candidate index=" + i + " loc=" + candidate.location()
+                        + " seq=" + candidate.sequence() + " rawCode=" + candidate.code() + " packetCode=0"
+                        + " queryFlags=" + Integer.toHexString(query.flags) + " public=" + query.isPublic
+                        + " hidden=" + query.isHidden + " queryPacketCode=" + update.card().code);
+            }
+            assertEquals(0, states[choice.player()].candidateCode(
+                    new DuelMessage.CardInfo(0,1-choice.player(),LOCATION_DECK,0,POS_FACEDOWN_DEFENSE)));
+        }
+
+        void assertHandVisibility(boolean visible) {
+            var query = FieldQuery.parse(OcgCore.nDuelQuery(engine,handle,RefreshSchedule.HAND_FLAGS,1,LOCATION_HAND,0,0));
+            assertEquals(visible, query.isPublic);
+            assertFalse(query.isHidden);
+            for (var state : states) {
+                var packet = (DuelMessage.UpdateCard) MessageSanitizer.forRecipient(
+                        new DuelMessage.UpdateCard(1,LOCATION_HAND,0,query),state.localPlayer);
+                int expected = visible || state.localPlayer == 1 ? 89631139 : 0;
+                assertEquals(expected,packet.card().code);
+                assertEquals(expected == 0 ? 0 : QUERY_CODE,packet.card().flags & QUERY_CODE);
+                assertEquals(expected,state.handDisplayCode(state.hand[1].getFirst()));
+                assertEquals(expected,state.hand[1].getFirst().code);
+                System.out.println("VISIBILITY Bell recipient=" + state.localPlayer + " loc=2 seq=0 rawCode=" + query.code
+                        + " flags=" + Integer.toHexString(query.flags) + " public=" + query.isPublic + " hidden=" + query.isHidden
+                        + " packetCode=" + packet.card().code + " display=" + expected);
+            }
+        }
+
+        @Override public void close() { OcgCore.nDestroyDuel(engine,handle); }
     }
 
     // --- Tests (ordered to form a duel lifecycle) ---

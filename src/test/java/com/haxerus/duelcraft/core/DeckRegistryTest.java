@@ -44,6 +44,13 @@ class DeckRegistryTest {
     }
 
     @Test
+    void loadListRetainsSide(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("complete.ydk"), SIMPLE_YDK + "!side\n42\n");
+
+        assertEquals(List.of(42), new DeckRegistry(dir).loadList("complete").side());
+    }
+
+    @Test
     void loadMissingDeckThrowsIOException(@TempDir Path dir) {
         DeckRegistry registry = new DeckRegistry(dir);
         assertThrows(IOException.class, () -> registry.load("nope"));
