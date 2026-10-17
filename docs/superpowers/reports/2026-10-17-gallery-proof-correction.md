@@ -274,3 +274,9 @@ Additionally opened the 1024 archive's screenshots/gallery_lobby/141_gallery-lob
 Build-only correction-fix-pixels.py samples the deterministic selected Alex perimeter and all letterbox rows outside its unchanged design canvas. The retained red original has 0/130 matching right-edge samples; final 1024 has 130/130, with top/bottom 133/133 and left 130/130. Its 96-pixel outer margins are uniformly Canvas-colored. The diagnostic allows a two-pixel coordinate search around the expected boundary, excludes corners, and is a focused defect probe, not a screenshot golden or substitute for image review. Originals are never rewritten. Native crops are unscaled, with exact source/rectangle mappings under each final archive's review/capture-map.json.
 
 Final independent rereview remains pending. Human aesthetic approval, production migration and the historical focus-restoration limitation remain open. No push or merge.
+
+## Independent final rereview closure
+
+The original whole-change reviewer independently reviewed `c981196..c7e5f0a` and approved all four fixes. It opened the approved lobby reference, retained 1024 failure image and 15 corrected native fullscreens/crops across 1024, 1280 and 1920 cases. Complete borders, quiet letterboxing, metadata accuracy and Change deck padding were confirmed; exact-instance backdrop registration and cleanup were checked against the harness. No introduced breakage was found, and no suites were rerun for review. The exact reviewed image list and earlier per-task reports are retained in `build/gallery-proof/correction-reviews/final-rereview.md`.
+
+The earlier pending and rejected checkpoints above are historical. Current fixture implementation and independent visual review are complete; human aesthetic approval, production migration and the existing production focus-restoration limitation remain separate. Production UI behavior is unchanged. Branch and worktree are retained without merge or push.

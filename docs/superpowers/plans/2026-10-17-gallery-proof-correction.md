@@ -69,7 +69,7 @@ Files: `ui/uitest/gallery_lobby.xml`, `LobbyGalleryScenario.java`, optional narr
 - [x] Archive focused captures and comparison material. Commit, then independent reviewer opens reference plus actual normal/selected/empty/long-roster/Settings images and verdicts C1/C2/C5/C6/C7. Fix visual failures before full verification.
 - [x] Freeze source and run `group:duelcraft_gallery` at 1280×720 and 1920×1080 requested scales 2/3/4, plus 1024×768 scale 2. Archive requested/effective scale, dependency identity and source hashes; clamped combinations are not new effective coverage. Inspect matrix captures for new defects.
 - [x] Run unchanged `collection_layout`, `collection_overflow`, `duel_lobby`, and full `./gradlew.bat test` once. Run archive script tests if tool changes. Verify production defaults/resources unchanged and `git diff --check c5cf505..HEAD` clean.
-- [ ] Update current handoff with functional results, independent visual verdicts, open human review and preserved historical limitations. Whole-change review after tasks; commit verification/docs. Keep branch/worktree, no merge/push.
+- [x] Update current handoff with functional results, independent visual verdicts, open human review and preserved historical limitations. Whole-change review after tasks; commit verification/docs. Keep branch/worktree, no merge/push.
 
 ## Completion
 
@@ -83,6 +83,10 @@ Verification execution is complete on frozen `0ce1a6a`; the final correction rep
 - [x] Freeze runtime source before launch and retain exact hashes. Final manifest: build/gallery-proof/correction-fix-source/manifest.json (266 files). Preserve all seven pre-fix matrix archives.
 - [x] Recheck group:duelcraft_gallery at 1280x720/effective 2, 1024x768/effective 2 and 1920x1080/effective 4, including 1100x800 live resize. All 12 scenario executions and 12,744 checks passed. Open native fullscreens and affected crops; record exact image list and pixel red/green diagnostic in the correction report.
 - [x] Run unchanged production regressions (3/3, 235 checks) and full JUnit once (1113 tests, 1112 passed, one existing skip), recheck source hashes, update handoff/report and retain earlier evidence. Runtime/Gradle ownership released.
-- [ ] Independent scoped final rereview opens actual native references, normal/fractional/large fullscreens and affected crops; approve all four findings before marking visual completion.
+- [x] Independent scoped final rereview opens actual native references, normal/fractional/large fullscreens and affected crops; approve all four findings before marking visual completion.
 
 Human aesthetic approval and production migration remain separate pending gates. The old seven-case counts above describe pre-fix source. No push or merge.
+
+## Final independent review closure
+
+The scoped rereview of `c981196..c7e5f0a` approved all four findings after opening the actual normal, fractional and large captures. Implementation and independent proof review are complete. Final-source verification remains 12,744 Gallery checks, 235 unchanged-production checks and 1,112 passed JUnit tests with one existing skip. Human visual approval and production migration remain pending. Review records are retained locally under `build/gallery-proof/correction-reviews/`.
