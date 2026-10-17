@@ -10,7 +10,6 @@ import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.*;
 import com.lowdragmc.lowdraglib2.utils.XmlUtils;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.fml.ModList;
 import org.lwjgl.glfw.GLFW;
 import java.util.List;
@@ -21,6 +20,12 @@ import java.util.concurrent.CompletableFuture;
 public final class GallerySpecimenScenario implements UIScenario {
     @Override public void configure(ScenarioOptions options) { options.requiresWorld(false); }
     @Override public void define(ScenarioBuilder s) {
+        s.step("preflight Gallery fixture", ctx -> {
+            var result = GalleryPreflight.check(GalleryPreflightScenario.SPECIMEN, GalleryPreflightScenario.REQUIRED);
+            ctx.attach("resource preflight", result.toString());
+            ctx.attach("unchecked owner", "This scenario runtime assertions and agent visual review own any unchecked fixture values");
+            if (!result.errors().isEmpty()) throw new IllegalStateException(result.errors().toString());
+        });
         for (boolean duel : new boolean[]{false, true}) {
             String canvas = duel ? "duel" : "management";
             s.openScreen(canvas + " vocabulary", ctx -> new Specimen(duel ? 960 : 1280, duel ? 540 : 720, "gallery-" + canvas))
@@ -188,7 +193,8 @@ public final class GallerySpecimenScenario implements UIScenario {
             });
         }
         private static ModularUI load(int width, int height, String canvasClass) {
-            var document = XmlUtils.loadXml(ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/uitest/gallery_specimen.xml"));
+            var resource = GalleryPreflightScenario.SPECIMEN;
+            var document = XmlUtils.loadXml(resource);
             if (document == null) throw new IllegalStateException("Missing Gallery specimen");
             var parsed = UI.of(document);
             parsed.rootElement.addClass(canvasClass);
