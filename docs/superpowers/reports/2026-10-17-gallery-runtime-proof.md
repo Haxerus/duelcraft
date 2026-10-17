@@ -149,6 +149,8 @@ The reusable pre-capture audit covers all visible/displayed button text containm
 
 ### Red evidence, visual review and limits
 
+**Test-first ordering deviation:** Only the missing-layout preflight scaffold red preceded the initial seam/resource draft. The complete behavior/geometry scenario was filled out afterward, so the first Task 4 checklist item is left open for its missed ordering requirement. Implementation acceptance and the fresh matrix are complete; this is a procedural deviation, not missing runtime coverage. The later Side-heading, Collapse-height and expanded-filter fixes have the actual retained red/green evidence described below.
+
 Retained red galleries: `task4-red-missing-layout` (0/1 expected missing-resource preflight); `task4-textfit-red` (81/83, Side heading needs 206.67 units vs 190 available at size 20); `task4-toggle-height-red` (117/119, inherited Collapse height 24 cannot contain its 28-unit label); `task4-all-text-red` (3040/3041, expanded Close filters text 112 units exceeds width 104). Earlier interaction/geometry passes and the caption-removal review are retained separately; interrupted matrix launches are incomplete evidence and are not counted in the reviewed matrix.
 
 Fixture-only measured exceptions are recorded in the [style guide](../specs/2026-10-17-gallery-style-guide.md#task-4-collection-proof-measurements): Side heading 18, Collapse height 32, Import/export width 160, Filters width 128, four Standard/three Large columns in the half-width lower sections. Main remains 10/8 columns; browser remains four columns, 74×108 cards, 128-unit virtual rows and compact 10-unit captions. Permanent search-help and export-folder captions are omitted/hidden; all required IDs remain.
