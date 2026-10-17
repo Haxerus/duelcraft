@@ -176,3 +176,56 @@ Departures from HTML are explicit: Minecraft font; retained production captions 
 ## Self-review and handoff
 
 Changed only the permitted renderer seam, Gallery fixtures/styles/assertions, guide and correction progress/report docs. Read the diff; native defaults and all production XML/LSS, behavior, network, policy, translations, JNI and dependencies remain unchanged. Every added style targets an explicit fixture component or semantic action role. Existing reports are preserved. git diff --check passes. Review the additional shared native-disabled changes with C1 and the one-line collection text override before the final matrix. Retain the historical focus-restoration gap and collection fractional-scale one-pixel border observation. No push/merge. Runtime ownership is released; independent visual review is the next step.
+## Final correction verification (2026-10-17)
+
+Functional verification passed on frozen runtime source `0ce1a6acf99584adcebfb73cd7e9b5b998df1af2`. Visual proof is **not complete**: the 1024×768 case has missing control/card outlines and a prominent Minecraft title-screen backdrop outside the fixed 16:9 canvas. Whole-change review must assess that finding before acceptance. Human approval and production migration remain pending. No runtime source changed during this verification.
+
+Independent focused reviews are retained in `.superpowers/sdd/2026-10-17-gallery-proof-correction/task-{1,2,3}-review.md`: Task 1 approved C1/C2/C7, Task 2 approved C1–C4/C7, and Task 3 approved C1/C2/C5/C6/C7 at 1280×720/effective 2. Task 3 includes the shared native-disabled owner fix and collection primary-text override. The small Change deck horizontal padding difference is nonblocking; no source churn was made for it. These focused approvals do not approve the later 1024 finding.
+
+### Frozen matrix and actual viewports
+
+Each case ran `./gradlew.bat runClient '-PldTest=group:duelcraft_gallery' -PldTestWindow=<window> -PldTestGuiScale=<request> -PskipNative`, with `GRADLE_USER_HOME=C:/Users/haxer/.gradle`. Each original report/screenshots/log was archived before the next launch under `build/gallery-proof/correction-final-gallery-<window>-s<request>`; matching browsable galleries are under `build/ui-gallery/`. All seven cases passed **4/4 scenarios, 4248/4248 checks, 1037 steps, 118 captures** each: **28 scenario executions, 29,736 checks, 7,259 steps, 826 captures**, no failed/error/skipped checks or retries.
+
+| Requested framebuffer | Requested scale | Live effective scale | Live GUI | Scenario duration |
+|---|---:|---:|---|---:|
+| 1280×720 | 2 | 2 | 640×360 | 112100 ms |
+| 1280×720 | 3 | 3 | 427×240 | 101072 ms |
+| 1280×720 | 4 | 3 | 427×240 | 104908 ms |
+| 1920×1080 | 2 | 2 | 960×540 | 114600 ms |
+| 1920×1080 | 3 | 3 | 640×360 | 106026 ms |
+| 1920×1080 | 4 | 4 | 480×270 | 107134 ms |
+| 1024×768 | 2 | 2 | 512×384 | 100575 ms |
+
+`build/gallery-proof/correction-final-verified-summary.json` and each `verified-metadata.json` derive actual per-scenario viewport attachments, including framebuffer, GUI and effective scale. All non-resize steps match the driver request; no group resize leakage. The collection's intentional 1100×800 live resize temporarily clamps requested 4 to effective 3 and restores 4 afterward at 1920×1080. Requested 1280 scale 4 duplicates effective 3, not new effective-scale coverage.
+
+The specimen's attachment prefix has a stale literal `requestedWindow=1280x720 requestedScale=2`. It is not request evidence. Driver metadata plus live `configuredScale`, window/framebuffer/GUI/effective fields establish the table above. Original reports remain unmodified; original driver convenience `viewports` arrays were empty, and the separate verified summaries supply the extracted evidence. This metadata issue remains a minor whole-change review item.
+
+Frozen manifest `build/gallery-proof/correction-final-source/manifest.json` covers 265 main Java/resource/build-property files, including native resources; SHA256 `2DBE9699A8C6FCC947D9A20B3A95C6AFE6014912E748853FB308E4C6B0D64B5A`. All hashes matched before each launch and after final tests. LDLib2 `2.2.39.a` runtime jar SHA256 `563F4D2A60C5ACF63992BAB9917045A35B740BB543C134BFDBFAA8DE64DF6F46` was retained/rechecked. Runtime source and dependencies stayed frozen. Build-only driver/metadata scripts are retained beside the evidence.
+
+### Native visual inspection and unresolved acceptance
+
+Opened the approved `correction-reference/collection-{full,surface}.png` and `lobby-{full,settings}.png` again. In **each of seven** matrix archives opened these exact native images (37 matrix images total):
+
+- `screenshots/gallery_collection/28_gallery-collection-normal.png`
+- `screenshots/gallery_collection/676_gallery-collection-live-resize.png`
+- `screenshots/gallery_lobby/41_gallery-lobby-selected.png`
+- `screenshots/gallery_lobby/74_gallery-lobby-rule-popup.png`
+- `screenshots/gallery_specimen/135_gallery-duel.png`
+
+Additionally opened the 1024 archive's `screenshots/gallery_lobby/140_gallery-lobby-empty.png` and `161_gallery-lobby-long-roster.png`. Each archive's `visual-inspection.json` lists the exact inspected files and findings. Higher-size cases preserve composition, readable hierarchy, controls and aligned native popup. Collection live resize retains fractional-scale outline loss already noted in Task 2. At 1024×768, several header buttons reduce to partial underline/side fragments, **the selected Alex card loses its whole right edge**, and the Minecraft title/logo is prominent outside the canvas. Text and routed state remain functional, but passing geometry is not visual approval. Do not bless this capture as an accepted golden or describe this solely as tiny one-pixel loss.
+
+Exact unresolved native capture:
+
+![1024×768 selected lobby: missing button and selected-card outlines, with prominent title backdrop](../../../build/gallery-proof/correction-final-gallery-1024x768-s2/screenshots/gallery_lobby/41_gallery-lobby-selected.png)
+
+[Open original 1024 capture](../../../build/gallery-proof/correction-final-gallery-1024x768-s2/screenshots/gallery_lobby/41_gallery-lobby-selected.png). Parent independently opened this exact image and requested whole-change assessment; no corrective runtime edit is authorized during this frozen run.
+
+### Unchanged production scenarios and full JUnit
+
+`./gradlew.bat runClient '-PldTest=collection_layout,collection_overflow,duel_lobby' -PldTestWindow=1280x720 -PldTestGuiScale=2 -PskipNative` exited 0: **3/3 scenarios, 235/235 checks, 423 steps, 13 captures, 38492 ms**. Per scenario: collection_layout 89 checks, collection_overflow 88, duel_lobby 58. Archive: `build/gallery-proof/correction-final-production-regressions`; browsable HTML: `build/ui-gallery/correction-final-production-regressions/index.html`. Opened native `collection_layout/105_collection-standard.png`, `collection_overflow/78_collection-large-expanded.png`, `duel_lobby/45_m5-lobby-idle.png`, and `duel_lobby/17_m5-rule-dropdown.png` under that archive's screenshots directory. Original gray production surfaces and text-only player rows remain intact.
+
+`./gradlew.bat test` ran **once**, actually executed the test task, exited 0 (`BUILD SUCCESSFUL in 2m 5s`): **72 suites, 1113 tests, 1112 passed, zero failures/errors, one skip**. The existing `DeckExportServiceTest.rejectsSymlinkTargetWithoutChangingOutsideFile()` skip reports Windows symlink creation unavailable because the client lacks the required privilege. Fresh XML/HTML retained as `correction-final-junit-results` / `correction-final-junit-html`; log and exact summary: `correction-final-junit.log` / `correction-final-junit-summary.json`, all under `build/gallery-proof`.
+
+No dirty-layout or flat-image warnings in the seven matrix launches or unchanged scenarios. Generic Minecraft/NeoForge resource, command, mipmap, sound/shader and Gradle warnings remain in original logs; this is not a warning-free claim. Preflight typo-property/`--color` DEBUG messages are deliberate negative checks. Existing production focus restoration remains unmet and unchanged. Production XML/LSS, navigation/network/policy remain unchanged; the narrow renderer seam defaults to the original text row. `src/test` is unchanged from frozen source; `git diff --check c5cf505..HEAD` passed. Archive tooling was unchanged, so no extra tool test run was needed.
+
+Runtime/Gradle ownership is released after this documentation handoff. Whole-change review is next; overall visual completion stays open for the 1024 finding. No merge or push.
