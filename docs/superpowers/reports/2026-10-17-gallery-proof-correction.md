@@ -105,3 +105,74 @@ Departures from HTML are explicit: Minecraft raster font, editable framed title,
 Changed only CollectionGalleryScenario.java, gallery_collection.xml, four fixture-only PNGs, correction reports and progress checkboxes. Production resources, controllers, routing/policy/networking, translations, JNI and dependencies are unchanged. Reused existing texture/controller seams and Task1 diagnostics; no abstraction or broad native-button selector was added. The count-only selector and explicit primary text color fix issues found by actual image review rather than weakening assertions. git diff --check passes. Temporary import teardown still deletes only its own allocated file.
 
 Runtime ownership is released after this task; no Gradle/client process remains owned by the implementer. Independent review is the next step; human approval and Task3 matrix/full-suite remain open. No push/merge.
+
+
+# Task 3 — Lobby composition correction (focused implementation)
+
+Status: focused implementation and self-review complete. Independent C1/C2/C5/C6/C7 review is next; human approval, final matrix, unchanged production scenarios and full JUnit remain deferred as instructed. Runtime ownership is released. Task 2 independent review is approved and its checklist is marked; the known fractional-scale one-pixel collection border loss remains for the final matrix.
+
+## Changes and scope
+
+The normal fixture uses deterministic Alex, Rowan and Mira cards in a centered horizontal row. Each real selectable Button has a 76-unit circular initial, separate 20-unit name and 14-unit availability text; the selected card has a gold edge and explicit checkmark beside Available. The controller owns IDs, binding and selected target, and recreates the same card structure after settings and selection updates. Invite is centered beneath the row. Change deck and Settings are grouped at the upper right; Home, Help and Close remain accessible at the left. The bottom strip has local Blue-Eyes artwork, the real active Dragon study summary (40/0/2), and real current rule/options.
+
+Added only the permitted package-private BiFunction<Target,Boolean,Button> fixture overload and renderer field in DuelLobbyScreen. All existing factories delegate to targetRow, whose text is exactly the original target name plus optional two spaces/checkmark. IDs/classes/binding remain in the original update loop. Production resources, navigation, input semantics, networking, policy and controllers are unchanged; no resource-name gating or screenshot-time replacement.
+
+Zero players hides an unowned fixture wrapper, so controller setDisplay cannot expose empty native scroller chrome. One player retains its centered avatar/card identity. Eighteen players wrap three cards per row in the same bounded central scroller; routed wheel input reaches the last row and a real click selects Player 18. Invite/deck/rule controls remain visible. The renderer never falls back to text rows.
+
+Settings is a 382-unit full-height right sheet with aligned label/control pairs and paired hand/draw fields. The Gallery-only rule popup uses the same pinned-runtime alignment correction as CollectionController: replace the default dialog LAYOUT_CHANGED clamp listener, position in root layout coordinates, and avoid mutations when already aligned. The correction lives entirely in LobbyGalleryScenario. No production focus-restoration fix: baseline and Gallery still record the initiator restoration requirement as UNMET, while asserting hidden field focus clears.
+
+Native disabled styling was a shared-owner issue exposed by final image review: gallery.lss styled only manual gallery-disabled, and the specimen masked native setActive(false) with that manual class. Per controller authorization, the shared role now aliases gallery-action.__disabled__, the specimen removes that masking class, and GalleryVisualAssertions.disabled verifies real native state, subdued fill/readable text and centering on both canvases and real pending Invite. Explicit pending roles retain amber precedence. The two existing primary text ID overrides (lobby Invite and collection Use for duels) each gain one native-disabled text override. This is the only additional Task 2 XML change; its composition/controller is unchanged.
+
+Native Selector intentionally hides popup arrows: source C:/Users/haxer/Documents/Programming/Modding/LDLib2/src/main/java/com/lowdragmc/lowdraglib2/gui/ui/elements/Selector.java:203–206. Popup checks preserve those hidden native arrows, thin track/thumb, native thumb texture and exclusion from gallery-action. The visible roster retains the generic compact-arrow/native-texture audit. No broad button selector was added.
+
+## TDD and command results
+
+All runs used GRADLE_USER_HOME=C:/Users/haxer/.gradle. Initial sandbox wrapper lock access failed; normal requested escalation succeeded, with no approval rejection or unresolved permission block.
+
+Initial RED, before composition implementation:
+`./gradlew.bat runClient -PldTest=gallery_lobby -PldTestWindow=1280x720 -PskipNative`
+
+Retained correction-lobby-red: 186/203 checks, 17 expected composition failures, 128 steps, 0/1 scenarios, Gradle exit 1. Failures demonstrated full-width vertical text rows, missing avatar/name/availability components, off-center Invite and absent artwork. This is runtime red evidence, not a static expectation.
+
+Each run was archived before the next launch overwrote build/ldlib2-uitest:
+
+- v1: 225/229, four failures. Native review exposed Button default row direction causing child overflow and incorrect hits, unsupported image syntax, popup offset/dirty loop. Fixed explicit card column, sprite texture and fixture popup alignment.
+- v2: 225/227, two failures, rejected 1×1 framebuffer/flat images. Added fixture-only iconified/1×1 window recovery using requested dimensions and an explicit reviewable-framebuffer check. No claim based on these captures.
+- v3: 266/268, two long-roster endpoint/click failures. Native 1280×720, popup correctly aligned, zero dirty warnings. Native review also caught collapsed title width and insufficient viewport-background specificity.
+- v4: 284/285, one overly generic popup-arrow assertion. Confirmed native Selector hides its arrows; replaced with popup-specific native contract, preserved the visible roster audit. Image review caught zero-height scroller chrome; hiding its fixture wrapper fixes it.
+- v5: 283/283, 161 steps, 13 captures, 1/1, 18936 ms, exit 0. All functional lobby checks passed. Image review exposed the real disabled action still looking enabled; retained as pre-native-disabled evidence.
+
+Final frozen GREEN:
+`./gradlew.bat runClient '-PldTest=gallery_specimen,gallery_lobby' -PldTestWindow=1280x720 -PskipNative`
+
+v6: 599/599 checks, zero failures/errors, 357 steps, 103 captures, 2/2 scenarios, 34364 ms, Gradle exit 0 / BUILD SUCCESSFUL. Lobby 16172 ms; specimen 15884 ms. Includes native disabled regression on both canvases, real pending Invite, selected target/RUSH rule dispatch, invalid LP gating, real first/middle/scrolled-last rule choices, eighteen Tab traversals inside Settings, Escape popup-before-sheet, hidden field input clearing, zero/one/long roster and preserved card identity after controller updates. Existing specimen activation, pending duplicate gating, failure, modal, selector, hover/press/focus and scroller checks passed. No dirty-layout or flat-capture warnings in v6. Normal Minecraft/NeoForge/bootstrap/shader warnings remain; output is not claimed pristine.
+
+Actual v6 native window/framebuffer 1280×720, GUI 640×360, requested/effective scale 2. Management design 1280×720/root scale 0.5; specimen duel design 960×540/root scale 0.6666667. Recovery diagnostic iconified=0/framebuffer=1280×720 in v6. Full matrix and full JUnit have not been run during this implementation stage.
+
+## Exact source and evidence
+
+Base 7a732b772f2596a3fba706d53eb69cbf711a7ea0 plus frozen v6 source. All eight changed source/resource files, unchanged local artwork, exact SHA256 hashes and base identity were copied before the final launch to build/gallery-proof/correction-lobby-v6-source; the raw archive also contains source/. No source edits followed that freeze; only documentation/proof packaging followed.
+
+DuelLobbyScreen SHA256 9DEC9D2333B4BF1E18F3D8131D6A702F5B06C98B7A1F661203193002E33D1550; LobbyGalleryScenario 2BF04627B571534F7466C6E417A87FC61B9995BB25CFCF06EB24F1BBA7F24117; gallery_lobby.xml 3606CCD113E18DCDB5C0167247BAABC66FAA7B2F574E838D1FF386965BAB16DA. Remaining exact hashes are in source/sha256.txt, including shared LSS, assertions, specimen Java/XML, the single collection XML override and reused artwork.
+
+LDLib2 runtime 2.2.39.a; runtime jar SHA256 563F4D2A60C5ACF63992BAB9917045A35B740BB543C134BFDBFAA8DE64DF6F46. Report records the exact Gradle-cache codeSource. Raw final report/original screenshots/log: build/gallery-proof/correction-lobby-v6. Navigable original-report gallery: build/ui-gallery/correction-lobby-v6/index.html. Earlier red/rejected runs remain separate; none is an accepted golden.
+
+## Actual visual self-review
+
+Read docs/mockups/ui-redesign/gallery.html and the Gallery guide. Opened exact approved correction-reference/lobby-full.png, lobby-surface.png, lobby-actions.png and lobby-settings.png before implementation. Opened diagnostic v1/v3/v4 captures and all final compact images below under build/gallery-proof/correction-lobby-v6/review:
+
+- normal-full.png; selected-full.png; empty-full.png; one-full.png; long-roster-full.png
+- settings-full.png; rule-popup-full.png; invalid-settings.png; pending-full.png
+- actions.png; deck-strip.png; roster-scrollbar.png
+- native-disabled-management.png; native-disabled-duel.png
+- specimen-management-full.png; specimen-duel-full.png; reference-runtime-pair.png
+
+capture-map.txt maps every copy/crop to its original and native rectangle. The comparison pair places unscaled original reference/runtime images side by side below a 32-pixel annotation band; previews may scale it. No screenshot mutation/repainting, resizing or online artwork dependency.
+
+C1 self-review: ordinary action labels centered and unclipped; disabled real actions are visibly subdued/readable, both native-disabled crops centered, explicit pending Save still amber. C2: roster arrows distinguishable and compact with thin track/thumb; popup retains native hidden arrows/thin thumb, no action rectangles applied internally. C5: normal horizontal avatars/name/Available, centered Invite, upper-right deck/settings, lower real deck/art/options strip. C6: empty region has no nested panel/chrome, one centered avatar, long roster retains three-card rows and selected last identity; pending visibly disables the real action. C7 exact reference/capture/deviation record supplied. Independent visual verdict is still required.
+
+Departures from HTML are explicit: Minecraft font; retained production captions Invite a player / Invite / MR5 and complete LP/hand/draw wording; counts share the production multiline deck-summary text at size 20; no fabricated browser global navigation; Home/Help/Close remain in the local header. Footer is anchored to the 720-unit canvas. The Settings sheet uses the existing single top-close action, with no duplicate Done; seed placeholder remains native Empty. No pixel-perfect browser font, human aesthetic approval, server-derived availability or real remote roster is claimed; the names/availability/content are deterministic fixture data. Existing collection missing-art stress remains separate.
+
+## Self-review and handoff
+
+Changed only the permitted renderer seam, Gallery fixtures/styles/assertions, guide and correction progress/report docs. Read the diff; native defaults and all production XML/LSS, behavior, network, policy, translations, JNI and dependencies remain unchanged. Every added style targets an explicit fixture component or semantic action role. Existing reports are preserved. git diff --check passes. Review the additional shared native-disabled changes with C1 and the one-line collection text override before the final matrix. Retain the historical focus-restoration gap and collection fractional-scale one-pixel border observation. No push/merge. Runtime ownership is released; independent visual review is the next step.

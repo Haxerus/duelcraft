@@ -229,6 +229,7 @@
         #inspector-art { height: 212; }
         #inspector-art .inspector-card { width: 140; height: 204; }
         #activate-deck text { text-color: #211c2a; }
+        #activate-deck.__disabled__ text { text-color: #b8afbe; }
         #main-count { font-size: 18; adaptive-width: false; vertical-align: center; }
 
         #sort-deck { width: 76; }

@@ -31,6 +31,7 @@ public final class GallerySpecimenScenario implements UIScenario {
             s.openScreen(canvas + " vocabulary", ctx -> new Specimen(duel ? 960 : 1280, duel ? 540 : 720, "gallery-" + canvas))
              .awaitModularUI().ticks(3)
              .step("component centering and scroller contracts", ctx -> {
+                 GalleryVisualAssertions.disabled(ctx, "#gallery-disabled");
                  GalleryVisualAssertions.control(ctx, "#gallery-action");
                  GalleryVisualAssertions.control(ctx, "#gallery-confirm");
                  GalleryVisualAssertions.scroller(ctx, "#gallery-rows");

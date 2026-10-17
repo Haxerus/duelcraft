@@ -44,6 +44,14 @@ public final class GalleryVisualAssertions {
         DuelUiAssertions.textFits(ctx, text);
     }
 
+    public static void disabled(TestContext ctx, String selector) {
+        var button = ctx.el(selector).as(Button.class);
+        ctx.check(selector + " native disabled state", !button.isActive() && button.getClasses().contains("__disabled__")
+                && !button.getClasses().contains("gallery-disabled"));
+        ctx.check(selector + " readable native disabled fill/text", button.getButtonStyle().baseTexture() instanceof RectTexture rect
+                && rect.getColor() == 0xff2b2233 && button.text.getTextStyle().textColor() == 0xffb8afbe);
+        control(ctx, selector);
+    }
     public static void scroller(TestContext ctx, String selector) {
         var scroll = ctx.el(selector).as(ScrollerView.class).verticalScroller;
         boolean duel = !ctx.all(".gallery-duel").isEmpty();

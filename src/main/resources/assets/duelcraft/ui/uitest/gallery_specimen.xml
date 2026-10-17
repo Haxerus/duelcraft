@@ -20,7 +20,7 @@
                     <label>Deck name</label><text-field id="gallery-name" />
                     <label>Rule preset</label>
                     <selector id="gallery-selector" />
-                    <button id="gallery-disabled" class="gallery-action gallery-disabled" text="Unavailable" />
+                    <button id="gallery-disabled" class="gallery-action" text="Unavailable" />
                     <button id="gallery-save" class="gallery-action gallery-primary" text="Save" />
                     <label id="gallery-feedback" class="gallery-warning">Ready to save</label>
                     <button id="gallery-confirm" class="gallery-action gallery-dense" text="Delete saved copy…" />

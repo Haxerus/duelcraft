@@ -15,6 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import java.util.*;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -29,6 +30,7 @@ public final class DuelLobbyScreen extends ManagementScreen {
     private final ClientPreparationState preparation;
     private final DuelLobbyController controller;
     private final boolean connected;
+    private final BiFunction<Target, Boolean, Button> targetRenderer;
     private final Runnable unsubscribe;
     private ClientCollectionState.View collection;
     private List<Target> targets;
@@ -39,8 +41,9 @@ public final class DuelLobbyScreen extends ManagementScreen {
 
     private DuelLobbyScreen(String layout, ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
                             Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
-                            Consumer<ScreenRoute> navigate, boolean connected) {
+                            Consumer<ScreenRoute> navigate, boolean connected, BiFunction<Target, Boolean, Button> targetRenderer) {
         super(layout, "Duel");
+        this.targetRenderer = targetRenderer;
         this.preparation = preparation; this.collection = collection; this.targets = targets; this.connected = connected;
         controller = new DuelLobbyController(preparation::view, command -> {
             feedback = "";
@@ -87,19 +90,29 @@ public final class DuelLobbyScreen extends ManagementScreen {
     }
     public static DuelLobbyScreen create() {
         var screen = new DuelLobbyScreen("duel_lobby", DuelcraftClient.preparation(), DuelcraftClient.getCollectionClient().state().view(),
-                online(), DuelcraftClient.preparation()::request, DuelcraftScreens::request, true);
+                online(), DuelcraftClient.preparation()::request, DuelcraftScreens::request, true, DuelLobbyScreen::targetRow);
         if (!DuelcraftScreens.managementBlocked()) screen.refreshCollection();
         return screen;
     }
     public static DuelLobbyScreen create(ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
                                          Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
                                          Consumer<ScreenRoute> navigate) {
-        return new DuelLobbyScreen("duel_lobby", preparation, collection, targets, send, navigate, false);
+        return new DuelLobbyScreen("duel_lobby", preparation, collection, targets, send, navigate, false, DuelLobbyScreen::targetRow);
     }
     static DuelLobbyScreen createFixture(String layout, ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
                                           Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
                                           Consumer<ScreenRoute> navigate) {
-        return new DuelLobbyScreen(layout, preparation, collection, targets, send, navigate, false);
+        return new DuelLobbyScreen(layout, preparation, collection, targets, send, navigate, false, DuelLobbyScreen::targetRow);
+    }
+    static DuelLobbyScreen createFixture(String layout, ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
+                                          Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
+                                          Consumer<ScreenRoute> navigate, BiFunction<Target, Boolean, Button> targetRenderer) {
+        return new DuelLobbyScreen(layout, preparation, collection, targets, send, navigate, false, targetRenderer);
+    }
+    private static Button targetRow(Target target, boolean selected) {
+        var row = new Button();
+        row.setText(Component.literal(target.name() + (selected ? "  ✓" : "")));
+        return row;
     }
     public static void clearForm() { form.target = null; form.rule = DuelRule.MR5; form.lp = "8000"; form.hand = "5"; form.draw = "1"; form.seed = ""; }
     private void acknowledge() { controller.acknowledge(); }
@@ -215,8 +228,8 @@ public final class DuelLobbyScreen extends ManagementScreen {
         if (idle) {
             var list = (ScrollerView) element("lobby-players"); list.clearAllScrollViewChildren();
             for (var target : targets) {
-                var row = new Button(); row.setId("lobby-player-" + target.id()); row.addClass("player-row");
-                row.setText(Component.literal(target.name() + (target.id().equals(form.target) ? "  ✓" : "")));
+                var row = targetRenderer.apply(target, target.id().equals(form.target));
+                row.setId("lobby-player-" + target.id()); row.addClass("player-row");
                 bind(row, () -> { form.target = target.id(); update(); });
                 list.addScrollViewChild(row);
             }
