@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ldlib2-ui>
+    <stylesheet location="ldlib2:lss/gdp.lss" />
+    <stylesheet location="duelcraft:lss/gallery.lss" />
+    <style>
+        #lobby-root { width: 1280; height: 720; }
+        #lobby-canvas { width: 100%; height: 100%; padding-all: 24; }
+        #lobby-panel { width: 100%; height: 100%; gap-all: 16; }
+        .row { flex-direction: row; gap-all: 12; align-items: center; }
+        .grow { flex: 1; min-width: 0; min-height: 0; }
+        .wrap { width: 100%; text-wrap: wrap; adaptive-height: true; }
+        #lobby-canvas button { min-width: 120; }
+        #lobby-canvas #lobby-help { width: 40; min-width: 40; }
+        #lobby-body { flex: 1; min-height: 0; gap-all: 12; }
+        #lobby-left { display: none; }
+        #lobby-right { flex: 1; min-height: 0; width: 100%; }
+        #lobby-right > .__scroller_view_view-port__ > .__scroller_view_view-container__ { gap-all: 12; }
+        #lobby-players { height: 320; width: 100%; }
+        .player-row { width: 100%; height: 40; margin-bottom: 4; }
+        #lobby-hands button, #lobby-first-choice button { flex: 1; }
+        #lobby-footer { flex-direction: row; align-items: center; gap-all: 12; height: 64; padding-all: 8; }
+        #lobby-deck { width: 440; }
+        #lobby-options { flex: 1; }
+        #lobby-actions { height: 48; }
+        #management-help, #lobby-settings-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC19151f); z-index: 90; }
+        .dialog-panel { width: 560; padding-all: 24; gap-all: 8; background: rect(#FF34273e, 0, 1, #FF8c7495); }
+        #settings-error { height: 32; }
+        .keyboard-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
+        .keyboard-focus text { text-color: #efd18e; }
+        #lobby-root .__selector_dialog__ { z-index: 95; background: rect(#FF19151f, 0, 1, #FF8c7495); }
+        #lobby-root .__selector_dialog__ label { height: 28; font-size: 16; text-color: #eee5d4; }
+        #lobby-root .__selector_dialog__ text { font-size: 16; text-color: #eee5d4; }
+        #lobby-root .__selector_preview__ label { height: 28; }
+        #lobby-root .__selector_dialog__ .__scroller_view_view-port__ { background: rect(#FF19151f); }
+    </style>
+    <root id="lobby-root" class="gallery-management"><element id="lobby-canvas">
+        <element id="lobby-panel">
+            <element class="row"><button id="lobby-home" text="Home" /><label class="gallery-title grow">Duel lobby</label><button id="lobby-select-deck" text="Change deck" /><button id="lobby-settings" text="Settings" /><button id="lobby-help" text="?" /><button id="lobby-close" text="Close" /></element>
+            <element id="lobby-body">
+                <scroller-view id="lobby-left"><element id="lobby-deck-box" /></scroller-view>
+                <scroller-view id="lobby-right">
+                    <text id="lobby-prompt" class="gallery-section wrap" />
+                    <scroller-view id="lobby-players" />
+                    <element id="lobby-hands" class="row"><button id="lobby-rock" text="Rock" /><button id="lobby-paper" text="Paper" /><button id="lobby-scissors" text="Scissors" /></element>
+                    <element id="lobby-first-choice" class="row"><button id="lobby-first" text="Go first" /><button id="lobby-second" text="Go second" /></element>
+                    <label id="lobby-countdown" class="gallery-meta" /><button id="lobby-retry" text="Retry" />
+                </scroller-view>
+            </element>
+            <element id="lobby-actions" class="row"><text id="lobby-feedback" class="grow wrap gallery-warning" /><button id="lobby-invite" text="Invite" class="gallery-primary" /><button id="lobby-accept" text="Accept" /><button id="lobby-decline" text="Decline" /><button id="lobby-cancel" text="Cancel invitation" style="min-width: 200;" /></element>
+            <element id="lobby-footer" class="gallery-panel"><text id="lobby-deck" class="wrap" /><text id="lobby-options" class="wrap gallery-meta" /></element>
+        </element>
+        <element id="lobby-settings-dialog"><element class="dialog-panel"><element class="row"><label class="gallery-title grow">Duel settings</label><button id="settings-close" text="Close" /></element><label>Rule preset</label><selector id="settings-rule" /><label>Life points</label><text-field id="settings-lp" /><label>Starting hand</label><text-field id="settings-hand" /><label>Draw per turn</label><text-field id="settings-draw" /><label>Seed (optional)</label><text-field id="settings-seed" /><text id="settings-error" class="wrap gallery-error" /></element></element>
+        <element id="management-help"><element class="dialog-panel"><label class="gallery-title">Duel help</label><text id="lobby-help-copy" class="wrap" /><button id="help-close" text="Close" /></element></element>
+    </element></root>
+</ldlib2-ui>

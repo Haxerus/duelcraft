@@ -37,10 +37,10 @@ public final class DuelLobbyScreen extends ManagementScreen {
     private boolean expiryRequested;
     private String feedback = "";
 
-    private DuelLobbyScreen(ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
+    private DuelLobbyScreen(String layout, ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
                             Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
                             Consumer<ScreenRoute> navigate, boolean connected) {
-        super("duel_lobby", "Duel");
+        super(layout, "Duel");
         this.preparation = preparation; this.collection = collection; this.targets = targets; this.connected = connected;
         controller = new DuelLobbyController(preparation::view, command -> {
             feedback = "";
@@ -86,7 +86,7 @@ public final class DuelLobbyScreen extends ManagementScreen {
         received();
     }
     public static DuelLobbyScreen create() {
-        var screen = new DuelLobbyScreen(DuelcraftClient.preparation(), DuelcraftClient.getCollectionClient().state().view(),
+        var screen = new DuelLobbyScreen("duel_lobby", DuelcraftClient.preparation(), DuelcraftClient.getCollectionClient().state().view(),
                 online(), DuelcraftClient.preparation()::request, DuelcraftScreens::request, true);
         if (!DuelcraftScreens.managementBlocked()) screen.refreshCollection();
         return screen;
@@ -94,7 +94,12 @@ public final class DuelLobbyScreen extends ManagementScreen {
     public static DuelLobbyScreen create(ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
                                          Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
                                          Consumer<ScreenRoute> navigate) {
-        return new DuelLobbyScreen(preparation, collection, targets, send, navigate, false);
+        return new DuelLobbyScreen("duel_lobby", preparation, collection, targets, send, navigate, false);
+    }
+    static DuelLobbyScreen createFixture(String layout, ClientPreparationState preparation, ClientCollectionState.View collection, List<Target> targets,
+                                          Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
+                                          Consumer<ScreenRoute> navigate) {
+        return new DuelLobbyScreen(layout, preparation, collection, targets, send, navigate, false);
     }
     public static void clearForm() { form.target = null; form.rule = DuelRule.MR5; form.lp = "8000"; form.hand = "5"; form.draw = "1"; form.seed = ""; }
     private void acknowledge() { controller.acknowledge(); }
