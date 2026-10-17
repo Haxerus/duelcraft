@@ -12,6 +12,8 @@
 
 ## Global constraints
 
+**2026-10-16 audit scope:** carry out the documentation/compatibility audit now; defer multiplayer until friends are available and keep the full UI design/style-guide pass separate. Preserve Oct 8 acceptance of the non-multiplayer checklist, with only the QA.2 dropdown human retest pending from its scoped correction. [Release evidence](../../testing/player-interaction-release.md), [authority audit](../../testing/player-interaction-audit.md) and [manual procedure](../../testing/player-interaction-manual.md) record this boundary. No new build or client/server/UI launch belongs to this checkpoint. Task 4 audit/documentation review is complete; existing evidence does not close final-candidate gates.
+
 **2026-10-06 acceptance carry-over:** include the open checks in the [QA.3 carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) in this milestone's editor, input, policy and dedicated-server passes. They no longer block starting M5 and have not been marked passed. Retain M5's own verification requirements.
 
 **2026-10-08 M5 feedback:** the user passed the non-multiplayer checklist except lobby presentation and the rule dropdown; multiplayer carries forward. See [the playtest update](../reports/2026-10-08-m5-playtest.md). The lobby redesign belongs to a separate full UI pass that first establishes an LDLib2 style guide and mockup-to-widget review process. Do not treat functional bounds checks as visual approval or expand the scoped dropdown correction into that redesign.
@@ -30,7 +32,7 @@ Paths are repository-relative in this document. Keep existing user/other-session
 
 **Interfaces:** report contains candidate commit/branch, dirty-diff inventory, native submodule SHA, mod/library/JDK versions, native DLL provenance, commands with exit status/time, installed JAR SHA256, actual test environment, links to screenshots, and unresolved checks. The report is evidence, not a template claiming future success.
 
-- [ ] Inspect `git status --short`, `git log -1`, and `git -C native/ygopro-core rev-parse HEAD`. Record the actual implementation commit and any uncommitted differences; do not call HEAD alone the tested artifact when code is dirty.
+- [x] Inspect `git status --short`, `git log -1`, and `git -C native/ygopro-core rev-parse HEAD`. Record the actual implementation commit and any uncommitted differences; do not call HEAD alone the tested artifact when code is dirty. Audit baseline and existing artifact provenance recorded on 2026-10-16; no new build claimed.
 - [ ] Check Java21, native DLLs, managed card database/scripts, and the test EDOPro paths configured in build.gradle. Resolve normal build prerequisites without broadening the release into an unrelated native/CI refactor. Do not assume a `skipNative` property exists.
 - [ ] Run the full build and retain its output:
 
@@ -46,14 +48,14 @@ $releaseJars = @(Get-ChildItem -LiteralPath build/libs -Filter '*.jar' | Where-O
 if ($releaseJars.Count -ne 1) { throw 'Identify the intended runtime JAR before testing.' }
 Get-FileHash -Algorithm SHA256 -LiteralPath $releaseJars[0].FullName
 ```
-- [ ] Use the same candidate JAR on both clients and dedicated server. Record the effective server setting and test hook installation per run; test both ownership settings without a companion and a companion restriction under both settings. Restart between configuration/addon changes. Check protocol version is the implemented compatible version (planned4); verify an older version fails with a clear incompatibility message. Do not distribute/publish the artifact as part of verification.
+- [ ] Use the same candidate JAR on both clients and dedicated server. Record the effective server setting and test hook installation per run; test both ownership settings without a companion and a companion restriction under both settings. Restart between configuration/addon changes. Check protocol version is the implemented compatible version (**8** as of M5; the original plan's expected `4` predates M2–M5 protocol changes); verify an older version fails with a clear incompatibility message. Do not distribute/publish the artifact as part of verification.
 - [ ] Record failures as blockers, fix within the owning milestone, and rerun the affected checks. Commit the populated initial report with `docs: record interaction release candidate` when it describes a real candidate, not empty checkboxes presented as evidence.
 
 ## Task 2: Automated correctness and UI matrix
 
 **Modify as needed:** tests/scenarios created in milestones 1–5; only production files implicated by reproductions. **Artifacts:** `build/ldlib2-uitest/`, copies in `build/interaction-release/<run-name>/`; update `docs/testing/player-interaction-release.md` with results and artifact paths.
 
-- [ ] Run `./gradlew.bat test` on the candidate and record suite totals/failures, including existing engine/duel regressions. Native/data failures are environment failures until diagnosed; do not remove/disable tests to get a clean result.
+- [x] Run `./gradlew.bat test` on the candidate and record suite totals/failures, including existing engine/duel regressions. Native/data failures are environment failures until diagnosed; do not remove/disable tests to get a clean result. On 2026-10-16, `test --rerun` passed on audit baseline `0d251da`: 1,113 cases, 1,112 passed, one existing Windows symlink skip, no failures/errors. This closes the fresh audit-baseline suite check only; Task 5's final-candidate repeat remains open after code changes.
 - [ ] Run the complete registered harness:
 
 ```powershell
@@ -69,6 +71,8 @@ Use a fresh run-name if that destination exists; do not recursively delete old e
 - [ ] For any failure, first add a failing assertion or write exact reproduction/expected/observed steps, then fix the responsible code and rerun affected tests plus the relevant regression suite. Commit fixes separately from report changes with messages naming the demonstrated behavior.
 
 ## Task 3: Dedicated-server two-player acceptance
+
+The [consolidated manual guide](../../testing/player-interaction-manual.md) contains the procedure and pending outcomes. Human friend steps and developer-only forged/failure fixtures are separate. Friends are unavailable at this checkpoint; rows remain pending. Preserve the accepted Oct 8 single-player results and request only the focused QA.2 dropdown retest plus outstanding multiplayer/final-candidate gates.
 
 **Create:** `docs/testing/player-interaction-manual.md` containing the procedure/table below and recorded outcomes. Use a disposable world with both players' permission to change that world's test inventories; never overwrite a personal world save as a test setup.
 
@@ -109,9 +113,11 @@ Use a fresh run-name if that destination exists; do not recursively delete old e
 
 ## Task 4: Documentation, compatibility, and removal audit
 
+**2026-10-16 complete:** independent review approved the audit/player documentation after the Delete-draft prose correction. The audit found no production authority bypass requiring a code fix. Static checks parsed source/packaged resources and checked 10 documents / 257 local link targets with zero errors; `git diff --check` passed. Reviewed guides/wiki/audit are committed locally as `1167103`; tracking updates follow separately. The local AGENTS.md update remains ignored under existing policy. Resource syntax/presence is not runtime loading; other M6 gates remain open.
+
 **Modify:** `docs/multiplayer-decks.md`, create `docs/player-collections.md`, update relevant `AGENTS.md` sections and `docs/engine-wiki/duelcraft-jni.md` host-policy descriptions, roadmap/handoff links. **Inspect:** every caller of old upload/selection APIs and item routes.
 
-- [ ] Audit sources for legacy paths using:
+- [x] Audit sources for legacy paths using:
 
 ```powershell
 rg -n 'DuelDeckPayload|playerCurrentDeck|setPlayerCurrentDeck|resolveDeck|startSoloDuel|startDuel' src/main/java
@@ -119,10 +125,10 @@ rg -n 'setData|replaceCounts|CollectionCommand|isBusy|isPreparing' src/main/java
 ```
 
 For each remaining start/mutation caller, identify the authenticated player, busy gate, revision/eligibility gate, and owner of the resulting state. Search results are an audit aid, not proof on their own. Old unsafe handlers/types must be removed or fail-closed, never quietly left registered. Do not remove the legitimate core Deck model, AI deck registry, or native engine code.
-- [ ] Document the J key/rebinding, home/binder/mat routes, deposit/withdraw semantics and unsupported stacks, draft versus active list, missing-card messages, preparation locks, save acknowledgement, Side storage without match play, same-world/server ownership, and limitations of current legality checks. Explain `requireCardOwnership=false` as the standalone default, how to enable the SERVER setting and restart, and that physical cards must be deposited to satisfy enabled ownership. Withdrawals always require stored copies; deck use never creates cards. Document the optional companion restriction hook and its denial/failure contract separately from acquisition content.
-- [ ] Document YDK import and updated command semantics, matching client/server protocol, and upgrade behavior: old local YDK files remain available to import, but import grants no ownership. Do not auto-credit collection counts from old deck files. Explain admin test-card grant permissions and that acquisition recipes/economy are separate work.
-- [ ] Update stale testing/scenario counts only after checking actual registration. Keep source-version/engine protocol material unchanged unless this integration changed that contract; preserve concurrent wiki edits. Replace handoff statements saying later plans still need writing with links to the completed plans.
-- [ ] Validate Markdown links and resource JSON/XML loading, run `git diff --check`, and review the final diff for unrelated edits. Commit `docs: explain collection and duel interaction flows`.
+- [x] Document the J key/rebinding, home/binder/mat routes, deposit/withdraw semantics and unsupported stacks, draft versus active list, missing-card messages, preparation locks, save acknowledgement, Side storage without match play, same-world/server ownership, and limitations of current legality checks. Explain `requireCardOwnership=false` as the standalone default, how to enable the SERVER setting and restart, and that physical cards must be deposited to satisfy enabled ownership. Withdrawals always require stored copies; deck use never creates cards. Document the optional companion restriction hook and its denial/failure contract separately from acquisition content.
+- [x] Document YDK import and updated command semantics, matching client/server protocol, and upgrade behavior: old local YDK files remain available to import, but import grants no ownership. Do not auto-credit collection counts from old deck files. Explain admin test-card grant permissions and that acquisition recipes/economy are separate work.
+- [x] Update stale testing/scenario counts only after checking actual registration. Keep source-version/engine protocol material unchanged unless this integration changed that contract; preserve concurrent wiki edits. Replace handoff statements saying later plans still need writing with links to the completed plans.
+- [x] Validate Markdown links and resource JSON/XML loading, run `git diff --check`, and review the final diff for unrelated edits. Commit `docs: explain collection and duel interaction flows`.
 
 ## Task 5: Final candidate and sign-off
 

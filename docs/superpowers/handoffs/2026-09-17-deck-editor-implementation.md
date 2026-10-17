@@ -1,5 +1,15 @@
 # Collection and deck editor implementation handoff
 
+## Current M6 audit checkpoint (2026-10-16)
+
+Work in the existing deck-editor worktree on `codex/qa-m4`, starting from clean `0d251daecd0c5769bdd82a13f5e11cc3ebcb75e3`. M5 is implemented; M6 Task 4's audit/documentation is complete after independent review, while M6 and release sign-off remain open. The [release evidence](../../testing/player-interaction-release.md), [authority audit](../../testing/player-interaction-audit.md), [collection guide](../../player-collections.md) and [consolidated manual procedure](../../testing/player-interaction-manual.md) distinguish historical runtime evidence, fresh static checks and outstanding candidate gates.
+
+The user accepted the Oct 8 non-multiplayer M5 checklist except lobby presentation and the rule dropdown. Keep that acceptance. QA.2 has the automated dropdown correction; its focused human recheck remains pending. Carry multiplayer until friends are available. Keep the full UI design/style-guide pass separate. No new build or client/server/UI run accompanies this audit; consult the release report for any fresh test-only verification. No merge or push.
+
+Current artifact: `1.0.0-m5-qa.2`, protocol **8**, source `1dd8ee00c9fc64ef36a51f8b2b908add323dbe7f`; existing JAR hash rechecked as `2D9A2FEDCC6177C6E81AE455EECF1A9C402AB8756B72B43A2BBBB9E87AA22397`. Documentation HEAD is not a new build source. Task 4 review found no production authority bypass requiring a code change; remaining M6 runtime and final-candidate gates stay open.
+
+The dated checkpoints below retain their original evidence and scheduling statements; use this section and the current milestone table for present status.
+
 ## M5 user playtest update (2026-10-08)
 
 The user tested everything in the M5 playtest except multiplayer and reports no issues beyond the lobby's visual design and the Settings rule dropdown. Carry multiplayer forward. Treat the lobby's nested panels, dead space and placement as work for a separate full UI pass with an LDLib2 style guide and mockup-to-widget review process. The dropdown has a scoped correction and real mouse-input regression; [the follow-up report](../reports/2026-10-08-m5-playtest.md) records its verification and artifact. Do not restart the approved M5 design or treat broader visual acceptance as complete.
@@ -39,7 +49,7 @@ Actual packaged server and two clients booted with native libraries verified aga
 ## Workspace and starting point
 
 - Implementation worktree: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft/.superpowers/worktrees/deck-editor`
-- Branch: `codex/player-collections`
+- Current branch: `codex/qa-m4`; `codex/player-collections` is the historical pre-M3 branch below.
 - Pre-M3 baseline: `b407f7b` (`Polish deck editor feedback and add type sorting`), followed by handoff commit `00b76ba`. The M3 completion addendum below records subsequent work; inspect current HEAD before editing.
 - Main checkout: `C:/Users/haxer/Documents/Programming/Modding/Duelcraft`. It is not the implementation starting point. Work directly in the existing worktree; do not restart from main or the old `deck-editor-m1` worktree.
 - This handoff and its [kickoff prompt](2026-09-17-deck-editor-kickoff.md) live in the implementation worktree. Use the absolute worktree paths when opening them from a fresh session.
@@ -90,16 +100,16 @@ M4 supplies command-driven preparation, persistent collection-backed selection a
 - Keep transfers and deck changes locked during preparation/live duels, with server enforcement. M3 must respect existing busy gates; M4 owns the full preparation integration and legacy duel-route cutover.
 - Configuration changes require restart/world reopening. The server captures the effective setting for its lifecycle. Revalidate persisted activation after config/companion changes; removing a restriction does not auto-reactivate a deck.
 - Acquisition, packs, rewards, progression, and extra restrictions belong to the companion. The user will handle acquisition later; it is not a blocking design question for M3.
-- Later entry points remain: binder opens collection/deckbuilding; duel mat opens invitation/preparation; remappable hotkey opens Home, so players need not carry items.
+- M5 entry points are implemented: binder opens collection/deckbuilding; duel mat opens invitation/preparation; remappable hotkey opens Home, so players need not carry items.
 
-## M3 scope and remaining milestones
+## Current milestone status
 
 | Milestone | Status and implementation plan |
 | --- | --- |
 | M3: Physical cards and transfers | **Complete, verified.** [Report](../reports/2026-09-19-card-transfers-m3.md). [Plan](../plans/2026-09-17-card-transfers-milestone-3.md): canonical passcode card item; inventory transaction planner/service; transfer packets and editor controls; restricted card-grant command and real inventory scenarios. |
 | M4: Duel preparation and import | Complete, verified and independently reviewed. [Plan](../plans/2026-09-17-duel-preparation-milestone-4.md): shared preparation service, YDK import retaining Side, immutable prepared decks, actual solo/multiplayer policy checks, and removal of legacy bypass paths. |
-| M5: Player entry points | Not implemented. [Plan](../plans/2026-09-17-player-entry-points-milestone-5.md): Home/hotkey, binder, mat, private lobby and state-aware navigation. |
-| M6: Release validation | Not implemented. [Plan](../plans/2026-09-17-interaction-release-milestone-6.md): full UI/runtime matrix, dedicated two-player acceptance, compatibility and documentation audit. |
+| M5: Player entry points | Implemented; Oct 8 non-multiplayer acceptance with lobby/dropdown exceptions. QA.2 dropdown automated regression passes; human retest pending. [Plan](../plans/2026-09-17-player-entry-points-milestone-5.md), [report](../reports/2026-10-08-m5-playtest.md). |
+| M6: Release validation | Task 4 audit/documentation complete and independently reviewed; multiplayer and final-candidate gates pending. [Plan](../plans/2026-09-17-interaction-release-milestone-6.md), [release evidence](../../testing/player-interaction-release.md). Full UI design pass stays separate. |
 
 M3 completed all four tasks, including conservation/capacity/revision tests, real inventory UI flows, retained-world restart checks, and dedicated-player isolation. Transfers use the existing `CollectionService` and shared policy. Preserve the contracts for accessible slots, canonical components, amount bounds, and all-or-nothing transfers.
 
@@ -132,7 +142,7 @@ $env:GRADLE_USER_HOME = 'C:/Users/haxer/.gradle'
 
 Use the shared Gradle cache; do not create a worktree-local `.gradle-user`. Native DLLs/build setup are already present here. Tests use the configured EDOPro data (`C:/ProjectIgnis/expansions/cards.cdb`, `C:/ProjectIgnis/script`, `C:/ProjectIgnis/script/official`). A separate fresh worktree needs the submodule/native setup in AGENTS.md; reusing this one avoids that setup.
 
-The current development entry point is `/duel collection`. M3 connects Deposit/Withdraw/Deposit carried cards and adds the level-2 `/duel card give <player> <passcode> <count>` command. Current channel protocol is 7. The production hotkey, binder, and mat belong to M5.
+Use remappable **J** for Home; the binder, mat and command routes share server authority. `/duel collection` remains available. M3 connected Deposit/Withdraw/Deposit carried cards and the level-2 `/duel card give <player> <passcode> <count>` command. Current channel protocol is **8**. See the [player guide](../../player-collections.md).
 
 LDLib2 source is `C:/Users/haxer/Documents/Programming/Modding/LDLib2`, not a sibling of this nested worktree. UI guidance: `docs/ldlib2-ui-guide.md` and `docs/ui-wiring-guide.md`. For engine-related changes, begin with `docs/engine-wiki/README.md`.
 

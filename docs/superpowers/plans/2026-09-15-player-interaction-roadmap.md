@@ -10,12 +10,14 @@ This roadmap covers the complete integration. Milestone 1 is complete through `2
 | 2. Persistence and saved lists — complete and reviewed | [Personal collections](2026-09-17-player-collections-milestone-2.md) |
 | 3. Physical cards and transfers — complete | [Inventory transfers](2026-09-17-card-transfers-milestone-3.md) |
 | 4. Duel preparation and import — complete and reviewed | [Authoritative preparation](2026-09-17-duel-preparation-milestone-4.md) |
-| 5. Home, binder, mat and lobby | [Player entry points](2026-09-17-player-entry-points-milestone-5.md) |
-| 6. Release validation | [Tests and documentation](2026-09-17-interaction-release-milestone-6.md) |
+| 5. Home, binder, mat and lobby — implemented; scoped human retest and multiplayer carried forward | [Player entry points](2026-09-17-player-entry-points-milestone-5.md) |
+| 6. Release validation — Task 4 audit/docs complete; sign-off pending | [Tests and documentation](2026-09-17-interaction-release-milestone-6.md) |
 
 Read the [shared implementation contracts](../specs/2026-09-17-player-interaction-contracts.md) alongside each plan. They settle storage/packet bounds, operation signatures, acknowledged saving, inventory scope, and preparation rules. Milestone 2's [verification report](../reports/2026-09-17-player-collections-m2.md) records 850 final unit/JNI tests, real editor/respawn, dedicated two-player privacy and retained-world rejoin/distinct-JVM restart evidence. Independent whole-branch and final-fix reviews are complete. M3 transfers are complete and user-accepted. M4 replaces legacy upload/deck-command authority with shared deck-use policy; its verification is recorded in the [M4 report](../reports/2026-09-19-duel-preparation-m4.md). M5 player entry points and M6 release validation remain separate checkpoints.
 
 ## Policy amendment before further implementation
+
+**Current execution update, 2026-10-16:** M5 is implemented. The user accepted the Oct 8 non-multiplayer checklist except lobby presentation and the rule dropdown; QA.2 has the scoped automated dropdown fix and awaits a focused human retest. Carry multiplayer until friends are available. Keep the full UI design/style-guide pass separate. M6 now consolidates the [release evidence](../../testing/player-interaction-release.md), [authority audit](../../testing/player-interaction-audit.md), [player guide](../../player-collections.md) and [remaining manual procedure](../../testing/player-interaction-manual.md). Task 4 audit/documentation review is complete; final-candidate gates remain open. No merge or push. The dated scheduling notes below retain their historical context; their “not started” statements do not describe current M5/M6 status.
 
 **Execution update, 2026-10-06:** the user approved progressing into M5 through [Home/lobby mockup review](../specs/2026-10-06-m5-entry-screen-review.md), then implementing its existing tasks and using M6 for consolidated QA/polish. [Open QA.3 checks](../reports/2026-10-06-qa3-carry-forward.md) carry forward without a pass claim. M5 production implementation has not started; its required correctness and journey checks remain in scope. This update supersedes older statements that all M4 manual acceptance must finish before starting M5.
 
@@ -78,6 +80,8 @@ Private two-player lobby supports invite target selection, received invites, acc
 **Exit:** complete hotkey-only journey with no items; binder reaches the same saved data; mat reaches the same lobby; request failures explain missing cards/busy/offline/expired states. Two-player testing proves invite races and end-of-duel navigation. Changing GUI scale/resizing preserves draft state.
 
 ## 6. Release playtest and documentation
+
+**In progress, 2026-10-16:** Task 4 audit and player documentation are complete after independent review, with fresh test-only/static results recorded in the [release report](../../testing/player-interaction-release.md). No new candidate build or client/server/UI pass. The [manual guide](../../testing/player-interaction-manual.md) consolidates M6 Task 3 and carried multiplayer checks without demanding repetition of the accepted single-player checklist. Final acceptance remains pending.
 
 Update `docs/multiplayer-decks.md`, `docs/engine-wiki/duelcraft-jni.md` for changed host contracts, and relevant project guidance. Remove obsolete normal-player upload paths rather than leaving paths that bypass configured ownership or companion restrictions. Do not rewrite unrelated engine documentation or cleanup unrelated mod template code.
 
