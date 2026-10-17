@@ -89,7 +89,7 @@ public final class DuelUiAssertions {
         }
     }
 
-    private static void textFits(TestContext ctx, TextElement text) {
+    public static void textFits(TestContext ctx, TextElement text) {
         if (text.getText().getString().isEmpty()) return;
         var style = text.getTextStyle();
         float width = style.adaptiveWidth() || style.textWrap() != TextWrap.WRAP

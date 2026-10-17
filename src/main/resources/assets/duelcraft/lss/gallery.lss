@@ -1,0 +1,53 @@
+/* Literal Gallery roles. Canvas geometry is deliberately scoped below. */
+.gallery-management, .gallery-duel { background: rect(#FF211c2a); }
+.gallery-panel { background: rect(#FF34273e); }
+.gallery-management label, .gallery-management text, .gallery-duel label, .gallery-duel text { text-color: #eee5d4; text-shadow: false; flex-shrink: 0; }
+.gallery-management button, .gallery-duel button { base-background: rect(#FF211c2a, 0, 1, #FF8c7495); hover-background: rect(#FF493851, 0, 1, #FF8c7495); pressed-background: rect(#FF19151f, 0, 1, #FF8c7495); flex-shrink: 0; }
+.gallery-management .gallery-primary, .gallery-duel .gallery-primary { base-background: rect(#FFeee5d4); hover-background: rect(#FFefd18e); pressed-background: rect(#FFc6ab77); }
+.gallery-primary text { text-color: #211c2a; }
+.gallery-management .gallery-disabled, .gallery-duel .gallery-disabled { base-background: rect(#FF2b2233, 0, 1, #FF8c7495); }
+.gallery-management .gallery-disabled text, .gallery-duel .gallery-disabled text, .gallery-management .gallery-meta, .gallery-duel .gallery-meta { text-color: #b8afbe; }
+.gallery-management .gallery-selected, .gallery-duel .gallery-selected { base-background: rect(#FF211c2a, 0, 1, #FFc6ab77); }
+.gallery-selected text { text-color: #c6ab77; }
+.gallery-management .gallery-focus, .gallery-duel .gallery-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
+.gallery-management .gallery-pending, .gallery-duel .gallery-pending { base-background: rect(#FF34273e, 0, 1, #FFe8b86d); }
+.gallery-management .gallery-pending text, .gallery-duel .gallery-pending text, .gallery-management .gallery-warning, .gallery-duel .gallery-warning { text-color: #e8b86d; }
+.gallery-management .gallery-error, .gallery-duel .gallery-error { text-color: #f08f9b; text-wrap: wrap; }
+.gallery-name { text-wrap: wrap; width: 100%; }
+.gallery-popup { background: rect(#FF19151f); z-index: 110; }
+.gallery-management text-field, .gallery-management selector, .gallery-duel text-field, .gallery-duel selector { background: rect(#FF19151f, 0, 1, #FF8c7495); text-color: #eee5d4; flex-shrink: 0; }
+.gallery-management text-field, .gallery-duel text-field { focus-overlay: rect(#00000000, 0, 1, #FFefd18e); }
+.gallery-management .gallery-panel { padding-all: 16; gap-all: 12; }
+.gallery-management .gallery-columns { gap-all: 24; }
+.gallery-management label, .gallery-management text { font-size: 16; height: 24; }
+.gallery-management button, .gallery-management text-field, .gallery-management selector { height: 40; font-size: 16; }
+.gallery-management button text { height: 28; }
+.gallery-management .gallery-display { font-size: 48; height: 56; }
+.gallery-management .gallery-title { font-size: 24; height: 32; }
+.gallery-management .gallery-section { font-size: 20; height: 28; }
+.gallery-management .gallery-meta { font-size: 14; height: 22; }
+.gallery-management .gallery-name { height: 80; }
+.gallery-management .gallery-error { height: 48; }
+.gallery-management .gallery-list { flex: 1; min-height: 80; }
+.gallery-management .gallery-list label, .gallery-management .__selector_preview__ label, .gallery-management.gallery-popup label { height: 32; }
+.gallery-duel .gallery-panel { padding-all: 12; gap-all: 9; }
+.gallery-duel .gallery-columns { gap-all: 18; }
+.gallery-duel label, .gallery-duel text { font-size: 12; height: 18; }
+.gallery-duel button, .gallery-duel text-field, .gallery-duel selector { height: 30; font-size: 12; }
+.gallery-duel button text { height: 21; }
+.gallery-duel .gallery-display { display: none; }
+.gallery-duel .gallery-title { font-size: 18; height: 24; }
+.gallery-duel .gallery-section { font-size: 15; height: 21; }
+.gallery-duel .gallery-meta { font-size: 10.5; height: 16.5; }
+.gallery-duel .gallery-name { height: 60; }
+.gallery-duel .gallery-error { height: 36; }
+.gallery-duel .gallery-list { flex: 1; min-height: 60; }
+.gallery-duel .gallery-list label, .gallery-duel .__selector_preview__ label, .gallery-duel.gallery-popup label { height: 24; }
+.gallery-management .__scroller_view_view-port__, .gallery-duel .__scroller_view_view-port__ { background: rect(#FF2b2233); }
+.gallery-management .__scroller_scroll_container__, .gallery-duel .__scroller_scroll_container__ { background: rect(#FF19151f); }
+.gallery-management .__scroller_scroll_bar__, .gallery-duel .__scroller_scroll_bar__ { background: rect(#FF8c7495); }
+.gallery-management selector, .gallery-duel selector { focus-overlay: rect(#00000000, 0, 1, #FFefd18e); }
+.gallery-management .gallery-dense { height: 32; }
+.gallery-duel .gallery-dense { height: 24; }
+.gallery-management .gallery-dense text { height: 24; }
+.gallery-duel .gallery-dense text { height: 18; }
