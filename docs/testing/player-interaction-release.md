@@ -1,6 +1,12 @@
 # Player interaction release evidence
 
-## M6 checkpoint: 2026-10-16
+**Dropdown acceptance, 2026-10-16:** the user confirmed readable lobby rule entries and working Escape behavior. The scoped dropdown recheck is complete. They authorized the remaining checks that need no multiplayer session; the full UI redesign and friends acceptance stay separate. The audit checkpoint below records the preceding batch.
+
+## Local verification continuation
+
+The [local verification report](player-interaction-local-verification.md) records the subsequent client runs, reproduced card texture defect and candidate preparation. Its current results supersede the pending local checks in the historical audit below. Multiplayer acceptance and the full UI redesign remain separate.
+
+## Historical audit checkpoint: 2026-10-16
 
 M6 is in progress; Task 4's authority/compatibility audit and player documentation are complete after independent review. This checkpoint also includes test-only verification. The user deferred multiplayer acceptance until friends are available and kept the full UI design pass separate. No new build, client/server launch, code change, merge or push forms part of this audit. The remaining final-candidate gates below stay open.
 
@@ -51,9 +57,8 @@ Independent review approved the audit/documentation batch after correcting one e
 
 Local runtime evidence remains under `build/evidence/collection-m5/` and `build/evidence/m5-dropdown-2026-10-08/`. The reports identify captures and failed attempts. These directories are local build evidence, not committed release assets.
 
-## Outstanding gates
+## Outstanding gates at the audit checkpoint
 
-- Human QA.2 dropdown recheck: select a middle rule, scroll to RUSH, select it, then verify layered Escape. This scoped check does not reopen the accepted single-player checklist.
 - Same identified JAR on both clients and a dedicated server: execute the carried two-player procedure, privacy, preparation locks/races, real client binder/mat/offhand dispatch, post-duel transfers, lifecycle and policy-restart checks in the [manual guide](player-interaction-manual.md). Record friend availability as pending, not failed or passed.
 - Developer fixtures: forged/stale actions, companion denial/exception at startup, injected engine-start failure and cleanup, and incompatible-peer rejection. Keep fixture evidence separate from human outcomes.
 - Final-candidate full build/tests and relevant UI regressions after the last code change; retain command outputs, source/diff identity and JAR hashes. The unrun full window/scale/non-16:9/resize matrix, managed-catalog performance and unavailable-data/image checks remain explicit M6 gates; previous partial coverage does not close them.

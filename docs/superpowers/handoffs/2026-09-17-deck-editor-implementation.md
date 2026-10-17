@@ -1,5 +1,13 @@
 # Collection and deck editor implementation handoff
 
+## Local verification continuation (2026-10-16)
+
+The user accepted the corrected lobby dropdown: entries are readable and Escape works as expected. Local continuation began from clean `cfb33a5` on `codex/qa-m4`; [the verification report](../../testing/player-interaction-local-verification.md) records the new candidate and evidence. The full UI group passed 58 scenarios/12,338 checks; all nine window/scale combinations passed 36 required surface executions/2,151 checks. Solo policy/failure fixtures passed 53 checks under each effective ownership setting. Real-catalog and controlled asset-failure probes passed with their retry/timing limits documented.
+
+The reproduced physical card texture warning was fixed in `7facebe`; DEV_ONLY verification and candidate version changes are in `66b19e2`. Candidate `1.0.0-m6-qa.1`, protocol 8, has SHA256 `BA404D16FB5F94DAD405D7D35ACC40DF4F45A9E2E7E827B5DA45312412FCFFEA`. Both ordinary and disposable configuration hashes are preserved. Final test/build status and independent report review are recorded in the linked report. No merge or push.
+
+M6 release sign-off remains open for installed same-JAR two-player acceptance and its associated developer checks. Keep the full UI redesign separate, including the small popup-edge styling observation. Preserve Task 4's completed audit, accepted single-player checks and all historical evidence. The known template model warnings remain explicit exceptions to the resource-loading sign-off. New evidence lives under `build/interaction-release/m6-local-2026-10-16/`; older dated checkpoints below describe their original state.
+
 ## Current M6 audit checkpoint (2026-10-16)
 
 Work in the existing deck-editor worktree on `codex/qa-m4`, starting from clean `0d251daecd0c5769bdd82a13f5e11cc3ebcb75e3`. M5 is implemented; M6 Task 4's audit/documentation is complete after independent review, while M6 and release sign-off remain open. The [release evidence](../../testing/player-interaction-release.md), [authority audit](../../testing/player-interaction-audit.md), [collection guide](../../player-collections.md) and [consolidated manual procedure](../../testing/player-interaction-manual.md) distinguish historical runtime evidence, fresh static checks and outstanding candidate gates.

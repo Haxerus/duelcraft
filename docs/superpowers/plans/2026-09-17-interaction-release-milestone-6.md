@@ -12,6 +12,8 @@
 
 ## Global constraints
 
+**2026-10-16 continuation:** the user accepted the lobby dropdown's readable entries and Escape behavior, closing its focused human recheck. Run the remaining non-multiplayer checks, with subagents where useful. The full UI redesign remains separate; installed two-player acceptance stays pending until friends are available. Preserve the completed Task 4 audit and prior verification evidence.
+
 **2026-10-16 audit scope:** carry out the documentation/compatibility audit now; defer multiplayer until friends are available and keep the full UI design/style-guide pass separate. Preserve Oct 8 acceptance of the non-multiplayer checklist, with only the QA.2 dropdown human retest pending from its scoped correction. [Release evidence](../../testing/player-interaction-release.md), [authority audit](../../testing/player-interaction-audit.md) and [manual procedure](../../testing/player-interaction-manual.md) record this boundary. No new build or client/server/UI launch belongs to this checkpoint. Task 4 audit/documentation review is complete; existing evidence does not close final-candidate gates.
 
 **2026-10-06 acceptance carry-over:** include the open checks in the [QA.3 carry-forward register](../reports/2026-10-06-qa3-carry-forward.md) in this milestone's editor, input, policy and dedicated-server passes. They no longer block starting M5 and have not been marked passed. Retain M5's own verification requirements.
@@ -33,8 +35,8 @@ Paths are repository-relative in this document. Keep existing user/other-session
 **Interfaces:** report contains candidate commit/branch, dirty-diff inventory, native submodule SHA, mod/library/JDK versions, native DLL provenance, commands with exit status/time, installed JAR SHA256, actual test environment, links to screenshots, and unresolved checks. The report is evidence, not a template claiming future success.
 
 - [x] Inspect `git status --short`, `git log -1`, and `git -C native/ygopro-core rev-parse HEAD`. Record the actual implementation commit and any uncommitted differences; do not call HEAD alone the tested artifact when code is dirty. Audit baseline and existing artifact provenance recorded on 2026-10-16; no new build claimed.
-- [ ] Check Java21, native DLLs, managed card database/scripts, and the test EDOPro paths configured in build.gradle. Resolve normal build prerequisites without broadening the release into an unrelated native/CI refactor. Do not assume a `skipNative` property exists.
-- [ ] Run the full build and retain its output:
+- [x] Check Java21, native DLLs, managed card database/scripts, and the test EDOPro paths configured in build.gradle. Recorded in the [local verification report](../../testing/player-interaction-local-verification.md) and `prerequisites.json`; normal Gradle cache access uses the existing approved elevated invocation. No native/CI refactor or assumed `skipNative` flag.
+- [x] Run the full build and retain its output: final `test --rerun build` passed on `66b19e2` in 2m4s. [Local evidence](../../testing/player-interaction-local-verification.md) identifies the M6 QA.1 JAR, SHA256 and unchanged bundled native hashes.
 
 ```powershell
 ./gradlew.bat build
@@ -49,14 +51,14 @@ if ($releaseJars.Count -ne 1) { throw 'Identify the intended runtime JAR before 
 Get-FileHash -Algorithm SHA256 -LiteralPath $releaseJars[0].FullName
 ```
 - [ ] Use the same candidate JAR on both clients and dedicated server. Record the effective server setting and test hook installation per run; test both ownership settings without a companion and a companion restriction under both settings. Restart between configuration/addon changes. Check protocol version is the implemented compatible version (**8** as of M5; the original plan's expected `4` predates M2–M5 protocol changes); verify an older version fails with a clear incompatibility message. Do not distribute/publish the artifact as part of verification.
-- [ ] Record failures as blockers, fix within the owning milestone, and rerun the affected checks. Commit the populated initial report with `docs: record interaction release candidate` when it describes a real candidate, not empty checkboxes presented as evidence.
+- [x] Record failures as blockers, fix within the owning milestone, and rerun the affected checks. The populated [local report](../../testing/player-interaction-local-verification.md) records the real candidate, retained failures/corrections, passing reruns and independent final approval. Report updates are committed separately from the fix and fixture commits.
 
 ## Task 2: Automated correctness and UI matrix
 
 **Modify as needed:** tests/scenarios created in milestones 1–5; only production files implicated by reproductions. **Artifacts:** `build/ldlib2-uitest/`, copies in `build/interaction-release/<run-name>/`; update `docs/testing/player-interaction-release.md` with results and artifact paths.
 
-- [x] Run `./gradlew.bat test` on the candidate and record suite totals/failures, including existing engine/duel regressions. Native/data failures are environment failures until diagnosed; do not remove/disable tests to get a clean result. On 2026-10-16, `test --rerun` passed on audit baseline `0d251da`: 1,113 cases, 1,112 passed, one existing Windows symlink skip, no failures/errors. This closes the fresh audit-baseline suite check only; Task 5's final-candidate repeat remains open after code changes.
-- [ ] Run the complete registered harness:
+- [x] Run `./gradlew.bat test` on the candidate and record suite totals/failures, including existing engine/duel regressions. The audit-baseline run on `0d251da` and final `test --rerun build` on `66b19e2` each passed 1,113 cases: 1,112 passed, one existing Windows symlink skip, zero failures/errors. Both runs are retained separately; no tests were disabled.
+- [x] Run the complete registered harness: 58/58 scenarios and 12,338/12,338 checks passed in the Oct 16 local run; see [results and preserved evidence](../../testing/player-interaction-local-verification.md). The later ownership metadata-only addition is covered by repeated solo runs.
 
 ```powershell
 ./gradlew.bat runClient -PldTest=group:duelcraft -PldTestWindow=1280x720
@@ -65,14 +67,14 @@ Copy-Item -LiteralPath build/ldlib2-uitest -Destination build/interaction-releas
 ```
 
 Use a fresh run-name if that destination exists; do not recursively delete old evidence. The harness clears its own output before each run, so copy before starting the next run. Inspect report.json status/scenario counts and actual screenshots.
-- [ ] For `collection_overflow`, `collection_search`, `duelcraft_home`, and `duel_lobby`, run the 3x3 combination of window1280x720/960x540/1920x1080 and requested GUI scale2/3/4. Use `-PldTestGuiScale=N` only if the scenario does not override it; add explicit scenario variants otherwise. Record effective framebuffer and GUI dimensions. Verify a non-16:9 viewport and resize while editing. No fixed minimum comfort promise until the user playtests it.
-- [ ] Check visual and interaction invariants: all section headers/actions remain in bounds, card rows do not overlap, scrollbars are usable, keyboard focus stays visible, filters/long text scroll within their panes, selected card survives reflow, dirty draft survives resize, and click hitboxes follow transforms. Check missing-card indicators with color-independent text/counts.
-- [ ] Profile the 16,000 synthetic catalog and real managed catalog: record counts, warm/cold search latency, mounted rows, scrolling/frame behavior, and pending image loads. Validate bounded row/widget creation and latest-query results. Simulate unavailable images/database without deleting user caches: inject the failure in a fixture or use a disposable cache. Check visible placeholders and retry behavior. Do not claim an FPS guarantee from the synthetic fixture alone.
-- [ ] For any failure, first add a failing assertion or write exact reproduction/expected/observed steps, then fix the responsible code and rerun affected tests plus the relevant regression suite. Commit fixes separately from report changes with messages naming the demonstrated behavior.
+- [x] For `collection_overflow`, `collection_search`, `duelcraft_home`, and `duel_lobby`, run the 3x3 combination of window1280x720/960x540/1920x1080 and requested GUI scale2/3/4. All nine launches passed: 36 required surface executions, 2,151 checks. The [local report](../../testing/player-interaction-local-verification.md) records actual scale clamps/framebuffers and successful non-16:9 dirty resize evidence; two minimized-window attempts are explicitly excluded from actual resize proof. No minimum comfort promise.
+- [x] Check visual and interaction invariants: bounds, non-overlap, independent pane/filter scrolling, visible keyboard focus, selection/draft preservation, transformed clicks and color-independent missing-copy text/counts passed. All four surface captures were inspected per matrix row. The small dropdown-edge visual observation is carried to the separate UI pass, not described as design approval.
+- [x] Profile the 16,000 synthetic catalog and real managed catalog: counts, first/repeat query timings, bounded mounted rows/widgets, wheel cadence and pending image loads are recorded in the [local report](../../testing/player-interaction-local-verification.md). The controlled unavailable-data/image probes passed. Debounce, uncontrolled caches and restart-only production recovery are explicit limits; no cold-machine or FPS guarantee is claimed.
+- [x] For any failure, first add a failing assertion or write exact reproduction/expected/observed steps, then fix the responsible code and rerun affected tests plus the relevant regression suite. The reproduced card atlas warning was corrected in `7facebe` and verified by the real baked-model check; the catalog fixture precondition was corrected with the original failed run retained. Reviewed fixture/version changes are in `66b19e2`, separate from reports.
 
 ## Task 3: Dedicated-server two-player acceptance
 
-The [consolidated manual guide](../../testing/player-interaction-manual.md) contains the procedure and pending outcomes. Human friend steps and developer-only forged/failure fixtures are separate. Friends are unavailable at this checkpoint; rows remain pending. Preserve the accepted Oct 8 single-player results and request only the focused QA.2 dropdown retest plus outstanding multiplayer/final-candidate gates.
+The [consolidated manual guide](../../testing/player-interaction-manual.md) contains the procedure and pending outcomes. Human friend steps and developer-only forged/failure fixtures are separate. Friends are unavailable at this checkpoint; those rows remain pending. Preserve the accepted Oct 8 single-player results and Oct 16 dropdown retest; carry only outstanding multiplayer/final-candidate gates forward.
 
 **Create:** `docs/testing/player-interaction-manual.md` containing the procedure/table below and recorded outcomes. Use a disposable world with both players' permission to change that world's test inventories; never overwrite a personal world save as a test setup.
 
@@ -108,6 +110,7 @@ The [consolidated manual guide](../../testing/player-interaction-manual.md) cont
 - [ ] Execute each sequence against the same release candidate JAR and record pass/fail plus evidence. Use operator give solely for seeding physical test cards. Test forged/stale requests through a dev-only fixture; do not ship a client-accessible generic mutation console.
 - [ ] Test an engine-start failure with an injected dev test failure at the start boundary: both players leave STARTING, partial sessions close, client screens clear failed-start state, and a later valid invite works. Remove or keep the injection strictly DEV_ONLY.
 - [ ] Complete a real duel through at least one normal win condition, plus concede/disconnect paths. Exercise solo with an empty human collection under default ownership off, and with an owned list under ownership on; server AI content needs no collection. Verify companion denial/failure prevents human startup under both settings. Full core simulation behavior is covered by existing tests; this task proves the new entry-to-exit integration.
+- [x] Available single-client portion: solo native startup/concede/retry, busy/stale rejection, real setup failure/close, retained draft and final companion denial/exception passed 53 checks per effective ownership setting. [Local evidence](../../testing/player-interaction-local-verification.md) and manual D5 record completion; D1/D3/D4 retain the unrun two-player portions. Normal-win/disconnect friend acceptance above remains pending.
 - [ ] Record human feedback on inspector readability, deck-grid density, filter discoverability, and keyboard focus. Make bounded layout fixes with corresponding screenshot/bounds updates; do not redesign the information architecture without a concrete finding.
 - [ ] Commit the procedure and actual outcomes as `test: document dedicated-server interaction acceptance`. List incomplete checks explicitly if players/server access are unavailable; release sign-off remains incomplete until they run.
 
@@ -134,9 +137,9 @@ For each remaining start/mutation caller, identify the authenticated player, bus
 
 **Modify:** execution report and roadmap milestone status only, plus fixes already justified above.
 
-- [ ] After the last code change run the full tests/build and relevant UI regression scenarios. If fixes changed persistence, transfers, or preparation, repeat the affected dedicated-server sequences on the rebuilt candidate; a previous JAR's pass does not transfer automatically.
-- [ ] Record the final commit/diff and JAR hash with test results. Confirm packet version, client/server artifact identity, no missing models/resources, and no reported errors in logs during the accepted journey.
-- [ ] Summarize implemented behavior, observed verification, remaining supported-rule/content limitations, and any blocked checks. Link real screenshots/report files rather than announcing unperformed tests. Update plan checkboxes only for completed work.
+- [x] After the last code change run the full tests/build and relevant UI regression scenarios. Final source `66b19e2` passed fresh full tests/build, the nine-case matrix and both effective ownership solo runs. The complete UI group precedes only the two-line ownership reporting addition, which was retested in solo. No persistence/transfer/preparation production behavior changed; installed same-JAR acceptance remains pending separately.
+- [ ] Record the final commit/diff and JAR hash with test results. Local candidate source/hash and protocol 8 are recorded; the card model warning is fixed and deliberate injected errors are identified. Same-JAR client/server acceptance and the existing `example_block`/`example_item` resource-warning exceptions remain open; do not claim blanket warning-free loading.
+- [x] Summarize implemented behavior, observed verification, remaining supported-rule/content limitations, and blocked checks. The [local report](../../testing/player-interaction-local-verification.md) links actual reports/captures and records review approval; the manual guide retains pending multiplayer acceptance. No release-complete claim.
 - [ ] Finish the implementation branch according to the user's requested workflow. Do not push, merge, publish the mod, alter a live server, or deploy the JAR merely because validation passed; those are separate user actions/requests.
 
 ## Completion
