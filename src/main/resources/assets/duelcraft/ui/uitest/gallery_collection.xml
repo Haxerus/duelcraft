@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ldlib2-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/Low-Drag-MC/LDLib2/refs/heads/1.21/ldlib2-ui.xsd">
+    <stylesheet location="ldlib2:lss/gdp.lss" />
+    <stylesheet location="duelcraft:lss/gallery.lss" />
+    <style>
+        #collection-root { width: 1280; height: 720; }
+        #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        label, text { font-size: 12; text-color: #FFFFFF; text-shadow: true; }
+        #saved-lists, #save-deck, #withdraw-card, #deposit-card, #section-deck, #section-side, #add-card, #remove-card,
+        #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
+        #card-density, #eligibility-details, #eligibility-close, #new-deck, #list-open, #list-duplicate, #list-export,
+        #list-delete, #list-import, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
+        #delete-cancel, #export-submit, #export-cancel, #export-overwrite-confirm, #export-overwrite-cancel,
+        #close-save, #close-discard, #close-cancel, #close-editor, #alternate-formats,
+        #import-export, #import-close, #help-button, #help-close, .saved-row {
+            height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
+        }
+        button text { font-size: 12; text-color: #ffffff; }
+        selector text, selector label { text-color: #ffffff; }
+        text-field, selector { height: 30; flex-shrink: 0; }
+        .row { flex-direction: row; gap-all: 6; align-items: center; }
+        .grow { flex: 1; min-width: 0; min-height: 0; }
+        .wrap { text-wrap: wrap; adaptive-height: true; width: 100%; }
+        .muted { text-color: #AAAAAA; }
+        .heading { font-size: 16; height: 20; flex-shrink: 0; }
+        #editor-header { height: 56; flex-shrink: 0; flex-direction: row; gap-all: 12; align-items: center; }
+        #header-title { width: 360; flex-shrink: 0; gap-all: 3; }
+        #header-spacer { flex: 1; min-width: 0; }
+        #header-state { width: 220; flex-shrink: 0; flex-direction: row; align-items: center; gap-all: 4; }
+        #header-state-labels { flex: 1; min-width: 0; gap-all: 2; }
+        #editor-nav { height: 34; flex-shrink: 0; flex-direction: row; gap-all: 6; align-items: center; }
+        #editor-nav button { height: 30; }
+        #new-deck, #saved-lists, #import-export { width: 126; }
+        #help-button { width: 34; }
+        #list-clear-active { width: 96; height: 24; }
+        #deck-summary { height: 14; }
+        #editor-title { display: flex; }
+        #list-name { width: 100%; }
+        #list-active-status { height: 18; text-wrap: hover_roll; overflow: hidden; }
+        #save-deck { width: 108; height: 36; }
+        #activate-deck { width: 124; height: 36; }
+        #close-editor { width: 82; height: 36; }
+        #lists-dialog, #import-dialog, #help-dialog, #delete-dialog, #export-dialog, #export-overwrite-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 90; }
+        #delete-dialog, #export-dialog { z-index: 110; }
+        #export-overwrite-dialog { z-index: 120; }
+        #lists-panel { width: 620; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #lists-panel .list-actions button { flex: 1; min-width: 0; }
+        #lists-close, #import-close { width: 30; min-width: 30; flex-shrink: 0; }
+        #saved-list-scroll { width: 100%; height: 230; }
+        #saved-list-scroll .__scroller_view_view-container__ { gap-all: 4; }
+        .saved-row { width: 100%; height: 38; flex-direction: row; align-items: center; gap-all: 6; }
+        .saved-name { flex: 1; min-width: 0; height: 38; }
+        .saved-name text { width: 100%; horizontal-align: left; text-wrap: none; overflow: hidden; }
+        .saved-name.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
+        .saved-active { width: 58; flex-shrink: 0; text-color: #FFDD55; }
+        #import-panel, #help-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #import-choice-row { flex-direction: row; gap-all: 6; align-items: center; }
+        #list-import-picker { flex: 1; min-width: 0; }
+        #list-import, #list-export { width: 140; }
+        #delete-panel, #export-panel, #export-overwrite-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #delete-panel button, #export-panel button, #export-overwrite-panel button { flex: 1; }
+        #editor-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 12; }
+        #card-inspector { width: 224; flex-shrink: 0; padding-all: 10; gap-all: 6; background: built-in(ui-gdp:RECT); }
+        #inspector-empty { flex: 1; min-height: 0; align-items: center; justify-content: center; gap-all: 16; }
+        #inspector-empty-back { width: 118; height: 172; flex-shrink: 0; background: sprite(duelcraft:textures/card_back.png); overlay: rect(#66000000); }
+        #inspector-empty-prompt { width: 100%; text-wrap: wrap; adaptive-height: true; horizontal-align: center; text-color: #AAAAAA; }
+        #card-details-scroll { flex: 1; min-height: 0; }
+        #card-details-scroll .__scroller_view_view-container__ { gap-all: 8; }
+        #inspector-art { height: 192; align-items: center; flex-shrink: 0; }
+        .inspector-card { width: 192; height: 192; }
+        #inspector-name { font-size: 16; text-color: #FFFF00; }
+        #inspector-stats { text-color: #CCCCCC; }
+        #inspector-description { font-size: 13; }
+        #inspector-owned, #inspector-used, #inspector-missing, #inspector-carried { height: 18; }
+        #transfer-amount { width: 70; }
+        #transfer-actions button { flex: 1; min-width: 0; }
+        #inspector-missing.warning { text-color: #FFDD55; }
+        #inspector-missing.neutral { text-color: #AAAAAA; }
+        #card-edit-controls { flex-shrink: 0; gap-all: 4; }
+        #card-edit-controls .row button { flex: 1; min-width: 0; }
+        #add-card, #remove-card { height: 34; }
+        #deck-sections { flex: 1; min-width: 0; min-height: 0; gap-all: 8; }
+        .deck-section { min-height: 0; background: built-in(ui-gdp:RECT_LIGHT); }
+        #main-section { flex: 1; min-height: 0; }
+        #extra-section { height: 128; flex-shrink: 0; }
+        #side-section { height: 32; flex-shrink: 0; }
+        .section-header { height: 30; flex-shrink: 0; flex-direction: row; align-items: center; padding-horizontal: 8; background: built-in(ui-gdp:RECT); }
+        .section-header label { flex: 1; }
+        #toggle-side, #sort-deck { width: 90; height: 24; }
+        .deck-grid { flex: 1; min-height: 0; }
+        .deck-grid .__scroller_view_view-container__ { display: grid; grid-template-columns: repeat(10, 54px); grid-auto-rows: 79px; gap-all: 4; justify-content: space_between; align-content: flex_start; }
+        .large .deck-grid .__scroller_view_view-container__ { grid-template-columns: repeat(8, 70px); grid-auto-rows: 103px; }
+        .deck-card { width: 54; height: 79; }
+        .large .deck-card { width: 70; height: 103; }
+        .card-tile { padding-all: 2; flex-shrink: 0; background: built-in(ui-gdp:RECT_RD_DARK); }
+        .card-art { width: 100%; height: 100%; justify-content: center; align-items: center; overflow: hidden; background: built-in(ui-gdp:RECT); }
+        .card-placeholder { width: 100%; height: 100%; background: sprite(duelcraft:textures/card_back.png); }
+        .inspector-card .card-placeholder { width: 68%; }
+        .card-tile.selected { overlay: built-in(ui-gdp:RECT_RD_T_SOLID); }
+        .mode-button.selected, .filter-choice.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
+        .selector-option { height: 24; flex-shrink: 0; font-size: 14; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
+        .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; vertical-align: center; background: rect(#CCFFAA00); }
+        .missing-copy.neutral { text-color: #FFFFFF; background: rect(#B0555555); }
+        #collection-pane { width: 348; flex-shrink: 0; min-height: 0; gap-all: 6; }
+        #collection-search { flex: 1; min-width: 0; }
+        #toggle-filters { width: 104; }
+        #collection-options selector { flex: 1; min-width: 0; }
+        #alternate-formats { height: 26; }
+        #active-filters { height: 48; flex-shrink: 0; }
+        #active-filters .__scroller_view_view-container__ { flex-direction: row; flex-wrap: wrap; gap-all: 4; }
+        .filter-chip { height: 24; padding-horizontal: 4; }
+        .filter-chip text { font-size: 10; }
+        #browse-results { flex: 1; min-height: 0; gap-all: 4; }
+        #collection-results-host { flex: 1; min-height: 0; }
+        #collection-results { flex: 1; min-height: 0; scroller-view-mode: vertical; scroller-vertical-display: always; scroller-horizontal-display: never; }
+        .collection-row { height: 128; width: 100%; flex-direction: row; gap-all: 6; flex-shrink: 0; }
+        .collection-cell { width: 74; height: 128; flex-shrink: 0; gap-all: 3; }
+        .collection-card { width: 74; height: 108; }
+        .collection-caption { width: 74; height: 14; font-size: 10; horizontal-align: center; }
+        #collection-empty { height: 40; text-wrap: wrap; horizontal-align: center; }
+        #filter-panel { flex: 1; min-height: 0; padding-all: 8; gap-all: 6; background: built-in(ui-gdp:RECT); }
+        #filter-scroll { flex: 1; min-height: 0; }
+        #filter-groups { gap-all: 6; }
+        .filter-heading { width: 100%; height: 22; padding-top: 5; }
+        .filter-choices { flex-direction: row; flex-wrap: wrap; gap-all: 4; }
+        .filter-choice { height: 28; padding-horizontal: 6; }
+        .filter-choice text { font-size: 11; }
+        #filter-apply { height: 34; }
+        .range-row { flex-direction: row; gap-all: 6; height: 32; flex-shrink: 0; }
+        .range-row text-field { flex: 1; min-width: 0; }
+        #filter-measure { width: 100%; }
+        #editor-footer { height: 36; flex-shrink: 0; flex-direction: row; align-items: center; gap-all: 8; }
+        #card-density { width: 158; }
+        #card-density text { adaptive-width: false; width: 100%; }
+        #deck-feedback { flex: 1; min-width: 0; gap-all: 2; }
+        #deck-warnings, #deck-shortages { width: 100%; font-size: 11; text-wrap: wrap; adaptive-height: true; horizontal-align: center; }
+        #deck-warnings, #deck-shortages.warning { text-color: #FFDD55; }
+        #deck-shortages.neutral { text-color: #AAAAAA; }
+        #editor-status { height: 18; flex-shrink: 0; font-size: 12; horizontal-align: center; }
+        #status-row { height: 18; flex-shrink: 0; }
+        #editor-status { flex: 1; min-width: 0; }
+        #eligibility-details { width: 94; height: 18; }
+        #eligibility-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 96; }
+        #eligibility-panel { width: 620; height: 420; padding-all: 20; gap-all: 12; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #eligibility-scroll { flex: 1; min-height: 0; }
+        #eligibility-scroll .__scroller_view_view-container__ { gap-all: 10; }
+        scroller-view { scroller-view-mode: vertical; scroller-vertical-display: always; scroller-horizontal-display: never; adaptive-height: false; adaptive-width: false; }
+        .__scroller_view_view-port__ { padding-all: 3; background: rect(#00000000); }
+        .__scroller_view_vertical-scroller__ { width: 12; }
+        .__scroller_view_horizontal-scroller__ { height: 12; }
+        .__scroller_head_button__, .__scroller_tail_button__ { width: 12; height: 12; flex-shrink: 0; }
+        #close-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 100; }
+        #close-panel { width: 460; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #close-panel label { text-color: #ffffff; }
+        #close-panel button { flex: 1; }
+
+        /* Fixture-only geometry: the production controller retains section heights and four-column virtualization. */
+        #collection-canvas { padding-all: 16; gap-all: 8; background: rect(#FF211c2a); }
+        #editor-header { height: 64; }
+        #editor-title { font-size: 24; height: 28; }
+        #header-title { width: 360; }
+        #editor-nav { height: 32; }
+        #editor-nav button { height: 32; }
+        #editor-body { gap-all: 12; }
+        #card-inspector { width: 260; padding-all: 8; gap-all: 4; background: rect(#FF34273e); }
+        #inspector-art { height: 136; }
+        .inspector-card { width: 136; height: 136; }
+        #inspector-name { font-size: 16; height: auto; }
+        #inspector-description { font-size: 16; height: auto; }
+        #inspector-stats { font-size: 14; height: auto; }
+        #card-edit-controls label { font-size: 14; height: 18; }
+        #card-edit-controls button { height: 32; }
+        #card-edit-controls button text { font-size: 16; height: 24; }
+        #gallery-lower-decks { height: 150; flex-shrink: 0; flex-direction: row; gap-all: 8; }
+        #extra-section, #side-section { flex: 1; min-width: 0; }
+        #extra-grid .__scroller_view_view-container__, #side-grid .__scroller_view_view-container__ { grid-template-columns: repeat(4, 54px); }
+        .large #extra-grid .__scroller_view_view-container__, .large #side-grid .__scroller_view_view-container__ { grid-template-columns: repeat(3, 70px); }
+        .section-header { height: 36; padding-horizontal: 8; gap-all: 8; background: rect(#FF19151f); }
+        .section-header label { font-size: 20; height: 28; }
+        #side-count { font-size: 18; }
+        #toggle-side { height: 32; }
+        #import-export { width: 160; }
+        #toggle-filters { width: 128; }
+        #activate-deck { width: 140; }
+        #inspector-name { text-color: #c6ab77; }
+        .card-tile.selected { overlay: rect(#00000000, 0, 2, #FFc6ab77); }
+        #sort-deck { width: 96; height: 32; }
+        #card-density { width: 160; height: 32; }
+        #sort-deck text, #card-density text { height: 24; font-size: 16; }
+        .deck-section { background: rect(#FF34273e); }
+        #collection-pane { width: 348; gap-all: 4; }
+        #collection-pane .heading { font-size: 20; height: 28; }
+        #collection-pane .muted { font-size: 14; height: 20; }
+        #collection-pane button, #collection-pane text-field, #collection-pane selector { height: 32; }
+        #collection-pane button text { height: 24; }
+        #collection-canvas .collection-caption { height: 14; font-size: 10; }
+        #collection-canvas .missing-copy { height: 13; font-size: 9; }
+        #filter-panel { background: rect(#FF34273e); }
+        #collection-canvas .filter-heading { font-size: 14; height: 24; }
+        #collection-canvas .filter-choice text { font-size: 14; height: 20; }
+        #filter-scroll label { height: 24; font-size: 14; }
+        #filter-clear { width: 96; }
+        #collection-empty { height: 48; font-size: 16; }
+        #editor-footer { height: 32; }
+        #deck-summary { font-size: 14; height: 20; }
+        #deck-warnings, #deck-shortages { font-size: 12; height: auto; }
+        #editor-status { height: 24; font-size: 14; }
+        #status-row { height: 24; }
+        #lists-panel, #import-panel, #help-panel, #delete-panel, #export-panel, #export-overwrite-panel, #close-panel { background: rect(#FF34273e, 0, 1, #FF8c7495); }
+        #saved-list-scroll { height: 160; }
+        #import-panel, #export-panel { width: 600; }
+        #collection-canvas .selector-option { height: 24; font-size: 14; }
+    </style>
+    <root id="collection-root">
+        <element id="collection-canvas" class="gallery-management">
+            <element id="editor-header">
+                <element id="header-title">
+                    <label id="editor-title" class="heading">My Collection</label>
+                    <text-field id="list-name" />
+                </element>
+                <element id="header-spacer" />
+                <element id="header-state">
+                    <element id="header-state-labels"><label id="list-active-status" /><label id="deck-summary" /></element>
+                    <button id="list-clear-active" text="duelcraft.collection.clear_active" />
+                </element>
+                <button class="gallery-primary" id="save-deck" text="duelcraft.collection.save" />
+                <button id="activate-deck" text="duelcraft.collection.use_for_duels" />
+            </element>
+            <element id="editor-nav">
+                <button id="collection-back" text="Back" style="display: none; width: 72;" />
+                <button id="new-deck" text="duelcraft.collection.new_deck" />
+                <button id="saved-lists" text="duelcraft.collection.lists" />
+                <button id="import-export" text="duelcraft.collection.import_export" />
+                <button id="help-button" text="?" />
+                <button id="close-editor" text="duelcraft.collection.close" />
+            </element>
+            <element id="editor-body">
+                <element id="card-inspector">
+                    <element id="inspector-empty">
+                        <element id="inspector-empty-back" />
+                        <label id="inspector-empty-prompt" />
+                    </element>
+                    <scroller-view id="card-details-scroll">
+                        <element id="inspector-art" />
+                        <label id="inspector-name" class="wrap" />
+                        <label id="inspector-stats" class="wrap" />
+                        <text id="inspector-description" class="wrap" />
+                    </scroller-view>
+                    <element id="card-edit-controls">
+                        <label id="inspector-owned" />
+                        <label id="inspector-carried" />
+                        <label id="inspector-used" />
+                        <label id="inspector-missing" />
+                        <element class="row"><label id="transfer-amount-label" class="grow" /><text-field id="transfer-amount" /></element>
+                        <element id="transfer-actions" class="row">
+                            <button id="deposit-card" text="duelcraft.collection.deposit" />
+                            <button id="withdraw-card" text="duelcraft.collection.withdraw" />
+                        </element>
+                        <element class="row">
+                            <button id="section-deck" class="mode-button" text="Deck" />
+                            <button id="section-side" class="mode-button" text="Side" />
+                        </element>
+                        <element class="row">
+                            <button id="add-card" text="+1 Add" />
+                            <button id="remove-card" text="−1 Remove" />
+                        </element>
+                    </element>
+                </element>
+                <element id="deck-sections">
+                    <element id="main-section" class="deck-section">
+                        <element id="main-header" class="section-header"><label id="main-count" /><button id="sort-deck" /><button id="card-density" text="Cards: Standard" /></element>
+                        <scroller-view id="main-grid" class="deck-grid" />
+                    </element>
+                    <element id="gallery-lower-decks">
+                    <element id="extra-section" class="deck-section">
+                        <element id="extra-header" class="section-header"><label id="extra-count" /></element>
+                        <scroller-view id="extra-grid" class="deck-grid" />
+                    </element>
+                    <element id="side-section" class="deck-section">
+                        <element id="side-header" class="section-header"><label id="side-count" /><button id="toggle-side" text="Expand" /></element>
+                        <scroller-view id="side-grid" class="deck-grid" />
+                    </element>
+                    </element>
+                </element>
+                <element id="collection-pane">
+                    <label class="heading">Card collection</label>
+                    <element class="row">
+                        <text-field id="collection-search" />
+                        <button id="toggle-filters" text="Filters" />
+                    </element>
+                    <element id="collection-options" class="row">
+                        <selector id="collection-ownership" />
+                        <selector id="card-sort" />
+                    </element>
+                    <scroller-view id="active-filters" />
+                    <button id="alternate-formats" class="mode-button" text="Alternate formats: Off" />
+                    <element id="browse-results">
+                        <label id="result-count" />
+                        <element id="collection-results-host" />
+                        <label id="collection-empty">No matching cards. Open Filters to clear.</label>
+                    </element>
+                    <element id="filter-panel">
+                        <element class="row"><label class="grow">Filter cards</label><button id="filter-clear" text="Clear all" /></element>
+                        <scroller-view id="filter-scroll">
+                            <element id="filter-groups" />
+                            <label class="filter-heading">Level / Rank / Link</label>
+                            <selector id="filter-measure" />
+                            <label>Number minimum / maximum</label>
+                            <element class="range-row"><text-field id="filter-measure-min" /><text-field id="filter-measure-max" /></element>
+                            <label>ATK minimum / maximum</label>
+                            <element class="range-row"><text-field id="filter-atk-min" /><text-field id="filter-atk-max" /></element>
+                            <label>DEF minimum / maximum</label>
+                            <element class="range-row"><text-field id="filter-def-min" /><text-field id="filter-def-max" /></element>
+                            <label>Pendulum scale minimum / maximum</label>
+                            <element class="range-row"><text-field id="filter-scale-min" /><text-field id="filter-scale-max" /></element>
+                        </scroller-view>
+                        <button id="filter-apply" text="Apply filters" />
+                    </element>
+                </element>
+            </element>
+            <element id="editor-footer">
+                <button id="deposit-cards" text="duelcraft.collection.deposit_all" />
+                <element id="deck-feedback">
+                    <label id="deck-warnings" />
+                    <label id="deck-shortages" />
+                </element>
+            </element>
+            <element id="status-row" class="row">
+                <label id="editor-status">duelcraft.collection.unavailable</label>
+                <button id="eligibility-details" />
+            </element>
+            <element id="eligibility-dialog">
+                <element id="eligibility-panel">
+                    <label id="eligibility-title" class="heading" />
+                    <label id="eligibility-summary" class="wrap" />
+                    <scroller-view id="eligibility-scroll" />
+                    <button id="eligibility-close" />
+                </element>
+            </element>
+            <element id="lists-dialog">
+                <element id="lists-panel">
+                    <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button id="lists-close" text="X" /></element>
+                    <scroller-view id="saved-list-scroll" />
+                    <element class="row list-actions">
+                        <button id="list-open" text="duelcraft.collection.open" />
+                        <button id="list-duplicate" text="duelcraft.collection.duplicate" />
+                        <button id="list-delete" text="duelcraft.collection.delete" />
+                    </element>
+                </element>
+            </element>
+            <element id="import-dialog">
+                <element id="import-panel">
+                    <element class="row"><label id="import-title" class="heading grow" /><button id="import-close" text="X" /></element>
+                    <element id="import-choice-row"><selector id="list-import-picker" /><button id="list-import" text="duelcraft.collection.import_ydk" /></element>
+                    <button id="list-export" text="duelcraft.collection.export_ydk" />
+                </element>
+            </element>
+            <element id="help-dialog">
+                <element id="help-panel">
+                    <label id="help-title" class="heading" />
+                    <label id="help-controls" class="wrap" />
+                    <label id="help-navigation" class="wrap" />
+                    <label id="help-ownership" class="wrap" />
+                    <label id="help-supported-checks" class="wrap" />
+                    <button id="help-close" text="duelcraft.collection.done" />
+                </element>
+            </element>
+            <element id="delete-dialog">
+                <element id="delete-panel">
+                    <label id="delete-title" class="heading">duelcraft.collection.delete_confirm</label>
+                    <label id="delete-copy" class="wrap">duelcraft.collection.delete_copy</label>
+                    <element class="row">
+                        <button id="delete-confirm" text="duelcraft.collection.delete" />
+                        <button id="delete-cancel" text="duelcraft.collection.cancel" />
+                    </element>
+                </element>
+            </element>
+            <element id="export-dialog">
+                <element id="export-panel">
+                    <label id="export-title" class="heading" />
+                    <label id="export-copy" class="wrap" style="display: none;" />
+                    <text-field id="export-filename" />
+                    <label id="export-error" class="wrap warning" />
+                    <element class="row">
+                        <button id="export-submit" text="duelcraft.collection.export" />
+                        <button id="export-cancel" text="duelcraft.collection.cancel" />
+                    </element>
+                </element>
+            </element>
+            <element id="export-overwrite-dialog">
+                <element id="export-overwrite-panel">
+                    <label id="export-overwrite-title" class="heading" />
+                    <label id="export-overwrite-copy" class="wrap" />
+                    <element class="row">
+                        <button id="export-overwrite-confirm" text="duelcraft.collection.export_replace" />
+                        <button id="export-overwrite-cancel" text="duelcraft.collection.cancel" />
+                    </element>
+                </element>
+            </element>
+            <element id="close-dialog">
+                <element id="close-panel">
+                    <label id="close-title" class="heading">duelcraft.collection.save_changes</label>
+                    <element class="row">
+                        <button id="close-save" text="Save" />
+                        <button id="close-discard" text="Discard" />
+                        <button id="close-cancel" text="duelcraft.collection.keep_editing" />
+                    </element>
+                </element>
+            </element>
+        </element>
+    </root>
+</ldlib2-ui>
