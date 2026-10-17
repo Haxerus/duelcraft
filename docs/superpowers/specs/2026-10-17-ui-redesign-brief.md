@@ -1,6 +1,6 @@
 # Duelcraft UI redesign: audit and design brief
 
-Date: 2026-10-17. **For critique; no direction or implementation is approved.**
+Date: 2026-10-17. **Gallery selected for refinement; product implementation is not yet approved.**
 
 ## Purpose and scope
 
@@ -59,10 +59,10 @@ Open [the comparison page](../../mockups/ui-redesign/index.html). Each direction
 | Direction | Composition and character | Tradeoff |
 | --- | --- | --- |
 | **A: Studio** | Slate surfaces, restrained blue selection, persistent horizontal navigation. Flat roster with rules alongside it. Compact editor controls and predictable columns. | Best starting point for frequent editing and minimal workflow disruption. It needs enough character from artwork and the board to avoid feeling like a utility app. |
-| **B: Gallery** | Deep plum, parchment actions and muted gold selection. Centered section navigation, artwork-led Home and a focused opponent decision. Contextual editing toolbar and larger selected-card treatment. | Stronger atmosphere and focus. Larger elements consume card space; review whether the comfort gain earns that space. |
+| **B: Gallery** | Deep plum, parchment actions and muted gold selection. Centered section navigation, artwork-led Home and a focused opponent decision. Secondary editing controls share existing headings; the selected card retains a larger treatment. | Stronger atmosphere and focus. Larger elements consume card space; review whether the comfort gain earns that space. |
 | **C: Workbench** | Cool stone surfaces, dark ink, restrained teal, square controls and a compact mode rail. Structured roster and adjacent setup area; a tabletop field. | Strongest change in identity and a closer material relationship to Minecraft. Check long-session comfort and whether labels/borders add too much visual weight. |
 
-My starting recommendation is Studio for layout efficiency. Gallery is useful for atmosphere and card emphasis; Workbench tests whether a lighter, game-adjacent surface is preferable. Selection should follow the user's critique, not the recommendation alone. We can borrow particular controls once the overall direction is clear.
+The user selected Gallery for its polished, game-oriented presentation, with Studio a close second. Workbench was rejected as too similar to a business SaaS application. Gallery Home and lobby were well received. For My Collection, the deck list, inspector and browser take priority; auxiliary controls must fit around those surfaces rather than reserve a separate toolbar row. The revised mockup moves New deck into the existing top action row and Sort/card size into the Main heading. These placement details remain open to critique.
 
 Prototype palette roles, ordered canvas / surface / divider / primary text / secondary text / accent:
 

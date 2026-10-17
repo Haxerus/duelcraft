@@ -27,3 +27,9 @@ Fonts are browser substitutes. The visual directions need Minecraft font, scale,
 `assets/<passcode>.png` contains unmodified card images copied from the existing development client cache at `run-collection-m3-ui/duelcraft/cache/images/cards/`. `fixture.js` identifies the sample cards. `assets/card-back.png` is an unmodified copy of the existing mod resource. Featured Blue-Eyes artwork reuses `../featured-art/blue-eyes.png`; its provenance is in that directory's README. These assets serve documentation previews and are not added to the mod's resources. No assets were downloaded for this review.
 
 No product source or dependency changes belong to this checkpoint. Carried-forward multiplayer playtests remain nonblocking and retain their own checklist.
+
+## Gallery refinement after first critique
+
+The user chose Gallery, with Studio second, and rejected Workbench's business-app appearance. Home and lobby were well received. The editor now gives priority to the deck, inspector and browser: New deck shares the existing top action row, while Sort and card size share the Main heading. The separate toolbar is removed. The comparison opens Gallery by default; earlier alternatives remain available for reference.
+
+A targeted headless Edge check verified the revised editor, card-size toggle, Sort and New deck controls, and the 960×540 canvas. The Main grid starts at approximately y=182 rather than y=237 on the 1280×720 sketch. Screenshots and measurements are under `build/ui-redesign-review/gallery-*refine*`. These checks concern the HTML prototype only; Home, lobby and production UI are unchanged.
