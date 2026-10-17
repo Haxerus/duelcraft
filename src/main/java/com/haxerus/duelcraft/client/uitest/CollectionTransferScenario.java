@@ -29,7 +29,10 @@ public final class CollectionTransferScenario implements UIScenario {
     @Override public void configure(ScenarioOptions options) { options.tags("collection", "inventory", "network"); }
 
     @Override public void define(ScenarioBuilder s) {
-        s.server("capture state and seed twenty physical cards", sc -> {
+        s.check("physical card model resolves card-back atlas sprite", ctx -> ctx.mc().getItemRenderer()
+                .getModel(CardItem.stack(CODE, 1), ctx.mc().level, ctx.mc().player, 0)
+                .getParticleIcon().contents().name().equals(net.minecraft.resources.ResourceLocation.parse("duelcraft:card_back")))
+         .server("capture state and seed twenty physical cards", sc -> {
             CollectionRuntimeFixture.capture(sc);
             var inventory = new ArrayList<ItemStack>();
             for (int i = 0; i < 41; i++) inventory.add(sc.player().getInventory().getItem(i).copy());
