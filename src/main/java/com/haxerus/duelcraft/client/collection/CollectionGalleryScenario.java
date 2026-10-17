@@ -4,6 +4,7 @@ import com.haxerus.duelcraft.client.carddata.CardInfo;
 import com.haxerus.duelcraft.client.uitest.CollectionFixture;
 import com.haxerus.duelcraft.client.uitest.DuelUiAssertions;
 import com.haxerus.duelcraft.client.uitest.GalleryPreflight;
+import com.haxerus.duelcraft.client.uitest.GalleryVisualAssertions;
 import com.haxerus.duelcraft.client.uitest.ManagementTestInput;
 import com.haxerus.duelcraft.collection.DeckListWriter;
 import com.haxerus.duelcraft.collection.CollectionReply;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static com.haxerus.duelcraft.core.OcgConstants.*;
+
 /** Dense Gallery composition through the unchanged collection controller and real input routing. */
 @LDLRegisterClient(name = "gallery_collection", group = "duelcraft_gallery", registry = UIScenario.REGISTRY,
         environment = RegistrationEnvironment.DEV_ONLY)
@@ -42,7 +45,63 @@ public final class CollectionGalleryScenario implements UIScenario {
              var result = GalleryPreflight.check(LAYOUT, GalleryPreflight.ids(original));
              ctx.attach("preflight", result.toString());
              return result.errors().isEmpty();
-         }).openScreen("dense Gallery with actual collection controller", ctx -> {
+         }).openScreen("normal Gallery with local artwork", ctx -> {
+             var model = ctx.put("model", CollectionFixture.model(false));
+             var owned = new java.util.HashMap<>(model.owned());
+             owned.put(CollectionFixture.FIRST, 3L);
+             model.replaceOwnership(owned);
+             var cards = new ArrayList<>(CollectionFixture.cards());
+             String[] names = {"Blue-Eyes White Dragon", "The 13th Grave", "Labrynth Cooclock", "Limit Reverse"};
+             int[] types = {TYPE_MONSTER | TYPE_NORMAL, TYPE_MONSTER | TYPE_NORMAL, TYPE_MONSTER | TYPE_EFFECT, TYPE_TRAP | TYPE_CONTINUOUS};
+             int[] attack = {3000, 1200, 0, 0}, defense = {2500, 900, 0, 0}, level = {8, 3, 1, 0};
+             long[] race = {RACE_DRAGON, RACE_ZOMBIE, RACE_FIEND, 0};
+             int[] attribute = {ATTRIBUTE_LIGHT, ATTRIBUTE_DARK, ATTRIBUTE_DARK, 0};
+             for (int i = 0; i < cards.size(); i++) {
+                 var card = cards.get(i);
+                 int kind = i % 4;
+                 cards.set(i, new CardInfo(card.code(), names[kind], "Deterministic local artwork specimen. Select Deck or Side, then add or remove a copy.",
+                         types[kind], attack[kind], defense[kind], level[kind], race[kind], attribute[kind], card.scope()));
+             }
+             var screen = CollectionScreen.createFixture(LAYOUT, model, cards, CollectionGalleryScenario::art,
+                     CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
+             Object controller = ctx.getField(screen, "controller");
+             SavedDeckController lists = ctx.getField(controller, "lists");
+             lists.applyView(new ClientCollectionState.View(1, model.owned(), List.of(
+                     new CollectionReply.Summary(CollectionFixture.LIST_ID, "Dragon study", 40, 5, 0)), CollectionFixture.LIST_ID));
+             lists.rename("Dragon study");
+             lists.save();
+             return screen;
+         }).awaitModularUI().ticks(4).click("#main-card-0").ticks(2)
+         .check("normal composition has 40 Main", ctx -> counts(ctx, 40, 5, 0))
+         .checkText("#list-active-status", "Active")
+         .click("#card-sort").ticks(2)
+         .step("normal browser uses real Passcode sort", ctx -> choose(ctx, "card-sort", CardSearch.Sort.PASSCODE)).ticks(2)
+         .step("normal header contract", CollectionGalleryScenario::header)
+         .step("normal controls and scrollbars", ctx -> {
+             for (String id : List.of("new-deck", "saved-lists", "import-export", "save-deck", "activate-deck", "help-button", "close-editor"))
+                 GalleryVisualAssertions.control(ctx, "#" + id);
+             GalleryVisualAssertions.scroller(ctx, "#main-grid");
+             GalleryVisualAssertions.scroller(ctx, "#card-details-scroll");
+             GalleryVisualAssertions.scroller(ctx, "#collection-results");
+             ctx.attach("normal inspector art", ctx.el("#inspector-art").bounds() + " tile=" + ctx.el("#inspector-art .inspector-card").bounds());
+         }).hoverAt(-100, -100).step("normal visible text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-normal")
+         .step("open active My decks", ctx -> ManagementTestInput.click(ctx, "#saved-lists")).ticks(2)
+         .checkVisible("#list-clear-active")
+         .step("relocated Clear active retains compact component", ctx -> {
+             GalleryVisualAssertions.control(ctx, "#list-clear-active");
+             GalleryVisualAssertions.scroller(ctx, "#saved-list-scroll");
+         }).hoverAt(-100, -100).screenshot("gallery-collection-active-decks")
+         .step("close active My decks", ctx -> ManagementTestInput.click(ctx, "#lists-close")).ticks(2)
+         .step("open Help through row", ctx -> ManagementTestInput.click(ctx, "#help-button")).ticks(2)
+         .checkVisible("#help-dialog")
+         .step("close Help", ctx -> ManagementTestInput.click(ctx, "#help-close")).ticks(2)
+         .typeInto("#list-name", "N".repeat(128)).ticks(2)
+         .step("long editable title stays bounded", CollectionGalleryScenario::header)
+         .hoverAt(-100, -100).step("long toolbar text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-toolbar-long")
+         .step("Close still routes through dirty confirmation", ctx -> ManagementTestInput.click(ctx, "#close-editor")).ticks(2)
+         .checkVisible("#close-dialog")
+         .step("retain normal draft", ctx -> ManagementTestInput.click(ctx, "#close-cancel")).ticks(2)
+         .openScreen("dense Gallery with actual collection controller", ctx -> {
              var model = ctx.put("model", CollectionFixture.model(true));
              ctx.put("saveReply", new CompletableFuture<SavedDeck>());
              var cards = new ArrayList<>(CollectionFixture.cards());
@@ -59,6 +118,7 @@ public final class CollectionGalleryScenario implements UIScenario {
          }).awaitModularUI().ticks(4).click("#main-card-0").click("#toggle-side").ticks(3)
          .check("actual 60 Main / 15 Extra / 15 Side", ctx -> counts(ctx, 60, 15, 15))
          .checkTextContains("#inspector-name", LONG_NAME)
+         .step("single aligned Gallery action row", CollectionGalleryScenario::header)
          .step("standard density content and measured bounds", CollectionGalleryScenario::audit)
          .hoverAt(-100, -100).step("gallery-collection-standard text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-standard")
          .click("#card-density").ticks(3)
@@ -82,6 +142,7 @@ public final class CollectionGalleryScenario implements UIScenario {
          .scroll("#collection-results", -8).ticks(2)
          .check("browser wheel scrolls independently", ctx -> pixels(ctx, "collection-results") > 0
                  && Math.abs(pixels(ctx, "main-grid") - ctx.<Float>get("mainBeforeBrowser")) < 1)
+         .hoverAt(-100, -100).screenshot("gallery-collection-scrolled")
          .step("Extra endpoint", ctx -> end(ctx, "extra-grid", 1)).ticks(2)
          .click("#extra-card-14").checkTextContains("#inspector-name", "Sample 80")
          .step("restore browser and Main endpoints", ctx -> { end(ctx, "collection-results", 0); end(ctx, "main-grid", 0); }).ticks(2)
@@ -163,9 +224,19 @@ public final class CollectionGalleryScenario implements UIScenario {
              ctx.put("width", window.getWidth()); ctx.put("height", window.getHeight());
              ctx.put("beforeResize", model(ctx).draft());
              ctx.put("mainPixels", pixels(ctx, "main-grid")); ctx.put("browserPixels", pixels(ctx, "collection-results"));
+             ctx.attach("before native resize", "maximized=" + GLFW.glfwGetWindowAttrib(window.getWindow(), GLFW.GLFW_MAXIMIZED));
+             if (GLFW.glfwGetWindowAttrib(window.getWindow(), GLFW.GLFW_MAXIMIZED) == GLFW.GLFW_TRUE)
+                 GLFW.glfwRestoreWindow(window.getWindow());
              GLFW.glfwSetWindowSize(window.getWindow(), 1100, 800);
-         }).waitUntil("resized bounds settled", ctx -> ctx.mc().getWindow().getWidth() == 1100
-                 && ctx.mc().getWindow().getHeight() == 800 && !ctx.requireUI().getStyleEngine().requireCalculate()).ticks(3)
+             GLFW.glfwPollEvents();
+         }).waitUntil("resized bounds settled", ctx -> {
+             var window = ctx.mc().getWindow();
+             boolean dirty = ctx.requireUI().getStyleEngine().requireCalculate();
+             int[] nativeWidth = new int[1], nativeHeight = new int[1];
+             GLFW.glfwGetWindowSize(window.getWindow(), nativeWidth, nativeHeight);
+             ctx.attach("resize settle", "native=" + nativeWidth[0] + "x" + nativeHeight[0] + " framebuffer=" + window.getWidth() + "x" + window.getHeight() + " layoutDirty=" + dirty);
+             return window.getWidth() == 1100 && window.getHeight() == 800 && !dirty;
+         }).ticks(3)
          .check("draft selection and meaningful scroll survive live resize", ctx -> model(ctx).draft().equals(ctx.get("beforeResize"))
                  && ctx.el("#inspector-name").text().equals(LONG_NAME) && ctx.<Float>get("mainPixels") > 0
                  && Math.abs(pixels(ctx, "main-grid") - ctx.<Float>get("mainPixels")) < 1
@@ -179,6 +250,39 @@ public final class CollectionGalleryScenario implements UIScenario {
              try { if (file != null) Files.deleteIfExists(file); }
              catch (IOException error) { throw new UncheckedIOException(error); }
          });
+    }
+
+    private static ResourceLocation art(int code) {
+        int[] images = {89631139, 32864, 2511, 27551};
+        return ResourceLocation.fromNamespaceAndPath("duelcraft", "textures/uitest/gallery/" + images[Math.floorMod(code - CollectionFixture.FIRST, 4)] + ".png");
+    }
+
+    private static void header(TestContext ctx) {
+        var name = ctx.el("#list-name").bounds();
+        ctx.check("editable title remains usefully bounded", name.width() >= ctx.el("#collection-canvas").bounds().width() * 220 / 1280
+                && name.width() <= ctx.el("#collection-canvas").bounds().width() * 340 / 1280);
+        for (String id : List.of("save-deck", "activate-deck")) {
+            var classes = ctx.el("#" + id).element().getClasses();
+            ctx.check(id + " has intended emphasis", classes.contains("gallery-primary") == id.equals("activate-deck"));
+        }
+        for (String id : List.of("new-deck", "saved-lists", "import-export", "save-deck", "activate-deck")) {
+            var action = ctx.el("#" + id).bounds();
+            var field = ctx.el("#list-name").element();
+            var text = ctx.el("#" + id).as(Button.class).text;
+            ctx.check(id + " content center aligns with editable field", Math.abs(field.getContentY() + field.getContentHeight() / 2
+                    - text.getContentY() - text.getContentHeight() / 2) < 1);
+            ctx.check(id + " shares editable title row", Math.abs(action.centerY() - name.centerY()) < 1);
+        }
+        var active = ctx.el("#list-active-status").bounds();
+        ctx.check("Active immediately follows bounded name", active.x() >= name.right() && active.x() - name.right() <= 12);
+        var summary = ctx.el("#deck-summary").bounds();
+        var count = ctx.el("#main-count").bounds();
+        ctx.check("Saved and Main do not overlap", count.right() <= summary.x() + 1 && summary.right() <= ctx.el("#sort-deck").bounds().x() + 1);
+        DuelUiAssertions.textFits(ctx, ctx.el("#main-count").as(TextElement.class));
+        DuelUiAssertions.textFits(ctx, ctx.el("#deck-summary").as(TextElement.class));
+        var main = ctx.el("#main-header").bounds();
+        ctx.check("saved feedback belongs beside Main", summary.y() >= main.y() && summary.bottom() <= main.bottom());
+        ctx.check("no auxiliary navigation row", ctx.el("#editor-nav").bounds().height() == 0);
     }
 
     private static DeckEditorModel model(TestContext ctx) { return ctx.get("model"); }

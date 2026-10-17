@@ -86,7 +86,7 @@
         #extra-section { height: 128; flex-shrink: 0; }
         #side-section { height: 32; flex-shrink: 0; }
         .section-header { height: 30; flex-shrink: 0; flex-direction: row; align-items: center; padding-horizontal: 8; background: built-in(ui-gdp:RECT); }
-        .section-header label { flex: 1; }
+        #main-count, #extra-count, #side-count { flex: 1; }
         #toggle-side, #sort-deck { width: 90; height: 24; }
         .deck-grid { flex: 1; min-height: 0; }
         .deck-grid .__scroller_view_view-container__ { display: grid; grid-template-columns: repeat(10, 54px); grid-auto-rows: 79px; gap-all: 4; justify-content: space_between; align-content: flex_start; }
@@ -211,29 +211,52 @@
         #saved-list-scroll { height: 160; }
         #import-panel, #export-panel { width: 600; }
         #collection-canvas .selector-option { height: 24; font-size: 14; }
+        /* One bounded title/action row; status belongs to its section. */
+        #editor-header { height: 48; gap-all: 8; }
+        #header-title { flex-grow: 0; flex-shrink: 0; flex-basis: 340; min-width: 0; width: 340; flex-direction: row; align-items: center; gap-all: 8; }
+        #list-name { flex: 1; min-width: 0; width: auto; height: 40; font-size: 20; }
+        #list-active-status { width: 58; height: 24; flex-shrink: 0; font-size: 14; text-color: #c6ab77; vertical-align: center; }
+        #new-deck, #saved-lists { width: 104; }
+        #import-export { width: 160; }
+        #save-deck { width: 72; }
+        #activate-deck { width: 140; }
+        #help-button { width: 32; }
+        #close-editor { width: 68; }
+        #new-deck, #saved-lists, #import-export, #save-deck, #activate-deck, #help-button, #close-editor { height: 40; }
+        #editor-header .gallery-action text { font-size: 16; height: 28; }
+        #main-count { flex: 1; min-width: 0; }
+        #deck-summary { flex-grow: 0; flex-shrink: 0; flex-basis: 120; width: 120; font-size: 12; height: 20; text-color: #b8afbe; adaptive-width: false; vertical-align: center; }
+        #inspector-art { height: 212; }
+        #inspector-art .inspector-card { width: 140; height: 204; }
+        #activate-deck text { text-color: #211c2a; }
+        #main-count { font-size: 18; adaptive-width: false; vertical-align: center; }
+
+        #sort-deck { width: 76; }
+        #card-density { width: 132; }
+        #sort-deck text, #card-density text { font-size: 12; }
+        #lists-panel #list-clear-active { width: 140; height: 32; }
+        #lists-panel #list-clear-active text { font-size: 16; height: 24; }
     </style>
     <root id="collection-root">
         <element id="collection-canvas" class="gallery-management">
             <element id="editor-header">
                 <element id="header-title">
-                    <label id="editor-title" class="heading">My Collection</label>
+                    <label id="editor-title" style="display: none;">My Collection</label>
                     <text-field id="list-name" />
+                    <label id="list-active-status" />
                 </element>
                 <element id="header-spacer" />
-                <element id="header-state">
-                    <element id="header-state-labels"><label id="list-active-status" /><label id="deck-summary" /></element>
-                    <button class="gallery-action" id="list-clear-active" text="duelcraft.collection.clear_active" />
-                </element>
-                <button class="gallery-action gallery-primary" id="save-deck" text="duelcraft.collection.save" />
-                <button class="gallery-action" id="activate-deck" text="duelcraft.collection.use_for_duels" />
-            </element>
-            <element id="editor-nav">
-                <button class="gallery-action" id="collection-back" text="Back" style="display: none; width: 72;" />
+                <element id="header-state" style="display: none;"><element id="header-state-labels" /></element>
                 <button class="gallery-action" id="new-deck" text="duelcraft.collection.new_deck" />
                 <button class="gallery-action" id="saved-lists" text="duelcraft.collection.lists" />
                 <button class="gallery-action" id="import-export" text="duelcraft.collection.import_export" />
+                <button class="gallery-action" id="save-deck" text="duelcraft.collection.save" />
+                <button class="gallery-action gallery-primary" id="activate-deck" text="duelcraft.collection.use_for_duels" />
                 <button class="gallery-action" id="help-button" text="?" />
                 <button class="gallery-action" id="close-editor" text="duelcraft.collection.close" />
+            </element>
+            <element id="editor-nav" style="display: none;">
+                <button class="gallery-action" id="collection-back" text="Back" style="display: none; width: 72;" />
             </element>
             <element id="editor-body">
                 <element id="card-inspector">
@@ -269,7 +292,7 @@
                 </element>
                 <element id="deck-sections">
                     <element id="main-section" class="deck-section">
-                        <element id="main-header" class="section-header"><label id="main-count" /><button class="gallery-action" id="sort-deck" /><button class="gallery-action" id="card-density" text="Cards: Standard" /></element>
+                        <element id="main-header" class="section-header"><label id="main-count" /><label id="deck-summary" /><button class="gallery-action" id="sort-deck" /><button class="gallery-action" id="card-density" text="Cards: Standard" /></element>
                         <scroller-view id="main-grid" class="deck-grid" />
                     </element>
                     <element id="gallery-lower-decks">
@@ -342,6 +365,7 @@
                 <element id="lists-panel">
                     <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button class="gallery-action" id="lists-close" text="X" /></element>
                     <scroller-view id="saved-list-scroll" />
+                    <button class="gallery-action" id="list-clear-active" text="duelcraft.collection.clear_active" />
                     <element class="row list-actions">
                         <button class="gallery-action" id="list-open" text="duelcraft.collection.open" />
                         <button class="gallery-action" id="list-duplicate" text="duelcraft.collection.duplicate" />

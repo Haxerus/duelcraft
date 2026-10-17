@@ -44,18 +44,19 @@ Files: `lss/gallery.lss`, `ui/uitest/gallery_specimen.xml`, Gallery specimen sce
 - [x] Expose reusable `GalleryVisualAssertions.control(TestContext, String)` and `scroller(TestContext, String)` plus compact attachments for actual outer/content bounds, line start Y, font/align settings and winning style/texture values. Reuse StyleBag/ElementRef APIs; no generic inspector or speculative file/line provenance system.
 - [x] Exercise ordinary/dense/default/hover/pressed/disabled/focused controls and a real scrollbar. Capture native images and component crops on management and duel canvases. Explicitly test internal controls are not ordinary actions. Run focused `gallery_specimen`/preflight checks only.
 - [x] Update guide with scoped-style ownership, line-box versus glyph review, scroller contract, reference/capture review checklist and separate functional/visual verdicts. Add new correction proof report. Commit scoped changes after verification.
-- [ ] Independent reviewer opens actual component images and compares alignment and scrollbar semantics against C1/C2; also reviews code/spec. Resolve findings before task 2.
+- [x] Independent reviewer opens actual component images and compares alignment and scrollbar semantics against C1/C2; also reviews code/spec. Resolve findings before task 2.
 
 ## Task 2 — Match collection composition
 
 Files: `ui/uitest/gallery_collection.xml`, `CollectionGalleryScenario.java`, fixture-only supporting resources/data where needed, correction proof report. Reuse Task 1 helpers.
 
-- [ ] Define failing header tests before editing layout: required controls share one row; field/action content centers align; Active stays adjacent to name; saved/dirty feedback is adjacent to Main; no separate navigation row; long field text cannot push actions.
-- [ ] Rebuild the fixture header from the approved reference, keeping required IDs/types. Existing title/navigation wrapper IDs can remain structural/hidden if needed; all meaningful actions must remain accessible. Use an editable bounded deck title. Preserve a concise My Collection context label only if it does not recreate the stacked name/toolbar problem.
-- [ ] Keep inspector left, deck center, browser right; maintain existing rich browser controls, full 60/15/15 stress state and both densities. Include a deterministic normal 40-card, ordinary-name composition with real local card artwork plus explicit missing-art/long-name stress captures. Assets may reuse/copy existing local mockup artwork into fixture-only resources; do not download new art or depend on asynchronous online data.
-- [ ] Run routed editing, filter/import, Save pending/error, scroll and resize checks on the real controller. Apply C1/C2 audits to relevant visible controls/scrollers. Preserve prior functional coverage without adding thousands of duplicate aesthetic assertions as a substitute for review.
-- [ ] Archive focused run and native header/scrollbar/full-screen captures; create approved-reference/runtime comparison material with viewport/state metadata. Record actual deviations. Commit scoped changes.
+- [x] Define failing header tests before editing layout: required controls share one row; field/action content centers align; Active stays adjacent to name; saved/dirty feedback is adjacent to Main; no separate navigation row; long field text cannot push actions.
+- [x] Rebuild the fixture header from the approved reference, keeping required IDs/types. Existing title/navigation wrapper IDs can remain structural/hidden if needed; all meaningful actions must remain accessible. Use an editable bounded deck title. Preserve a concise My Collection context label only if it does not recreate the stacked name/toolbar problem.
+- [x] Keep inspector left, deck center, browser right; maintain existing rich browser controls, full 60/15/15 stress state and both densities. Include a deterministic normal 40-card, ordinary-name composition with real local card artwork plus explicit missing-art/long-name stress captures. Assets may reuse/copy existing local mockup artwork into fixture-only resources; do not download new art or depend on asynchronous online data.
+- [x] Run routed editing, filter/import, Save pending/error, scroll and resize checks on the real controller. Apply C1/C2 audits to relevant visible controls/scrollers. Preserve prior functional coverage without adding thousands of duplicate aesthetic assertions as a substitute for review.
+- [x] Archive focused run and native header/scrollbar/full-screen captures; create approved-reference/runtime comparison material with viewport/state metadata. Record actual deviations. Commit scoped changes.
 - [ ] Independent visual reviewer must open the approved collection reference and actual captures, explicitly verdict C1–C4 and card-space/browser preservation. A plain second-row toolbar, floating status or off-center labels is a failure even if tests pass.
+
 
 ## Task 3 — Match lobby composition and close verification
 
