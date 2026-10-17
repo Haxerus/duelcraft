@@ -1,6 +1,6 @@
 # Duelcraft UI redesign: audit and design brief
 
-Date: 2026-10-17. **Gallery selected for refinement; product implementation is not yet approved.**
+Date: 2026-10-17. **Gallery and its refined layouts are user-approved. The style guide and LDLib2 tooling plan are the current checkpoint; product migration has not started.**
 
 ## Purpose and scope
 
@@ -8,7 +8,7 @@ Give players a coherent interface for managing cards, preparing duels and follow
 
 PR #7 merged into `main` at `ef0599d`. This design work uses `codex/ui-redesign` in the existing deck-editor worktree. Carried-forward multiplayer acceptance remains tracked in the [manual checklist](../../testing/player-interaction-manual.md); the user has confirmed it does not block new work.
 
-This checkpoint contains a source audit, this brief and three HTML review directions. Next come critique, a selected design/style guide, a small tooling plan and a real LDLib2 proof. Product migration follows those decisions. This checkpoint does not change Java, LSS, assets packaged in the mod, server policy or dependencies.
+The initial checkpoint contained a source audit, this brief and three HTML review directions. The user has now approved Gallery after collection and lobby refinements. The [Gallery style guide](2026-10-17-gallery-style-guide.md) and [LDLib2 tooling plan](../plans/2026-10-17-ui-tooling.md) define the next real-client proof. Product migration follows review of that proof. This checkpoint does not change Java, LSS, assets packaged in the mod, server policy or dependencies.
 
 ## What we have learned
 
@@ -37,7 +37,7 @@ The [surface audit](../reports/2026-10-17-ui-surface-audit.md) records current c
 
 ## Provisional design rules
 
-These are starting points to test, not a finished style guide.
+These historical starting points informed the mockups. The [Gallery style guide](2026-10-17-gallery-style-guide.md) now owns the selected rules and their runtime proof requirements.
 
 | Area | Proposed rule and how to judge it |
 | --- | --- |
@@ -62,7 +62,7 @@ Open [the comparison page](../../mockups/ui-redesign/index.html). Each direction
 | **B: Gallery** | Deep plum, parchment actions and muted gold selection. Centered section navigation, artwork-led Home and a focused opponent decision. Secondary editing controls share existing headings; the selected card retains a larger treatment. | Stronger atmosphere and focus. Larger elements consume card space; review whether the comfort gain earns that space. |
 | **C: Workbench** | Cool stone surfaces, dark ink, restrained teal, square controls and a compact mode rail. Structured roster and adjacent setup area; a tabletop field. | Strongest change in identity and a closer material relationship to Minecraft. Check long-session comfort and whether labels/borders add too much visual weight. |
 
-The user selected Gallery for its polished, game-oriented presentation, with Studio a close second. Workbench was rejected as too similar to a business SaaS application. Gallery Home and lobby were well received. For My Collection, the deck list, inspector and browser take priority; auxiliary controls must fit around those surfaces rather than reserve a separate toolbar row. The revised mockup moves New deck into the existing top action row and Sort/card size into the Main heading. These placement details remain open to critique.
+The user selected Gallery for its polished, game-oriented presentation, with Studio a close second. Workbench was rejected as too similar to a business SaaS application. Gallery Home and lobby were well received. For My Collection, the deck list, inspector and browser take priority; auxiliary controls must fit around those surfaces rather than reserve a separate toolbar row. The revised mockup moves New deck into the existing top action row and Sort/card size into the Main heading. The user approved these refinements and moving Change deck beside Settings in the upper-right lobby action row; the bottom strip contains deck and rule information only.
 
 Prototype palette roles, ordered canvas / surface / divider / primary text / secondary text / accent:
 
@@ -78,7 +78,7 @@ The sketches simplify some filter contents and game actions. They do not authori
 
 ## Subsequent tooling checkpoint
 
-After choosing and refining a direction, specify the minimum tools needed to implement it reliably:
+The [tooling plan](../plans/2026-10-17-ui-tooling.md) turns the following audit recommendations into tasks:
 
 1. A screenshot/state gallery over existing LDLib2 reports, with screen, fixture, window, framebuffer and effective GUI scale visible.
 2. A small reusable component specimen screen for buttons, text fields, selectors, rows, feedback and layered dialogs. Include long text, disabled/pending/focus states and real mouse/keyboard input.
@@ -89,8 +89,8 @@ Use the collection editor as the first dense composition proof, including expand
 
 ## Review and completion criteria
 
-This first review asks which direction feels right and which arrangements should change. It does not request approval to implement the entire UI.
+The direction review is complete. The current review concerns the style guide and tooling plan; it does not authorize production screen migration.
 
 Before product migration, the chosen direction must cover: Home with no deck/invitation/error; editor with full Main/Extra/Side, long text, empty search, unknown artwork, pending/failing Save and policy denial; dirty navigation and destructive confirmation; lobby with no players, invite/wait/RPS/tie/first choice/start failure; duel with long hand/log/zone contents, revealed-card prompts, waiting, leave confirmation and result. Preserve behavior while measuring each of these states.
 
-Success means a player can identify the current state and next action; controls remain legible and clickable at supported sizes; field/card content keeps usable space; and another developer can build a matching screen from the guide and component specimens. The user will critique the mockups before the style guide and tooling implementation plan are finalized.
+Success means a player can identify the current state and next action; controls remain legible and clickable at supported sizes; field/card content keeps usable space; and another developer can build a matching screen from the guide and component specimens. The user has approved Gallery. Review the guide and tooling plan next, then judge the real LDLib2 proof before production migration.

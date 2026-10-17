@@ -1,5 +1,7 @@
 # Duelcraft UI design guide
 
+Historical September duel-layout guide. The [Gallery style guide](superpowers/specs/2026-10-17-gallery-style-guide.md) now owns the redesign direction and visual rules. Keep this document for regression context; current source and engine contracts govern behavior, including the later simultaneous inspector/log support.
+
 ## Scope and visual direction
 
 Keep the existing Minecraft font, dark beveled field, card artwork, zone order, and 960 × 540 design canvas. This is a layout and legibility pass over implemented duel UI, not a new visual identity. The companion [HTML mockup](ui-design-mockup.html) illustrates the component rules; LDLib2 screenshots are the rendering authority.

@@ -1,5 +1,11 @@
 # Collection and deck editor implementation handoff
 
+## Gallery style and tooling checkpoint (2026-10-17)
+
+The user approved Gallery, including the content-first collection layout and Change deck beside Settings in the lobby. The [Gallery style guide](../specs/2026-10-17-gallery-style-guide.md) records that direction, shared component rules and candidate measurements for the real-client proof. The [LDLib2 tooling plan](../plans/2026-10-17-ui-tooling.md) defines the next work; its tasks remain unchecked. Use `codex/ui-redesign` in this existing deck-editor worktree. Current work changes documentation only; no new production UI, tooling, game build or runtime acceptance is claimed.
+
+Next: review the guide/plan, build the narrow tooling and fixture proofs, then review real LDLib2 rendering before planning screen migration. Preserve rich browser controls and existing policies/input semantics. Earlier mockup approval does not establish Minecraft text fit or dropdown behavior. Carried-forward multiplayer checks remain nonblocking and retain their evidence. Do not push or merge without a request. Dated checkpoints below describe their original state.
+
 ## UI redesign begins (2026-10-17)
 
 The user merged PR #7 into `main` (`ef0599d`) and explicitly carried open multiplayer playtests forward without blocking new work. The next task is the UI redesign. Its [audit/design brief](../specs/2026-10-17-ui-redesign-brief.md) and [three-direction review checkpoint](../reports/2026-10-17-ui-directions-review.md) live on `codex/ui-redesign` in this existing worktree. This phase changes only documentation/mockups; the user will critique the directions before the style guide, tooling and LDLib2 implementation. The earlier M6 checkpoints below retain their original acceptance limits.

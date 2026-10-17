@@ -35,3 +35,7 @@ The user chose Gallery, with Studio second, and rejected Workbench's business-ap
 A targeted headless Edge check verified the revised editor, card-size toggle, Sort and New deck controls, and the 960×540 canvas. The Main grid starts at approximately y=182 rather than y=237 on the 1280×720 sketch. Screenshots and measurements are under `build/ui-redesign-review/gallery-*refine*`. These checks concern the HTML prototype only; Home, lobby and production UI are unchanged.
 
 The next lobby refinement moves Change deck beside Settings in the upper-right action row, leaving the bottom strip for active-deck and rule information. Targeted browser checks verified alignment at 1280×720 and 960×540, both menus opening, and Escape dismissal, with no script errors. Evidence: build/ui-redesign-review/gallery-lobby-actions-*.png.
+
+## Approved direction and next checkpoint
+
+The user approved Gallery after the collection and lobby refinements. The [Gallery style guide](../../superpowers/specs/2026-10-17-gallery-style-guide.md) records the selected rules; the [LDLib2 tooling plan](../../superpowers/plans/2026-10-17-ui-tooling.md) defines the next rendering and input proofs. The browser sketches remain composition references. Production migration follows review of the real-client proof.
