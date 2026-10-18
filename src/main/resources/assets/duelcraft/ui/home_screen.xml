@@ -20,8 +20,6 @@
         #home-invitation { width: 168; }
         #management-help { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC19151f); z-index: 90; }
         #help-panel { width: 560; padding-all: 24; gap-all: 16; background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
-        .keyboard-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
-        .keyboard-focus text { text-color: #efd18e; }
     </style>
     <root id="home-root" class="gallery-management"><element id="home-canvas">
         <element id="home-art" />

@@ -1192,7 +1192,7 @@
         flex-shrink: 0;
         }
 
-        .card-source {
+        .gallery-duel .card-source {
         width: 100%;
         adaptive-height: true;
         text-wrap: wrap;

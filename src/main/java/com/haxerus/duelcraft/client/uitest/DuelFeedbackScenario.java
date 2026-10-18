@@ -123,7 +123,8 @@ public final class DuelFeedbackScenario implements UIScenario {
              var name = line.getText().getSiblings().stream()
                      .filter(part -> part.getString().equals("Silver Guardian")).findFirst().orElseThrow();
              ctx.check("card name has its own color", name.getStyle().getColor() != null
-                     && name.getStyle().getColor().getValue() == 0xE6C878);
+                     && name.getStyle().getColor().getValue() == 0xC6AB77
+                     && name.getStyle().getColor().getValue() != (line.getTextStyle().textColor() & 0xFFFFFF));
          })
          .screenshot("log-mixed-context")
          .step("target a sanitized set card beside a known card", ctx -> {

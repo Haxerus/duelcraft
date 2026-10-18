@@ -5,12 +5,12 @@
 .gallery-management .gallery-action, .gallery-management .saved-name, .gallery-management .filter-choice, .gallery-management .filter-chip, .gallery-duel .gallery-action { base-background: rect(#FF211c2a, 0, 1.25, #FF8c7495); hover-background: rect(#FF493851, 0, 1.25, #FF8c7495); pressed-background: rect(#FF19151f, 0, 1.25, #FF8c7495); flex-shrink: 0; align-items: center; }
 .gallery-management .gallery-primary, .gallery-duel .gallery-primary { base-background: rect(#FFeee5d4); hover-background: rect(#FFefd18e); pressed-background: rect(#FFc6ab77); }
 .gallery-primary text { text-color: #211c2a; }
-.gallery-management .gallery-disabled, .gallery-duel .gallery-disabled, .gallery-management .gallery-action.__disabled__, .gallery-duel .gallery-action.__disabled__ { base-background: rect(#FF2b2233, 0, 1.25, #FF8c7495); }
-.gallery-management .gallery-disabled text, .gallery-duel .gallery-disabled text, .gallery-management .gallery-action.__disabled__ text, .gallery-duel .gallery-action.__disabled__ text, .gallery-management .gallery-meta, .gallery-duel .gallery-meta { text-color: #b8afbe; }
 .gallery-management .gallery-selected, .gallery-duel .gallery-selected { base-background: rect(#FF211c2a, 0, 1.25, #FFc6ab77); }
 .gallery-selected text { text-color: #c6ab77; }
-.gallery-management .gallery-focus, .gallery-duel .gallery-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
-.gallery-management .gallery-primary.gallery-focus, .gallery-duel .gallery-primary.gallery-focus { base-background: rect(#FFeee5d4, 0, 2, #FFefd18e); }
+.gallery-management .gallery-focus, .gallery-duel .gallery-focus, .gallery-management .gallery-action.keyboard-focus, .gallery-management .player-row.keyboard-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
+.gallery-management .gallery-primary.gallery-focus, .gallery-duel .gallery-primary.gallery-focus, .gallery-management .gallery-primary.keyboard-focus { base-background: rect(#FFeee5d4, 0, 2, #FFefd18e); }
+.gallery-management .gallery-disabled, .gallery-duel .gallery-disabled, .gallery-management .gallery-action.__disabled__, .gallery-duel .gallery-action.__disabled__ { base-background: rect(#FF2b2233, 0, 1.25, #FF8c7495); }
+.gallery-management .gallery-disabled text, .gallery-duel .gallery-disabled text, .gallery-management .gallery-action.__disabled__ text, .gallery-duel .gallery-action.__disabled__ text, .gallery-management .gallery-meta, .gallery-duel .gallery-meta { text-color: #b8afbe; }
 .gallery-management .gallery-pending, .gallery-management .gallery-primary.gallery-pending, .gallery-duel .gallery-pending, .gallery-duel .gallery-primary.gallery-pending { base-background: rect(#FF34273e, 0, 1.25, #FFe8b86d); }
 .gallery-management .gallery-pending text, .gallery-duel .gallery-pending text, .gallery-management .gallery-action.gallery-pending text, .gallery-duel .gallery-action.gallery-pending text, .gallery-management .gallery-warning, .gallery-duel .gallery-warning { text-color: #e8b86d; }
 .gallery-management .gallery-error, .gallery-duel .gallery-error { text-color: #f08f9b; text-wrap: wrap; }

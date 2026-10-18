@@ -290,6 +290,37 @@ public final class DuelPanelLayoutScenario implements UIScenario {
                  "A very long monster name that must wrap inside the card information panel"));
         capture(s, "right-panels-log-click-keeps-all-details");
 
+        s.step("read the bottom of a split long zone", ctx -> ctx.el("#zone-inspector-list").as(ScrollerView.class)
+                .verticalScroller.setNormalizedValue(1)).ticks(2)
+         .step("remember high zone reading position", ctx -> ctx.put("highZoneOffset", scrollOffset(ctx, "#zone-inspector-list")));
+        press(s, "#zone-inspector-expand");
+        s.step("expanded viewport temporarily clamps high zone offset", ctx -> {
+            var list = ctx.el("#zone-inspector-list").as(ScrollerView.class);
+            float range = list.getContainerHeight() - list.viewPort.getContentHeight();
+            ctx.check("saved zone offset exceeds expanded range", (float) ctx.get("highZoneOffset") > range + 1);
+            ctx.check("expanded zone displays its clamped bottom", atBottom(ctx, "#zone-inspector-list"));
+        });
+        capture(s, "zone-high-offset-expanded");
+        press(s, "#zone-inspector-expand");
+        s.step("Restore retains high zone reading intent", ctx ->
+                sameOffset(ctx, "#zone-inspector-list", "highZoneOffset", "high zone offset survives expansion clamp"));
+        press(s, "#zone-inspector-expand");
+        s.step("mutate inspected pile during expansion", ctx -> inspectionPile(61)).ticks(3)
+         .checkCount("#zone-inspector-list .card", 61);
+        press(s, "#zone-inspector-expand");
+        s.step("expanded mutation retains original reading intent", ctx ->
+                sameOffset(ctx, "#zone-inspector-list", "highZoneOffset", "expanded content refresh cannot save forced clamp"));
+        press(s, "#zone-inspector-expand");
+        s.scroll("#zone-inspector-list", 20).ticks(2)
+         .step("remember manual expanded zone input", ctx -> {
+             ctx.check("expanded zone wheel leaves bottom", !atBottom(ctx, "#zone-inspector-list"));
+             ctx.put("manualZoneOffset", scrollOffset(ctx, "#zone-inspector-list"));
+         });
+        press(s, "#zone-inspector-expand");
+        s.step("Restore honors manual expanded zone input", ctx ->
+                sameOffset(ctx, "#zone-inspector-list", "manualZoneOffset", "manual expanded zone input replaces old intent"));
+        capture(s, "zone-manual-expanded-scroll-restored");
+
         press(s, "#zone-inspector-close");
         s.step("log-only after closing zone", ctx -> checkRightPanels(ctx, false, true));
         press(s, "#duel-log-expand");

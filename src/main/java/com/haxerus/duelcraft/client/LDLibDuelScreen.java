@@ -436,7 +436,7 @@ public class LDLibDuelScreen {
                     UIRefresher.this.refreshRightPanels();
                 }
                 @Override public void restoreScrollAfterContentLayout(float offset) {
-                    UIRefresher.this.restoreZoneAfterContentLayout(byId("zone-inspector").hasClass("panel-suppressed") ? zoneScrollOffset : offset);
+                    UIRefresher.this.restoreZoneAfterContentLayout(expandedPanel != null || byId("zone-inspector").hasClass("panel-suppressed") ? zoneScrollOffset : offset);
                 }
             });
             var descResolver = new OptionTextResolver(
@@ -971,9 +971,9 @@ public class LDLibDuelScreen {
         }
 
         private void rememberRightPanelScrolls() {
-            if (zoneList != null && !byId("zone-inspector").hasClass("hidden") && !byId("zone-inspector").hasClass("panel-suppressed"))
+            if (zoneList != null && expandedPanel == null && !byId("zone-inspector").hasClass("hidden") && !byId("zone-inspector").hasClass("panel-suppressed"))
                 zoneScrollOffset = scrollOffset(zoneList);
-            // Log intent comes from scroll input; expanded geometry can clamp it temporarily.
+            // Expanded geometry can clamp either panel temporarily; retain its input-owned intent.
         }
 
         private static float scrollOffset(ScrollerView list) {

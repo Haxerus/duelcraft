@@ -45,7 +45,23 @@ public final class LobbyGalleryScenario implements UIScenario {
          .screenshot("gallery-lobby-normal")
          .step("select opponent", ctx -> ManagementTestInput.click(ctx, "#lobby-player-" + OTHER)).ticks(2)
          .check("selected card has explicit marker", ctx -> ctx.el("#lobby-player-" + OTHER).element().getClasses().contains("gallery-selected"))
-         .screenshot("gallery-lobby-selected");
+         .screenshot("gallery-lobby-selected")
+         .step("Tab to enabled Invite with pointer away", ctx -> GalleryVisualAssertions.tabTo(ctx, "#lobby-invite")).ticks(2)
+         .step("Invite keyboard presentation", ctx -> GalleryVisualAssertions.keyboardFocus(ctx, "#lobby-invite"))
+         .screenshot("lobby-invite-keyboard-focus")
+         .step("Tab to ordinary lobby action", ctx -> GalleryVisualAssertions.tabTo(ctx, "#lobby-settings")).ticks(2)
+         .step("ordinary lobby keyboard presentation", ctx -> GalleryVisualAssertions.keyboardFocus(ctx, "#lobby-settings"))
+         .screenshot("lobby-settings-keyboard-focus")
+         .step("Tab to quiet lobby Home", ctx -> GalleryVisualAssertions.tabTo(ctx, "#lobby-home")).ticks(2)
+         .step("quiet lobby Home keyboard presentation", ctx -> GalleryVisualAssertions.keyboardFocus(ctx, "#lobby-home"))
+         .screenshot("lobby-home-keyboard-focus")
+         .step("Tab to selected roster card", ctx -> GalleryVisualAssertions.tabTo(ctx, "#lobby-player-" + OTHER)).ticks(2)
+         .step("selected roster keyboard presentation", ctx -> {
+             GalleryVisualAssertions.keyboardFocus(ctx, "#lobby-player-" + OTHER);
+             var card = ctx.el("#lobby-player-" + OTHER).element();
+             ctx.check("focus retains selected roster marker", card.hasClass("gallery-selected")
+                     && card.select(".player-availability", TextElement.class).findFirst().orElseThrow().getTextStyle().textColor() == 0xffc6ab77);
+         }).screenshot("lobby-selected-keyboard-focus");
         focusObservation(s, "gallery");
         s.step("open Settings", ctx -> ManagementTestInput.click(ctx, "#lobby-settings")).ticks(2)
          .screenshot("gallery-lobby-settings")

@@ -50,7 +50,13 @@ public final class DuelcraftHomeScenario implements UIScenario {
               var id = UUID.randomUUID();
               var view = new ClientCollectionState.View(1, Map.of(), List.of(new CollectionReply.Summary(id, "Dragon study", 40, 0, 2)), id);
               return HomeScreen.create(view, null, route -> {}, artwork());
-          }).awaitModularUI().ticks(3).screenshot("m5-home-featured-artwork");
+          }).awaitModularUI().ticks(3).screenshot("m5-home-featured-artwork")
+          .step("Tab to Home Duel with pointer away", ctx -> GalleryVisualAssertions.tabTo(ctx, "#home-duels")).ticks(2)
+          .step("Home primary keyboard presentation", ctx -> GalleryVisualAssertions.keyboardFocus(ctx, "#home-duels"))
+          .screenshot("home-duel-keyboard-focus")
+          .step("Tab to ordinary Home action", ctx -> GalleryVisualAssertions.tabTo(ctx, "#home-collection")).ticks(2)
+          .step("Home ordinary keyboard presentation", ctx -> GalleryVisualAssertions.keyboardFocus(ctx, "#home-collection"))
+          .screenshot("home-collection-keyboard-focus");
     }
     private static net.minecraft.resources.ResourceLocation artwork() {
         return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("duelcraft", "textures/uitest/gallery/home-featured.png");

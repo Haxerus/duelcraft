@@ -19,6 +19,26 @@ import com.lowdragmc.lowdraglib2.uitest.TestContext;
 public final class GalleryVisualAssertions {
     private GalleryVisualAssertions() {}
 
+    public static void tabTo(TestContext ctx, String selector) {
+        ctx.input().moveTo(1, 1);
+        ctx.ui().clearFocus();
+        for (int i = 0; i < 40 && !ctx.el(selector).element().isFocused(); i++)
+            ctx.screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_TAB, 0, 0);
+        ctx.require(selector + " reached by Tab", ctx.el(selector).element().isFocused());
+    }
+
+    public static void keyboardFocus(TestContext ctx, String selector) {
+        var button = ctx.el(selector).as(Button.class);
+        boolean primary = button.hasClass("gallery-primary");
+        ctx.attach(selector + " focus style", "base=" + button.getStyleBag().computeCandidateSlot(PropertyRegistry.BASE_BACKGROUND)
+                + " textures=" + textures(button));
+        ctx.check(selector + " actual keyboard focus", button.isFocused() && button.hasClass("keyboard-focus"));
+        ctx.check(selector + " visible Gallery focus outline", button.getButtonStyle().baseTexture() instanceof RectTexture rect
+                && rect.getBorderColor() == 0xffefd18e && Math.abs(rect.getStroke() - 2) < .01f
+                && rect.getColor() == (primary ? 0xffeee5d4 : 0xff211c2a));
+        if (primary) ctx.check(selector + " readable primary foreground", button.text.getTextStyle().textColor() == 0xff211c2a);
+    }
+
     public static void control(TestContext ctx, String selector) {
         var button = ctx.el(selector).as(Button.class);
         var text = button.text;
