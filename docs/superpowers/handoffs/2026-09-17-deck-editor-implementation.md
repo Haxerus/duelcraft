@@ -1,5 +1,12 @@
 # Collection and deck editor implementation handoff
 
+## Gallery production migration complete (2026-10-17)
+
+Production Collection, Home, Duel lobby and live-duel presentation now use the approved Gallery design on `codex/ui-redesign`, through source commit `0cc5f3f`. Existing collection authority, preparation workflows, engine/network contracts and field topology are preserved. The earlier “production unchanged” checkpoints below are historical.
+
+The [migration report](../reports/2026-10-17-gallery-production-migration.md) records the scoped commits, manual playtest steps and exact evidence. Final build: 1112 JUnit passes, one existing Windows symlink-privilege skip. All 58 regression scenarios and three Gallery proofs have passing executions on the final source across the combined run and unchanged-source reruns (17450 checks). The combined run itself remains recorded as failed: its native window was iconified, preventing resize and plausibly invalidating synthetic hover; all affected checks passed in fresh clients. Both resolution runs passed 5/5 scenarios and 6569/6569 checks at 1024×768/2 and 1920×1080/4. Independent source review approved the corrections; independent visual review opened 46 native images with no blocking defect in the reviewed scope.
+
+Agent implementation and verification are complete. Human aesthetic approval remains separate. Multiplayer/installed-JAR playtests remain carried forward and nonblocking. Keep harness windows unminimized; consistent iconification recovery is a future tooling follow-up. No merge or push. Branch and worktree are preserved.
 ## Current Gallery shared-inset correction (2026-10-17)
 
 Fields, selected dropdown values and both short/scrolled popup layouts now share one Gallery inset declaration per design canvas. The Selector's explicit left edge falls back to that rule, and the collection's Gallery class lives on the actual UI root so detached popups inherit it. Production UI remains unchanged. [Evidence](../reports/2026-10-17-gallery-shared-control-inset.md): two final native runs passed 6/6 scenario executions and 8722/8722 checks, with independent screenshot review finding no issues. Human review and production migration remain separate. Earlier checkpoints retain their historical results.

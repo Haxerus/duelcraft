@@ -46,11 +46,11 @@
 
 **Interfaces:** Consume shared Gallery LSS/assets from Task 1. Keep all existing navigation, preparation and settings APIs. Production and fixtures use the same player-card renderer, with injected test data/art only where needed.
 
-- [ ] Promote approved lobby layout and avatar-card renderer into production, resolving real player skins with a deterministic fallback. Remove redundant fixture layout/renderer routing.
-- [ ] Preserve zero/one/long roster, settings, pending, incoming/outgoing invitation, RPS, tie, first choice, startup and close-versus-cancel behavior.
-- [ ] Restyle Home as the approved art-backed left menu; preserve active/missing deck, invitation, resume, retry and Help. Keep art ratio/cropping and Canvas fade.
-- [ ] Apply quiet production management backdrop and retain modal/keyboard ownership. Point proof scenarios at production and test Home/lobby regression plus native visual captures.
-- [ ] Review and commit scoped changes.
+- [x] Promote approved lobby layout and avatar-card renderer into production, resolving real player skins with a deterministic fallback. Remove redundant fixture layout/renderer routing.
+- [x] Preserve zero/one/long roster, settings, pending, incoming/outgoing invitation, RPS, tie, first choice, startup and close-versus-cancel behavior.
+- [x] Restyle Home as the approved art-backed left menu; preserve active/missing deck, invitation, resume, retry and Help. Keep art ratio/cropping and Canvas fade.
+- [x] Apply quiet production management backdrop and retain modal/keyboard ownership. Point proof scenarios at production and test Home/lobby regression plus native visual captures.
+- [x] Review and commit scoped changes.
 
 ### Task 3: Live duel Gallery treatment and complete validation
 
@@ -58,7 +58,7 @@
 
 **Interfaces:** Consume Gallery duel styles without applying ordinary action geometry to field cards, slots, counters or scrollbar internals. Preserve all server/engine and response APIs. Expand/restore right reading panels through the existing layout method and visibility state, not a second screen controller.
 
-- [ ] Apply Gallery colors, flat edges, explicit action roles and readable label alignment to live duel controls, reading surfaces and prompt/leave/result overlays. Preserve field bounds and current prompt/layer ownership.
-- [ ] Add zone/log Expand/Restore controls with independent visibility intent and scroll preservation as required by the guide; test each single/split/expanded/closed transition and append-follow behavior.
-- [ ] Run focused duel checks, then source-freeze and run JUnit plus the full non-multiplayer UI regression group and Gallery proofs at 1280×720 and 1024×768. Archive evidence and inspect native screenshots with independent reviewers.
-- [ ] Fix material regressions, record exact results and limitations, update handoff and plan checkboxes. Perform final whole-change review and commit. Keep multiplayer manual checks carried forward; do not claim human visual acceptance of the newly migrated screens.
+- [x] Apply Gallery colors, flat edges, explicit action roles and readable label alignment to live duel controls, reading surfaces and prompt/leave/result overlays. Preserve field bounds and current prompt/layer ownership.
+- [x] Add zone/log Expand/Restore controls with independent visibility intent and scroll preservation as required by the guide; test each single/split/expanded/closed transition and append-follow behavior.
+- [x] Run focused duel checks, then source-freeze and run JUnit plus the full non-multiplayer UI regression group and Gallery proofs at 1280×720 and 1024×768. Archive evidence and inspect native screenshots with independent reviewers.
+- [x] Fix material regressions, record exact results and limitations, update handoff and plan checkboxes. Perform final whole-change review and commit. Keep multiplayer manual checks carried forward; do not claim human visual acceptance of the newly migrated screens.
