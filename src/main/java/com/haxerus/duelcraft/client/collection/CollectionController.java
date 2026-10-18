@@ -228,7 +228,7 @@ final class CollectionController {
             lists.refresh();
             element("lists-dialog").setDisplay(true);
         });
-        button("lists-close").setOnClick(event -> element("lists-dialog").setDisplay(false));
+        bindListAction(button("lists-close"), () -> element("lists-dialog").setDisplay(false));
         button("new-deck").setOnClick(event -> lists.navigate(lists::newDraft));
         button("import-export").setOnClick(event -> {
             refreshImportPicker(importPicker);
@@ -238,7 +238,7 @@ final class CollectionController {
         button("help-button").setOnClick(event -> element("help-dialog").setDisplay(true));
         button("help-close").setOnClick(event -> element("help-dialog").setDisplay(false));
         ((TextField) element("list-name")).setTextResponder(lists::rename);
-        button("list-open").setOnClick(event -> {
+        bindListAction(button("list-open"), () -> {
             UUID target = selectedSavedId;
             if (target == null || !savedExists(target)) return;
             lists.navigate(() -> {
@@ -246,7 +246,7 @@ final class CollectionController {
                 element("lists-dialog").setDisplay(false);
             });
         });
-        button("list-duplicate").setOnClick(event -> {
+        bindListAction(button("list-duplicate"), () -> {
             UUID target = selectedSavedId;
             if (target == null || !savedExists(target)) return;
             lists.navigate(() -> {
@@ -279,7 +279,7 @@ final class CollectionController {
             ((TextElement) element(id)).setText(Component.translatable("duelcraft.collection." + id.replace('-', '_')));
         element("export-dialog").setDisplay(false);
         element("export-overwrite-dialog").setDisplay(false);
-        button("list-delete").setOnClick(event -> {
+        bindListAction(button("list-delete"), () -> {
             if (selectedSavedId == null || !savedExists(selectedSavedId)) return;
             deleteTarget = selectedSavedId;
             String targetName = lists.summaries().stream()
@@ -301,7 +301,6 @@ final class CollectionController {
         });
         button("activate-deck").setText(Component.translatable("duelcraft.collection.use_for_duels"));
         button("activate-deck").setOnClick(event -> lists.activate());
-        button("list-clear-active").setOnClick(event -> lists.clearActive());
         element("lists-dialog").setDisplay(false);
         element("import-dialog").setDisplay(false);
         element("help-dialog").setDisplay(false);
@@ -415,8 +414,6 @@ final class CollectionController {
         for (String id : List.of("list-open", "list-duplicate", "list-delete"))
             element(id).setActive(!lists.pending() && lists.ready() && selectedSavedId != null);
         for (String id : List.of("close-discard", "close-cancel")) element(id).setActive(!lists.pending());
-        element("list-clear-active").setActive(!lists.pending() && lists.activeId() != null);
-        element("list-clear-active").setDisplay(lists.activeId() != null);
         element("close-dialog").setDisplay(lists.needsDecision());
         copyLimitCode = 0;
         ((TextElement) element("list-active-status")).setText(Component.literal(
@@ -451,7 +448,7 @@ final class CollectionController {
             name.text.setOverflowVisible(false);
             name.getStyle().tooltips(Component.literal(summary.name()));
             name.setActive(!lists.pending());
-            name.setOnClick(event -> {
+            bindListAction(name, () -> {
                 selectedSavedId = id;
                 savedRows.forEach((rowId, button) -> {
                     if (rowId.equals(id)) button.addClass("selected");
@@ -462,14 +459,73 @@ final class CollectionController {
             });
             row.addChild(name);
             if (id.equals(lists.activeId())) {
-                var active = new Label();
-                active.addClass("saved-active");
+                name.addClass("has-active");
+                var active = new Button();
+                active.setId("list-clear-active").addClass("saved-active");
                 active.setText(Component.literal("Active"));
-                row.addChild(active);
+                active.getStyle().tooltips(Component.literal("Clear active deck"));
+                active.setActive(!lists.pending() && lists.ready());
+                bindListAction(active, lists::clearActive);
+                active.addEventListener(UIEvents.MOUSE_UP, event -> event.stopPropagation());
+                // Use event intent: LDLib listeners can still see the previous hover/focus state.
+                active.addEventListener(UIEvents.MOUSE_ENTER, event -> updateActiveChip(active, true), true);
+                active.addEventListener(UIEvents.MOUSE_LEAVE, event -> updateActiveChip(active, active.isFocused()), true);
+                active.addEventListener(UIEvents.FOCUS_IN, event -> updateActiveChip(active, true));
+                active.addEventListener(UIEvents.FOCUS_OUT, event -> updateActiveChip(active, active.getState() != Button.State.DEFAULT));
+                name.addChild(active);
             }
             rows.addScrollViewChild(row);
             savedRows.put(id, name);
         }
+    }
+
+    private static void updateActiveChip(Button active, boolean engaged) {
+        boolean clearing = active.isActive() && engaged;
+        active.setText(Component.literal(clearing ? "Clear" : "Active"));
+        if (clearing) active.addClass("clear-affordance");
+        else active.removeClass("clear-affordance");
+    }
+
+    private boolean listsAreTopLayer() {
+        return element("lists-dialog").isDisplayed() && !element("delete-dialog").isDisplayed()
+                && !element("close-dialog").isDisplayed();
+    }
+
+    private void bindListAction(Button target, Runnable action) {
+        target.setFocusable(true);
+        target.setOnClick(event -> {
+            event.stopPropagation();
+            action.run();
+        });
+        target.addEventListener(UIEvents.KEY_DOWN, event -> {
+            if (event.target == target && (event.keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
+                    || event.keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_SPACE)) {
+                event.stopPropagation();
+                if (target.isActive() && listsAreTopLayer()) action.run();
+            }
+        });
+        target.addEventListener(UIEvents.FOCUS_IN, event -> {
+            if (event.target != target) return;
+            target.addClass("keyboard-focus");
+            for (var parent = target.getParent(); parent != null; parent = parent.getParent())
+                if (parent instanceof ScrollerView scroll) scroll.scrollToChild(target);
+        });
+        target.addEventListener(UIEvents.FOCUS_OUT, event -> {
+            if (event.target == target) target.removeClass("keyboard-focus");
+        });
+    }
+
+    boolean tabThroughLists(boolean reverse) {
+        if (!listsAreTopLayer()) return false;
+        var controls = element("lists-panel").selfAndAllChildren()
+                .filter(e -> e instanceof Button && e.isFocusable() && e.isActive() && e.isDisplayed()).toList();
+        if (controls.isEmpty()) return true;
+        int index = -1;
+        for (int i = 0; i < controls.size(); i++) if (controls.get(i).isFocused()) index = i;
+        int next = index < 0 ? (reverse ? controls.size() - 1 : 0)
+                : Math.floorMod(index + (reverse ? -1 : 1), controls.size());
+        controls.get(next).focus();
+        return true;
     }
 
     private void refreshEligibility() {

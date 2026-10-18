@@ -25,7 +25,7 @@
         gap-all: 2;
         padding-all: 8;
         margin-vertical: 8;
-        background: rect(#FF34273e)
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         .field-bg-half {

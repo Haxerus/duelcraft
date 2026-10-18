@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Gallery presentation refinements (2026-10-18)
+
+The user accepted editing, filtering, import/export, live dueling, lobby controls, inspector/log controls and resizing. Follow-up refinements extend Home artwork across the full window, integrate a square-corner Active/Clear chip within the saved-deck row, and add a thin field outline while retaining the visible Minecraft backdrop. Mouse and keyboard clearing use the existing authoritative acknowledgement flow. [Verification and focused recheck](../reports/2026-10-18-gallery-home-and-active-chip.md): four affected scenarios passed 5884 checks; after the requested sharp-corner change, Home/chip passed 43 checks at 1024×768. Build passed with 1112 JUnit passes and one existing privilege skip. Updated candidate is `build/manual-test/duelcraft-gallery-playtest-fix-2.jar`. Multiplayer remains carried forward; no merge or push.
+
 ## Initial Gallery playtest corrections (2026-10-18)
 
 User feedback accepted the Gallery direction and identified stretched Collection inspector artwork and an opaque live-duel backdrop. The inspector is now square; full-window and canvas fills are removed from the duel while keeping Gallery board/panel surfaces. The proof now displays cropped artwork and checks its bounds. [Correction report](../reports/2026-10-18-gallery-playtest-corrections.md) records focused real-client passes, visual review and the replacement test JAR. Remaining human checklist items and multiplayer checks are not inferred complete.

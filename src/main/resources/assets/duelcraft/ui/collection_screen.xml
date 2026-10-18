@@ -10,7 +10,7 @@
         #saved-lists, #save-deck, #withdraw-card, #deposit-card, #section-deck, #section-side, #add-card, #remove-card,
         #toggle-side, #sort-deck, #toggle-filters, #filter-clear, #filter-apply, #deposit-cards, #activate-deck,
         #card-density, #eligibility-details, #eligibility-close, #new-deck, #list-open, #list-duplicate, #list-export,
-        #list-delete, #list-import, #list-clear-active, #list-refresh, #lists-close, #delete-confirm,
+        #list-delete, #list-import, #list-refresh, #lists-close, #delete-confirm,
         #delete-cancel, #export-submit, #export-cancel, #export-overwrite-confirm, #export-overwrite-cancel,
         #close-save, #close-discard, #close-cancel, #close-editor, #alternate-formats,
         #import-export, #import-close, #help-button, #help-close, .saved-row {
@@ -33,7 +33,6 @@
         #editor-nav button { height: 30; }
         #new-deck, #saved-lists, #import-export { width: 126; }
         #help-button { width: 34; }
-        #list-clear-active { width: 96; height: 24; }
         #deck-summary { height: 14; }
         #editor-title { display: flex; }
         #list-name { width: 100%; }
@@ -49,11 +48,18 @@
         #lists-close, #import-close { width: 30; min-width: 30; flex-shrink: 0; }
         #saved-list-scroll { width: 100%; height: 230; }
         #saved-list-scroll .__scroller_view_view-container__ { gap-all: 4; }
-        .saved-row { width: 100%; height: 38; flex-direction: row; align-items: center; gap-all: 6; }
+        .saved-row { width: 100%; height: 40; flex-direction: row; align-items: center; background: rect(#00000000); }
         .saved-name { flex: 1; min-width: 0; height: 38; }
-        .saved-name text { width: 100%; horizontal-align: left; text-wrap: none; overflow: hidden; }
+        .saved-name > text { width: 100%; horizontal-align: left; text-wrap: none; overflow: hidden; }
         .saved-name.selected { base-background: rect(#FF211c2a, 0, 1.25, #FFc6ab77); hover-background: rect(#FF493851, 0, 1.25, #FFc6ab77); pressed-background: rect(#FF19151f, 0, 1.25, #FFc6ab77); }
-        .saved-active { width: 58; flex-shrink: 0; text-color: #FFDD55; }
+        .saved-name.keyboard-focus { base-background: rect(#FF211c2a, 0, 1.5, #FFefd18e); }
+        .saved-name.has-active { padding-right: 100; }
+        #list-clear-active { position: absolute; right: 10; top: 7; width: 80; height: 26; padding-all: 0; align-items: center; base-background: rect(#FF211c2a, 0, 1, #FFc6ab77); hover-background: rect(#FF211c2a, 0, 1, #FFf08f9b); pressed-background: rect(#FF493851, 0, 1, #FFf08f9b); }
+        #list-clear-active text { width: 100%; height: 18; font-size: 14; horizontal-align: center; vertical-align: center; text-color: #c6ab77; }
+        #list-clear-active.clear-affordance { base-background: rect(#FF211c2a, 0, 1, #FFf08f9b); }
+        #list-clear-active.clear-affordance text { text-color: #f08f9b; }
+        #list-clear-active.__disabled__ { base-background: rect(#FF211c2a, 0, 1, #FF8c7495); }
+        #list-clear-active.__disabled__ text { text-color: #b8afbe; }
         #import-panel, #help-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #import-choice-row { flex-direction: row; gap-all: 6; align-items: center; }
         #list-import-picker { flex: 1; min-width: 0; }
@@ -232,8 +238,6 @@
         #sort-deck { width: 76; }
         #card-density { width: 132; }
         #sort-deck text, #card-density text { font-size: 12; }
-        #lists-panel #list-clear-active { width: 140; height: 32; }
-        #lists-panel #list-clear-active text { font-size: 16; height: 24; }
     </style>
     <root id="collection-root" class="gallery-management">
         <element id="collection-canvas">
@@ -361,7 +365,6 @@
                 <element id="lists-panel">
                     <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button class="gallery-action" id="lists-close" text="X" /></element>
                     <scroller-view id="saved-list-scroll" />
-                    <button class="gallery-action" id="list-clear-active" text="duelcraft.collection.clear_active" />
                     <element class="row list-actions">
                         <button class="gallery-action" id="list-open" text="duelcraft.collection.open" />
                         <button class="gallery-action" id="list-duplicate" text="duelcraft.collection.duplicate" />

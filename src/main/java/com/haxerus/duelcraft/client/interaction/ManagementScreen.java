@@ -63,9 +63,12 @@ abstract class ManagementScreen extends ModularUIScreen {
         element(id).setDisplay(true);
     }
     @Override public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float tick) {
-        graphics.fill(0, 0, width, height, 0xff211c2a);
+        renderBackdrop(graphics, mouseX, mouseY, tick);
         graphics.flush();
         super.render(graphics, mouseX, mouseY, tick);
+    }
+    protected void renderBackdrop(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float tick) {
+        graphics.fill(0, 0, width, height, 0xff211c2a);
     }
     protected void hide(String id) {
         var surface = element(id);

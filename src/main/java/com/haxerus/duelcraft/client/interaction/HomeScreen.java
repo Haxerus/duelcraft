@@ -12,11 +12,13 @@ import java.util.function.Consumer;
 
 public final class HomeScreen extends ManagementScreen {
     private final boolean connected;
+    private final ResourceLocation artwork;
     private PreparationView preparation;
     private final int featuredCode = new int[]{89631139, 46986414, 44508094}[ThreadLocalRandom.current().nextInt(3)];
     private HomeScreen(ClientCollectionState.View view, PreparationView preparation, Consumer<ScreenRoute> navigate, boolean connected, ResourceLocation artwork) {
         super("home_screen", "Duelcraft");
         this.connected = connected;
+        this.artwork = artwork;
         this.preparation = preparation;
         button("home-collection", () -> navigate.accept(ScreenRoute.COLLECTION));
         button("home-duels", () -> navigate.accept(ScreenRoute.LOBBY));
@@ -30,27 +32,28 @@ public final class HomeScreen extends ManagementScreen {
         element("home-retry").setDisplay(false);
         update(view);
         invitation();
-        element("home-art").style(style -> style.background((graphics, mx, my, x, y, w, h, tick) -> {
-            var images = DuelcraftClient.getCardImageManager();
-            var art = connected && images != null ? images.getCardArt(featuredCode) : artwork;
-            graphics.fill((int)x, (int)y, (int)(x+w), (int)(y+h), 0xff211c2a);
-            if (art == null) return;
-            var texture = SpriteTexture.of(art);
-            var size = texture.getImageSize();
-            float artWidth = w * .6875f;
-            float scale = Math.max(artWidth / size.width, h / size.height);
-            int cropWidth = Math.min(size.width, Math.round(artWidth / scale));
-            int cropHeight = Math.min(size.height, Math.round(h / scale));
-            texture.setSprite((size.width - cropWidth) / 2, (size.height - cropHeight) / 2, cropWidth, cropHeight)
-                    .draw(graphics, mx, my, x + w - artWidth, y, artWidth, h, tick);
-            // Fade artwork into the Gallery canvas behind the left menu.
-            for (int offset = 0; offset < 640; offset += 4) {
-                int alpha = Math.max(0, 255 - offset * 255 / 640);
-                int left = (int)(x + (400 + offset) * w / 1280f);
-                int right = (int)(x + (404 + offset) * w / 1280f);
-                graphics.fill(left, (int)y, right, (int)(y+h), alpha << 24 | 0x211c2a);
-            }
-        }));
+    }
+    @Override
+    protected void renderBackdrop(net.minecraft.client.gui.GuiGraphics graphics, int mx, int my, float tick) {
+        super.renderBackdrop(graphics, mx, my, tick);
+        var images = DuelcraftClient.getCardImageManager();
+        var art = connected && images != null ? images.getCardArt(featuredCode) : artwork;
+        if (art == null) return;
+        var texture = SpriteTexture.of(art);
+        var size = texture.getImageSize();
+        float artWidth = width * .6875f;
+        float scale = Math.max(artWidth / size.width, height / (float) size.height);
+        int cropWidth = Math.min(size.width, Math.round(artWidth / scale));
+        int cropHeight = Math.min(size.height, Math.round(height / scale));
+        texture.setSprite((size.width - cropWidth) / 2, (size.height - cropHeight) / 2, cropWidth, cropHeight)
+                .draw(graphics, mx, my, width - artWidth, 0, artWidth, height, tick);
+        // Fade artwork into the Gallery canvas behind the left menu.
+        for (int offset = 0; offset < 640; offset += 4) {
+            int alpha = Math.max(0, 255 - offset * 255 / 640);
+            int left = (int)((400 + offset) * width / 1280f);
+            int right = (int)((404 + offset) * width / 1280f);
+            graphics.fill(left, 0, right, height, alpha << 24 | 0x211c2a);
+        }
     }
     public static HomeScreen create() {
         var screen = new HomeScreen(null, DuelcraftClient.preparation().view(), DuelcraftScreens::request, true, null);

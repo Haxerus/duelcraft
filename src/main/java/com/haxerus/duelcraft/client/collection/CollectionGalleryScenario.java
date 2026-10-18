@@ -115,8 +115,11 @@ public final class CollectionGalleryScenario implements UIScenario {
          }).hoverAt(-100, -100).step("normal visible text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-normal")
          .step("open active My decks", ctx -> ManagementTestInput.click(ctx, "#saved-lists")).ticks(2)
          .checkVisible("#list-clear-active")
-         .step("relocated Clear active retains compact component", ctx -> {
-             GalleryVisualAssertions.control(ctx, "#list-clear-active");
+         .step("active chip is inset within the saved entry", ctx -> {
+             var chip = ctx.el("#list-clear-active").bounds();
+             var row = ctx.el("#saved-row-0").bounds();
+             ctx.check("chip stays inside row", chip.x() > row.x() && chip.right() < row.right()
+                     && chip.y() >= row.y() && chip.bottom() <= row.bottom());
              GalleryVisualAssertions.scroller(ctx, "#saved-list-scroll");
          }).hoverAt(-100, -100).screenshot("gallery-collection-active-decks")
          .step("close active My decks", ctx -> ManagementTestInput.click(ctx, "#lists-close")).ticks(2)
@@ -209,7 +212,7 @@ public final class CollectionGalleryScenario implements UIScenario {
          .check("128-unit deck name accepted", ctx -> lists(ctx).name().length() == 128)
          .step("open My decks", ctx -> ManagementTestInput.click(ctx, "#saved-lists")).ticks(2)
          .checkVisible("#saved-list-scroll").checkExists("#saved-row-0")
-         .click("#saved-row-0").ticks(2)
+         .click("#saved-row-0").step("inspect selection without keyboard focus", ctx -> ctx.ui().clearFocus()).ticks(2)
          .check("selected saved list retains Gallery gold", ctx -> selectedGallery(ctx, "#saved-row-0"))
          .hoverAt(-100, -100).step("gallery-collection-my-decks text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-my-decks")
          .step("close My decks", ctx -> ManagementTestInput.click(ctx, "#lists-close")).ticks(2)

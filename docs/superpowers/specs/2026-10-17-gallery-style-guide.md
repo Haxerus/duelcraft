@@ -76,7 +76,7 @@ Use quiet edges and at most a small corner treatment for controls, with a slight
 
 ### Home
 
-Keep featured monster art on the right, fading into a solid menu on the left. Place the title, active deck and short vertical action list in that safe area. Crop artwork without stretching it; keep it out from behind menu text. Missing art leaves a complete, usable menu on the Canvas fill. Do not add promotional tiles, level bars or a decorative dashboard.
+Keep featured monster art on the right, fading into a solid menu on the left. Render this decorative backdrop across the full window, including space outside the centered management canvas. Keep controls on the stable canvas. Place the title, active deck and short vertical action list in that safe area. Crop artwork without stretching it; keep it out from behind menu text. Missing art leaves a complete, usable menu on the Canvas fill. Do not add promotional tiles, level bars or a decorative dashboard.
 
 No active deck, suspended draft, incoming invitation and request failure are real states. Show their relevant action and concise status in the menu area. Do not combine an absent deck with a fabricated deck name or successful status.
 
@@ -95,6 +95,8 @@ Keep the empty inspector quiet. Show the card name, artwork, essential stats and
 ### My decks and file tools
 
 Use a compact scrollable saved-deck list with a clear selection and active marker. Keep Open, Duplicate and Delete scoped to that selection. New deck stays outside this menu. Show a single close affordance; do not add a Done button with the same effect.
+
+Inset the active marker within the saved entry's continuous surface. Use a fixed-size, square-cornered gold Active chip that becomes red Clear on hover or keyboard focus, with a “Clear active deck” tooltip. Clicking it or pressing Enter/Space clears activation through the existing acknowledgement flow without selecting the row or deleting the saved deck. Remove the separate Clear active row. Tab/Shift+Tab stays within My decks while it is the top layer; scrolling keeps focused entries visible.
 
 Import / Export remains a separate task. Use a dropdown of YDK files from `<instance root>/duelcraft/decks`; no operating-system file dialog or permanent folder caption. Stack the import group and export action vertically with consistent widths. Preserve export filename validation and overwrite confirmation. Place Help behind its own control, without a paragraph footer in each menu.
 
@@ -156,6 +158,8 @@ Truncate long names only in compact rows, with the full name available in the se
 Use existing card assets and fallback art paths. Do not stretch cards or reveal hidden artwork via hover, placeholder caching or a transition. Original Duelcraft art can replace the featured artwork later without rearranging Home.
 
 The live duel keeps the Minecraft world visible behind the interface. Do not fill the full window or duel canvas with an opaque Canvas color. Gallery surfaces belong to the board, reading panels and controls; management screens retain their opaque backgrounds.
+
+Give the main field surface one thin Control edge outline to separate it from the world. Do not add a bevel, nested frame or gold selection color to this boundary.
 
 The first proof needs no animation. Later motion should explain zone movement, reveal or changed selection, with stable origin/destination anchors. Define interruption, queued events and reduced-motion behavior in that separate task. Do not add idle pulses, automatic art carousels or decorative entrance animations here.
 

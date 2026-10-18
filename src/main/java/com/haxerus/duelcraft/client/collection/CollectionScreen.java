@@ -145,6 +145,8 @@ public final class CollectionScreen extends ModularUIScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_TAB
+                && controller.tabThroughLists((modifiers & org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT) != 0)) return true;
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             if (!controller.dismissTopLayer()) controller.requestClose();
             return true;
