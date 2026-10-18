@@ -111,30 +111,12 @@ public final class CollectionScreen extends ModularUIScreen {
         return createWithArt(model, cards, textures, textures, id, saveDraft, search, request, refresh, client);
     }
 
-    static CollectionScreen createFixture(ResourceLocation layout, DeckEditorModel model, List<CardInfo> cards,
-            IntFunction<ResourceLocation> textures, UUID id, DeckSaveHandler saveDraft, CollectionQuery search) {
-        var screen = createWithArt(layout, model, cards, textures, textures, id, saveDraft, search,
-                command -> CompletableFuture.failedFuture(new IllegalStateException("Sample list actions unavailable")),
-                () -> CompletableFuture.completedFuture(new ClientCollectionState.View(0, model.owned(), List.of(), null)),
-                Runnable::run);
-        if (saveDraft == null) screen.controller.initializeCollections();
-        return screen;
-    }
-
     private static CollectionScreen createWithArt(DeckEditorModel model, List<CardInfo> cards,
             IntFunction<ResourceLocation> textures, IntFunction<ResourceLocation> art, UUID id,
             DeckSaveHandler saveDraft, CollectionQuery search,
             Function<CollectionCommand, CompletionStage<CollectionReply>> request,
             Supplier<CompletionStage<ClientCollectionState.View>> refresh, Executor client) {
-        return createWithArt(ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/collection_screen.xml"),
-                model, cards, textures, art, id, saveDraft, search, request, refresh, client);
-    }
-
-    private static CollectionScreen createWithArt(ResourceLocation location, DeckEditorModel model, List<CardInfo> cards,
-            IntFunction<ResourceLocation> textures, IntFunction<ResourceLocation> art, UUID id,
-            DeckSaveHandler saveDraft, CollectionQuery search,
-            Function<CollectionCommand, CompletionStage<CollectionReply>> request,
-            Supplier<CompletionStage<ClientCollectionState.View>> refresh, Executor client) {
+        var location = ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/collection_screen.xml");
         var document = XmlUtils.loadXml(location);
         if (document == null) throw new IllegalStateException("Failed to load " + location);
         var parsed = UI.of(document);
@@ -183,6 +165,8 @@ public final class CollectionScreen extends ModularUIScreen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.fill(0, 0, width, height, 0xff211c2a);
+        graphics.flush();
         controller.refreshTransfers();
         super.render(graphics, mouseX, mouseY, partialTick);
         controller.afterLayout();

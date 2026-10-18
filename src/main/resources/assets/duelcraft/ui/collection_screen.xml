@@ -2,6 +2,7 @@
 <ldlib2-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/Low-Drag-MC/LDLib2/refs/heads/1.21/ldlib2-ui.xsd">
     <stylesheet location="ldlib2:lss/gdp.lss" />
+    <stylesheet location="duelcraft:lss/gallery.lss" />
     <style>
         #collection-root { width: 1280; height: 720; }
         #collection-canvas { width: 100%; height: 100%; padding-all: 12; gap-all: 8; background: built-in(ui-gdp:BORDER_THICK_RT1); }
@@ -15,7 +16,7 @@
         #import-export, #import-close, #help-button, #help-close, .saved-row {
             height: 30; flex-shrink: 0; background: built-in(ui-gdp:RECT);
         }
-        button text { font-size: 12; text-color: #ffffff; }
+        .gallery-action text { font-size: 12; text-color: #ffffff; }
         selector text, selector label { text-color: #ffffff; }
         text-field, selector { height: 30; flex-shrink: 0; }
         .row { flex-direction: row; gap-all: 6; align-items: center; }
@@ -51,7 +52,7 @@
         .saved-row { width: 100%; height: 38; flex-direction: row; align-items: center; gap-all: 6; }
         .saved-name { flex: 1; min-width: 0; height: 38; }
         .saved-name text { width: 100%; horizontal-align: left; text-wrap: none; overflow: hidden; }
-        .saved-name.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
+        .saved-name.selected { base-background: rect(#FF211c2a, 0, 1.25, #FFc6ab77); hover-background: rect(#FF493851, 0, 1.25, #FFc6ab77); pressed-background: rect(#FF19151f, 0, 1.25, #FFc6ab77); }
         .saved-active { width: 58; flex-shrink: 0; text-color: #FFDD55; }
         #import-panel, #help-panel { width: 480; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #import-choice-row { flex-direction: row; gap-all: 6; align-items: center; }
@@ -85,7 +86,7 @@
         #extra-section { height: 128; flex-shrink: 0; }
         #side-section { height: 32; flex-shrink: 0; }
         .section-header { height: 30; flex-shrink: 0; flex-direction: row; align-items: center; padding-horizontal: 8; background: built-in(ui-gdp:RECT); }
-        .section-header label { flex: 1; }
+        #main-count, #extra-count, #side-count { flex: 1; }
         #toggle-side, #sort-deck { width: 90; height: 24; }
         .deck-grid { flex: 1; min-height: 0; }
         .deck-grid .__scroller_view_view-container__ { display: grid; grid-template-columns: repeat(10, 54px); grid-auto-rows: 79px; gap-all: 4; justify-content: space_between; align-content: flex_start; }
@@ -97,8 +98,8 @@
         .card-placeholder { width: 100%; height: 100%; background: sprite(duelcraft:textures/card_back.png); }
         .inspector-card .card-placeholder { width: 68%; }
         .card-tile.selected { overlay: built-in(ui-gdp:RECT_RD_T_SOLID); }
-        .mode-button.selected, .filter-choice.selected { base-background: built-in(ui-gdp:RECT_RD_DARK); }
-        .selector-option { height: 18; flex-shrink: 0; font-size: 12; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
+        .mode-button.selected, .filter-choice.selected { base-background: rect(#FF211c2a, 0, 1.25, #FFc6ab77); hover-background: rect(#FF493851, 0, 1.25, #FFc6ab77); pressed-background: rect(#FF19151f, 0, 1.25, #FFc6ab77); }
+        .selector-option { height: 24; flex-shrink: 0; font-size: 14; text-color: #FFFFFF; vertical-align: center; overflow: hidden; }
         .missing-copy { position: absolute; bottom: 2; left: 2; right: 2; height: 13; font-size: 9; text-color: #000000; text-shadow: false; horizontal-align: center; vertical-align: center; background: rect(#CCFFAA00); }
         .missing-copy.neutral { text-color: #FFFFFF; background: rect(#B0555555); }
         #collection-pane { width: 348; flex-shrink: 0; min-height: 0; gap-all: 6; }
@@ -148,34 +149,111 @@
         .__scroller_view_view-port__ { padding-all: 3; background: rect(#00000000); }
         .__scroller_view_vertical-scroller__ { width: 12; }
         .__scroller_view_horizontal-scroller__ { height: 12; }
-        .__scroller_head_button__, .__scroller_tail_button__ { width: 12; height: 12; flex-shrink: 0; }
+        /* Shared Gallery component styles own compact arrow geometry. */
         #close-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#96000000); z-index: 100; }
         #close-panel { width: 460; padding-all: 20; gap-all: 14; background: built-in(ui-gdp:BORDER_THICK_RT1); }
         #close-panel label { text-color: #ffffff; }
         #close-panel button { flex: 1; }
+
+        /* Gallery composition retains controller section heights and four-column virtualization. */
+        #collection-canvas { padding-all: 16; gap-all: 8; background: rect(#FF211c2a); }
+        #editor-header { height: 64; }
+        #editor-title { font-size: 24; height: 28; }
+        #header-title { width: 360; }
+        #editor-nav { height: 32; }
+        #editor-nav button { height: 32; }
+        #editor-body { gap-all: 12; }
+        #card-inspector { width: 260; padding-all: 8; gap-all: 4; background: rect(#FF34273e); }
+        #inspector-art { height: 136; }
+        .inspector-card { width: 136; height: 136; }
+        #inspector-name { font-size: 16; height: auto; }
+        #inspector-description { font-size: 16; height: auto; }
+        #inspector-stats { font-size: 14; height: auto; }
+        #card-edit-controls label { font-size: 14; height: 18; }
+        #card-edit-controls button { height: 32; }
+        #card-edit-controls .gallery-action text { font-size: 16; height: 24; }
+        .section-header { height: 32; padding-horizontal: 8; gap-all: 8; background: rect(#FF19151f); }
+        .section-header label { font-size: 18; height: 28; vertical-align: center; }
+        #side-count { font-size: 18; }
+        #toggle-side { height: 32; }
+        #import-export { width: 160; }
+        #toggle-filters { width: 128; }
+        #activate-deck { width: 140; }
+        #inspector-name { text-color: #c6ab77; }
+        .card-tile.selected { overlay: rect(#00000000, 0, 2, #FFc6ab77); }
+        #sort-deck { width: 96; height: 32; }
+        #card-density { width: 160; height: 32; }
+        #sort-deck text, #card-density text { height: 24; font-size: 16; }
+        .deck-section { background: rect(#FF34273e); }
+        #collection-pane { width: 348; gap-all: 4; }
+        #collection-pane .heading { font-size: 20; height: 28; }
+        #collection-pane .muted { font-size: 14; height: 20; }
+        #collection-pane .gallery-action, #collection-pane text-field, #collection-pane selector { height: 32; }
+        #collection-pane .gallery-action text { height: 24; }
+        #collection-canvas .collection-caption { height: 14; font-size: 10; }
+        #collection-canvas .missing-copy { height: 13; font-size: 9; }
+        #filter-panel { background: rect(#FF34273e); }
+        #collection-canvas .filter-heading { font-size: 14; height: 24; }
+        #collection-canvas .filter-choice text { font-size: 14; height: 20; }
+        #filter-scroll label { height: 24; font-size: 14; }
+        #filter-clear { width: 96; }
+        #collection-empty { height: 48; font-size: 16; }
+        #editor-footer { height: 32; }
+        #deck-summary { font-size: 14; height: 20; }
+        #deck-warnings, #deck-shortages { font-size: 12; height: auto; }
+        #editor-status { height: 24; font-size: 14; }
+        #status-row { height: 24; }
+        #lists-panel, #import-panel, #help-panel, #delete-panel, #export-panel, #export-overwrite-panel, #close-panel { background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
+        #saved-list-scroll { height: 160; }
+        #import-panel, #export-panel { width: 600; }
+        #collection-canvas .selector-option { height: 24; font-size: 14; }
+        /* One bounded title/action row; status belongs to its section. */
+        #editor-header { height: 48; gap-all: 8; }
+        #header-title { flex-grow: 0; flex-shrink: 0; flex-basis: 340; min-width: 0; width: 340; flex-direction: row; align-items: center; gap-all: 8; }
+        #list-name { flex: 1; min-width: 0; width: auto; height: 40; font-size: 20; }
+        #list-active-status { width: 58; height: 24; flex-shrink: 0; font-size: 14; text-color: #c6ab77; vertical-align: center; }
+        #new-deck, #saved-lists { width: 104; }
+        #import-export { width: 160; }
+        #save-deck { width: 72; }
+        #activate-deck { width: 140; }
+        #help-button { width: 32; }
+        #close-editor { width: 68; }
+        #new-deck, #saved-lists, #import-export, #save-deck, #activate-deck, #help-button, #close-editor { height: 40; }
+        #editor-header .gallery-action text { font-size: 16; height: 28; }
+        #main-count { flex: 1; min-width: 0; }
+        #deck-summary { flex-grow: 0; flex-shrink: 0; flex-basis: 120; width: 120; font-size: 12; height: 20; text-color: #b8afbe; adaptive-width: false; vertical-align: center; }
+        #inspector-art { height: 212; }
+        #inspector-art .inspector-card { width: 140; height: 204; }
+        #activate-deck text { text-color: #211c2a; }
+        #activate-deck.__disabled__ text { text-color: #b8afbe; }
+        #main-count { font-size: 18; adaptive-width: false; vertical-align: center; }
+
+        #sort-deck { width: 76; }
+        #card-density { width: 132; }
+        #sort-deck text, #card-density text { font-size: 12; }
+        #lists-panel #list-clear-active { width: 140; height: 32; }
+        #lists-panel #list-clear-active text { font-size: 16; height: 24; }
     </style>
-    <root id="collection-root">
+    <root id="collection-root" class="gallery-management">
         <element id="collection-canvas">
             <element id="editor-header">
+                <button class="gallery-action" id="collection-back" text="Back" style="display: none; width: 72;" />
                 <element id="header-title">
-                    <label id="editor-title" class="heading">My Collection</label>
+                    <label id="editor-title" style="display: none;">My Collection</label>
                     <text-field id="list-name" />
+                    <label id="list-active-status" />
                 </element>
                 <element id="header-spacer" />
-                <element id="header-state">
-                    <element id="header-state-labels"><label id="list-active-status" /><label id="deck-summary" /></element>
-                    <button id="list-clear-active" text="duelcraft.collection.clear_active" />
-                </element>
-                <button id="save-deck" text="duelcraft.collection.save" />
-                <button id="activate-deck" text="duelcraft.collection.use_for_duels" />
+                <element id="header-state" style="display: none;"><element id="header-state-labels" /></element>
+                <button class="gallery-action" id="new-deck" text="duelcraft.collection.new_deck" />
+                <button class="gallery-action" id="saved-lists" text="duelcraft.collection.lists" />
+                <button class="gallery-action" id="import-export" text="duelcraft.collection.import_export" />
+                <button class="gallery-action" id="save-deck" text="duelcraft.collection.save" />
+                <button class="gallery-action gallery-primary" id="activate-deck" text="duelcraft.collection.use_for_duels" />
+                <button class="gallery-action" id="help-button" text="?" />
+                <button class="gallery-action" id="close-editor" text="duelcraft.collection.close" />
             </element>
-            <element id="editor-nav">
-                <button id="collection-back" text="Back" style="display: none; width: 72;" />
-                <button id="new-deck" text="duelcraft.collection.new_deck" />
-                <button id="saved-lists" text="duelcraft.collection.lists" />
-                <button id="import-export" text="duelcraft.collection.import_export" />
-                <button id="help-button" text="?" />
-                <button id="close-editor" text="duelcraft.collection.close" />
+            <element id="editor-nav" style="display: none;">
             </element>
             <element id="editor-body">
                 <element id="card-inspector">
@@ -196,22 +274,22 @@
                         <label id="inspector-missing" />
                         <element class="row"><label id="transfer-amount-label" class="grow" /><text-field id="transfer-amount" /></element>
                         <element id="transfer-actions" class="row">
-                            <button id="deposit-card" text="duelcraft.collection.deposit" />
-                            <button id="withdraw-card" text="duelcraft.collection.withdraw" />
+                            <button class="gallery-action" id="deposit-card" text="duelcraft.collection.deposit" />
+                            <button class="gallery-action" id="withdraw-card" text="duelcraft.collection.withdraw" />
                         </element>
                         <element class="row">
-                            <button id="section-deck" class="mode-button" text="Deck" />
-                            <button id="section-side" class="mode-button" text="Side" />
+                            <button id="section-deck" class="gallery-action mode-button" text="Deck" />
+                            <button id="section-side" class="gallery-action mode-button" text="Side" />
                         </element>
                         <element class="row">
-                            <button id="add-card" text="+1 Add" />
-                            <button id="remove-card" text="−1 Remove" />
+                            <button class="gallery-action" id="add-card" text="+1 Add" />
+                            <button class="gallery-action" id="remove-card" text="−1 Remove" />
                         </element>
                     </element>
                 </element>
                 <element id="deck-sections">
                     <element id="main-section" class="deck-section">
-                        <element id="main-header" class="section-header"><label id="main-count" /><button id="sort-deck" /></element>
+                        <element id="main-header" class="section-header"><label id="main-count" /><label id="deck-summary" /><button class="gallery-action" id="sort-deck" /><button class="gallery-action" id="card-density" text="Cards: Standard" /></element>
                         <scroller-view id="main-grid" class="deck-grid" />
                     </element>
                     <element id="extra-section" class="deck-section">
@@ -219,7 +297,7 @@
                         <scroller-view id="extra-grid" class="deck-grid" />
                     </element>
                     <element id="side-section" class="deck-section">
-                        <element id="side-header" class="section-header"><label id="side-count" /><button id="toggle-side" text="Expand" /></element>
+                        <element id="side-header" class="section-header"><label id="side-count" /><button class="gallery-action" id="toggle-side" text="Expand" /></element>
                         <scroller-view id="side-grid" class="deck-grid" />
                     </element>
                 </element>
@@ -227,22 +305,21 @@
                     <label class="heading">Card collection</label>
                     <element class="row">
                         <text-field id="collection-search" />
-                        <button id="toggle-filters" text="Filters" />
+                        <button class="gallery-action" id="toggle-filters" text="Filters" />
                     </element>
-                    <label class="muted">Name, effect text or exact passcode</label>
                     <element id="collection-options" class="row">
                         <selector id="collection-ownership" />
                         <selector id="card-sort" />
                     </element>
                     <scroller-view id="active-filters" />
-                    <button id="alternate-formats" class="mode-button" text="Alternate formats: Off" />
+                    <button id="alternate-formats" class="gallery-action mode-button" text="Alternate formats: Off" />
                     <element id="browse-results">
                         <label id="result-count" />
                         <element id="collection-results-host" />
                         <label id="collection-empty">No matching cards. Open Filters to clear.</label>
                     </element>
                     <element id="filter-panel">
-                        <element class="row"><label class="grow">Filter cards</label><button id="filter-clear" text="Clear all" /></element>
+                        <element class="row"><label class="grow">Filter cards</label><button class="gallery-action" id="filter-clear" text="Clear all" /></element>
                         <scroller-view id="filter-scroll">
                             <element id="filter-groups" />
                             <label class="filter-heading">Level / Rank / Link</label>
@@ -256,46 +333,46 @@
                             <label>Pendulum scale minimum / maximum</label>
                             <element class="range-row"><text-field id="filter-scale-min" /><text-field id="filter-scale-max" /></element>
                         </scroller-view>
-                        <button id="filter-apply" text="Apply filters" />
+                        <button class="gallery-action" id="filter-apply" text="Apply filters" />
                     </element>
                 </element>
             </element>
             <element id="editor-footer">
-                <button id="deposit-cards" text="duelcraft.collection.deposit_all" />
+                <button class="gallery-action" id="deposit-cards" text="duelcraft.collection.deposit_all" />
                 <element id="deck-feedback">
                     <label id="deck-warnings" />
                     <label id="deck-shortages" />
                 </element>
-                <button id="card-density" text="Cards: Standard" />
             </element>
             <element id="status-row" class="row">
                 <label id="editor-status">duelcraft.collection.unavailable</label>
-                <button id="eligibility-details" />
+                <button class="gallery-action" id="eligibility-details" />
             </element>
             <element id="eligibility-dialog">
                 <element id="eligibility-panel">
                     <label id="eligibility-title" class="heading" />
                     <label id="eligibility-summary" class="wrap" />
                     <scroller-view id="eligibility-scroll" />
-                    <button id="eligibility-close" />
+                    <button class="gallery-action" id="eligibility-close" />
                 </element>
             </element>
             <element id="lists-dialog">
                 <element id="lists-panel">
-                    <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button id="lists-close" text="X" /></element>
+                    <element class="row"><label id="lists-title" class="heading grow">duelcraft.collection.lists</label><button class="gallery-action" id="lists-close" text="X" /></element>
                     <scroller-view id="saved-list-scroll" />
+                    <button class="gallery-action" id="list-clear-active" text="duelcraft.collection.clear_active" />
                     <element class="row list-actions">
-                        <button id="list-open" text="duelcraft.collection.open" />
-                        <button id="list-duplicate" text="duelcraft.collection.duplicate" />
-                        <button id="list-delete" text="duelcraft.collection.delete" />
+                        <button class="gallery-action" id="list-open" text="duelcraft.collection.open" />
+                        <button class="gallery-action" id="list-duplicate" text="duelcraft.collection.duplicate" />
+                        <button class="gallery-action" id="list-delete" text="duelcraft.collection.delete" />
                     </element>
                 </element>
             </element>
             <element id="import-dialog">
                 <element id="import-panel">
-                    <element class="row"><label id="import-title" class="heading grow" /><button id="import-close" text="X" /></element>
-                    <element id="import-choice-row"><selector id="list-import-picker" /><button id="list-import" text="duelcraft.collection.import_ydk" /></element>
-                    <button id="list-export" text="duelcraft.collection.export_ydk" />
+                    <element class="row"><label id="import-title" class="heading grow" /><button class="gallery-action" id="import-close" text="X" /></element>
+                    <element id="import-choice-row"><selector id="list-import-picker" /><button class="gallery-action" id="list-import" text="duelcraft.collection.import_ydk" /></element>
+                    <button class="gallery-action" id="list-export" text="duelcraft.collection.export_ydk" />
                 </element>
             </element>
             <element id="help-dialog">
@@ -305,7 +382,7 @@
                     <label id="help-navigation" class="wrap" />
                     <label id="help-ownership" class="wrap" />
                     <label id="help-supported-checks" class="wrap" />
-                    <button id="help-close" text="duelcraft.collection.done" />
+                    <button class="gallery-action" id="help-close" text="duelcraft.collection.done" />
                 </element>
             </element>
             <element id="delete-dialog">
@@ -313,20 +390,20 @@
                     <label id="delete-title" class="heading">duelcraft.collection.delete_confirm</label>
                     <label id="delete-copy" class="wrap">duelcraft.collection.delete_copy</label>
                     <element class="row">
-                        <button id="delete-confirm" text="duelcraft.collection.delete" />
-                        <button id="delete-cancel" text="duelcraft.collection.cancel" />
+                        <button class="gallery-action" id="delete-confirm" text="duelcraft.collection.delete" />
+                        <button class="gallery-action" id="delete-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>
             <element id="export-dialog">
                 <element id="export-panel">
                     <label id="export-title" class="heading" />
-                    <label id="export-copy" class="wrap" />
+                    <label id="export-copy" class="wrap" style="display: none;" />
                     <text-field id="export-filename" />
                     <label id="export-error" class="wrap warning" />
                     <element class="row">
-                        <button id="export-submit" text="duelcraft.collection.export" />
-                        <button id="export-cancel" text="duelcraft.collection.cancel" />
+                        <button class="gallery-action" id="export-submit" text="duelcraft.collection.export" />
+                        <button class="gallery-action" id="export-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>
@@ -335,8 +412,8 @@
                     <label id="export-overwrite-title" class="heading" />
                     <label id="export-overwrite-copy" class="wrap" />
                     <element class="row">
-                        <button id="export-overwrite-confirm" text="duelcraft.collection.export_replace" />
-                        <button id="export-overwrite-cancel" text="duelcraft.collection.cancel" />
+                        <button class="gallery-action" id="export-overwrite-confirm" text="duelcraft.collection.export_replace" />
+                        <button class="gallery-action" id="export-overwrite-cancel" text="duelcraft.collection.cancel" />
                     </element>
                 </element>
             </element>
@@ -344,9 +421,9 @@
                 <element id="close-panel">
                     <label id="close-title" class="heading">duelcraft.collection.save_changes</label>
                     <element class="row">
-                        <button id="close-save" text="Save" />
-                        <button id="close-discard" text="Discard" />
-                        <button id="close-cancel" text="duelcraft.collection.keep_editing" />
+                        <button class="gallery-action" id="close-save" text="Save" />
+                        <button class="gallery-action" id="close-discard" text="Discard" />
+                        <button class="gallery-action" id="close-cancel" text="duelcraft.collection.keep_editing" />
                     </element>
                 </element>
             </element>

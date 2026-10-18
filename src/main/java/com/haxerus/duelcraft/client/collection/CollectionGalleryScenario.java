@@ -13,7 +13,6 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.*;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.*;
-import com.lowdragmc.lowdraglib2.utils.XmlUtils;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
@@ -32,20 +31,23 @@ import static com.haxerus.duelcraft.core.OcgConstants.*;
 @LDLRegisterClient(name = "gallery_collection", group = "duelcraft_gallery", registry = UIScenario.REGISTRY,
         environment = RegistrationEnvironment.DEV_ONLY)
 public final class CollectionGalleryScenario implements UIScenario {
-    private static final ResourceLocation LAYOUT = ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/uitest/gallery_collection.xml");
+    private static final ResourceLocation LAYOUT = ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/collection_screen.xml");
+    private static boolean selectedGallery(TestContext ctx, String selector) {
+        var texture = ctx.el(selector).as(Button.class).getButtonStyle().baseTexture();
+        return texture instanceof com.lowdragmc.lowdraglib2.gui.texture.RectTexture rect
+                && rect.getBorderColor() == 0xffc6ab77;
+    }
     private static final String LONG_NAME = "Amber Dragon, Guardian of the Ancient Library and the Last Unbroken Covenant";
     @Override public void configure(ScenarioOptions options) { options.tags("gallery", "collection").requiresWorld(false); }
     @Override public void define(ScenarioBuilder s) {
-        var backdrop = new com.haxerus.duelcraft.client.uitest.GalleryBackdrop();
-        s.step("install Gallery backdrop", ctx -> backdrop.install());
-        s.teardown("remove Gallery backdrop", ctx -> backdrop.close());
-        s.openScreen("unchanged collection behavioral baseline", ctx -> CollectionScreen.create(
+        s.openScreen("production collection behavioral baseline", ctx -> CollectionScreen.create(
                 CollectionFixture.model(true), CollectionFixture.cards(), code -> null, CollectionFixture.LIST_ID,
                 CollectionFixture::saved, CollectionFixture.query())).awaitModularUI().ticks(3)
          .click("#main-card-0").checkTextContains("#inspector-name", "Amber Dragon")
-         .check("Gallery retains every original static controller ID", ctx -> {
-             var original = XmlUtils.loadXml(ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/collection_screen.xml"));
-             var result = GalleryPreflight.check(LAYOUT, GalleryPreflight.ids(original));
+         .check("production Gallery resource preflight", ctx -> {
+             var result = GalleryPreflight.check(LAYOUT, java.util.Set.of("list-name", "save-deck", "activate-deck",
+                     "main-grid", "extra-grid", "side-grid", "collection-results-host", "filter-panel",
+                     "lists-panel", "import-panel", "close-panel"));
              ctx.attach("preflight", result.toString());
              return result.errors().isEmpty();
          }).openScreen("normal Gallery with local artwork", ctx -> {
@@ -65,21 +67,30 @@ public final class CollectionGalleryScenario implements UIScenario {
                  cards.set(i, new CardInfo(card.code(), names[kind], "Deterministic local artwork specimen. Select Deck or Side, then add or remove a copy.",
                          types[kind], attack[kind], defense[kind], level[kind], race[kind], attribute[kind], card.scope()));
              }
-             var screen = CollectionScreen.createFixture(LAYOUT, model, cards, CollectionGalleryScenario::art,
+             var screen = CollectionScreen.create(model, cards, CollectionGalleryScenario::art,
                      CollectionFixture.LIST_ID, CollectionFixture::saved, CollectionFixture.query());
+             screen.setBackAction(() -> ctx.put("backInvoked", true));
              Object controller = ctx.getField(screen, "controller");
              SavedDeckController lists = ctx.getField(controller, "lists");
              lists.applyView(new ClientCollectionState.View(1, model.owned(), List.of(
                      new CollectionReply.Summary(CollectionFixture.LIST_ID, "Dragon study", 40, 5, 0)), CollectionFixture.LIST_ID));
              lists.rename("Dragon study");
              lists.save();
-             return backdrop.include(screen);
+             return screen;
          }).awaitModularUI().ticks(4).click("#main-card-0").ticks(2)
          .check("normal composition has 40 Main", ctx -> counts(ctx, 40, 5, 0))
          .checkText("#list-active-status", "Active")
          .click("#card-sort").ticks(2)
          .step("normal browser uses real Passcode sort", ctx -> choose(ctx, "card-sort", CardSearch.Sort.PASSCODE)).ticks(2)
-         .step("normal header contract", CollectionGalleryScenario::header)
+         .checkVisible("#collection-back")
+         .step("normal routed header contract", ctx -> {
+             header(ctx);
+             GalleryVisualAssertions.control(ctx, "#collection-back");
+             ctx.check("Back stays inside header", ctx.el("#collection-back").bounds().x() >= 0
+                     && ctx.el("#collection-back").bounds().right() <= ctx.el("#list-name").bounds().x());
+             ManagementTestInput.click(ctx, "#collection-back");
+             ctx.check("Back invokes route callback", Boolean.TRUE.equals(ctx.get("backInvoked")));
+         })
          .step("normal controls and scrollbars", ctx -> {
              for (String id : List.of("new-deck", "saved-lists", "import-export", "save-deck", "activate-deck", "help-button", "close-editor"))
                  GalleryVisualAssertions.control(ctx, "#" + id);
@@ -116,13 +127,13 @@ public final class CollectionGalleryScenario implements UIScenario {
              var first = cards.getFirst();
              cards.set(0, new CardInfo(first.code(), LONG_NAME, first.desc(), first.type(), first.atk(), first.def(),
                      first.level(), first.race(), first.attribute(), first.scope()));
-             var screen = CollectionScreen.createFixture(LAYOUT, model, cards, code -> null, CollectionFixture.LIST_ID,
+             var screen = CollectionScreen.create(model, cards, code -> null, CollectionFixture.LIST_ID,
                      (name, draft) -> ctx.<CompletableFuture<SavedDeck>>get("saveReply"), CollectionFixture.query());
              Object controller = ctx.getField(screen, "controller");
              SavedDeckController lists = ctx.getField(controller, "lists");
              lists.applyView(new ClientCollectionState.View(1, model.owned(), List.of(
                      new CollectionReply.Summary(CollectionFixture.LIST_ID, "N".repeat(128), 60, 15, 15)), null));
-             return backdrop.include(screen);
+             return screen;
          }).awaitModularUI().ticks(4).click("#main-card-0").click("#toggle-side").ticks(3)
          .check("actual 60 Main / 15 Extra / 15 Side", ctx -> counts(ctx, 60, 15, 15))
          .checkTextContains("#inspector-name", LONG_NAME)
@@ -169,6 +180,10 @@ public final class CollectionGalleryScenario implements UIScenario {
          .typeInto("#collection-search", "").ticks(2)
          .click("#toggle-filters").ticks(2)
          .checkVisible("#filter-panel").checkExists("#filter-category-monster")
+         .click("#filter-category-monster").ticks(2)
+         .check("selected filter retains Gallery gold", ctx -> selectedGallery(ctx, "#filter-category-monster"))
+         .hoverAt(-100, -100).screenshot("gallery-collection-selected-filter")
+         .click("#filter-category-monster").ticks(2)
          .step("expanded filter text fits", ctx -> {
              DuelUiAssertions.textFits(ctx, ctx.el("#filter-apply").as(Button.class).text);
              viewport(ctx);
@@ -185,6 +200,8 @@ public final class CollectionGalleryScenario implements UIScenario {
          .check("128-unit deck name accepted", ctx -> lists(ctx).name().length() == 128)
          .step("open My decks", ctx -> ManagementTestInput.click(ctx, "#saved-lists")).ticks(2)
          .checkVisible("#saved-list-scroll").checkExists("#saved-row-0")
+         .click("#saved-row-0").ticks(2)
+         .check("selected saved list retains Gallery gold", ctx -> selectedGallery(ctx, "#saved-row-0"))
          .hoverAt(-100, -100).step("gallery-collection-my-decks text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-my-decks")
          .step("close My decks", ctx -> ManagementTestInput.click(ctx, "#lists-close")).ticks(2)
          .step("create unique discovered import fixture", ctx -> {

@@ -71,7 +71,8 @@ final class CollectionWidgetPlaytest {
           .check("My decks is a separate top-level action", ctx -> {
               var lists = ctx.el("#saved-lists").bounds();
               var save = ctx.el("#save-deck").bounds();
-              return lists.y() > save.y() && DuelScreenScenario.insideViewport(lists);
+              return Math.abs(lists.centerY() - save.centerY()) <= 1
+                      && lists.right() <= save.x() && DuelScreenScenario.insideViewport(lists);
           })
           .checkVisible("#inspector-empty")
           .checkText("#inspector-empty-prompt", "Select a card to inspect.")

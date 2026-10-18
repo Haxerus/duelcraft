@@ -40,8 +40,8 @@ public final class CollectionControlsScenario implements UIScenario {
          });
         CollectionRuntimeFixture.press(s, "#saved-lists");
         s.checkVisible("#lists-dialog").checkBounds("#lists-panel", DuelScreenScenario::insideViewport)
-         .check("saved list viewport shows five full rows", ctx ->
-                 CollectionLayoutScenario.contained(ctx.el("#saved-row-4").bounds(),
+         .check("compact saved list viewport shows three full rows", ctx ->
+                 CollectionLayoutScenario.contained(ctx.el("#saved-row-2").bounds(),
                          ctx.el("#saved-list-scroll").bounds()))
          .hoverAt(-100, -100).screenshot("collection-saved-rows-top")
          .step("scroll to sixth saved row", ctx -> ctx.el("#saved-list-scroll").as(ScrollerView.class)

@@ -116,7 +116,7 @@ public final class GalleryVisualAssertions {
     }
 
     private static boolean tintedGlyph(IGuiTexture texture, String direction, int color) {
-        return texture instanceof SpriteTexture sprite && sprite.getImageLocation().toString().equals("duelcraft:textures/uitest/gallery/scroll-" + direction + ".png")
+        return texture instanceof SpriteTexture sprite && sprite.getImageLocation().toString().equals("duelcraft:textures/gui/gallery/scroll-" + direction + ".png")
                 && sprite.color == color;
     }
 
