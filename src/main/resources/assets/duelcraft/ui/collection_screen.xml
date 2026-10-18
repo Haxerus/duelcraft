@@ -223,7 +223,8 @@
         #main-count { flex: 1; min-width: 0; }
         #deck-summary { flex-grow: 0; flex-shrink: 0; flex-basis: 120; width: 120; font-size: 12; height: 20; text-color: #b8afbe; adaptive-width: false; vertical-align: center; }
         #inspector-art { height: 212; }
-        #inspector-art .inspector-card { width: 140; height: 204; }
+        /* The inspector loads cropped square artwork, not the full card image. */
+        #inspector-art .inspector-card { width: 204; height: 204; }
         #activate-deck text { text-color: #211c2a; }
         #activate-deck.__disabled__ text { text-color: #b8afbe; }
         #main-count { font-size: 18; adaptive-width: false; vertical-align: center; }

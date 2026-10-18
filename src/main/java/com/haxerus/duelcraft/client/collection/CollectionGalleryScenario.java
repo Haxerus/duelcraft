@@ -78,6 +78,12 @@ public final class CollectionGalleryScenario implements UIScenario {
              lists.save();
              return screen;
          }).awaitModularUI().ticks(4).click("#main-card-0").ticks(2)
+         .step("inspector uses cropped artwork fixture", ctx -> {
+             // Production requests cards_cropped separately; the local fixture contains full cards.
+             ctx.el("#inspector-art .card-art").element().style(style -> style.background(
+                     com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture.of(art(CollectionFixture.FIRST))
+                             .setSprite(29, 70, 210, 210)));
+         })
          .check("normal composition has 40 Main", ctx -> counts(ctx, 40, 5, 0))
          .checkText("#list-active-status", "Active")
          .click("#card-sort").ticks(2)
@@ -103,6 +109,9 @@ public final class CollectionGalleryScenario implements UIScenario {
              GalleryVisualAssertions.scroller(ctx, "#card-details-scroll");
              GalleryVisualAssertions.scroller(ctx, "#collection-results");
              ctx.attach("normal inspector art", ctx.el("#inspector-art").bounds() + " tile=" + ctx.el("#inspector-art .inspector-card").bounds());
+             var art = ctx.el("#inspector-art .card-art").bounds();
+             ctx.check("cropped inspector artwork is square", Math.abs(art.width() - art.height()) <= 1,
+                     art.width(), art.height());
          }).hoverAt(-100, -100).step("normal visible text audit", CollectionGalleryScenario::auditVisibleText).screenshot("gallery-collection-normal")
          .step("open active My decks", ctx -> ManagementTestInput.click(ctx, "#saved-lists")).ticks(2)
          .checkVisible("#list-clear-active")

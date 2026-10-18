@@ -85,13 +85,6 @@ public final class DuelScreen extends ModularUIScreen {
     }
 
     @Override
-    public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float tick) {
-        graphics.fill(0, 0, width, height, 0xff211c2a);
-        graphics.flush();
-        super.render(graphics, mouseX, mouseY, tick);
-    }
-
-    @Override
     public void init() {
         super.init();
         if (width == 0 || height == 0) return; // minimized window

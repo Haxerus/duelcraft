@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Initial Gallery playtest corrections (2026-10-18)
+
+User feedback accepted the Gallery direction and identified stretched Collection inspector artwork and an opaque live-duel backdrop. The inspector is now square; full-window and canvas fills are removed from the duel while keeping Gallery board/panel surfaces. The proof now displays cropped artwork and checks its bounds. [Correction report](../reports/2026-10-18-gallery-playtest-corrections.md) records focused real-client passes, visual review and the replacement test JAR. Remaining human checklist items and multiplayer checks are not inferred complete.
+
 ## Gallery production migration complete (2026-10-17)
 
 Production Collection, Home, Duel lobby and live-duel presentation now use the approved Gallery design on `codex/ui-redesign`, through source commit `0cc5f3f`. Existing collection authority, preparation workflows, engine/network contracts and field topology are preserved. The earlier “production unchanged” checkpoints below are historical.

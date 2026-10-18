@@ -90,7 +90,7 @@ Main, Extra and Side form three vertically stacked, full-width sections. Use the
 
 Preserve category, subtype/properties, race, attributes, Level/Rank/Link, ATK/DEF/scale ranges, ownership, sorting and alternate-format filters. The HTML filter panel is incomplete. The user likes the production browser's rich controls; start from those controls and fit Gallery's colors and hierarchy around them. Keep active filters and a clear/reset action visible. Filtering must not reset inspector, selection or unrelated scroll positions.
 
-Keep the empty inspector quiet. Show the card name, artwork, essential stats and scrollable effect when selected. Unknown/hidden cards show only permitted information. Show explicit Add/Remove and transfer controls where applicable, so the interface remains usable without knowing mouse shortcuts.
+Keep the empty inspector quiet. Show the card name, artwork, essential stats and scrollable effect when selected. The Collection inspector uses cropped artwork in a square; deck and browser tiles use full portrait cards. Unknown/hidden cards show only permitted information. Show explicit Add/Remove and transfer controls where applicable, so the interface remains usable without knowing mouse shortcuts.
 
 ### My decks and file tools
 
@@ -154,6 +154,8 @@ Use short verbs: Save, New deck, Change deck, Invite, Cancel invitation. Keep no
 Truncate long names only in compact rows, with the full name available in the selected detail or tooltip. Never truncate card effects, errors or selectable condition text with no way to read the rest. Test accents, fallback glyphs, long names and multiline effects with the real font. Avoid hardcoded English string widths in reusable components.
 
 Use existing card assets and fallback art paths. Do not stretch cards or reveal hidden artwork via hover, placeholder caching or a transition. Original Duelcraft art can replace the featured artwork later without rearranging Home.
+
+The live duel keeps the Minecraft world visible behind the interface. Do not fill the full window or duel canvas with an opaque Canvas color. Gallery surfaces belong to the board, reading panels and controls; management screens retain their opaque backgrounds.
 
 The first proof needs no animation. Later motion should explain zone movement, reveal or changed selection, with stable origin/destination anchors. Define interruption, queued events and reduced-motion behavior in that separate task. Do not add idle pulses, automatic art carousels or decorative entrance animations here.
 
