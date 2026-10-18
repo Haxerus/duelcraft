@@ -38,8 +38,23 @@ public final class GallerySpecimenScenario implements UIScenario {
                  GalleryVisualAssertions.control(ctx, "#gallery-action");
                  GalleryVisualAssertions.control(ctx, "#gallery-confirm");
                  GalleryVisualAssertions.scroller(ctx, "#gallery-rows");
+                 GalleryVisualAssertions.field(ctx, "#gallery-name");
              })
              .step("default component crops", ctx -> captureControls(ctx, canvas + "-default"))
+             .step("scroller hover capture", ctx -> {
+                 var bar = ctx.el("#gallery-rows").as(ScrollerView.class).verticalScroller.scrollBar;
+                 var point = ElementBounds.of(bar).center();
+                 ctx.input().moveTo(point.x, point.y);
+             }).ticks(2).check("thumb is hovered", ctx -> ctx.el("#gallery-rows").as(ScrollerView.class).verticalScroller.scrollBar.getState() == Button.State.HOVERED)
+             .screenshot("gallery-" + canvas + "-scroll-hover")
+             .step("scroller pressed capture", ctx -> {
+                 var bar = ctx.el("#gallery-rows").as(ScrollerView.class).verticalScroller.scrollBar;
+                 var point = ElementBounds.of(bar).center();
+                 ctx.input().mouseDown(point.x, point.y, 0);
+             }).ticks(2).check("thumb is pressed", ctx -> ctx.el("#gallery-rows").as(ScrollerView.class).verticalScroller.scrollBar.getState() == Button.State.PRESSED)
+             .screenshot("gallery-" + canvas + "-scroll-pressed")
+             .step("release scroller", ctx -> ctx.input().mouseUp(-100, -100, 0)).hoverAt(-100, -100)
+
              .step("font and bounded text contracts", ctx -> {
                  for (var text : ctx.all("*")) {
                      if (!(text.element() instanceof TextElement element)) continue;

@@ -84,6 +84,9 @@ public final class CollectionGalleryScenario implements UIScenario {
              for (String id : List.of("new-deck", "saved-lists", "import-export", "save-deck", "activate-deck", "help-button", "close-editor"))
                  GalleryVisualAssertions.control(ctx, "#" + id);
              GalleryVisualAssertions.scroller(ctx, "#main-grid");
+             GalleryVisualAssertions.field(ctx, "#list-name");
+             GalleryVisualAssertions.field(ctx, "#collection-search");
+             GalleryVisualAssertions.field(ctx, "#transfer-amount");
              GalleryVisualAssertions.scroller(ctx, "#card-details-scroll");
              GalleryVisualAssertions.scroller(ctx, "#collection-results");
              ctx.attach("normal inspector art", ctx.el("#inspector-art").bounds() + " tile=" + ctx.el("#inspector-art .inspector-card").bounds());

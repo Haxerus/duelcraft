@@ -8,7 +8,6 @@ import com.haxerus.duelcraft.duel.*;
 import com.haxerus.duelcraft.server.PreparationStatePayload;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.*;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
-import com.lowdragmc.lowdraglib2.gui.ui.styletemplate.Sprites;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.*;
@@ -64,13 +63,14 @@ public final class LobbyGalleryScenario implements UIScenario {
          .step("rule geometry", ctx -> {
              ctx.check("popup layout stable", !ctx.requireUI().getStyleEngine().requireCalculate());
              GalleryVisualAssertions.control(ctx, "#settings-close");
+             GalleryVisualAssertions.field(ctx, "#settings-lp");
+             GalleryVisualAssertions.field(ctx, "#settings-seed");
              var nativeScroll = selector(ctx).scrollerView.verticalScroller;
              // Selector's constructor deliberately hides popup arrows; retain its native component identity.
              ctx.check("selector retains hidden native arrows", !nativeScroll.headButton.isDisplayed() && !nativeScroll.tailButton.isDisplayed());
-             ctx.check("selector retains thin track and thumb", nativeScroll.scrollContainer.getSizeWidth() <= 4.1f && nativeScroll.scrollBar.getSizeWidth() <= 4.1f);
-             ctx.check("selector retains native thumb and role", nativeScroll.scrollBar.getButtonStyle().baseTexture() == Sprites.SCROLL_BAR_V
-                     && !nativeScroll.scrollBar.getClasses().contains("gallery-action") && !nativeScroll.headButton.getClasses().contains("gallery-action")
-                     && !nativeScroll.tailButton.getClasses().contains("gallery-action"));
+             ctx.check("selector retains consistent track and thumb", Math.abs(nativeScroll.scrollContainer.getSizeWidth() - 12) < .1f
+                     && Math.abs(nativeScroll.scrollBar.getSizeWidth() - 12) < .1f);
+             GalleryVisualAssertions.thumb(ctx, nativeScroll.scrollBar);
              var selector = selector(ctx);
              var anchor = ctx.el("#settings-rule").bounds();
              var popup = ElementBounds.of(selector.dialog);

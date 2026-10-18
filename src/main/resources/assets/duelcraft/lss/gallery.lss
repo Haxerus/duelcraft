@@ -46,10 +46,10 @@
 .gallery-duel .gallery-list label, .gallery-duel .__selector_preview__ label, .gallery-duel.gallery-popup label { height: 24; }
 .gallery-management .__scroller_view_view-port__, .gallery-duel .__scroller_view_view-port__ { background: rect(#FF2b2233); }
 .gallery-management .__scroller_scroll_container__, .gallery-duel .__scroller_scroll_container__ { background: rect(#FF19151f); }
-/* Explicit vertical-scroller components: readable arrows, thin native thumb/track. */
+/* Gallery scroller parts have their own palette and geometry, independent of action buttons. */
 .gallery-management .__scroller_view_vertical-scroller__, .gallery-duel .__scroller_view_vertical-scroller__ { width: 12; }
 .__scroller_view_vertical-scroller__ .__scroller_head_button__, .__scroller_view_vertical-scroller__ .__scroller_tail_button__ { width: 12; height: 12; flex-shrink: 0; }
-.__scroller_view_vertical-scroller__ .__scroller_scroll_container__ { width: 4; align-self: center; }
+.__scroller_view_vertical-scroller__ .__scroller_scroll_container__ { width: 12; align-self: center; }
 .__scroller_view_vertical-scroller__ .__scroller_scroll_bar__ { padding-all: 0; }
 .gallery-management selector, .gallery-duel selector { focus-overlay: rect(#00000000, 0, 1.25, #FFefd18e); }
 .gallery-management .gallery-dense { height: 32; }
@@ -59,4 +59,11 @@
 
 .gallery-duel .__scroller_view_vertical-scroller__ { width: 9; }
 .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_head_button__, .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_tail_button__ { width: 9; height: 9; }
-.gallery-duel .__scroller_view_vertical-scroller__ .__scroller_scroll_container__ { width: 3; }
+.gallery-duel .__scroller_view_vertical-scroller__ .__scroller_scroll_container__ { width: 9; }
+
+.gallery-management text-field { padding-horizontal: 10; }
+.gallery-duel text-field { padding-horizontal: 7.5; }
+.gallery-management .__scroller_scroll_bar__, .gallery-duel .__scroller_scroll_bar__ { base-background: rect(#FF8c7495); hover-background: rect(#FFb8afbe); pressed-background: rect(#FFefd18e); }
+/* Flat Gallery arrow silhouettes; no GDP outline or shadow. */
+.gallery-management .__scroller_view_vertical-scroller__ .__scroller_head_button__, .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_head_button__ { base-background: sprite(duelcraft:textures/uitest/gallery/scroll-up.png) color(#FFb8afbe); hover-background: sprite(duelcraft:textures/uitest/gallery/scroll-up.png) color(#FFeee5d4); pressed-background: sprite(duelcraft:textures/uitest/gallery/scroll-up.png) color(#FFefd18e); }
+.gallery-management .__scroller_view_vertical-scroller__ .__scroller_tail_button__, .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_tail_button__ { base-background: sprite(duelcraft:textures/uitest/gallery/scroll-down.png) color(#FFb8afbe); hover-background: sprite(duelcraft:textures/uitest/gallery/scroll-down.png) color(#FFeee5d4); pressed-background: sprite(duelcraft:textures/uitest/gallery/scroll-down.png) color(#FFefd18e); }

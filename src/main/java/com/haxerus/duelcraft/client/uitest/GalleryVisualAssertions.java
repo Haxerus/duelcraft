@@ -6,11 +6,10 @@ import com.lowdragmc.lowdraglib2.gui.ui.data.Vertical;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.style.PropertyRegistry;
-import com.lowdragmc.lowdraglib2.gui.texture.Icons;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.RectTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
-import com.lowdragmc.lowdraglib2.gui.ui.styletemplate.Sprites;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.lowdragmc.lowdraglib2.uitest.ElementBounds;
 import com.lowdragmc.lowdraglib2.uitest.TestContext;
 
@@ -56,7 +55,7 @@ public final class GalleryVisualAssertions {
         var scroll = ctx.el(selector).as(ScrollerView.class).verticalScroller;
         boolean duel = !ctx.all(".gallery-duel").isEmpty();
         float arrowSize = duel ? 9 : 12;
-        float trackSize = duel ? 3 : 4;
+        float trackSize = arrowSize;
         var head = scroll.headButton;
         var tail = scroll.tailButton;
         ctx.attach(selector + " scroller", "head=" + bounds(head) + " tail=" + bounds(tail)
@@ -67,19 +66,43 @@ public final class GalleryVisualAssertions {
                 + " thumbTextures=" + textures(scroll.scrollBar));
         ctx.check(selector + " compact arrows", Math.abs(head.getSizeHeight() - arrowSize) <= .1f
                 && Math.abs(tail.getSizeHeight() - arrowSize) <= .1f && Math.abs(head.getSizeWidth() - arrowSize) <= .1f && Math.abs(tail.getSizeWidth() - arrowSize) <= .1f);
-        ctx.check(selector + " thin track and thumb", scroll.scrollContainer.getSizeWidth() <= trackSize + .1f
-                && scroll.scrollBar.getSizeWidth() <= trackSize + .1f);
-        ctx.check(selector + " native up arrow textures", head.getButtonStyle().baseTexture() == Icons.UP_ARROW_NO_BAR_S
-                && head.getButtonStyle().hoverTexture() == Icons.UP_ARROW_NO_BAR_S_LIGHT
-                && head.getButtonStyle().pressedTexture() == Icons.UP_ARROW_NO_BAR_S_WHITE);
-        ctx.check(selector + " native down arrow textures", tail.getButtonStyle().baseTexture() == Icons.DOWN_ARROW_NO_BAR_S
-                && tail.getButtonStyle().hoverTexture() == Icons.DOWN_ARROW_NO_BAR_S_LIGHT
-                && tail.getButtonStyle().pressedTexture() == Icons.DOWN_ARROW_NO_BAR_S_WHITE);
-        ctx.check(selector + " native thumb textures", scroll.scrollBar.getButtonStyle().baseTexture() == Sprites.SCROLL_BAR_V
-                && scroll.scrollBar.getButtonStyle().hoverTexture() == Sprites.SCROLL_BAR_LIGHT_V
-                && scroll.scrollBar.getButtonStyle().pressedTexture() == Sprites.SCROLL_BAR_WHITE_V);
+        ctx.check(selector + " track and thumb match arrow width", Math.abs(scroll.scrollContainer.getSizeWidth() - trackSize) <= .1f
+                && Math.abs(scroll.scrollBar.getSizeWidth() - trackSize) <= .1f);
+        arrow(ctx, selector + " up", head, "up");
+        arrow(ctx, selector + " down", tail, "down");
+        thumb(ctx, scroll.scrollBar);
         ctx.check(selector + " internals are not actions", !head.getClasses().contains("gallery-action")
                 && !tail.getClasses().contains("gallery-action") && !scroll.scrollBar.getClasses().contains("gallery-action"));
+    }
+
+    public static void field(TestContext ctx, String selector) {
+        var field = ctx.el(selector).as(TextField.class);
+        float inset = ctx.all(".gallery-duel").isEmpty() ? 10 : 7.5f;
+        ctx.attach(selector + " editable inset", bounds(field));
+        ctx.check(selector + " horizontal text inset", Math.abs(field.getContentX() - field.getPositionX() - inset) < .1f
+                && Math.abs(field.getPositionX() + field.getSizeWidth() - field.getContentX() - field.getContentWidth() - inset) < .1f);
+    }
+
+    public static void thumb(TestContext ctx, Button thumb) {
+        ctx.check("Gallery flat thumb states", fill(thumb.getButtonStyle().baseTexture(), 0xff8c7495)
+                && fill(thumb.getButtonStyle().hoverTexture(), 0xffb8afbe)
+                && fill(thumb.getButtonStyle().pressedTexture(), 0xffefd18e));
+    }
+
+    private static void arrow(TestContext ctx, String label, Button button, String direction) {
+        var style = button.getButtonStyle();
+        ctx.check(label + " Gallery arrow states", tintedGlyph(style.baseTexture(), direction, 0xffb8afbe)
+                && tintedGlyph(style.hoverTexture(), direction, 0xffeee5d4)
+                && tintedGlyph(style.pressedTexture(), direction, 0xffefd18e));
+    }
+
+    private static boolean tintedGlyph(IGuiTexture texture, String direction, int color) {
+        return texture instanceof SpriteTexture sprite && sprite.getImageLocation().toString().equals("duelcraft:textures/uitest/gallery/scroll-" + direction + ".png")
+                && sprite.color == color;
+    }
+
+    private static boolean fill(IGuiTexture texture, int color) {
+        return texture instanceof RectTexture rect && rect.getColor() == color;
     }
 
     private static String textures(Button button) {

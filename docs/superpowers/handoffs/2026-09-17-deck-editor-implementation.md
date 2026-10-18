@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Current Gallery field and scrollbar correction (2026-10-17)
+
+User review exposed two incorrectly specified component defaults: two-unit editable padding and stock shaded scrollbar textures with tracks one-third of arrow width. Gallery fields now have explicit 10/7.5-unit horizontal insets; scrollbars use matching 12/9-unit widths, flat Gallery colors and authored unshaded arrow silhouettes. Production UI remains unchanged. [Correction evidence](../reports/2026-10-17-gallery-field-scrollbar-correction.md) records red checks, a visually rejected intermediate stock mask, final native runs at 1280×720 and 1024×768 (6/6 scenario executions, 8570/8570 checks), and independent visual approval. Human aesthetic review and production migration remain separate checkpoints.
+
 ## Current Gallery layout refinement (2026-10-17)
 
 Following user review, the Gallery collection proof restores full-width stacked Main/Extra/Side sections with shared card spacing and centered headings. The lobby header now groups Home with its title, deck/setup actions together, and Help/Close after a divider. Production UI remains unchanged. [Refinement evidence](../reports/2026-10-17-gallery-layout-refinement.md) records the red checks, two passing real-client runs (4/4 scenario executions, 7930/7930 checks), live resize and independent screenshot review with no actionable findings. Human review of this refinement and production migration remain separate checkpoints. Earlier proof evidence below remains historical.
