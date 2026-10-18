@@ -203,7 +203,7 @@ public class PromptController {
     private Button addDialogActionButton() {
         var button = new Button();
         button.setId("prompt-dialog-action-btn");
-        button.addClasses("prompt-btn", "hidden");
+        button.addClasses("prompt-btn", "gallery-action", "hidden");
         button.setOnClick(e -> runActionButton());
         promptButtons.addChild(button);
         return button;
@@ -411,7 +411,7 @@ public class PromptController {
         }
         var close = new Button();
         close.setId("reveal-close");
-        close.addClass("prompt-btn");
+        close.addClasses("prompt-btn", "gallery-action");
         close.setText(Component.literal("Close"));
         close.setOnClick(e -> acknowledgeReveal());
         promptButtons.addChild(close);
@@ -501,12 +501,12 @@ public class PromptController {
 
         var yesBtn = new Button();
         yesBtn.setText(Component.literal("Yes"));
-        yesBtn.addClass("prompt-btn");
+        yesBtn.addClasses("prompt-btn", "gallery-action");
         yesBtn.setOnClick(e -> callbacks.sendResponse(() -> validatedYesNo(true)));
 
         var noBtn = new Button();
         noBtn.setText(Component.literal("No"));
-        noBtn.addClass("prompt-btn");
+        noBtn.addClasses("prompt-btn", "gallery-action");
         noBtn.setOnClick(e -> callbacks.sendResponse(() -> validatedYesNo(false)));
 
         promptButtons.addChild(yesBtn);
@@ -541,7 +541,7 @@ public class PromptController {
             int idx = i;
             var btn = new Button();
             btn.setText(Component.literal(options.get(i)));
-            btn.addClass("prompt-btn");
+            btn.addClasses("prompt-btn", "gallery-action");
             if (descriptions) btn.addClass("prompt-option-btn");
             btn.setOnClick(e -> onSelect.accept(idx));
             if (choices != null) choices.addScrollViewChild(btn);
@@ -600,7 +600,7 @@ public class PromptController {
             int code = card.code();
             var btn = new Button();
             btn.setText(Component.literal(card.name()));
-            btn.addClass("prompt-name-btn");
+            btn.addClasses("prompt-name-btn", "gallery-action");
             btn.setOnClick(e -> callbacks.sendResponse(() -> validatedAnnounceCard(code)));
             results.addScrollViewChild(btn);
         }
@@ -615,7 +615,7 @@ public class PromptController {
 
         var okBtn = new Button();
         okBtn.setText(Component.literal("OK"));
-        okBtn.addClass("prompt-btn");
+        okBtn.addClasses("prompt-btn", "gallery-action");
         okBtn.setOnClick(e -> {
             try {
                 int code = Integer.parseInt(input.getValue().trim());
@@ -668,7 +668,7 @@ public class PromptController {
             var btn = new Button();
             btn.setId("announce-bit-" + bit);
             btn.setText(Component.literal(labelFor.apply(bit)));
-            btn.addClass("prompt-btn");
+            btn.addClasses("prompt-btn", "gallery-action");
             btn.setOnClick(e -> {
                 bitSelection.toggle(bit);
                 toggleClass(btn, "selected", bitSelection.isChecked(bit));
@@ -735,7 +735,7 @@ public class PromptController {
         if (!sel.forced()) {
             var passBtn = new Button();
             passBtn.setText(Component.literal("Pass"));
-            passBtn.addClasses("prompt-btn");
+            passBtn.addClasses("prompt-btn", "gallery-action");
             passBtn.setOnClick(e -> callbacks.sendResponse(() -> ResponseValidator.selectChain(sel, -1)));
             promptButtons.addChild(passBtn);
         }
@@ -1049,7 +1049,7 @@ public class PromptController {
 
         var keepOrderBtn = new Button();
         keepOrderBtn.setText(Component.literal("Keep Order"));
-        keepOrderBtn.addClasses("prompt-btn");
+        keepOrderBtn.addClasses("prompt-btn", "gallery-action");
         // A leading -1 skips sorting; the engine takes it unconditionally, nothing to validate.
         keepOrderBtn.setOnClick(e -> callbacks.sendResponse(ResponseBuilder::sortCardsDefault));
         promptButtons.addChild(keepOrderBtn);
@@ -1322,7 +1322,7 @@ public class PromptController {
 
         var confirmBtn = new Button();
         confirmBtn.setText(Component.literal("Confirm"));
-        confirmBtn.addClasses("prompt-btn");
+        confirmBtn.addClasses("prompt-btn", "gallery-action");
         confirmBtn.setOnClick(e -> {
             if (sumSelection.isComplete()) sendSumResponse();
         });

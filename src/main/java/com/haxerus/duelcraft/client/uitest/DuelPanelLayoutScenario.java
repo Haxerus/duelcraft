@@ -173,6 +173,8 @@ public final class DuelPanelLayoutScenario implements UIScenario {
          });
         capture(s, "right-panels-zone-content-refresh");
 
+        press(s, "#zone-inspector-expand");
+        s.step("single zone expands with log intentionally closed", ctx -> checkRightPanels(ctx, true, false));
         press(s, "#log-toggle");
         s.step("both panels split the column", ctx -> {
              checkRightPanels(ctx, true, true);
@@ -198,6 +200,40 @@ public final class DuelPanelLayoutScenario implements UIScenario {
              ctx.put("logOffset", offset);
              sameOffset(ctx, "#zone-inspector-list", "zoneOffset", "scrolling log does not move zone");
          });
+        press(s, "#zone-inspector-expand");
+        s.step("explicit zone expansion preserves board and offsets", ctx -> {
+            checkRightPanels(ctx, true, false);
+            sameBounds(ctx, "#field-area", "fieldBounds", "expanded field");
+            sameOffset(ctx, "#zone-inspector-list", "zoneOffset", "expanded zone offset");
+        });
+        capture(s, "right-panels-zone-expanded");
+        press(s, "#zone-inspector-expand");
+        s.step("zone restore preserves independent reading positions", ctx -> {
+            checkRightPanels(ctx, true, true);
+            sameOffset(ctx, "#zone-inspector-list", "zoneOffset", "restored zone offset");
+            sameOffset(ctx, "#duel-log-list", "logOffset", "restored log offset");
+        });
+        press(s, "#duel-log-expand");
+        s.step("explicit log expansion", ctx -> checkRightPanels(ctx, false, true));
+        press(s, "#duel-log-expand");
+        s.step("log restore retains split and offsets", ctx -> {
+            checkRightPanels(ctx, true, true);
+            sameOffset(ctx, "#duel-log-list", "logOffset", "log expansion round trip");
+        });
+        press(s, "#duel-log-expand");
+        press(s, "#plr-graveyard");
+        s.step("explicit inspection reveals suppressed zone", ctx -> checkRightPanels(ctx, true, true));
+        press(s, "#zone-inspector-expand");
+        press(s, "#log-toggle");
+        s.step("explicit log request restores suppressed log", ctx -> checkRightPanels(ctx, true, true));
+        press(s, "#zone-inspector-expand");
+        s.step("append to suppressed log away from bottom", ctx -> LDLibDuelScreen.applyMessage(
+                new DuelMessage.Summoning(33750025, new LocInfo(0, LOCATION_MZONE, 1, POS_FACEUP_ATTACK)))).ticks(3);
+        press(s, "#zone-inspector-expand");
+        s.step("suppressed log append preserves reading position", ctx -> {
+            checkRightPanels(ctx, true, true);
+            sameOffset(ctx, "#duel-log-list", "logOffset", "hidden append retains offset");
+        });
         press(s, "#log-toggle");
         s.step("zone expands without losing its scroll", ctx -> {
              checkRightPanels(ctx, true, false);
@@ -217,7 +253,16 @@ public final class DuelPanelLayoutScenario implements UIScenario {
          .step("non-bottom append preserves exact log offset", ctx -> {
              sameOffset(ctx, "#duel-log-list", "logOffset", "non-bottom append preserves log offset");
              ctx.check("non-bottom append stays away from bottom", !atBottom(ctx, "#duel-log-list"));
-         })
+         });
+        press(s, "#duel-log-expand");
+        s.scroll("#duel-log-list", 20).ticks(2)
+         .step("remember manual expanded log scroll", ctx -> {
+             ctx.check("expanded manual scroll leaves bottom", !atBottom(ctx, "#duel-log-list"));
+             ctx.put("expandedLogOffset", scrollOffset(ctx, "#duel-log-list"));
+         });
+        press(s, "#duel-log-expand");
+        s.step("restore retains manual expanded reading position", ctx ->
+                sameOffset(ctx, "#duel-log-list", "expandedLogOffset", "expanded input updates reading intent"))
          .step("scroll log to bottom", ctx -> ctx.el("#duel-log-list").as(ScrollerView.class)
                  .verticalScroller.setNormalizedValue(1)).ticks(2)
          .step("remember bottom before append", ctx -> {
@@ -230,6 +275,11 @@ public final class DuelPanelLayoutScenario implements UIScenario {
          .ticks(3)
          .check("bottom append follows the new last line", ctx -> atBottom(ctx, "#duel-log-list")
                  && scrollOffset(ctx, "#duel-log-list") > (float) ctx.get("bottomOffset"));
+        press(s, "#zone-inspector-expand");
+        s.step("append to suppressed bottom-following log", ctx -> LDLibDuelScreen.applyMessage(
+                new DuelMessage.Summoning(28406301, new LocInfo(0, LOCATION_MZONE, 2, POS_FACEUP_ATTACK)))).ticks(3);
+        press(s, "#zone-inspector-expand");
+        s.check("restored log retains bottom-follow intent", ctx -> atBottom(ctx, "#duel-log-list"));
         s.step("click newest card log entry", ctx -> {
             var bounds = ctx.all("#duel-log-list .log-line").getLast().bounds();
             ctx.input().mouseDown(bounds.centerX(), bounds.centerY(), 0);
@@ -240,8 +290,46 @@ public final class DuelPanelLayoutScenario implements UIScenario {
                  "A very long monster name that must wrap inside the card information panel"));
         capture(s, "right-panels-log-click-keeps-all-details");
 
+        s.step("read the bottom of a split long zone", ctx -> ctx.el("#zone-inspector-list").as(ScrollerView.class)
+                .verticalScroller.setNormalizedValue(1)).ticks(2)
+         .step("remember high zone reading position", ctx -> ctx.put("highZoneOffset", scrollOffset(ctx, "#zone-inspector-list")));
+        press(s, "#zone-inspector-expand");
+        s.step("expanded viewport temporarily clamps high zone offset", ctx -> {
+            var list = ctx.el("#zone-inspector-list").as(ScrollerView.class);
+            float range = list.getContainerHeight() - list.viewPort.getContentHeight();
+            ctx.check("saved zone offset exceeds expanded range", (float) ctx.get("highZoneOffset") > range + 1);
+            ctx.check("expanded zone displays its clamped bottom", atBottom(ctx, "#zone-inspector-list"));
+        });
+        capture(s, "zone-high-offset-expanded");
+        press(s, "#zone-inspector-expand");
+        s.step("Restore retains high zone reading intent", ctx ->
+                sameOffset(ctx, "#zone-inspector-list", "highZoneOffset", "high zone offset survives expansion clamp"));
+        press(s, "#zone-inspector-expand");
+        s.step("mutate inspected pile during expansion", ctx -> inspectionPile(61)).ticks(3)
+         .checkCount("#zone-inspector-list .card", 61);
+        press(s, "#zone-inspector-expand");
+        s.step("expanded mutation retains original reading intent", ctx ->
+                sameOffset(ctx, "#zone-inspector-list", "highZoneOffset", "expanded content refresh cannot save forced clamp"));
+        press(s, "#zone-inspector-expand");
+        s.scroll("#zone-inspector-list", 20).ticks(2)
+         .step("remember manual expanded zone input", ctx -> {
+             ctx.check("expanded zone wheel leaves bottom", !atBottom(ctx, "#zone-inspector-list"));
+             ctx.put("manualZoneOffset", scrollOffset(ctx, "#zone-inspector-list"));
+         });
+        press(s, "#zone-inspector-expand");
+        s.step("Restore honors manual expanded zone input", ctx ->
+                sameOffset(ctx, "#zone-inspector-list", "manualZoneOffset", "manual expanded zone input replaces old intent"));
+        capture(s, "zone-manual-expanded-scroll-restored");
+
         press(s, "#zone-inspector-close");
         s.step("log-only after closing zone", ctx -> checkRightPanels(ctx, false, true));
+        press(s, "#duel-log-expand");
+        press(s, "#duel-log-expand");
+        s.step("restore single log never reopens zone", ctx -> checkRightPanels(ctx, false, true));
+        press(s, "#plr-graveyard");
+        press(s, "#zone-inspector-expand");
+        press(s, "#zone-inspector-close");
+        s.step("closing expanded zone reveals intended log", ctx -> checkRightPanels(ctx, false, true));
         press(s, "#duel-log-close");
         s.step("neither panel after both close", ctx -> checkRightPanels(ctx, false, false));
         s.step("long message", ctx -> {

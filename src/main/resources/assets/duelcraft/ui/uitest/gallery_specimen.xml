@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ldlib2-ui>
+    <stylesheet location="duelcraft:lss/gallery.lss" />
+    <style>
+        #gallery-root { width: 100%; height: 100%; }
+        #gallery-content { width: 100%; height: 100%; }
+        .gallery-columns { flex-direction: row; flex: 1; min-height: 0; }
+        .gallery-column { flex: 1; min-width: 0; }
+        #gallery-modal { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC19151f); z-index: 100; }
+        #gallery-dialog { width: 50%; }
+    </style>
+    <root id="gallery-root">
+        <element id="gallery-content" class="gallery-panel">
+            <label class="gallery-display">Duelcraft</label>
+            <label class="gallery-title">Gallery · Component specimen</label>
+            <element class="gallery-columns">
+                <element class="gallery-column gallery-panel">
+                    <label class="gallery-section">Actions and input</label>
+                    <button id="gallery-action" class="gallery-action gallery-primary" text="Invite player" />
+                    <label>Deck name</label><text-field id="gallery-name" />
+                    <label>Rule preset</label>
+                    <selector id="gallery-selector" />
+                    <button id="gallery-disabled" class="gallery-action" text="Unavailable" />
+                    <button id="gallery-save" class="gallery-action gallery-primary" text="Save" />
+                    <label id="gallery-feedback" class="gallery-warning">Ready to save</label>
+                    <button id="gallery-confirm" class="gallery-action gallery-dense" text="Delete saved copy…" />
+                </element>
+                <element class="gallery-column gallery-panel">
+                    <label class="gallery-section">Selected deck · Active</label>
+                    <button id="gallery-selected" class="gallery-action gallery-selected" text="Selected · Active" />
+                    <text class="gallery-name">Étoile of the Ancient Dragon — a deliberately long deck and card name, shown in full in the selected detail</text>
+                    <label class="gallery-meta">Accents: Étoile · naïve · 日本語 ★</label>
+                    <label class="gallery-section">Scrollable saved decks</label>
+                    <scroller-view id="gallery-rows" class="gallery-list">
+                        <label id="gallery-first-row">01 · Amber Dragon</label><label>02 · Spell toolbox</label>
+                        <label>03 · Étoile</label><label>04 · Cinder Dragon</label>
+                        <label>05 · Ritual library</label><label>06 · Ancient forest</label>
+                        <label>07 · Last saved deck</label><label>08 · Last saved deck</label><label>09 · Last saved deck</label><label>10 · Last saved deck</label><label>11 · Last saved deck</label><label id="gallery-last-row">12 · Last saved deck</label>
+                    </scroller-view>
+                    <text class="gallery-error">Could not load that deck. Select another deck or try again.</text>
+                </element>
+            </element>
+        </element>
+        <element id="gallery-modal"><element id="gallery-dialog" class="gallery-panel">
+            <label class="gallery-title">Delete this deck?</label>
+            <text class="gallery-name">Your deposited cards remain in your collection.</text>
+            <button class="gallery-action" id="gallery-dismiss" text="Cancel" />
+        </element></element>
+    </root>
+</ldlib2-ui>

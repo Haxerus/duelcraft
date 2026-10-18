@@ -2,6 +2,7 @@
 <ldlib2-ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/Low-Drag-MC/LDLib2/refs/heads/1.21/ldlib2-ui.xsd">
     <stylesheet location="ldlib2:lss/gdp.lss" />
+    <stylesheet location="duelcraft:lss/gallery.lss" />
     <style>
         /* ── Root: fixed design canvas. DuelScreen scales #duel-canvas to the window. ── */
         #duel-root {
@@ -24,7 +25,7 @@
         gap-all: 2;
         padding-all: 8;
         margin-vertical: 8;
-        background: built-in(ui-gdp:BORDER_THICK_RT1)
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         .field-bg-half {
@@ -81,7 +82,7 @@
         }
 
         .pz-slot {
-        background: built-in(ui-gdp:RECT_RD_DARK);
+        background: rect(#FF19151f);
         }
 
         /* ── Zone Grid (rectangle background behind zones) ── */
@@ -90,7 +91,7 @@
         align-items: center;
         gap-all: 2;
         padding-all: 4;
-        background: built-in(ui-gdp:RECT_RD_DARK);
+        background: rect(#FF19151f);
         }
 
         /* ── Zone Rows Container ── */
@@ -150,11 +151,11 @@
         }
 
         .pile-slot {
-        background: built-in(ui-gdp:RECT_RD_DARK);
+        background: rect(#FF19151f);
         }
 
         .emz-slot {
-        background: built-in(ui-gdp:RECT_RD_DARK);
+        background: rect(#FF19151f);
         }
 
         /* ── Center Row (EMZ + Controls) ── */
@@ -174,6 +175,9 @@
         /* ── Phase buttons ── */
 
         .phase-btn {
+        base-background: rect(#FF211c2a, 0, 1, #FF8c7495);
+        hover-background: rect(#FF493851, 0, 1, #FFc6ab77);
+        pressed-background: rect(#FF19151f, 0, 1, #FFefd18e);
         width: 24;
         height: 24;
         }
@@ -192,7 +196,7 @@
         align-items: stretch;
         gap-all: 4;
         padding-all: 4;
-        background: rect(#1A1A2E, 4, 1, #4444AA);
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         .duel-control-btn {
@@ -210,7 +214,7 @@
         #duel-controls-divider {
         height: 1;
         margin-top: 2;
-        background: rect(#4444AA);
+        background: rect(#FF8c7495);
         }
 
         #shuffle-btn.hidden, #prompt-toggle-btn.hidden {
@@ -366,16 +370,24 @@
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
-        background: built-in(ui-gdp:RECT);
+        background: rect(#FF34273e);
         }
 
-        #duel-log.hidden, #zone-inspector.hidden {
+        #duel-log.hidden, #zone-inspector.hidden, .panel-suppressed {
         display: none;
         }
 
+        /* Scope Gallery text metrics to reading surfaces, never field cards or counters. */
+        .panel-actions { flex-direction: row; justify-content: center; gap-all: 4; }
+        .gallery-duel .duel-control-btn { height: 20; }
+        .gallery-duel .duel-control-btn > text { height: 14; font-size: 8; }
+        .gallery-duel .prompt-btn { height: 24; }
+        .gallery-duel .prompt-btn > text { height: 18; font-size: 10; }
+        .gallery-duel .prompt-option-btn, .gallery-duel .prompt-name-btn { height: auto; }
+        .gallery-duel .prompt-option-btn > text, .gallery-duel .prompt-name-btn > text { height: auto; }
         #duel-log-title {
-        height: 12;
-        font-size: 9;
+        height: 21;
+        font-size: 15;
         text-color: #FFFFFF;
         }
 
@@ -383,7 +395,7 @@
         flex: 1;
         }
 
-        #duel-log-close, #zone-inspector-close {
+        #duel-log-close, #zone-inspector-close, #duel-log-expand, #zone-inspector-expand {
         align-self: center;
         min-width: 32;
         height: 20;
@@ -400,8 +412,8 @@
         width: 100%;
         adaptive-height: true;
         text-wrap: wrap;
-        font-size: 7;
-        text-color: #DDDDDD;
+        font-size: 9;
+        text-color: #eee5d4;
         }
 
         /* ── Refcounted player hints (MSG_PLAYER_HINT), under each player's name ── */
@@ -623,7 +635,7 @@
         }
 
         #opponent-hand .__scroller_view_view-port__, #player-hand .__scroller_view_view-port__ {
-        background: built-in(ui-gdp:RECT_LIGHT);
+        background: rect(#FF2b2233);
         min-height: 42;
         }
 
@@ -661,7 +673,7 @@
 
         #hud-turn-phase {
         font-size: 7;
-        text-color: #AAAAAA;
+        text-color: #b8afbe;
         horizontal-align: center;
         }
 
@@ -675,7 +687,7 @@
         flex-direction: column;
         gap-all: 2;
         padding-all: 4;
-        background: built-in(ui-gdp:RECT);
+        background: rect(#FF34273e);
         }
 
         #card-info-banner.hidden {
@@ -698,16 +710,17 @@
         }
 
         #card-name-label {
-        height: 10;
-        font-size: 9;
-        text-color: #FFFF00;
+        min-height: 21;
+        height: auto;
+        font-size: 15;
+        text-color: #c6ab77;
         horizontal-align: center;
         }
 
         #card-stats-label {
         height: 10;
         font-size: 8;
-        text-color: #CCCCCC;
+        text-color: #b8afbe;
         horizontal-align: center;
         }
 
@@ -733,20 +746,20 @@
         flex-direction: row;
         }
 
-        .link-marker, #card-link-center {
+        .gallery-duel .link-marker, #card-link-center {
         width: 14;
         height: 14;
         flex-shrink: 0;
         }
 
-        .link-marker {
+        .gallery-duel .link-marker {
         font-size: 12;
         horizontal-align: center;
         vertical-align: center;
         text-color: #777777;
         }
 
-        .link-marker.active {
+        .gallery-duel .link-marker.active {
         text-color: #FF5555;
         }
 
@@ -774,10 +787,11 @@
 
         #zone-inspector-title {
         width: 100%;
-        min-height: 12;
-        adaptive-height: true;
+        min-height: 21;
+        height: auto;
         text-wrap: wrap;
-        font-size: 9;
+        adaptive-height: true;
+        font-size: 15;
         text-color: #FFFFFF;
         }
 
@@ -813,7 +827,7 @@
 
         .insp-slot {
         flex-basis: 1;
-        background: built-in(ui-gdp:RECT);
+        background: rect(#FF34273e);
         }
 
         .inspector-card-entry {
@@ -849,7 +863,7 @@
         gap-all: 8;
         padding-all: 8;
         width: 280;
-        background: rect(#1A1A2E, 4, 1, #4444AA);
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         #prompt-title {
@@ -952,7 +966,7 @@
         }
 
         .prompt-card-scroller .__scroller_view_view-port__ {
-        background: built-in(ui-gdp:RECT_LIGHT);
+        background: rect(#FF2b2233);
         min-height: 48;
         }
 
@@ -982,7 +996,7 @@
         gap-all: 4;
         padding-all: 8;
         width: 200;
-        background: rect(#1A1A2E, 4, 1, #4444AA);
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         #result-title {
@@ -1001,7 +1015,7 @@
         adaptive-height: true;
         text-wrap: wrap;
         font-size: 8;
-        text-color: #AAAAAA;
+        text-color: #b8afbe;
         horizontal-align: center;
         }
 
@@ -1031,7 +1045,7 @@
         gap-all: 4;
         padding-all: 8;
         width: 200;
-        background: rect(#1A1A2E, 4, 1, #4444AA);
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         #hint-modal-text {
@@ -1069,7 +1083,7 @@
         gap-all: 4;
         padding-all: 8;
         width: 200;
-        background: rect(#1A1A2E, 4, 1, #4444AA);
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         }
 
         #pause-title {
@@ -1101,7 +1115,7 @@
         }
 
         .prompt-name-scroller .__scroller_view_view-port__ {
-        background: built-in(ui-gdp:RECT_LIGHT);
+        background: rect(#FF2b2233);
         height: 160;
         }
 
@@ -1143,7 +1157,7 @@
         min-height: 35;
         }
 
-        .position-label {
+        .gallery-duel .position-label {
         width: 100%;
         font-size: 6;
         text-color: #FFFFFF;
@@ -1177,7 +1191,7 @@
         flex-shrink: 0;
         }
 
-        .card-source {
+        .gallery-duel .card-source {
         width: 100%;
         adaptive-height: true;
         text-wrap: wrap;
@@ -1259,7 +1273,7 @@
         flex-direction: row;
         gap-all: 1;
         padding-all: 1;
-        background: rect(#1A1A2E, 2, 1, #4444AA);
+        background: rect(#FF34273e, 0, 1, #FF8c7495);
         z-index: 10;
         }
 
@@ -1296,6 +1310,11 @@
         .zone-icon.pendulum-marker.hidden {
         display: none;
         }
+        /* Horizontal card/hand scrollers keep their existing hit geometry. */
+        .__scroller_view_horizontal-scroller__ .__scroller_scroll_container__ { background: rect(#FF19151f); }
+        .__scroller_view_horizontal-scroller__ .__scroller_scroll_bar__ { base-background: rect(#FF8c7495); hover-background: rect(#FFb8afbe); pressed-background: rect(#FFefd18e); }
+        .__scroller_view_horizontal-scroller__ .__scroller_head_button__ { base-background: sprite(duelcraft:textures/gui/gallery/scroll-up.png) rotate(-90) color(#FFb8afbe); hover-background: sprite(duelcraft:textures/gui/gallery/scroll-up.png) rotate(-90) color(#FFeee5d4); pressed-background: sprite(duelcraft:textures/gui/gallery/scroll-up.png) rotate(-90) color(#FFefd18e); }
+        .__scroller_view_horizontal-scroller__ .__scroller_tail_button__ { base-background: sprite(duelcraft:textures/gui/gallery/scroll-up.png) rotate(90) color(#FFb8afbe); hover-background: sprite(duelcraft:textures/gui/gallery/scroll-up.png) rotate(90) color(#FFeee5d4); pressed-background: sprite(duelcraft:textures/gui/gallery/scroll-up.png) rotate(90) color(#FFefd18e); }
     </style>
 
     <root id="duel-root">
@@ -1398,11 +1417,11 @@
                     </element>
                 </element>
                 <element id="center-controls">
-                    <button id="phase-btn-left" class="phase-btn" text="SP" />
+                    <button id="phase-btn-left" class="phase-btn gallery-action" text="SP" />
                     <element id="emz-left" class="square-slot emz-slot" />
-                    <button id="phase-btn-center" class="phase-btn" text="BP" />
+                    <button id="phase-btn-center" class="phase-btn gallery-action" text="BP" />
                     <element id="emz-right" class="square-slot emz-slot" />
-                    <button id="phase-btn-right" class="phase-btn" text="EP" />
+                    <button id="phase-btn-right" class="phase-btn gallery-action" text="EP" />
                 </element>
                 <element id="plr-piles-banished" class="pile-column">
                     <element id="plr-banished" class="card-slot pile-slot">
@@ -1487,13 +1506,13 @@
             </scroller-view>
         </element>
 
-        <element id="duel-controls">
-            <button id="shuffle-btn" class="duel-control-btn hidden" text="Shuffle" />
-            <button id="prompt-toggle-btn" class="duel-control-btn hidden" text="Hide Prompt" />
-            <button id="chain-toggle-btn" class="duel-control-btn" text="Chain: ON" />
-            <button id="log-toggle" class="duel-control-btn" text="Log" />
+        <element id="duel-controls" class="gallery-duel">
+            <button id="shuffle-btn" class="duel-control-btn hidden gallery-action" text="Shuffle" />
+            <button id="prompt-toggle-btn" class="duel-control-btn hidden gallery-action" text="Hide Prompt" />
+            <button id="chain-toggle-btn" class="duel-control-btn gallery-action" text="Chain: ON" />
+            <button id="log-toggle" class="duel-control-btn gallery-action" text="Log" />
             <element id="duel-controls-divider" />
-            <button id="concede-btn" class="duel-control-btn" text="Concede" />
+            <button id="concede-btn" class="duel-control-btn gallery-action" text="Concede" />
         </element>
 
         <!-- ══════════ OVERLAYS (absolute positioned) ══════════ -->
@@ -1520,13 +1539,13 @@
         <label id="opp-hints" class="player-hints hidden" />
 
         <!-- Shared Cancel/Finish button for field selections, also bound to right-click -->
-        <element id="prompt-action-bar">
-            <button id="prompt-action-btn" class="prompt-btn hidden" text="Finish" />
+        <element id="prompt-action-bar" class="gallery-duel">
+            <button id="prompt-action-btn" class="prompt-btn hidden gallery-action" text="Finish" />
         </element>
 
         <!-- Prompt Dialog (centered overlay for selections) -->
         <element id="prompt-overlay" class="hidden">
-            <element id="prompt-dialog">
+            <element id="prompt-dialog" class="gallery-duel">
                 <label id="prompt-source-title" class="hidden" />
                 <label id="prompt-title">Select an option</label>
                 <element id="prompt-body">
@@ -1539,25 +1558,25 @@
         </element>
 
         <!-- Independent right-side inspectors remain usable beside an active prompt. -->
-        <element id="duel-right-column" class="hidden">
+        <element id="duel-right-column" class="gallery-duel hidden">
             <element id="zone-inspector" class="hidden">
                 <label id="zone-inspector-title">Graveyard (#)</label>
                 <scroller-view id="zone-inspector-list">
                     <!-- Inspector entries added dynamically in Java -->
                 </scroller-view>
-                <button id="zone-inspector-close" text="Close" />
+                <element class="panel-actions"><button id="zone-inspector-expand" class="gallery-action gallery-dense" text="Expand" /><button id="zone-inspector-close" class="gallery-action gallery-dense" text="Close" /></element>
             </element>
             <element id="duel-log" class="hidden">
                 <label id="duel-log-title">Duel log</label>
                 <scroller-view id="duel-log-list">
                     <!-- Log lines added dynamically in Java -->
                 </scroller-view>
-                <button id="duel-log-close" text="Close" />
+                <element class="panel-actions"><button id="duel-log-expand" class="gallery-action gallery-dense" text="Expand" /><button id="duel-log-close" class="gallery-action gallery-dense" text="Close" /></element>
             </element>
         </element>
 
         <!-- Card Info Banner (above selection dimmer so descriptions remain scrollable) -->
-        <element id="card-info-banner" class="hidden">
+        <element id="card-info-banner" class="gallery-duel hidden">
             <element id="card-image-area" />
             <text id="card-name-label" class="card-label">Number 11: Big Eye</text>
             <text id="card-stats-label" class="card-label">DARK / Rank 7 / Spellcaster / Xyz /
@@ -1600,28 +1619,28 @@
 
         <!-- Duel Result Overlay (winner and reason, shown when the duel ends) -->
         <element id="result-overlay" class="hidden">
-            <element id="result-dialog">
+            <element id="result-dialog" class="gallery-duel">
                 <label id="result-title">Duel over</label>
                 <label id="result-reason">Life points</label>
-                <button id="result-close" class="prompt-btn" text="Close" />
+                <button id="result-close" class="prompt-btn gallery-action gallery-primary" text="Close" />
             </element>
         </element>
 
         <!-- Hint Modal (HINT_MESSAGE: a message that blocks until acknowledged) -->
         <element id="hint-modal" class="hidden">
-            <element id="hint-modal-dialog">
+            <element id="hint-modal-dialog" class="gallery-duel">
                 <label id="hint-modal-text">Message</label>
-                <button id="hint-modal-ok" class="prompt-btn" text="OK" />
+                <button id="hint-modal-ok" class="prompt-btn gallery-action gallery-primary" text="OK" />
             </element>
         </element>
 
         <!-- Pause Overlay (ESC while the duel is live) -->
         <element id="pause-overlay" class="hidden">
-            <element id="pause-dialog">
+            <element id="pause-dialog" class="gallery-duel">
                 <label id="pause-title">Leave duel?</label>
                 <element id="pause-buttons">
-                    <button id="pause-concede" class="prompt-btn" text="Concede" />
-                    <button id="pause-stay" class="prompt-btn" text="Stay" />
+                    <button id="pause-concede" class="prompt-btn gallery-action" text="Concede" />
+                    <button id="pause-stay" class="prompt-btn gallery-action gallery-primary" text="Stay" />
                 </element>
             </element>
         </element>

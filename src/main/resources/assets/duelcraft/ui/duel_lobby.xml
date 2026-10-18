@@ -1,59 +1,103 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ldlib2-ui>
     <stylesheet location="ldlib2:lss/gdp.lss" />
+    <stylesheet location="duelcraft:lss/gallery.lss" />
     <style>
         #lobby-root { width: 1280; height: 720; }
-        #lobby-canvas { width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#E818171E); }
-        #lobby-panel { width: 940; height: 584; padding-all: 22; gap-all: 20; background: built-in(ui-gdp:BORDER_THICK_RT1); }
-        label, text { font-size: 16; text-color: #FFFFFF; text-shadow: true; }
+        #lobby-canvas { width: 100%; height: 100%; padding-all: 32; }
+        #lobby-panel { width: 100%; height: 100%; gap-all: 24; }
         .row { flex-direction: row; gap-all: 12; align-items: center; }
         .grow { flex: 1; min-width: 0; min-height: 0; }
         .wrap { width: 100%; text-wrap: wrap; adaptive-height: true; }
-        .heading { font-size: 22; }
-        #lobby-canvas button { height: 40; min-width: 100; flex-shrink: 0; background: built-in(ui-gdp:RECT); }
-        .keyboard-focus { background: rect(#FF665378); }
-        .keyboard-focus text { text-color: #FFF0B8; }
-        #lobby-help { min-width: 40; width: 40; }
-        #lobby-body { flex: 1; min-height: 0; flex-direction: row; gap-all: 22; }
-        #lobby-left { width: 260; gap-all: 16; }
-        #lobby-deck-box { padding-all: 16; gap-all: 12; background: rect(#FF1B1923); }
-        #lobby-right { flex: 1; min-width: 0; gap-all: 20; }
-        #lobby-left > .__scroller_view_view-port__ > .__scroller_view_view-container__ { gap-all: 16; }
-        #lobby-right > .__scroller_view_view-port__ > .__scroller_view_view-container__ { gap-all: 20; }
-        #lobby-players { height: 278; width: 100%; }
-        .player-row { width: 100%; height: 40; margin-bottom: 5; }
-        #lobby-hands button { flex: 1; min-width: 0; height: 80; }
-        #lobby-first-choice button { flex: 1; }
-        #lobby-footer { height: 60; flex-direction: row; gap-all: 12; align-items: center; }
-        #lobby-feedback, #settings-error { text-color: #EBBC82; }
-        #management-help, #lobby-settings-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC08070C); z-index: 90; }
-        .dialog-panel { width: 480; padding-all: 22; gap-all: 16; background: built-in(ui-gdp:BORDER_THICK_RT1); }
-        text-field, selector { height: 36; width: 100%; flex-shrink: 0; }
-        .__selector_preview__ label, .__selector_dialog__ label { height: 28; flex-shrink: 0; }
-        .__selector_dialog__ { z-index: 95; }
-        #settings-seed { height: 36; }
+        #lobby-canvas .gallery-action { min-width: 120; }
+        #lobby-canvas #lobby-select-deck { min-width: 144; }
+        #lobby-canvas #lobby-help { width: 40; min-width: 40; }
+        #lobby-body { flex: 1; min-height: 0; gap-all: 12; }
+        #lobby-left { display: none; }
+        #lobby-right { flex: 1; min-height: 0; width: 100%; }
+        .gallery-stage { align-items: center; gap-all: 12; padding-top: 24; }
+        #lobby-players { height: 184; width: 592; }
+        .player-row { flex-direction: column; width: 174; height: 170; padding-all: 10; gap-all: 4; align-items: center; flex-shrink: 0; base-background: rect(#FF211c2a); hover-background: rect(#FF493851); pressed-background: rect(#FF19151f); }
+        #lobby-hands button, #lobby-first-choice button { flex: 1; }
+        #lobby-footer { flex-direction: row; align-items: center; gap-all: 20; height: 128; padding-all: 16; background: rect(#FF211c2a); }
+        #lobby-deck { width: 100%; font-size: 20; text-wrap: wrap; adaptive-height: true; }
+        #lobby-deck-scroll { width: 100%; height: 70; }
+        #lobby-root #lobby-deck-scroll .__scroller_view_view-port__ { background: rect(#FF211c2a); }
+        #lobby-options { width: 360; height: 48; font-size: 14; horizontal-align: right; }
+        #lobby-actions { height: 40; justify-content: center; }
+        #management-help, #lobby-settings-dialog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC19151f); z-index: 90; }
+        .dialog-panel { width: 560; padding-all: 24; gap-all: 8; background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
+        #settings-error { height: 32; }
+        #lobby-root .__selector_dialog__ { z-index: 95; background: rect(#FF19151f, 0, 1.25, #FF8c7495); }
+        #lobby-root .__selector_dialog__ label { height: 28; font-size: 16; text-color: #eee5d4; }
+        #lobby-root .__selector_dialog__ text { font-size: 16; text-color: #eee5d4; }
+        #lobby-root .__selector_preview__ label { height: 28; }
+        #lobby-root .__selector_dialog__ .__scroller_view_view-port__ { background: rect(#FF19151f); }
+        #lobby-root .gallery-stage-viewport, #lobby-root .gallery-roster-viewport { background: rect(#FF211c2a); }
+        #lobby-prompt { height: 44; font-size: 32; horizontal-align: center; vertical-align: center; }
+        #gallery-roster-count { horizontal-align: center; width: 100%; margin-bottom: 12; }
+        .gallery-roster { flex-direction: row; flex-wrap: wrap; justify-content: center; gap-all: 20; }
+        .player-row > .__button_text__ { display: none; }
+        .player-row .player-avatar { width: 76; height: 76; font-size: 28; horizontal-align: center; vertical-align: center; background: rect(#FF493851, 38); }
+        .player-row .player-name { width: 148; height: 44; font-size: 20; text-wrap: wrap; horizontal-align: center; vertical-align: center; }
+        .player-row .player-availability { width: 148; height: 22; font-size: 14; horizontal-align: center; vertical-align: center; text-color: #b8afbe; }
+        .player-row.gallery-selected { base-background: rect(#FF211c2a, 0, 1.25, #FFc6ab77); }
+        .player-row.gallery-selected .player-avatar { background: rect(#FF63516b, 38, 1, #FFc6ab77); }
+        .player-row.gallery-selected .player-availability { text-color: #c6ab77; }
+        #gallery-lobby-art { width: 66; height: 96; background: sprite(duelcraft:textures/card_back.png); }
+        #gallery-deck-copy { flex: 1; gap-all: 4; }
+        #lobby-invite { width: 230; }
+        #lobby-invite text { text-color: #211c2a; }
+        #lobby-invite.__disabled__ text { text-color: #b8afbe; }
+        #lobby-feedback { position: absolute; left: 0; bottom: 0; height: 28; horizontal-align: center; }
+        #gallery-settings-sheet { position: absolute; right: 0; top: 0; width: 382; height: 100%; padding-all: 32; gap-all: 24; background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
+        #gallery-settings-sheet .gallery-title { font-size: 22; }
+        #gallery-settings-sheet #settings-close { min-width: 40; width: 40; }
+        .settings-pair { width: 100%; gap-all: 8; }
+        .settings-half { flex: 1; min-width: 0; gap-all: 8; }
+        .empty-roster #gallery-roster-slot { display: none; }
+        #gallery-roster-slot { width: 592; height: 184; }
+        #gallery-lobby-title { width: 80; flex-shrink: 0; vertical-align: center; }
+        #lobby-header { height: 40; flex-shrink: 0; }
+        #lobby-navigation { gap-all: 16; }
+        #lobby-utilities { gap-all: 8; margin-left: 12; padding-left: 24; }
+        #lobby-utilities-divider { position: absolute; left: 0; top: 8; width: 1.25; height: 24; background: rect(#FF57465f); }
+        #lobby-canvas #lobby-home, #lobby-canvas #lobby-close { width: 80; min-width: 80; }
+        .gallery-management .lobby-home { base-background: rect(#FF211c2a); }
     </style>
-    <root id="lobby-root"><element id="lobby-canvas">
+    <root id="lobby-root" class="gallery-management"><element id="lobby-canvas">
         <element id="lobby-panel">
-            <element class="row"><button id="lobby-home" text="Home" /><label class="heading grow">Duel</label><button id="lobby-help" text="?" /><button id="lobby-close" text="Close" /></element>
-            <element id="lobby-body">
-                <scroller-view id="lobby-left">
-                    <element id="lobby-deck-box"><label>Your active deck</label><text id="lobby-deck" class="wrap" /><button id="lobby-select-deck" text="Select deck" /></element>
-                    <text id="lobby-options" class="wrap" />
-                    <button id="lobby-settings" text="Settings" />
-                </scroller-view>
+            <element id="lobby-header" class="row">
+                <element id="lobby-navigation" class="row">
+                    <button class="gallery-action lobby-home" id="lobby-home" text="‹ Home" />
+                    <label id="gallery-lobby-title" class="gallery-title">Duel</label>
+                </element>
+                <element class="grow" />
+                <element id="lobby-preparation-actions" class="row">
+                    <button class="gallery-action" id="lobby-select-deck" text="Change deck" />
+                    <button class="gallery-action" id="lobby-settings" text="Settings" />
+                </element>
+                <element id="lobby-utilities" class="row">
+                    <element id="lobby-utilities-divider" />
+                    <button class="gallery-action" id="lobby-help" text="?" />
+                    <button class="gallery-action" id="lobby-close" text="Close" />
+                </element>
+            </element>
+            <element id="lobby-body"><text id="lobby-feedback" class="wrap gallery-warning" />
+                <scroller-view id="lobby-left"><element id="lobby-deck-box" /></scroller-view>
                 <scroller-view id="lobby-right">
-                    <text id="lobby-prompt" class="heading wrap" />
-                    <scroller-view id="lobby-players" />
-                    <element id="lobby-hands" class="row"><button id="lobby-rock" text="Rock" /><button id="lobby-paper" text="Paper" /><button id="lobby-scissors" text="Scissors" /></element>
-                    <element id="lobby-first-choice" class="row"><button id="lobby-first" text="Go first" /><button id="lobby-second" text="Go second" /></element>
-                    <label id="lobby-countdown" />
-                    <button id="lobby-retry" text="Retry" />
+                    <text id="lobby-prompt" class="wrap" /><label id="gallery-roster-count" class="gallery-meta"></label>
+                    <element id="gallery-roster-slot"><scroller-view id="lobby-players" /></element>
+            <element id="lobby-actions" class="row"><button id="lobby-invite" text="Invite" class="gallery-action gallery-primary" /><button class="gallery-action" id="lobby-accept" text="Accept" /><button class="gallery-action" id="lobby-decline" text="Decline" /><button class="gallery-action" id="lobby-cancel" text="Cancel invitation" style="min-width: 200;" /></element>
+                    <element id="lobby-hands" class="row"><button class="gallery-action" id="lobby-rock" text="Rock" /><button class="gallery-action" id="lobby-paper" text="Paper" /><button class="gallery-action" id="lobby-scissors" text="Scissors" /></element>
+                    <element id="lobby-first-choice" class="row"><button class="gallery-action" id="lobby-first" text="Go first" /><button class="gallery-action" id="lobby-second" text="Go second" /></element>
+                    <label id="lobby-countdown" class="gallery-meta" /><button class="gallery-action" id="lobby-retry" text="Retry" />
                 </scroller-view>
             </element>
-            <element id="lobby-footer"><text id="lobby-feedback" class="grow wrap" /><button id="lobby-invite" text="Invite" /><button id="lobby-accept" text="Accept" /><button id="lobby-decline" text="Decline" /><button id="lobby-cancel" text="Cancel" /></element>
+
+            <element id="lobby-footer"><element style="position: absolute; left: 0; top: 0; width: 100%; height: 1; background: rect(#FF57465f);" /><element id="gallery-lobby-art" /><element id="gallery-deck-copy"><label class="gallery-meta">Active deck</label><scroller-view id="lobby-deck-scroll"><text id="lobby-deck" /></scroller-view></element><text id="lobby-options" class="gallery-meta" /></element>
         </element>
-        <element id="lobby-settings-dialog"><element class="dialog-panel"><element class="row"><label class="heading grow">Duel settings</label><button id="settings-close" text="Close" /></element><label>Rule preset</label><selector id="settings-rule" /><label>Life points</label><text-field id="settings-lp" /><label>Starting hand</label><text-field id="settings-hand" /><label>Draw per turn</label><text-field id="settings-draw" /><label>Seed (optional)</label><text-field id="settings-seed" /><text id="settings-error" class="wrap" /></element></element>
-        <element id="management-help"><element class="dialog-panel"><label class="heading">Duel help</label><text id="lobby-help-copy" class="wrap" /><button id="help-close" text="Close" /></element></element>
+        <element id="lobby-settings-dialog"><element id="gallery-settings-sheet"><element class="row"><label class="gallery-title grow">Duel settings</label><button class="gallery-action" id="settings-close" text="×" /></element><element class="settings-pair"><label>Rule preset</label><selector id="settings-rule" /></element><element class="settings-pair"><label>Life points</label><text-field id="settings-lp" /></element><element class="row"><element class="settings-half"><label>Starting hand</label><text-field id="settings-hand" /></element><element class="settings-half"><label>Draw per turn</label><text-field id="settings-draw" /></element></element><element class="settings-pair"><label>Seed (optional)</label><text-field id="settings-seed" /></element><text id="settings-error" class="wrap gallery-error" /></element></element>
+        <element id="management-help"><element class="dialog-panel"><label class="gallery-title">Duel help</label><text id="lobby-help-copy" class="wrap" /><button class="gallery-action" id="help-close" text="Close" /></element></element>
     </element></root>
 </ldlib2-ui>

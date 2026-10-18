@@ -8,6 +8,10 @@ import com.haxerus.duelcraft.duel.*;
 import com.haxerus.duelcraft.interaction.ScreenRoute;
 import com.haxerus.duelcraft.server.PreparationStatePayload;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
@@ -75,11 +79,16 @@ public final class DuelLobbyScreen extends ManagementScreen {
         button("lobby-first", () -> controller.onFirst(true));
         button("lobby-second", () -> controller.onFirst(false));
         button("lobby-retry", () -> { preparation.request(new PreparationCommand.View()); refreshCollection(); });
-        button("lobby-help", () -> element("management-help").setDisplay(true));
+        button("lobby-help", () -> show("management-help", "lobby-help"));
         button("help-close", () -> hide("management-help"));
-        button("lobby-settings", () -> element("lobby-settings-dialog").setDisplay(true));
+        button("lobby-settings", () -> show("lobby-settings-dialog", "lobby-settings"));
         button("settings-close", () -> hide("lobby-settings-dialog"));
+        ((ScrollerView) element("lobby-right")).viewContainer.addClass("gallery-stage");
+        ((ScrollerView) element("lobby-players")).viewContainer.addClass("gallery-roster");
+        ((ScrollerView) element("lobby-right")).viewPort.addClass("gallery-stage-viewport");
+        ((ScrollerView) element("lobby-players")).viewPort.addClass("gallery-roster-viewport");
         configureSettings();
+        alignRulePopup();
         element("management-help").setDisplay(false);
         element("lobby-settings-dialog").setDisplay(false);
         unsubscribe = preparation.subscribe(this::received);
@@ -95,6 +104,28 @@ public final class DuelLobbyScreen extends ManagementScreen {
                                          Function<PreparationCommand, CompletionStage<PreparationStatePayload>> send,
                                          Consumer<ScreenRoute> navigate) {
         return new DuelLobbyScreen(preparation, collection, targets, send, navigate, false);
+    }
+    private static Button targetRow(Target target, boolean selected) {
+        var card = new Button();
+        card.setText(target.name() + (selected ? "  \u2713" : ""));
+        card.getStyle().tooltips(Component.literal(target.name()));
+        if (selected) card.addClass("gallery-selected");
+        var avatar = new Label();
+        avatar.setText(""); avatar.addClass("player-avatar");
+        avatar.style(style -> style.background((graphics, mx, my, x, y, w, h, tick) -> {
+            var connection = Minecraft.getInstance().getConnection();
+            var player = connection == null ? null : connection.getPlayerInfo(target.id());
+            var skin = player == null ? DefaultPlayerSkin.get(target.id()) : player.getSkin();
+            var texture = SpriteTexture.of(skin.texture());
+            texture.setSprite(8, 8, 8, 8).draw(graphics, mx, my, x, y, w, h, tick);
+            texture.setSprite(40, 8, 8, 8).draw(graphics, mx, my, x, y, w, h, tick);
+        }));
+        var name = new Label();
+        name.setText(target.name()); name.addClass("player-name");
+        var availability = new Label();
+        availability.setText(selected ? "\u2713 Available" : "Available"); availability.addClass("player-availability");
+        card.addChildren(avatar, name, availability);
+        return card;
     }
     public static void clearForm() { form.target = null; form.rule = DuelRule.MR5; form.lp = "8000"; form.hand = "5"; form.draw = "1"; form.seed = ""; }
     private void acknowledge() { controller.acknowledge(); }
@@ -141,6 +172,25 @@ public final class DuelLobbyScreen extends ManagementScreen {
             update();
         }));
     }
+    private void alignRulePopup() {
+        var selector = (Selector<?>) element("settings-rule");
+        selector.scrollerView.setId("gallery-rule-scroller");
+        // Pinned LDLib's root-hosted popup clamp uses unscaled screen coordinates.
+        selector.dialog.getBubbleListeners(UIEvents.LAYOUT_CHANGED).forEach(listener ->
+                selector.dialog.removeEventListener(UIEvents.LAYOUT_CHANGED, listener));
+        selector.dialog.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
+            var dialog = selector.dialog;
+            var root = element("lobby-root");
+            float width = Math.max(selector.getSizeWidth(), 50);
+            float left = Math.clamp(selector.getPositionX() - root.getPositionX(), 0, Math.max(0, root.getSizeWidth() - width));
+            float top = Math.clamp(selector.getPositionY() + selector.getSizeHeight() - root.getPositionY(), 0,
+                    Math.max(0, root.getSizeHeight() - dialog.getSizeHeight()));
+            if (Math.abs(dialog.getPositionX() - root.getPositionX() - left) > .1f
+                    || Math.abs(dialog.getPositionY() - root.getPositionY() - top) > .1f
+                    || Math.abs(dialog.getSizeWidth() - width) > .1f)
+                dialog.layout(layout -> layout.left(left).top(top).width(width));
+        });
+    }
     private PlayerOptions options() { return new PlayerOptions(Integer.parseInt(form.lp), Integer.parseInt(form.hand), Integer.parseInt(form.draw)); }
     private Long seed() { return form.seed.isBlank() ? null : Long.parseLong(form.seed); }
     private String invalidSettings() {
@@ -174,6 +224,10 @@ public final class DuelLobbyScreen extends ManagementScreen {
         boolean idle = mode == PreparationView.Mode.IDLE, invited = mode == PreparationView.Mode.INVITED;
         boolean ready = collection != null && collection.activeId() != null;
         text("lobby-deck", HomeScreen.deckSummary(collection));
+        element("gallery-lobby-art").setDisplay(ready);
+        text("gallery-roster-count", targets.size() + (targets.size() == 1 ? " player available" : " players available"));
+        element("gallery-roster-count").setDisplay(idle);
+        element("gallery-roster-slot").setDisplay(idle && !targets.isEmpty());
         text("lobby-feedback", preparation.detail().isEmpty() ? feedback : preparation.detail());
         text("settings-error", invalidSettings());
         text("lobby-help-copy", "Close hides this screen; Cancel ends preparation.\n\n" +
@@ -185,6 +239,7 @@ public final class DuelLobbyScreen extends ManagementScreen {
         if (!idle) hide("lobby-settings-dialog");
         element("lobby-players").setDisplay(idle);
         element("lobby-invite").setDisplay(idle);
+        ((Button) element("lobby-invite")).setText(controller.pending() && idle ? "Inviting\u2026" : "Invite");
         element("lobby-invite").setActive(ready && !controller.pending() && form.target != null && invalidSettings().isEmpty()
                 && targets.stream().anyMatch(t -> t.id().equals(form.target)));
         element("lobby-accept").setDisplay(invited && !view.outgoing());
@@ -210,8 +265,8 @@ public final class DuelLobbyScreen extends ManagementScreen {
         if (idle) {
             var list = (ScrollerView) element("lobby-players"); list.clearAllScrollViewChildren();
             for (var target : targets) {
-                var row = new Button(); row.setId("lobby-player-" + target.id()); row.addClass("player-row");
-                row.setText(Component.literal(target.name() + (target.id().equals(form.target) ? "  ✓" : "")));
+                var row = targetRow(target, target.id().equals(form.target));
+                row.setId("lobby-player-" + target.id()); row.addClass("player-row");
                 bind(row, () -> { form.target = target.id(); update(); });
                 list.addScrollViewChild(row);
             }

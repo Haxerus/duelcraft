@@ -16,6 +16,7 @@ import org.lwjgl.glfw.GLFW;
 /** Shared management canvas sizing and one-layer-at-a-time modal close. */
 abstract class ManagementScreen extends ModularUIScreen {
     protected boolean removed;
+    private final java.util.Map<String, UIElement> returnFocus = new java.util.HashMap<>();
     protected ManagementScreen(String resource, String title) { super(load(resource), Component.literal(title)); }
     private static ModularUI load(String resource) {
         var document = XmlUtils.loadXml(ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/" + resource + ".xml"));
@@ -56,10 +57,25 @@ abstract class ManagementScreen extends ModularUIScreen {
     protected UIElement keyboardSurface() {
         return element("management-help").isDisplayed() ? element("management-help") : modularUI.ui.rootElement;
     }
+    protected void show(String id, String initiator) {
+        returnFocus.put(id, element(initiator));
+        modularUI.clearFocus();
+        element(id).setDisplay(true);
+    }
+    @Override public void render(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float tick) {
+        renderBackdrop(graphics, mouseX, mouseY, tick);
+        graphics.flush();
+        super.render(graphics, mouseX, mouseY, tick);
+    }
+    protected void renderBackdrop(net.minecraft.client.gui.GuiGraphics graphics, int mouseX, int mouseY, float tick) {
+        graphics.fill(0, 0, width, height, 0xff211c2a);
+    }
     protected void hide(String id) {
         var surface = element(id);
         if (modularUI.getFocusedElement() != null && surface.isAncestorOf(modularUI.getFocusedElement())) modularUI.clearFocus();
         surface.setDisplay(false);
+        var initiator = returnFocus.remove(id);
+        if (initiator != null && usable(initiator)) initiator.focus();
     }
     private static boolean usable(UIElement element) {
         for (var current = element; current != null; current = current.getParent()) {

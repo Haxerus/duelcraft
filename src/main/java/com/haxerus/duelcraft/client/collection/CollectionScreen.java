@@ -145,6 +145,8 @@ public final class CollectionScreen extends ModularUIScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_TAB
+                && controller.tabThroughLists((modifiers & org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT) != 0)) return true;
         if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
             if (!controller.dismissTopLayer()) controller.requestClose();
             return true;
@@ -165,6 +167,8 @@ public final class CollectionScreen extends ModularUIScreen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.fill(0, 0, width, height, 0xff211c2a);
+        graphics.flush();
         controller.refreshTransfers();
         super.render(graphics, mouseX, mouseY, partialTick);
         controller.afterLayout();
