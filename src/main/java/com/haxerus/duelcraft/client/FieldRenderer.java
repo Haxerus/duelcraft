@@ -441,7 +441,7 @@ public class FieldRenderer {
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
             slot.addClass("has-card");
         } else {
-            slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
+            slot.lss("background", "rect(#FF19151f)");
             slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
             slot.removeClass("has-card");
         }
@@ -455,7 +455,7 @@ public class FieldRenderer {
             slot.select(".zone-icon").forEach(icon -> icon.addClass("hidden"));
             slot.addClass("has-card");
         } else {
-            slot.lss("background", "built-in(ui-gdp:RECT_RD_DARK)");
+            slot.lss("background", "rect(#FF19151f)");
             slot.select(".zone-icon").forEach(icon -> icon.removeClass("hidden"));
             slot.removeClass("has-card");
             callbacks.clearPendingImage(slot);

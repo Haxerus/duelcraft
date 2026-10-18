@@ -275,6 +275,9 @@ public class LDLibDuelScreen {
         private boolean logAtBottom = true;
         private int renderedLogEntries;
         private int rightPanelLayoutRevision;
+        // Expansion suppresses presentation only; hidden retains the user's open/close intent.
+        private String expandedPanel;
+        private boolean restoringScroll;
         private int logContentRevision;
         private int zoneContentRevision;
 
@@ -326,8 +329,22 @@ public class LDLibDuelScreen {
             zoneList = byId("zone-inspector-list", ScrollerView.class);
             logToggle = byId("log-toggle", Button.class);
             logClose = byId("duel-log-close", Button.class);
-            logList.verticalScroller.setOnValueChanged(value -> rememberLogScroll());
-            zoneList.verticalScroller.setOnValueChanged(value -> zoneScrollOffset = scrollOffset(zoneList));
+            logList.verticalScroller.setOnValueChanged(value -> {
+                if (!restoringScroll && !logPanel.hasClass("hidden") && !logPanel.hasClass("panel-suppressed")) {
+                    logScrollOffset = value * scrollRange(logList);
+                    logAtBottom = atBottom(logList, logScrollOffset);
+                }
+            });
+            zoneList.verticalScroller.setOnValueChanged(value -> {
+                if (!restoringScroll && !byId("zone-inspector").hasClass("panel-suppressed")) zoneScrollOffset = value * scrollRange(zoneList);
+            });
+            // A display change can settle over several layout passes. Keep pixel intent throughout.
+            for (var element : new UIElement[]{logList.viewPort, logList.viewContainer}) {
+                element.addEventListener(UIEvents.LAYOUT_CHANGED, e -> restoreScroll(logList, logScrollOffset, logAtBottom));
+            }
+            for (var element : new UIElement[]{zoneList.viewPort, zoneList.viewContainer}) {
+                element.addEventListener(UIEvents.LAYOUT_CHANGED, e -> restoreScroll(zoneList, zoneScrollOffset, false));
+            }
 
             // ── Field slots (owned by FieldRenderer) ──
             field = new FieldRenderer(ui, state, FieldLayout.fromFlags(state.duelFlags), new FieldRenderer.Callbacks() {
@@ -414,10 +431,12 @@ public class LDLibDuelScreen {
                     UIRefresher.this.clearCardInfo(source);
                 }
                 @Override public void onVisibilityChanged() {
+                    UIRefresher.this.rememberRightPanelScrolls();
+                    expandedPanel = null;
                     UIRefresher.this.refreshRightPanels();
                 }
                 @Override public void restoreScrollAfterContentLayout(float offset) {
-                    UIRefresher.this.restoreZoneAfterContentLayout(offset);
+                    UIRefresher.this.restoreZoneAfterContentLayout(byId("zone-inspector").hasClass("panel-suppressed") ? zoneScrollOffset : offset);
                 }
             });
             var descResolver = new OptionTextResolver(
@@ -862,12 +881,22 @@ public class LDLibDuelScreen {
                 logToggle.setOnClick(e -> {
                     if (logPanel == null) return;
                     rememberRightPanelScrolls();
+                    boolean suppressed = logPanel.hasClass("panel-suppressed");
+                    expandedPanel = null;
                     if (logPanel.hasClass("hidden")) {
                         logPanel.removeClass("hidden");
                         rebuildLog();
-                    } else {
+                    } else if (!suppressed) {
                         logPanel.addClass("hidden");
                     }
+                    refreshRightPanels();
+                    e.stopPropagation();
+                });
+            }
+            for (String panel : new String[]{"zone-inspector", "duel-log"}) {
+                byId(panel + "-expand", Button.class).setOnClick(e -> {
+                    rememberRightPanelScrolls();
+                    expandedPanel = panel.equals(expandedPanel) ? null : panel;
                     refreshRightPanels();
                     e.stopPropagation();
                 });
@@ -886,7 +915,6 @@ public class LDLibDuelScreen {
         /** Rewrites the panel from {@link DuelLog}; only called while it is open. */
         private void rebuildLog() {
             if (logList == null) return;
-            rememberLogScroll();
             int entryCount = state.duelLog.entries().size();
             boolean appendOnly = entryCount > renderedLogEntries;
             boolean followBottom = appendOnly && logAtBottom;
@@ -898,8 +926,8 @@ public class LDLibDuelScreen {
                 for (var segment : entry.segments()) {
                     var part = Component.literal(segment.text());
                     switch (segment.role()) {
-                        case CARD_NAME -> part.withStyle(style -> style.withColor(0xE6C878));
-                        case CONTEXT -> part.withStyle(style -> style.withColor(0xA9C7EF).withBold(true));
+                        case CARD_NAME -> part.withStyle(style -> style.withColor(0xC6AB77));
+                        case CONTEXT -> part.withStyle(style -> style.withColor(0xEEE5D4).withBold(true));
                         case PLAIN -> { }
                     }
                     text.append(part);
@@ -923,26 +951,37 @@ public class LDLibDuelScreen {
             int revision = ++rightPanelLayoutRevision;
             boolean zoneVisible = zoneInspector != null && !byId("zone-inspector").hasClass("hidden");
             boolean logVisible = logPanel != null && !logPanel.hasClass("hidden");
+            if (("zone-inspector".equals(expandedPanel) && !zoneVisible)
+                    || ("duel-log".equals(expandedPanel) && !logVisible)) expandedPanel = null;
+            setPanelSuppressed("zone-inspector", expandedPanel != null && !"zone-inspector".equals(expandedPanel));
+            setPanelSuppressed("duel-log", expandedPanel != null && !"duel-log".equals(expandedPanel));
+            byId("zone-inspector-expand", Button.class).setText(Component.literal("zone-inspector".equals(expandedPanel) ? "Restore" : "Expand"));
+            byId("duel-log-expand", Button.class).setText(Component.literal("duel-log".equals(expandedPanel) ? "Restore" : "Expand"));
+            zoneVisible &= !byId("zone-inspector").hasClass("panel-suppressed");
+            logVisible &= !logPanel.hasClass("panel-suppressed");
             if (zoneVisible || logVisible) rightColumn.removeClass("hidden");
             else rightColumn.addClass("hidden");
             if (zoneVisible) restoreAfterViewportLayout(zoneList, zoneScrollOffset, false, revision);
             if (logVisible) restoreAfterViewportLayout(logList, logScrollOffset, logAtBottom, revision);
         }
 
-        private void rememberRightPanelScrolls() {
-            if (zoneList != null && !byId("zone-inspector").hasClass("hidden"))
-                zoneScrollOffset = scrollOffset(zoneList);
-            if (logPanel != null && !logPanel.hasClass("hidden")) rememberLogScroll();
+        private void setPanelSuppressed(String id, boolean suppressed) {
+            if (suppressed) byId(id).addClass("panel-suppressed");
+            else byId(id).removeClass("panel-suppressed");
         }
 
-        private void rememberLogScroll() {
-            if (logList == null || logPanel == null || logPanel.hasClass("hidden")) return;
-            logScrollOffset = scrollOffset(logList);
-            logAtBottom = atBottom(logList, logScrollOffset);
+        private void rememberRightPanelScrolls() {
+            if (zoneList != null && !byId("zone-inspector").hasClass("hidden") && !byId("zone-inspector").hasClass("panel-suppressed"))
+                zoneScrollOffset = scrollOffset(zoneList);
+            // Log intent comes from scroll input; expanded geometry can clamp it temporarily.
         }
 
         private static float scrollOffset(ScrollerView list) {
             return Math.max(0, -list.viewContainer.getTaffyLayout().location().y);
+        }
+
+        private static float scrollRange(ScrollerView list) {
+            return Math.max(0, list.getContainerHeight() - list.viewPort.getContentHeight());
         }
 
         private static boolean atBottom(ScrollerView list, float offset) {
@@ -973,10 +1012,16 @@ public class LDLibDuelScreen {
             });
         }
 
-        private static void restoreScroll(ScrollerView list, float offset, boolean bottom) {
+        private void restoreScroll(ScrollerView list, float offset, boolean bottom) {
             float range = Math.max(0, list.getContainerHeight() - list.viewPort.getContentHeight());
             float normalized = range <= 0 ? 0 : bottom ? 1 : Math.min(offset, range) / range;
-            list.verticalScroller.setNormalizedValue(normalized);
+            restoringScroll = true;
+            try {
+                // Notify ScrollerView so its content moves, without overwriting stored pixel intent.
+                list.verticalScroller.setNormalizedValue(normalized);
+            } finally {
+                restoringScroll = false;
+            }
         }
 
         private static void addClassTo(UIElement element, String styleClass) {
@@ -1286,7 +1331,7 @@ public class LDLibDuelScreen {
                         imageArea.lss("background", "sprite(" + loc + ")");
                         pendingArtElement = null;
                     } else {
-                        imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+                        imageArea.lss("background", "rect(#FF19151f)");
                         pendingArtElement = imageArea;
                         pendingArtCode = code;
                     }
@@ -1297,7 +1342,7 @@ public class LDLibDuelScreen {
                 setTextElement("card-text", "");
                 setTextElement("card-atk-def-label", "");
                 if (imageArea != null)
-                    imageArea.lss("background", "sdf(#3c3c50, 3, 2)");
+                    imageArea.lss("background", "rect(#FF19151f)");
             }
         }
 
