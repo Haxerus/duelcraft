@@ -4,6 +4,8 @@
 
 The user reported no issues with editing, filtering, import/export, live dueling, lobby controls, inspector/log controls or resizing. Carry that acceptance forward. These refinements address the remaining presentation feedback; multiplayer acceptance remains pending and nonblocking.
 
+On 2026-10-18 the user tested the final updated JAR identified below, reported that everything looks good, and requested a PR into `main`. The focused manual recheck is accepted. Remaining [multiplayer and associated developer checks](../../testing/player-interaction-manual.md) remain pending and nonblocking.
+
 ## Changes
 
 - Home artwork and its fade now render across the entire window, separately from the centered 1280×720 control canvas. Aspect-preserving cropping and the missing-art fallback remain. This removes side bars in wider window proportions without moving the controls.
@@ -23,6 +25,7 @@ Final verification:
 - `refinements-square-chip-2026-10-18`: final square-corner styling at 1024×768 / GUI scale 2; `collection_active_chip` and `duelcraft_home` passed, 43/43 checks. Mouse, Enter and Space each sent one revisioned clear request, retained row selection, waited for acknowledgement, and preserved both saved rows.
 - `refinements-build-2026-10-18`: `build -PskipNative` passed; 1113 JUnit cases, 1112 passed, one existing Windows symlink-privilege skip, zero failures/errors. Each final archive records no runtime-source changes during execution. Existing native DLLs were reused.
 - Native captures opened for review: wide Home featured artwork, wide field/long-card-info, wide active-deck popup; 1280 chip rest/hover and keyboard focus; final 1024 square chip rest and keyboard focus, plus Home featured artwork. The latter confirms full-window coverage at 4:3, complementing the wide-window proof. No full unrelated UI-suite or multiplayer rerun was performed.
+- PR preparation rechecked `build -PskipNative` at `d395fea`: successful with all 15 tasks up-to-date and no runtime-source changes (`pr-build-2026-10-18`). This reused the passing test results above; it was not a fresh test execution. Fresh `origin/main` (`ef0599d`) is already an ancestor of the branch, and `git diff --check` passed.
 
 Updated candidate: `build/manual-test/duelcraft-gallery-playtest-fix-2.jar`.
 SHA-256: `FC63D04F20F836089A61162ED9818AA880A491743F3B49A153908DC04CFACEE4`.

@@ -2,6 +2,8 @@
 
 ## Scope and outcome recording
 
+The Gallery UI redesign and final updated JAR were accepted by the user on 2026-10-18; see the [artifact and verification record](../superpowers/reports/2026-10-18-gallery-home-and-active-chip.md). The UI pass referenced in the historical notes below is now complete. Remaining multiplayer and associated developer checks in this document stay pending and nonblocking for the Gallery PR; no outcome row is promoted by that approval.
+
 The user accepted the non-multiplayer M5 checklist on 2026-10-08 except lobby presentation and the rule dropdown. On 2026-10-16 they confirmed the corrected dropdown entries are readable and Escape works as expected. Keep that acceptance; do not ask them to repeat the full single-player checklist. The full lobby/UI design pass is separate. Multiplayer checks wait for friends. See [release evidence](player-interaction-release.md) for candidate identity and the historical reports.
 
 For each run, record date, operator, exact source/diff, JAR SHA256 on both clients and server, player UUIDs, effective ownership setting, companion/version, window/GUI scale, result and evidence path. Use one identified protocol-8 Windows x64 candidate on all three processes with Java 21, Minecraft 1.21.1, NeoForge 21.1.224 and LDLib2 2.2.39.a. Preserve logs/screenshots and relevant before/after inventory, collection revision, saved-list and active-selection snapshots. Use a disposable world with both players' permission to seed inventories. Preserve existing worlds and evidence.

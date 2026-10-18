@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Gallery playtest accepted; PR requested (2026-10-18)
+
+The user tested `duelcraft-gallery-playtest-fix-2.jar` and reports that everything looks good. This accepts the final Gallery presentation refinements at runtime source `d395fea`, including the sharp Active/Clear chip. They requested a PR from `codex/ui-redesign` into `main`; merging remains a separate action. The [final refinement report](../reports/2026-10-18-gallery-home-and-active-chip.md) records the accepted artifact and verification. Remaining [multiplayer and associated developer checks](../../testing/player-interaction-manual.md) stay pending and nonblocking; this approval does not mark them passed. Earlier dated checkpoints retain their historical status.
+
 ## Gallery presentation refinements (2026-10-18)
 
 The user accepted editing, filtering, import/export, live dueling, lobby controls, inspector/log controls and resizing. Follow-up refinements extend Home artwork across the full window, integrate a square-corner Active/Clear chip within the saved-deck row, and add a thin field outline while retaining the visible Minecraft backdrop. Mouse and keyboard clearing use the existing authoritative acknowledgement flow. [Verification and focused recheck](../reports/2026-10-18-gallery-home-and-active-chip.md): four affected scenarios passed 5884 checks; after the requested sharp-corner change, Home/chip passed 43 checks at 1024×768. Build passed with 1112 JUnit passes and one existing privilege skip. Updated candidate is `build/manual-test/duelcraft-gallery-playtest-fix-2.jar`. Multiplayer remains carried forward; no merge or push.
