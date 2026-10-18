@@ -1,6 +1,6 @@
 # Duelcraft Gallery design and style guide
 
-Date: 2026-10-17. **Gallery's visual direction and refined layouts are user-approved. This guide specifies the next LDLib2 proof; its new measurements and component details still need that proof and review.** No production UI migration accompanies this document.
+Date: 2026-10-17. **The user approved the corrected native Gallery proofs through `63168de` and authorized production migration.** The [migration plan](../plans/2026-10-17-gallery-production-migration.md) and [verification report](../reports/2026-10-17-gallery-production-migration.md) own current implementation status. Historical proof notes below retain their original evidence and limitations.
 
 ## Authority and scope
 
