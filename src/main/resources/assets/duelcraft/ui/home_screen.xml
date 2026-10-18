@@ -1,38 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ldlib2-ui>
     <stylesheet location="ldlib2:lss/gdp.lss" />
+    <stylesheet location="duelcraft:lss/gallery.lss" />
     <style>
         #home-root { width: 1280; height: 720; }
-        #home-canvas { width: 100%; height: 100%; justify-content: center; padding-left: 48; background: rect(#FF18171E); }
+        #home-canvas { width: 100%; height: 100%; }
         #home-art { position: absolute; left: 0; top: 0; width: 1280; height: 720; }
-        #home-panel { width: 480; padding-all: 22; gap-all: 16; background: built-in(ui-gdp:BORDER_THICK_RT1); }
-        label, text { font-size: 16; text-color: #FFFFFF; text-shadow: true; }
+        #home-panel { position: absolute; left: 76; top: 80; width: 460; gap-all: 12; }
         .row { flex-direction: row; gap-all: 12; align-items: center; }
         .grow { flex: 1; min-width: 0; }
         .wrap { width: 100%; text-wrap: wrap; adaptive-height: true; }
-        button { height: 40; flex-shrink: 0; background: built-in(ui-gdp:RECT); }
-        .keyboard-focus { background: rect(#FF665378); }
-        .keyboard-focus text { text-color: #FFF0B8; }
-        #home-title { font-size: 24; }
+        #home-utilities { position: absolute; right: 32; top: 32; }
+        #home-title { font-size: 48; height: 56; margin-bottom: 24; }
         #home-help { width: 40; } #home-close { width: 80; }
-        #home-deck-box { padding-all: 18; gap-all: 10; background: rect(#FF1B1923); }
+        #home-deck-box { gap-all: 6; margin-bottom: 20; }
         #home-active-deck { font-size: 20; }
         #home-collection, #home-duels { height: 54; width: 100%; }
-        #home-invitation { width: 140; }
-        #management-help { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC08070C); z-index: 90; }
-        #help-panel { width: 480; padding-all: 22; gap-all: 18; background: built-in(ui-gdp:BORDER_THICK_RT1); }
+        #home-duels text { text-color: #211c2a; }
+        #home-invitation { width: 168; }
+        #management-help { position: absolute; left: 0; top: 0; width: 100%; height: 100%; align-items: center; justify-content: center; background: rect(#CC19151f); z-index: 90; }
+        #help-panel { width: 560; padding-all: 24; gap-all: 16; background: rect(#FF34273e, 0, 1.25, #FF8c7495); }
+        .keyboard-focus { base-background: rect(#FF211c2a, 0, 2, #FFefd18e); }
+        .keyboard-focus text { text-color: #efd18e; }
     </style>
-    <root id="home-root"><element id="home-canvas">
+    <root id="home-root" class="gallery-management"><element id="home-canvas">
         <element id="home-art" />
+        <element id="home-utilities" class="row"><button class="gallery-action" id="home-help" text="?" /><button class="gallery-action" id="home-close" text="Close" /></element>
         <element id="home-panel">
-            <element class="row"><label id="home-title" class="grow">Duelcraft</label><button id="home-help" text="?" /><button id="home-close" text="Close" /></element>
-            <element id="home-deck-box"><label>Your active deck</label><text id="home-active-deck" class="wrap" /></element>
-            <button id="home-retry" text="Retry" />
-            <button id="home-duels" text="Duel" />
-            <button id="home-collection" text="Collection &amp; Decks" />
-            <element id="home-invitation-row" class="row"><text id="home-invitation-text" class="grow wrap" /><button id="home-invitation" text="View invitation" /></element>
-            <button id="home-resume" text="Resume draft" />
+            <label id="home-title">Duelcraft</label>
+            <element id="home-deck-box"><label class="gallery-meta">Active deck</label><text id="home-active-deck" class="wrap" /></element>
+            <button class="gallery-action" id="home-retry" text="Retry" />
+            <button class="gallery-action gallery-primary" id="home-duels" text="Duel" />
+            <button class="gallery-action" id="home-collection" text="Collection &amp; Decks" />
+            <element id="home-invitation-row" class="row"><text id="home-invitation-text" class="grow wrap" /><button class="gallery-action" id="home-invitation" text="View invitation" /></element>
+            <button class="gallery-action" id="home-resume" text="Resume draft" />
         </element>
-        <element id="management-help"><element id="help-panel"><label>Duelcraft help</label><text class="wrap">Open your collection to build or select a deck. Choose Duel to invite another player. J opens Home; change it in Minecraft Controls.</text><button id="help-close" text="Close" /></element></element>
+        <element id="management-help"><element id="help-panel"><label class="gallery-title">Duelcraft help</label><text class="wrap">Open your collection to build or select a deck. Choose Duel to invite another player. J opens Home; change it in Minecraft Controls.</text><button class="gallery-action" id="help-close" text="Close" /></element></element>
     </element></root>
 </ldlib2-ui>

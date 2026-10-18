@@ -7,7 +7,6 @@ import com.haxerus.duelcraft.core.DuelRule;
 import com.haxerus.duelcraft.duel.*;
 import com.haxerus.duelcraft.server.PreparationStatePayload;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.*;
-import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.lowdragmc.lowdraglib2.uitest.*;
@@ -22,9 +21,6 @@ public final class LobbyGalleryScenario implements UIScenario {
     private static final UUID OTHER = UUID.fromString("00000000-0000-0000-0000-000000000005");
     @Override public void configure(ScenarioOptions options) { options.requiresWorld(false); }
     @Override public void define(ScenarioBuilder s) {
-        var backdrop = new com.haxerus.duelcraft.client.uitest.GalleryBackdrop();
-        s.step("install Gallery backdrop", ctx -> backdrop.install());
-        s.teardown("remove Gallery backdrop", ctx -> backdrop.close());
         s.step("restore iconified fixture window", ctx -> {
             var window = ctx.mc().getWindow();
             int iconified = GLFW.glfwGetWindowAttrib(window.getWindow(), GLFW.GLFW_ICONIFIED);
@@ -36,14 +32,14 @@ public final class LobbyGalleryScenario implements UIScenario {
                 GLFW.glfwPollEvents();
             }
         }).waitUntil("native framebuffer restored", ctx -> ctx.mc().getWindow().getWidth() > 100 && ctx.mc().getWindow().getHeight() > 100)
-         .openScreen("baseline focus observation", ctx -> fixture(ctx, false)).awaitModularUI().ticks(3);
+         .openScreen("baseline focus observation", ctx -> fixture(ctx)).awaitModularUI().ticks(3);
         focusObservation(s, "baseline");
         s.step("Gallery preflight", ctx -> {
             var original = XmlUtils.loadXml(resource("duel_lobby"));
-            var result = GalleryPreflight.check(resource("uitest/gallery_lobby"), GalleryPreflight.ids(original));
+            var result = GalleryPreflight.check(resource("duel_lobby"), GalleryPreflight.ids(original));
             ctx.attach("preflight", result.toString());
             ctx.require("all production IDs and supported Gallery styles", result.errors().isEmpty());
-        }).openScreen("Gallery real lobby", ctx -> backdrop.include(fixture(ctx, true))).awaitModularUI().ticks(3)
+        }).openScreen("Gallery real lobby", ctx -> fixture(ctx)).awaitModularUI().ticks(3)
          .step("viewport and visible text", LobbyGalleryScenario::audit)
          .step("approved lobby composition", LobbyGalleryScenario::composition)
          .screenshot("gallery-lobby-normal")
@@ -126,18 +122,19 @@ public final class LobbyGalleryScenario implements UIScenario {
          .step("send local invite", ctx -> ManagementTestInput.click(ctx, "#lobby-invite")).ticks(2)
          .check("real invite uses selected target and rule", ctx -> ctx.get("command") instanceof PreparationCommand.Invite invite
                  && invite.target().equals(OTHER) && invite.rule() == DuelRule.RUSH)
+         .check("pending invite identifies acknowledgement wait", ctx -> ctx.el("#lobby-invite").as(Button.class).text.getText().getString().equals("Inviting\u2026"))
          .check("pending invite disables action", ctx -> !ctx.el("#lobby-invite").isActive())
          .step("native pending presentation", ctx -> GalleryVisualAssertions.disabled(ctx, "#lobby-invite"))
          .screenshot("gallery-lobby-pending")
-         .openScreen("zero-player lobby", ctx -> backdrop.include(fixture(ctx, true, 0))).awaitModularUI().ticks(3)
+         .openScreen("zero-player lobby", ctx -> fixture(ctx, 0)).awaitModularUI().ticks(3)
          .checkHidden("#gallery-roster-slot").checkCount(".player-row", 0).checkTextContains("#lobby-prompt", "No other players")
          .check("zero roster cannot invite", ctx -> !ctx.el("#lobby-invite").isActive())
          .screenshot("gallery-lobby-empty")
-         .openScreen("one-player lobby", ctx -> backdrop.include(fixture(ctx, true, 1))).awaitModularUI().ticks(3)
+         .openScreen("one-player lobby", ctx -> fixture(ctx, 1)).awaitModularUI().ticks(3)
          .checkCount(".player-avatar", 1)
          .step("one card stays centered", ctx -> ctx.check("one card centered", Math.abs(ctx.all(".player-row").getFirst().bounds().centerX() - ctx.el("#lobby-players").bounds().centerX()) < 8))
          .screenshot("gallery-lobby-one")
-         .openScreen("long-roster lobby", ctx -> backdrop.include(fixture(ctx, true, 18))).awaitModularUI().ticks(3)
+         .openScreen("long-roster lobby", ctx -> fixture(ctx, 18)).awaitModularUI().ticks(3)
          .checkCount(".player-avatar", 18).checkCount(".player-name", 18).checkCount(".player-availability", 18)
          .step("long roster retains card structure", ctx -> {
              GalleryVisualAssertions.scroller(ctx, "#lobby-players");
@@ -155,6 +152,16 @@ public final class LobbyGalleryScenario implements UIScenario {
          .checkCount(".player-avatar", 18)
          .check("last selected identity survives controller update", ctx -> ctx.el("#lobby-player-" + targetId(17)).element().getClasses().contains("gallery-selected"))
          .step("show selected last card", ctx -> ctx.el("#lobby-players").as(ScrollerView.class).scrollToChild(ctx.el("#lobby-player-" + targetId(17)).element())).ticks(3)
+         .step("maximum real names remain readable", ctx -> {
+             for (var ref : ctx.all(".player-name")) DuelUiAssertions.textFits(ctx, ref.as(TextElement.class));
+             DuelUiAssertions.textFits(ctx, ctx.el("#lobby-deck").as(TextElement.class));
+             var card = ctx.el("#lobby-player-" + targetId(17)).bounds();
+             for (var child : ctx.el("#lobby-player-" + targetId(17)).element().getChildren()) if (child.isDisplayed())
+                 DuelUiAssertions.contains(ctx, card, ElementBounds.of(child), "maximum-name card owns its content");
+             DuelUiAssertions.contains(ctx, ctx.el("#lobby-footer").bounds(), ctx.el("#lobby-deck-scroll").bounds(), "footer owns reading viewport");
+             var scroll = ctx.el("#lobby-deck-scroll").as(ScrollerView.class);
+             scroll.scrollToChild(ctx.el("#lobby-deck").element());
+         }).ticks(2)
          .screenshot("gallery-lobby-long-roster")
          .teardown("close fixture", ctx -> { ctx.mc().setScreen(null); DuelLobbyScreen.clearForm(); });
     }
@@ -193,61 +200,23 @@ public final class LobbyGalleryScenario implements UIScenario {
             GalleryVisualAssertions.control(ctx, "#" + id);
     }
     private static ResourceLocation resource(String name) { return ResourceLocation.fromNamespaceAndPath("duelcraft", "ui/" + name + ".xml"); }
-    private static DuelLobbyScreen fixture(TestContext ctx, boolean gallery) { return fixture(ctx, gallery, 3); }
-    private static DuelLobbyScreen fixture(TestContext ctx, boolean gallery, int count) {
+    private static DuelLobbyScreen fixture(TestContext ctx) { return fixture(ctx, 3); }
+    private static DuelLobbyScreen fixture(TestContext ctx, int count) {
         DuelLobbyScreen.clearForm();
         var state = new ClientPreparationState(request -> {}); state.connect();
         state.receive(new PreparationStatePayload(null, PreparationResult.OK,
                 new PreparationView(0, PreparationView.Mode.IDLE, null, null, null, "", false, false, false, 0, null)));
         var id = UUID.randomUUID();
-        var collection = new ClientCollectionState.View(0, Map.of(), List.of(new CollectionReply.Summary(id, "Dragon study", 40, 0, 2)), id);
+        var collection = new ClientCollectionState.View(0, Map.of(), List.of(new CollectionReply.Summary(id, count == 18 ? "W".repeat(128) : "Dragon study", 40, 0, 2)), id);
         var targets = new ArrayList<DuelLobbyScreen.Target>();
         String[] names = {"Alex", "Rowan", "Mira"};
-        for (int i = 0; i < count; i++) targets.add(new DuelLobbyScreen.Target(targetId(i), i < 3 ? names[i] : "Player " + (i + 1)));
+        for (int i = 0; i < count; i++) targets.add(new DuelLobbyScreen.Target(targetId(i), i < 3 ? names[i] : i == 17 ? "W".repeat(16) : "Player " + (i + 1)));
         java.util.function.Function<PreparationCommand, java.util.concurrent.CompletionStage<PreparationStatePayload>> send = command -> {
             ctx.put("command", command); return new CompletableFuture<>();
         };
-        if (!gallery) return DuelLobbyScreen.create(state, collection, targets, send, route -> ctx.put("route", route));
-        var screen = DuelLobbyScreen.createFixture("uitest/gallery_lobby", state, collection, targets, send, route -> ctx.put("route", route), LobbyGalleryScenario::playerCard);
-        ((ScrollerView) screen.element("lobby-right")).viewContainer.addClass("gallery-stage");
-        ((ScrollerView) screen.element("lobby-players")).viewContainer.addClass("gallery-roster");
-        ((ScrollerView) screen.element("lobby-right")).viewPort.addClass("gallery-stage-viewport");
-        ((ScrollerView) screen.element("lobby-players")).viewPort.addClass("gallery-roster-viewport");
-        alignRulePopup(screen);
-        screen.text("gallery-roster-count", count + (count == 1 ? " player available" : " players available"));
-        if (count == 0) screen.element("lobby-root").addClass("empty-roster");
-        return screen;
-    }
-    private static void alignRulePopup(DuelLobbyScreen screen) {
-        var selector = (Selector<?>) screen.element("settings-rule");
-        selector.scrollerView.setId("gallery-rule-scroller");
-        // Pinned LDLib's root-hosted popup clamp uses unscaled screen coordinates.
-        selector.dialog.getBubbleListeners(UIEvents.LAYOUT_CHANGED).forEach(listener ->
-                selector.dialog.removeEventListener(UIEvents.LAYOUT_CHANGED, listener));
-        selector.dialog.addEventListener(UIEvents.LAYOUT_CHANGED, event -> {
-            var dialog = selector.dialog;
-            var root = screen.element("lobby-root");
-            float width = Math.max(selector.getSizeWidth(), 50);
-            float left = Math.clamp(selector.getPositionX() - root.getPositionX(), 0, Math.max(0, root.getSizeWidth() - width));
-            float top = Math.clamp(selector.getPositionY() + selector.getSizeHeight() - root.getPositionY(), 0,
-                    Math.max(0, root.getSizeHeight() - dialog.getSizeHeight()));
-            if (Math.abs(dialog.getPositionX() - root.getPositionX() - left) > .1f
-                    || Math.abs(dialog.getPositionY() - root.getPositionY() - top) > .1f
-                    || Math.abs(dialog.getSizeWidth() - width) > .1f)
-                dialog.layout(layout -> layout.left(left).top(top).width(width));
-        });
+        return DuelLobbyScreen.create(state, collection, targets, send, route -> ctx.put("route", route));
     }
     private static UUID targetId(int index) { return index == 0 ? OTHER : new UUID(0, 100 + index); }
-    private static Button playerCard(DuelLobbyScreen.Target target, boolean selected) {
-        var card = new Button();
-        card.setText(target.name() + (selected ? "  ✓" : ""));
-        if (selected) card.addClass("gallery-selected");
-        var avatar = new Label(); avatar.setText(target.name().substring(0, 1)); avatar.addClass("player-avatar");
-        var name = new Label(); name.setText(target.name()); name.addClass("player-name");
-        var availability = new Label(); availability.setText(selected ? "✓ Available" : "Available"); availability.addClass("player-availability");
-        card.addChildren(avatar, name, availability);
-        return card;
-    }
     private static void focusObservation(ScenarioBuilder s, String label) {
         s.key(GLFW.GLFW_KEY_TAB).ticks(2)
          .step(label + " focus Settings by routed Tab", ctx -> {
@@ -259,7 +228,7 @@ public final class LobbyGalleryScenario implements UIScenario {
          .typeInto("#settings-lp", "8000").ticks(2).key(GLFW.GLFW_KEY_ESCAPE).ticks(2)
          .step(label + " observe restoration", ctx -> {
              ctx.attach(label + " after dismissal", focused(ctx));
-             ctx.attach("restoration requirement", ctx.el("#lobby-settings").element().isFocused() ? "RESTORED" : "UNMET: initiating Settings control not restored; observation only, no production fix");
+             ctx.check("Settings restores initiating control", ctx.el("#lobby-settings").element().isFocused());
              ctx.check("hidden field loses focus", !ctx.el("#settings-lp").element().isFocused());
          });
     }

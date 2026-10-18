@@ -6,6 +6,7 @@ import com.haxerus.duelcraft.duel.PreparationView;
 import com.haxerus.duelcraft.interaction.ScreenRoute;
 import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
 import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
@@ -13,7 +14,7 @@ public final class HomeScreen extends ManagementScreen {
     private final boolean connected;
     private PreparationView preparation;
     private final int featuredCode = new int[]{89631139, 46986414, 44508094}[ThreadLocalRandom.current().nextInt(3)];
-    private HomeScreen(ClientCollectionState.View view, PreparationView preparation, Consumer<ScreenRoute> navigate, boolean connected) {
+    private HomeScreen(ClientCollectionState.View view, PreparationView preparation, Consumer<ScreenRoute> navigate, boolean connected, ResourceLocation artwork) {
         super("home_screen", "Duelcraft");
         this.connected = connected;
         this.preparation = preparation;
@@ -22,7 +23,7 @@ public final class HomeScreen extends ManagementScreen {
         button("home-invitation", () -> navigate.accept(ScreenRoute.LOBBY));
         button("home-resume", () -> navigate.accept(ScreenRoute.COLLECTION));
         button("home-close", this::onClose);
-        button("home-help", () -> element("management-help").setDisplay(true));
+        button("home-help", () -> show("management-help", "home-help"));
         button("help-close", () -> hide("management-help"));
         button("home-retry", this::refresh);
         element("management-help").setDisplay(false);
@@ -31,25 +32,36 @@ public final class HomeScreen extends ManagementScreen {
         invitation();
         element("home-art").style(style -> style.background((graphics, mx, my, x, y, w, h, tick) -> {
             var images = DuelcraftClient.getCardImageManager();
-            var art = connected && images != null ? images.getCardArt(featuredCode) : null;
-            graphics.fill((int)x, (int)y, (int)(x+w), (int)(y+h), 0xff18171e);
+            var art = connected && images != null ? images.getCardArt(featuredCode) : artwork;
+            graphics.fill((int)x, (int)y, (int)(x+w), (int)(y+h), 0xff211c2a);
             if (art == null) return;
-            SpriteTexture.of(art).draw(graphics, mx, my, x + w * .40625f, y, w * .59375f, h, tick);
-            // Opaque left edge blends into transparent artwork without tinting menu text.
-            for (int offset = 0; offset < 400; offset += 4) {
-                int alpha = Math.max(0, 255 - offset * 255 / 400);
-                int left = (int)(x + w * .40625f + offset * w / 1280f);
-                int right = (int)(x + w * .40625f + (offset + 4) * w / 1280f);
-                graphics.fill(left, (int)y, right, (int)(y+h), alpha << 24 | 0x18171e);
+            var texture = SpriteTexture.of(art);
+            var size = texture.getImageSize();
+            float artWidth = w * .6875f;
+            float scale = Math.max(artWidth / size.width, h / size.height);
+            int cropWidth = Math.min(size.width, Math.round(artWidth / scale));
+            int cropHeight = Math.min(size.height, Math.round(h / scale));
+            texture.setSprite((size.width - cropWidth) / 2, (size.height - cropHeight) / 2, cropWidth, cropHeight)
+                    .draw(graphics, mx, my, x + w - artWidth, y, artWidth, h, tick);
+            // Fade artwork into the Gallery canvas behind the left menu.
+            for (int offset = 0; offset < 640; offset += 4) {
+                int alpha = Math.max(0, 255 - offset * 255 / 640);
+                int left = (int)(x + (400 + offset) * w / 1280f);
+                int right = (int)(x + (404 + offset) * w / 1280f);
+                graphics.fill(left, (int)y, right, (int)(y+h), alpha << 24 | 0x211c2a);
             }
         }));
     }
     public static HomeScreen create() {
-        var screen = new HomeScreen(null, DuelcraftClient.preparation().view(), DuelcraftScreens::request, true);
+        var screen = new HomeScreen(null, DuelcraftClient.preparation().view(), DuelcraftScreens::request, true, null);
         screen.refresh(); return screen;
     }
     public static HomeScreen create(ClientCollectionState.View view, PreparationView preparation, Consumer<ScreenRoute> navigate) {
-        return new HomeScreen(view, preparation, navigate, false);
+        return new HomeScreen(view, preparation, navigate, false, null);
+    }
+    public static HomeScreen create(ClientCollectionState.View view, PreparationView preparation, Consumer<ScreenRoute> navigate,
+                                    ResourceLocation artwork) {
+        return new HomeScreen(view, preparation, navigate, false, artwork);
     }
     private void refresh() {
         text("home-active-deck", "Loading…");
