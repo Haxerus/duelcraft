@@ -64,6 +64,7 @@ public final class LobbyGalleryScenario implements UIScenario {
              ctx.check("popup layout stable", !ctx.requireUI().getStyleEngine().requireCalculate());
              GalleryVisualAssertions.control(ctx, "#settings-close");
              GalleryVisualAssertions.field(ctx, "#settings-lp");
+             GalleryVisualAssertions.selector(ctx, "#settings-rule");
              GalleryVisualAssertions.field(ctx, "#settings-seed");
              var nativeScroll = selector(ctx).scrollerView.verticalScroller;
              // Selector's constructor deliberately hides popup arrows; retain its native component identity.

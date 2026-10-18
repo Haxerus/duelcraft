@@ -1,5 +1,9 @@
 # Collection and deck editor implementation handoff
 
+## Current Gallery shared-inset correction (2026-10-17)
+
+Fields, selected dropdown values and both short/scrolled popup layouts now share one Gallery inset declaration per design canvas. The Selector's explicit left edge falls back to that rule, and the collection's Gallery class lives on the actual UI root so detached popups inherit it. Production UI remains unchanged. [Evidence](../reports/2026-10-17-gallery-shared-control-inset.md): two final native runs passed 6/6 scenario executions and 8722/8722 checks, with independent screenshot review finding no issues. Human review and production migration remain separate. Earlier checkpoints retain their historical results.
+
 ## Current Gallery field and scrollbar correction (2026-10-17)
 
 User review exposed two incorrectly specified component defaults: two-unit editable padding and stock shaded scrollbar textures with tracks one-third of arrow width. Gallery fields now have explicit 10/7.5-unit horizontal insets; scrollbars use matching 12/9-unit widths, flat Gallery colors and authored unshaded arrow silhouettes. Production UI remains unchanged. [Correction evidence](../reports/2026-10-17-gallery-field-scrollbar-correction.md) records red checks, a visually rejected intermediate stock mask, final native runs at 1280×720 and 1024×768 (6/6 scenario executions, 8570/8570 checks), and independent visual approval. Human aesthetic review and production migration remain separate checkpoints.

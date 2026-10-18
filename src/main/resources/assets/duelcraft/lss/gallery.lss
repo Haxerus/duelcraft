@@ -61,8 +61,18 @@
 .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_head_button__, .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_tail_button__ { width: 9; height: 9; }
 .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_scroll_container__ { width: 9; }
 
-.gallery-management text-field { padding-horizontal: 10; }
-.gallery-duel text-field { padding-horizontal: 7.5; }
+/* Selector sets an explicit left edge; release it to the shared horizontal inset. */
+.gallery-management selector > element, .gallery-duel selector > element { padding-left: auto; }
+/* Shared field-like content inset: editable text, selected values, and both popup layouts.
+   Selector's direct element child is its display; inset it once, not its nested preview. */
+.gallery-management text-field,
+.gallery-management selector > element,
+.gallery-management .__selector_list-view__,
+.gallery-management .__selector_scroller-view__ .__scroller_view_view-port__ { padding-horizontal: 10; }
+.gallery-duel text-field,
+.gallery-duel selector > element,
+.gallery-duel .__selector_list-view__,
+.gallery-duel .__selector_scroller-view__ .__scroller_view_view-port__ { padding-horizontal: 7.5; }
 .gallery-management .__scroller_scroll_bar__, .gallery-duel .__scroller_scroll_bar__ { base-background: rect(#FF8c7495); hover-background: rect(#FFb8afbe); pressed-background: rect(#FFefd18e); }
 /* Flat Gallery arrow silhouettes; no GDP outline or shadow. */
 .gallery-management .__scroller_view_vertical-scroller__ .__scroller_head_button__, .gallery-duel .__scroller_view_vertical-scroller__ .__scroller_head_button__ { base-background: sprite(duelcraft:textures/uitest/gallery/scroll-up.png) color(#FFb8afbe); hover-background: sprite(duelcraft:textures/uitest/gallery/scroll-up.png) color(#FFeee5d4); pressed-background: sprite(duelcraft:textures/uitest/gallery/scroll-up.png) color(#FFefd18e); }

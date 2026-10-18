@@ -86,6 +86,8 @@ public final class CollectionGalleryScenario implements UIScenario {
              GalleryVisualAssertions.scroller(ctx, "#main-grid");
              GalleryVisualAssertions.field(ctx, "#list-name");
              GalleryVisualAssertions.field(ctx, "#collection-search");
+             GalleryVisualAssertions.selector(ctx, "#collection-ownership");
+             GalleryVisualAssertions.selector(ctx, "#card-sort");
              GalleryVisualAssertions.field(ctx, "#transfer-amount");
              GalleryVisualAssertions.scroller(ctx, "#card-details-scroll");
              GalleryVisualAssertions.scroller(ctx, "#collection-results");
@@ -387,6 +389,7 @@ public final class CollectionGalleryScenario implements UIScenario {
         Map<T, Button> candidates = ctx.getField(selector, "candidateButtons");
         var button = candidates.get(value);
         ctx.require("real popup contains requested row", selector.isOpen() && button != null);
+        GalleryVisualAssertions.selector(ctx, "#" + id);
         var anchor = ctx.el("#" + id).bounds(); var dialog = ElementBounds.of(selector.dialog); var hit = ElementBounds.of(button);
         float x = Math.clamp(anchor.x(), 0, Math.max(0, ctx.mc().getWindow().getGuiScaledWidth() - dialog.width()));
         float y = Math.clamp(anchor.bottom(), 0, Math.max(0, ctx.mc().getWindow().getGuiScaledHeight() - dialog.height()));

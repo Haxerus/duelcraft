@@ -234,8 +234,8 @@
         #lists-panel #list-clear-active { width: 140; height: 32; }
         #lists-panel #list-clear-active text { font-size: 16; height: 24; }
     </style>
-    <root id="collection-root">
-        <element id="collection-canvas" class="gallery-management">
+    <root id="collection-root" class="gallery-management">
+        <element id="collection-canvas">
             <element id="editor-header">
                 <element id="header-title">
                     <label id="editor-title" style="display: none;">My Collection</label>

@@ -39,6 +39,7 @@ public final class GallerySpecimenScenario implements UIScenario {
                  GalleryVisualAssertions.control(ctx, "#gallery-confirm");
                  GalleryVisualAssertions.scroller(ctx, "#gallery-rows");
                  GalleryVisualAssertions.field(ctx, "#gallery-name");
+                 GalleryVisualAssertions.selector(ctx, "#gallery-selector");
              })
              .step("default component crops", ctx -> captureControls(ctx, canvas + "-default"))
              .step("scroller hover capture", ctx -> {
@@ -130,6 +131,7 @@ public final class GallerySpecimenScenario implements UIScenario {
              .step("open six preset choices", ctx -> ManagementTestInput.click(ctx, "#gallery-selector")).ticks(3)
              .step("selector row metrics", ctx -> {
                  var selector = ctx.el("#gallery-selector").as(Selector.class);
+                 GalleryVisualAssertions.selector(ctx, "#gallery-selector");
                  int index = 0;
                  for (var label : selector.scrollerView.viewContainer.select("label", Label.class).toList()) {
                      label.setId("gallery-option-" + index++);

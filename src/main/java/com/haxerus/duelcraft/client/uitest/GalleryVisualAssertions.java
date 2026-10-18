@@ -10,6 +10,8 @@ import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.RectTexture;
 import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Selector;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.uitest.ElementBounds;
 import com.lowdragmc.lowdraglib2.uitest.TestContext;
 
@@ -81,6 +83,23 @@ public final class GalleryVisualAssertions {
         ctx.attach(selector + " editable inset", bounds(field));
         ctx.check(selector + " horizontal text inset", Math.abs(field.getContentX() - field.getPositionX() - inset) < .1f
                 && Math.abs(field.getPositionX() + field.getSizeWidth() - field.getContentX() - field.getContentWidth() - inset) < .1f);
+    }
+
+    public static void selector(TestContext ctx, String id) {
+        var selector = ctx.el(id).as(Selector.class);
+        float inset = ctx.all(".gallery-duel").isEmpty() ? 10 : 7.5f;
+        var preview = selector.preview.select("label", Label.class).findFirst().orElseThrow();
+        ctx.attach(id + " selector inset", "display=" + bounds(selector.display) + " preview=" + bounds(preview));
+        ctx.check(id + " selected text shares field inset", Math.abs(preview.getContentX() - selector.getPositionX() - inset) < .1f);
+        if (!selector.isOpen()) return;
+        var container = selector.scrollerView.isDisplayed() ? selector.scrollerView.viewPort : selector.listView;
+        ctx.attach(id + " popup inset", "container=" + bounds(container));
+        var rows = container.select("label", Label.class).toList();
+        ctx.check(id + " popup has text rows", !rows.isEmpty());
+        for (var row : rows) {
+            ctx.check(id + " popup text shares field inset", Math.abs(row.getContentX() - container.getPositionX() - inset) < .1f);
+            DuelUiAssertions.textFits(ctx, row);
+        }
     }
 
     public static void thumb(TestContext ctx, Button thumb) {
